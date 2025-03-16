@@ -1,15 +1,14 @@
-{ config, pkgs, ... }: {
-
- #############################
- # Auto update
- #############################
+{ config, pkgs, lib, ... }:
+let
+  hostname = builtins.readFile "/etc/hostname";  # Read the hostname dynamically
+in {
+  #############################
+  # Auto update with dynamic hostname
+  #############################
   system.autoUpgrade = {
     enable = true;
-    flake = "github:esp0xdeadbeef/nixos#l-werk"; # Explicitly set the flake path
-    flags = [
-      "--impure"
-      #"--flake" # "/etc/nixos#nixos"
-    ];
+    flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;  # Use the hostname
+    flags = [ "--impure" ];
     dates = "02:00";
     randomizedDelaySec = "45min";
   };
