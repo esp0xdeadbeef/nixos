@@ -327,14 +327,24 @@ exec --no-startup-id parcellite
 exec_always --no-startup-id autotiling
 #exec --no-startup-id discord
 
+#for_window [class="burp-StartBurp" title="Burp Suite Professional"] move window to workspace 8
+#for_window [class="burp-StartBurp" title="Burp Suite Professional"] move container to workspace 10
+for_window [class="burp-StartBurp" title="^Burp Suite Professional$"] move container to workspace 10
+for_window [class="burp-StartBurp" title="licensed to REDACTED"] move container to workspace 8
+for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
+
+for_window [class="google-chrome" class="Google-chrome"] move window to workspace 2
+
+#for_window [class="Firefox"] move window to workspace 8
+#for_window [class="firefox"] move window to workspace 8
+for_window [class="Navigator" class="firefox"] move window to workspace 8
 for_window [class="discord"] move to workspace "5"
 for_window [class="Spotify"] move to workspace 4
 for_window [class="Slack"] move window to workspace 5
 for_window [class="teams-for-linux"] move window to workspace 5
-for_window [class="*Microsoft Teams classic"] move window to workspace 5
-for_window [class="microsoft teams - preview"] move window to workspace 5
-for_window [class="Microsoft Teams - Preview"] move window to workspace 5
-for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
+#for_window [class="*Microsoft Teams classic"] move window to workspace 5
+#for_window [class="microsoft teams - preview"] move window to workspace 5
+#for_window [class="Microsoft Teams - Preview"] move window to workspace 5
 for_window [class="Office 365 on Electron" title="Planning.xlsm"] move container to workspace 5
 #for_window [class="Chromium" title=".*"] move container to workspace 10
 
