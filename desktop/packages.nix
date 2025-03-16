@@ -12,7 +12,7 @@
 services.locate = {
              enable = true;
     package = pkgs.plocate;
-    localuser = null;
+    #localuser = null;
     # prunePaths = options.services.locate.prunePaths.default ++ [ "/mnt/pool" ];
   };
 

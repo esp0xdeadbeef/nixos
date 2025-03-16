@@ -2,7 +2,8 @@
   description = "A SecureBoot-enabled NixOS configurations";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    #nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     lanzaboote = {
@@ -39,6 +40,7 @@
           ./system/locale.nix
           ./network/basic.nix
           ./desktop/packages.nix
+          ./desktop/darkmode.nix
           ./desktop/shell-env.nix
           ./desktop/users-and-groups.nix
           ./virtualization/general.nix

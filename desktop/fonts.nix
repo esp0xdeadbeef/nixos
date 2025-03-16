@@ -7,7 +7,7 @@
       font-awesome
       font-awesome_6
       powerline-fonts
-      nerdfonts
+      #nerdfonts
       terminus_font
       noto-fonts
       noto-fonts-emoji
