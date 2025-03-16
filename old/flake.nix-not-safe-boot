@@ -1,0 +1,100 @@
+{
+  description = "A SecureBoot-enabled NixOS configuration";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote/v0.4.2";
+
+      # Optional but recommended to limit the size of your system closure.
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { self, nixpkgs, lanzaboote, ... }: {
+    nixosConfigurations = {
+      nixos = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+
+        modules = [
+          ./audio-and-bluetooth.nix
+          ./autologin.nix
+          ./autoupdate.nix
+          ./bootloader.nix
+          ./desktop-environment.nix
+          ./nvidia.nix
+          ./gc.nix
+          ./hardware-configuration.nix
+          ./locale-settings.nix
+          ./network-basics.nix
+          ./packages-and-applications.nix
+          ./shell-env.nix
+          ./users-and-groups.nix
+          ./virtualization-general.nix
+          ./virtualization-lxc.nix
+          #./tpm-config.nix
+
+          # Base configuration (e.g., state version)
+          ({ config, pkgs, ... }: {
+            system.stateVersion = "24.11";
+          })
+
+          # --------------------------------------------------------------------------------
+          # To DISABLE lanzaboote (build config normally without it), comment out the block
+          # below. This configuration does not include lanzaboote.
+          # --------------------------------------------------------------------------------
+          # ( { pkgs, lib, ... }: {
+          #   # If you need these packages for debugging Secure Boot,
+          #   # you can still include them in your environment.systemPackages.
+          #   environment.systemPackages = [
+          #     pkgs.sbctl
+          #     pkgs.tpm2-tss
+          #   ];
+          #
+          #   # Ensure systemd-boot is enabled.
+          #   boot.loader.systemd-boot.enable = lib.mkForce true;
+          #   boot.loader.efi.canTouchEfiVariables = true;
+          #
+          #   # Disable lanzaboote by setting its enable flag to false.
+          #   boot.lanzaboote = {
+          #     enable = false;
+          #     # pkiBundle can remain defined or be removed.
+          #     pkiBundle = "/etc/secureboot";
+          #   };
+          # })
+
+          # --------------------------------------------------------------------------------
+          # To ENABLE lanzaboote, uncomment the block below and comment out the DISABLE block above.
+          # --------------------------------------------------------------------------------
+          # lanzaboote.nixosModules.lanzaboote
+          #
+          # ({ pkgs, lib, ... }: {
+          #   environment.systemPackages = [
+          #     pkgs.sbctl
+          #     pkgs.tpm2-tss
+          #   ];
+          #
+          #   # Prevent systemd-boot from being installed since lanzaboote replaces it.
+          #   boot.loader.systemd-boot.enable = lib.mkForce false;
+          #
+          #   boot.lanzaboote = {
+          #     enable = true;
+          #     pkiBundle = "/etc/secureboot";
+          #   };
+          # })
+
+({ config, pkgs, ... }: {
+  # Disable GRUB entirely.
+  boot.loader.grub.enable = false;
+
+  # Enable systemd-boot in UEFI mode.
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+})
+        ];
+      };
+    };
+  };
+}
+
