@@ -4,101 +4,89 @@ icons_format = "{icon}"
 
 [theme]
 theme = "solarized-dark"
+
 [theme.overrides]
 #idle_bg = "#123456"
 idle_bg = "#000000"
 idle_fg = "#dddddd"
 
 [icons]
-icons = "awesome4"
-#[icons.overrides]
-##bat = ["|E|", "|_|", "|=|", "|F|"]
-#bat = ["|E|", "? UNK", "🪫 BAT", "🔋 FULL"]
-#bat_charging = "🔌 CHR "
+icons = "awesome6"
 [icons.overrides]
 bat_charging = "\uf1e6 CHR" # fa-plug
 bat = [
-    "\uf244: empty", # fa-battery-empty
-    "\uf243: quarter", # fa-battery-quarter
-    "\uf242: half", # fa-battery-half
-    "\uf241: ", # fa-battery-three-quarters
-    "\uf240: FULL", # fa-battery-full
+    "\uf244", # fa-battery-empty
+    "\uf243", # fa-battery-quarter
+    "\uf242", # fa-battery-half
+    "\uf241", # fa-battery-three-quarters
+    "\uf240", # fa-battery-full
 ]
 bat_not_available = "\uf244 ? UNK" # fa-battery-empty
-#cpu = "🧮"
 
 [[block]]
 block = "net"
 format = " $icon {$signal_strength $ssid $frequency|LAN} via $device "
 
-[[block]]
-block = "custom"
-command = "~/.config/i3status-rust/get_ipv4.sh"
-interval = 60
+#[[block]]
+#block = "custom"
+#command = "~/.config/i3status-rust/get_ipv4.sh"
+#interval = 60
+
+#[[block]]
+#block = "custom"
+#command = "~/.config/i3status-rust/get_ipv6.sh"
+#interval = 60
 
 [[block]]
 block = "custom"
-command = "~/.config/i3status-rust/get_ipv6.sh"
+cycle = [
+    "(echo -n '🏠 '; ip a s wlp0s20f3 | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n2 | head -n1)",
+    "(echo -n '🏠 '; ip a s wlp0s20f3 | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n1 | head -n1)",
+    "(echo -n '🌍 '; curl -s ifconfig.me -4)",
+    "(echo -n '🌍 '; curl -s ifconfig.me -6)",
+]
+
+#prefix = "🌍 "
+#cycle_format = "🌍 {}"
+#format = "🌐 {output}"
+#format = "🌍 {}"
+#format = "🌍 {}"  # This adds an icon prefix without modifying the script
 interval = 60
 
 [[block]]
 block = "sound"
+
 [[block.click]]
 button = "left"
 cmd = "pavucontrol"
 
-
-#[[block]]
-#block = "net"
-#interface = "eth0"
-#format_up = "E: {ip} ({speed})"
-#format_down = "E: down"
-
-
-### THIS FAILS< need to fix!! don't remove
-#[[block]]
-#block = "net"
-#interface = "wlp0s20f3"
-#format_up = "W: {ssid} {quality} @ {bitrate} {ip}"
-#format_down = "W: down"
-
-#[[block]]
-#block = "memory"
-#format = "🐏 {used}"
+[[block]]
+block = "custom"
+cycle = [
+    "df -h / | awk 'NR==2 {print \"/: \"$4}'",
+    "df -h /home/deadbeef/second-ssd | awk 'NR==2 {print \"mnt: \"$4}'"
+]
+interval = 20
 
 #[[block]]
 #block = "disk_space"
 #path = "/"
-#format = "💾 {avail}"
-
-
-
-[[block]]
-block = "disk_space"
-path = "/"
-info_type = "available"
-alert_unit = "GB"
-interval = 20
-warning = 20.0
-alert = 10.0
-format = " $icon /: $available.eng(w:2) "
-
-[[block]]
-block = "disk_space"
-path = "/home/deadbeef/second-ssd"
-info_type = "available"
-alert_unit = "GB"
-interval = 20
-warning = 20.0
-alert = 10.0
-format = " $icon mnt: $available.eng(w:2) "
+#info_type = "available"
+#alert_unit = "GB"
+#interval = 20
+#warning = 20.0
+#alert = 10.0
+#format = " $icon /: $available.eng(w:2) "
 
 #[[block]]
-#block = "sound"
-#device = "default"
-#mixer = "Master"
-#format = "♪: {volume}%"
-#format_muted = "♪: muted ({volume}%)"
+#block = "disk_space"
+#path = "/home/deadbeef/second-ssd"
+#info_type = "available"
+#alert_unit = "GB"
+#interval = 20
+#warning = 20.0
+#alert = 10.0
+#format = " $icon mnt: $available.eng(w:2) "
 
 [[block]]
 block = "memory"
@@ -110,7 +98,6 @@ block = "cpu"
 info_cpu = 20
 warning_cpu = 50
 critical_cpu = 90
-
 
 [[block]]
 block = "custom"
@@ -124,9 +111,7 @@ format = "$icon $percentage {$time |}"
 device = "DisplayDevice"
 driver = "upower"
 
-
 [[block]]
 block = "time"
 interval = 1
-#format = " $timestamp.datetime(f:'%d-%m-%Y %R:%S') "
 format = " $timestamp.datetime(f:'%Y-%m-%d %R:%S') "
