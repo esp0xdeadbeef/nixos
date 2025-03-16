@@ -69,7 +69,7 @@
         ] [];
 
         # Private laptop with AMD GPU and other differences
-        private = mkNixOS "esp" [
+        private = mkNixOS "l-esp" [
           #./hardware-configuration-private.nix
           #./hardware/amd.nix
         ] [
