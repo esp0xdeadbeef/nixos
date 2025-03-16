@@ -46,7 +46,6 @@
           ./virtualization/general.nix
           ./virtualization/lxc.nix
           ./system/version.nix
-          ./system/bootloader2.nix
           #./hardware/usb-firewall.nix
           lanzaboote.nixosModules.lanzaboote
 
