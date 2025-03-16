@@ -33,10 +33,7 @@
           ./system/autoupdate.nix
           ./system/bootloader.nix
           ./desktop/environment.nix
-          ./hardware/secondary-harddisk.nix
-          ./hardware/nvidia.nix
           ./system/garbage-collection.nix
-          ./hardware-configuration.nix
           ./system/locale.nix
           ./network/basic.nix
           ./desktop/packages.nix
@@ -63,9 +60,12 @@
 
         # Work laptop with NVIDIA
         l-werk = mkNixOS "l-werk" [
-          ./hardware-configuration.nix
-          ./hardware/nvidia.nix
-          ./hardware/secondary-harddisk.nix
+          #./hardware-configuration.nix
+          #./hardware/hardware-configuration-l-werk.nix
+          ./hardware/hardware-configuration-l-werk.nix
+          ./hardware/nvidia-l-werk.nix
+          ./hardware/secondary-harddisk-l-werk.nix
+          #./hardware/usb-firewall.nix
         ] [];
 
         # Private laptop with AMD GPU and other differences
