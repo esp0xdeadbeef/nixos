@@ -22,7 +22,7 @@
     let
       mkNixOS = hostname: hardwareModules: extraModules: nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        specialArgs = { inherit nixpkgs-unstable; };
+        specialArgs = { inherit nixpkgs-unstable hostname; };
         modules = [
           # This is not a complete NixOS configuration and you need to reference
           # your normal configuration here.
@@ -69,12 +69,12 @@
         ] [];
 
         # Private laptop with AMD GPU and other differences
-        private = mkNixOS "private" [
-          ./hardware-configuration-private.nix
-          ./hardware/amd.nix
+        private = mkNixOS "esp" [
+          #./hardware-configuration-private.nix
+          #./hardware/amd.nix
         ] [
-          ./network/private-setup.nix
-          ./desktop/private-config.nix
+          #./network/private-setup.nix
+          #./desktop/private-config.nix
         ];
       };
 

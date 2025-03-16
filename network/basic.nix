@@ -1,8 +1,9 @@
-{ config, pkgs, ... }: {  
+{ config, pkgs, hostname, ... }: {  
   #############################
   # Networking and Localization
   #############################
-  networking.hostName = "l-werk";
+  #networking.hostName = "l-werk";
+  networking.hostName = hostname;
   hardware.bluetooth.enable = true;
   programs.nm-applet.enable = true;
   services.blueman.enable = true;
