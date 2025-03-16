@@ -63,6 +63,7 @@
           #./hardware-configuration.nix
           #./hardware/hardware-configuration-l-werk.nix
           ./hardware/hardware-configuration-l-werk.nix
+          ./hardware/sound-fix-l-werk.nix
           ./hardware/nvidia-l-werk.nix
           ./hardware/secondary-harddisk-l-werk.nix
           #./hardware/usb-firewall.nix
