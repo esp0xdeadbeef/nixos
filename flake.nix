@@ -18,9 +18,9 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, lanzaboote, home-manager, ...}: {
-    nixosConfigurations = {
-      l-werk = nixpkgs.lib.nixosSystem {
+  outputs = { self, nixpkgs, nixpkgs-unstable, lanzaboote, home-manager, ... }:
+    let
+      mkNixOS = hostname: hardwareModules: extraModules: nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit nixpkgs-unstable; };
         modules = [
@@ -53,13 +53,34 @@
           home-manager.nixosModules.home-manager
           ./home-manager/home.nix
 
+        ] 
+          ++ hardwareModules # Hardware-specific modules
+          ++ extraModules; # Additional per-machine modules
+      };
+    in {
+      nixosConfigurations = {
+        # Default config (no hardware, just the base system)
+        default = mkNixOS "default" [] [];
+
+        # Work laptop with NVIDIA
+        l-werk = mkNixOS "l-werk" [
+          ./hardware-configuration.nix
+          ./hardware/nvidia.nix
+          ./hardware/secondary-harddisk.nix
+        ] [];
+
+        # Private laptop with AMD GPU and other differences
+        private = mkNixOS "private" [
+          ./hardware-configuration-private.nix
+          ./hardware/amd.nix
+        ] [
+          ./network/private-setup.nix
+          ./desktop/private-config.nix
         ];
       };
-    };
 
-    packages.x86_64-linux = {
-      default = self.nixosConfigurations.nixos.config.system.build.toplevel;
-      nixos-rebuild = self.nixosConfigurations.nixos.config.system.build.toplevel;
+      packages.x86_64-linux = {
+        default = self.nixosConfigurations.default.config.system.build.toplevel;
+      };
     };
-  };
 }
