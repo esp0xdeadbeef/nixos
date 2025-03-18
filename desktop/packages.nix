@@ -25,6 +25,7 @@ arandr
 #                hyprland
 #rofi
                 #autorandr
+		fast-cli
 #                cudaPackages.cudatoolkit
                 alacritty
 #flameshot
@@ -34,6 +35,7 @@ navi
                 vim
                 responder
                 nmap
+		autorandr
 sbctl
 openssl
 tpm2-tools
@@ -41,7 +43,6 @@ jq
 usbutils
 file
 gron
-fast-cli
 mokutil
 man
                 glxinfo
