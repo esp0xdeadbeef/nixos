@@ -42,6 +42,7 @@ tpm2-tools
 jq
 usbutils
 file
+jython
 gron
 mokutil
 man
