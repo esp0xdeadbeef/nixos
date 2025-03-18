@@ -11,6 +11,7 @@
     i3status-rust
     discord
     obsidian
+    autorandr
     vscode
     google-chrome
     flameshot

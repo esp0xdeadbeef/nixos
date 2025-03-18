@@ -232,10 +232,10 @@ bindsym $mod+t mode "resize"
 
 bar {
     status_command i3status-rs ~/.config/i3status-rust/config.toml
-    i3bar_command i3bar --transparency
+    #i3bar_command i3bar --transparency
     #font pango:IBM Plex Mono, Material Icons 12
-    position bottom
-    tray_output primary
+    #position bottom
+    #tray_output primary
     #mode hide
     #hidden_state hide
     modifier $mod
@@ -249,7 +249,7 @@ bar {
         inactive_workspace #282a3670 #282a3670 #f8f8f2
         urgent_workspace #2f343a70 #ff555570 #282a36
     }
-    padding 0
+    #padding 0
 }
 
 gaps inner 15
@@ -354,4 +354,5 @@ exec --no-startup-id xsetroot -solid "#000000"
 #exec --no-startup-id picom
 #exec_always --no-startup-id xss-lock -- i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png & 
 exec --no-startup-id teams-for-linux
+exec --no-startup-id autorandr
 exec --no-startup-id spotify
