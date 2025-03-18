@@ -12,6 +12,7 @@
     discord
     obsidian
     autorandr
+    fast-cli
     vscode
     google-chrome
     flameshot
