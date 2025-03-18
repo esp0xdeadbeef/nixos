@@ -9,7 +9,7 @@ in {
     enable = true;
     flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;  # Use the hostname
     flags = [ "--impure" ];
-    dates = "02:00";
+    dates = "9:00";
     randomizedDelaySec = "45min";
   };
 }
