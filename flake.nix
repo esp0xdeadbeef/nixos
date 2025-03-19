@@ -16,6 +16,7 @@
     # Add Home Manager as an input
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
   };
 
   outputs = { self, nixpkgs, nixpkgs-unstable, lanzaboote, home-manager, ... }:
@@ -47,6 +48,7 @@
           lanzaboote.nixosModules.lanzaboote
 
           home-manager.nixosModules.home-manager
+          #./home-manager/home-manager-module.nix
           ./home-manager/home.nix
 
         ] 

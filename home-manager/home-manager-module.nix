@@ -3,6 +3,6 @@
 {
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
-  home-manager.users.deadbeef = import ./home-manager/home.nix;
+  home-manager.users.deadbeef = import "git+ssh://git@github.com/cmaayen/home-manager";
 }
 

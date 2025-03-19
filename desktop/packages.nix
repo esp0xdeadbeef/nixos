@@ -36,6 +36,7 @@ navi
                 responder
                 nmap
 		autorandr
+gh
 sbctl
 openssl
 tpm2-tools
