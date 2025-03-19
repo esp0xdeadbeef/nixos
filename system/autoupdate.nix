@@ -11,6 +11,8 @@ in {
     flags = [ "--impure" ];
     dates = "9:00";
     randomizedDelaySec = "45min";
+    operation = "switch";  # Avoid switching to a new kernel immediately
+    allowReboot = false;   # Prevent automatic reboots
   };
 }
 
