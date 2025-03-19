@@ -49,7 +49,7 @@ boot.initrd.luks.devices."root".device = "/dev/disk/by-uuid/be6d5b2f-d108-4535-9
   #swapDevices = [ ];
   swapDevices = [ {
     device = "/var/lib/swapfile";
-    size = 16*1024;
+    size = 45*1024;
   } ];
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking

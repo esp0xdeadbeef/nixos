@@ -15,6 +15,7 @@
      #home.file.".config/i3status-rust/gpu-load.sh".source = /etc/nixos/i3status-rust/gpu-load.sh;
 
      
+     services.autorandr.enable = true;
      programs.dconf.enable = true;
               services.xserver = {
                 enable = true;
@@ -29,7 +30,8 @@
               windowManager.i3 = {
                   enable = true;
                   extraPackages = with pkgs; [
-                      dmenu
+                      #dmenu
+                      rofi
                       i3status
                       i3lock
                       i3blocks
@@ -49,9 +51,9 @@
               #environment.variables.GTK_THEME = "Adwaita:dark";
               services.gnome.gnome-keyring.enable = true;
               #services.desktopManager.plasma6.enable = true;
-              #services.xserver.displayManager.gdm.enable = true;
+              services.xserver.displayManager.gdm.enable = true;
               #services.xserver.desktopManager.gnome.enable = true;
 
               #programs.sway.enable = true;
-              services.displayManager.defaultSession = "xfce+i3";
+              services.displayManager.defaultSession = "none+i3";
 }
