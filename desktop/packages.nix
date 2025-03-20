@@ -44,10 +44,12 @@ arandr
 #flameshot
 #google-chrome
 navi
+pulseaudio
                 tpm2-tss
                 vim
                 responder
                 nmap
+playerctl
 		autorandr
 gh
 sshpass
