@@ -45,6 +45,8 @@ arandr
 #google-chrome
 navi
 pulseaudio
+feroxbuster
+nuclei
                 tpm2-tss
                 vim
                 responder
