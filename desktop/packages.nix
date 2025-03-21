@@ -50,13 +50,14 @@ pulseaudio
 feroxbuster
 nuclei
 gau # wayback machine
+nmap
+sqlmap
 
 
 
                 tpm2-tss
                 vim
                 responder
-                nmap
 playerctl
 		autorandr
 gh
