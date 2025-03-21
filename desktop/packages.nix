@@ -22,6 +22,7 @@ environment.etc."burp/jython.jar" = {
 
 
               programs.wireshark.enable = true;
+# also check nix-index btw :)
 services.locate = {
              enable = true;
     package = pkgs.plocate;
@@ -34,6 +35,7 @@ services.locate = {
 
               environment.systemPackages = with pkgs; [
 home-manager
+nix-index
 arandr
 #                hyprland
 #rofi
@@ -47,6 +49,10 @@ navi
 pulseaudio
 feroxbuster
 nuclei
+gau # wayback machine
+
+
+
                 tpm2-tss
                 vim
                 responder
