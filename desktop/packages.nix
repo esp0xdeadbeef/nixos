@@ -53,6 +53,7 @@ gau # wayback machine
 nmap
 sqlmap
 certipy
+enum4linux
 
 
 
