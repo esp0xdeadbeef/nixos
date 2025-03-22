@@ -54,6 +54,7 @@ nmap
 sqlmap
 certipy
 enum4linux
+metasploit
 
 
 
