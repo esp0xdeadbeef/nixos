@@ -55,6 +55,7 @@ sqlmap
 certipy
 enum4linux
 metasploit
+lastpass-cli
 
 
 
