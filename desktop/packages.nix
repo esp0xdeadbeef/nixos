@@ -52,6 +52,7 @@ nuclei
 gau # wayback machine
 nmap
 sqlmap
+certipy
 
 
 
