@@ -1,4 +1,5 @@
 { config, pkgs, ... }: {
+              environment.etc.hosts.enable = false;
               programs.firefox.enable = true;
               programs.neovim.enable = true;
               programs.neovim.defaultEditor = true;
