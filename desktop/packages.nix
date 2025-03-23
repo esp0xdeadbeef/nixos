@@ -51,6 +51,7 @@ feroxbuster
 nuclei
 gau # wayback machine
 nmap
+unzip
 sqlmap
 certipy
 enum4linux
