@@ -59,6 +59,7 @@ enum4linux
 enum4linux-ng
 metasploit
 samba4Full
+rlwrap
 lastpass-cli
 
 
