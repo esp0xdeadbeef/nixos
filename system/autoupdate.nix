@@ -9,7 +9,7 @@ in {
     enable = true;
     flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;  # Use the hostname
     flags = [ "--impure" ];
-    dates = "9:00";
+    dates = "Mon 9:00";
     randomizedDelaySec = "45min";
     operation = "switch";  # Avoid switching to a new kernel immediately
     allowReboot = false;   # Prevent automatic reboots
