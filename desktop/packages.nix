@@ -129,6 +129,8 @@ firefox
         kind
         #teams
         brave
+python3.pkgs.evdev
+python3.pkgs.pygraphviz
         #google-chrome
         #chromium
         #signal-desktop
