@@ -12,6 +12,8 @@ extra-experimental-features = nix-command flakes
 access-tokens = github.com=ghp_......
 
 # make it the same...
+# update the respitory with nixos:
+nix flake update --flake github:esp0xdeadbeef/nixos
 # Then update with:
 nixos-rebuild switch --impure --flake "github:esp0xdeadbeef/nixos#$(hostname)"
 
