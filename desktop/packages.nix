@@ -104,6 +104,7 @@ lxc
 tmux
                 dig
                 #(burpsuite.override { proEdition = true; })
+zap
 bindfs
 xclip
                 wget
@@ -131,6 +132,7 @@ firefox
         brave
 python3.pkgs.evdev
 python3.pkgs.pygraphviz
+podman-compose
         #google-chrome
         #chromium
         #signal-desktop
