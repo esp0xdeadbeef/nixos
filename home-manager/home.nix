@@ -21,6 +21,8 @@
     };
   };
 
+  
+  nixpkgs.config.allowUnfree = true;
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;
@@ -31,8 +33,8 @@
       home.packages = with pkgs; [
         htop
         teams-for-linux
-        intune-portal
-        #microsoft-edge
+        #intune-portal
+        microsoft-edge
         xdotool
         azure-cli
         i3status-rust
