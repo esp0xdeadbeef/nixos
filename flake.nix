@@ -1,5 +1,5 @@
 {
-  description = "A SecureBoot-enabled NixOS configurations";
+  description = "A optionally SecureBoot-enabled NixOS configuration";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
@@ -27,7 +27,9 @@
         modules = nixpkgs.lib.filter (module: module != null) [
           # This is not a complete NixOS configuration and you need to reference
           # your normal configuration here.
-# ls /etc/nixos | grep 'nix$' | grep -v flake | grep -v 'secboot\|nvidia' | sed 's/^/.\//g'    [16:35:26]
+          # ls /etc/nixos | grep 'nix$' | grep -v flake | grep -v 'secboot\|nvidia' | sed 's/^/.\//g'
+          
+
           #./hardware/usb-firewall.nix
           ./desktop/users-and-groups.nix
           ./system/version.nix
@@ -74,9 +76,11 @@
           #./hardware-configuration-private.nix
           #./hardware/amd.nix
         ] [
-          #./network/private-setup.nix
-          #./desktop/private-config.nix
-        ] false;
+          #./hardware/l-esp/hardware-configuration.nix
+          {
+             networking.hostName = "s-router-vpn-1";
+          }
+        ] true;
         s-router-vpn-1 = mkNixOS "s-router-vpn-1" [
           # configuration without secureboot and or lanzaboote
           ./hardware/s-router-vpn-1/hardware-configuration.nix
