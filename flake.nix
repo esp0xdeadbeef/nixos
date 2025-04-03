@@ -21,18 +21,43 @@
 
   outputs = { self, nixpkgs, nixpkgs-unstable, lanzaboote, home-manager, ... }:
     let
-      mkNixOS = hostname: hardwareModules: extraModules: nixpkgs.lib.nixosSystem {
+      mkNixOS = hostname: hardwareModules: extraModules: secureBoot: nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit nixpkgs-unstable hostname; };
-        modules = [
+        modules = nixpkgs.lib.filter (module: module != null) [
           # This is not a complete NixOS configuration and you need to reference
           # your normal configuration here.
 # ls /etc/nixos | grep 'nix$' | grep -v flake | grep -v 'secboot\|nvidia' | sed 's/^/.\//g'    [16:35:26]
-          ./hardware/audio-and-bluetooth.nix
+          #./hardware/usb-firewall.nix
+          ./desktop/users-and-groups.nix
+          ./system/version.nix
+          ./system/autoupdate.nix
+          (if secureBoot then lanzaboote.nixosModules.lanzaboote else null)
+          home-manager.nixosModules.home-manager
+          #./home-manager/home-manager-module.nix
+          ./home-manager/home.nix
+        ]
+          ++ hardwareModules # Hardware-specific modules
+          ++ extraModules; # Additional per-machine modules
+      };
+    in {
+      nixosConfigurations = {
+        # Default config (no hardware, just the base system)
+        default = mkNixOS "default" [] [] false;
+
+        # Work laptop with NVIDIA
+        l-werk = mkNixOS "l-werk" [
+          ./hardware/l-werk/hardware-configuration.nix
+          ./hardware/l-werk/audio-and-bluetooth.nix
+          ./hardware/l-werk/sound-fix-l-werk.nix
+          ./hardware/l-werk/nvidia-l-werk.nix
+          ./hardware/l-werk/secondary-harddisk-l-werk.nix
+          ./hardware/l-werk/bootloader.nix
+          #./hardware/usb-firewall.nix
+        ] [
+
           ./desktop/fonts.nix
           ./system/autologin.nix
-          ./system/autoupdate.nix
-          ./system/bootloader.nix
           ./desktop/environment.nix
           ./system/garbage-collection.nix
           ./system/locale.nix
@@ -40,45 +65,29 @@
           ./desktop/packages.nix
           ./desktop/darkmode.nix
           ./desktop/shell-env.nix
-          ./desktop/users-and-groups.nix
           ./virtualization/general.nix
           ./virtualization/lxc.nix
-          ./system/version.nix
-          #./hardware/usb-firewall.nix
-          lanzaboote.nixosModules.lanzaboote
-
-          home-manager.nixosModules.home-manager
-          #./home-manager/home-manager-module.nix
-          ./home-manager/home.nix
-
-        ] 
-          ++ hardwareModules # Hardware-specific modules
-          ++ extraModules; # Additional per-machine modules
-      };
-    in {
-      nixosConfigurations = {
-        # Default config (no hardware, just the base system)
-        default = mkNixOS "default" [] [];
-
-        # Work laptop with NVIDIA
-        l-werk = mkNixOS "l-werk" [
-          #./hardware-configuration.nix
-          #./hardware/hardware-configuration-l-werk.nix
-          ./hardware/hardware-configuration-l-werk.nix
-          ./hardware/sound-fix-l-werk.nix
-          ./hardware/nvidia-l-werk.nix
-          ./hardware/secondary-harddisk-l-werk.nix
-          #./hardware/usb-firewall.nix
-        ] [];
+        ] true;
 
         # Private laptop with AMD GPU and other differences
-        private = mkNixOS "l-esp" [
+        l-esp = mkNixOS "l-esp" [
           #./hardware-configuration-private.nix
           #./hardware/amd.nix
         ] [
           #./network/private-setup.nix
           #./desktop/private-config.nix
-        ];
+        ] false;
+        s-router-vpn-1 = mkNixOS "s-router-vpn-1" [
+          # configuration without secureboot and or lanzaboote
+          ./hardware/s-router-vpn-1/hardware-configuration.nix
+        ] [
+          ./hardware/s-router-vpn-1/ssh-vim-and-basics.nix
+          {
+             networking.hostName = "s-router-vpn-1";
+          }
+          #./network/private-setup.nix
+          #./desktop/private-config.nix
+        ] false;
       };
 
       packages.x86_64-linux = {
@@ -86,3 +95,4 @@
       };
     };
 }
+
