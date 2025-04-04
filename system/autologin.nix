@@ -1,4 +1,4 @@
 { config, pkgs, ... }: {
-              #services.displayManager.autoLogin.user = "deadbeef";
+   services.displayManager.autoLogin.user = "deadbeef";
 }
 

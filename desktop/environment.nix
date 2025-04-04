@@ -37,7 +37,7 @@
                       i3blocks
                       autotiling
                  ];
-                configFile = builtins.toPath "/etc/nixos/home-manager/i3/config"; 
+                #configFile = builtins.toPath "/etc/nixos/home-manager/i3/config"; 
                 #extraSessionCommands = ''
                 #  exec --no-startup-id autotiling
                 #'';
@@ -50,7 +50,7 @@
             
               #environment.variables.GTK_THEME = "Adwaita:dark";
               services.gnome.gnome-keyring.enable = true;
-              #services.desktopManager.plasma6.enable = true;
+              services.desktopManager.plasma6.enable = true;
               services.xserver.displayManager.gdm.enable = true;
               #services.xserver.desktopManager.gnome.enable = true;
 
