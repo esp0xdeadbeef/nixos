@@ -140,6 +140,7 @@ sbctl
 tcpdump
 wireshark
 tshark
+ventoy-full
 
               ];
 
