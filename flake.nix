@@ -75,6 +75,7 @@
         # Private laptop with AMD GPU and other differences
         l-esp = mkNixOS "l-esp" [
           ./hardware/l-esp/hardware-configuration.nix
+          ./hardware/l-werk/bootloader.nix
           #./hardware/amd.nix
         ] [
           #./hardware/l-esp/hardware-configuration.nix
