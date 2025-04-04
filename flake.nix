@@ -79,7 +79,9 @@
         ] [
           #./hardware/l-esp/hardware-configuration.nix
           {
-             networking.hostName = "s-router-vpn-1";
+             networking.hostName = "s-esp";
+             boot.loader.systemd-boot.enable = true;
+             boot.loader.efi.canTouchEfiVariables = true;
           }
         ] true;
         s-router-vpn-1 = mkNixOS "s-router-vpn-1" [
