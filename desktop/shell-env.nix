@@ -18,7 +18,7 @@
                 ohMyZsh = {
                    enable = true;
                    #theme = "random";
-                   theme = "clean";
+                   #theme = "clean";
                    plugins = [
                      "sudo"
                      "terraform"
