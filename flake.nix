@@ -57,6 +57,7 @@
           ./hardware/l-werk/bootloader.nix
           #./hardware/usb-firewall.nix
         ] [
+          ./llms/ollama.nix
 
           ./desktop/fonts.nix
           ./system/autologin.nix
