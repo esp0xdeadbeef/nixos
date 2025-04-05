@@ -19,159 +19,132 @@
 
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, lanzaboote, home-manager, ... }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nixpkgs-unstable,
+      lanzaboote,
+      home-manager,
+      ...
+    }:
     let
-      mkNixOS = hostname: hardwareModules: extraModules: secureBoot: nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = { inherit nixpkgs-unstable hostname; };
-        modules = nixpkgs.lib.filter (module: module != null) [
-          # This is not a complete NixOS configuration and you need to reference
-          # your normal configuration here.
-          # ls /etc/nixos | grep 'nix$' | grep -v flake | grep -v 'secboot\|nvidia' | sed 's/^/.\//g'
-          
+      mkNixOS =
+        hostname: hardwareModules: extraModules: secureBoot:
+        nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          specialArgs = { inherit nixpkgs-unstable hostname; };
+          modules =
+            nixpkgs.lib.filter (module: module != null) [
+              # This is not a complete NixOS configuration and you need to reference
+              # your normal configuration here.
+              # ls /etc/nixos | grep 'nix$' | grep -v flake | grep -v 'secboot\|nvidia' | sed 's/^/.\//g'
 
-          #./hardware/usb-firewall.nix
-          ./desktop/users-and-groups.nix
-          ./system/version.nix
-          ./system/autoupdate.nix
-          (if secureBoot then lanzaboote.nixosModules.lanzaboote else null)
-          home-manager.nixosModules.home-manager
-          #./home-manager/home-manager-module.nix
-          #./home-manager/home.nix
-        ]
-          ++ hardwareModules # Hardware-specific modules
-          ++ extraModules; # Additional per-machine modules
-      };
-    in {
+              #./hardware/usb-firewall.nix
+              ./desktop/users-and-groups.nix
+              ./system/version.nix
+              ./system/autoupdate.nix
+              (if secureBoot then lanzaboote.nixosModules.lanzaboote else null)
+              home-manager.nixosModules.home-manager
+              #./home-manager/home-manager-module.nix
+              #./home-manager/home.nix
+            ]
+            ++ hardwareModules # Hardware-specific modules
+            ++ extraModules; # Additional per-machine modules
+        };
+    in
+    {
       nixosConfigurations = {
         # Default config (no hardware, just the base system)
-        default = mkNixOS "default" [] [] false;
+        default = mkNixOS "default" [ ] [ ] false;
 
         # Work laptop with NVIDIA
-        l-werk = mkNixOS "l-werk" [
-          ./hardware/l-werk/hardware-configuration.nix
-          ./hardware/l-werk/audio-and-bluetooth.nix
-          ./hardware/l-werk/sound-fix-l-werk.nix
-          ./hardware/l-werk/nvidia-l-werk.nix
-          ./hardware/l-werk/secondary-harddisk-l-werk.nix
-          ./hardware/l-werk/bootloader.nix
-          #./hardware/usb-firewall.nix
-        ] [
-          ./llms/ollama.nix
+        l-werk =
+          mkNixOS "l-werk"
+            [
+              ./hardware/l-werk/hardware-configuration.nix
+              ./hardware/l-werk/audio-and-bluetooth.nix
+              ./hardware/l-werk/sound-fix-l-werk.nix
+              ./hardware/l-werk/nvidia-l-werk.nix
+              ./hardware/l-werk/secondary-harddisk-l-werk.nix
+              ./hardware/l-werk/bootloader.nix
+              #./hardware/usb-firewall.nix
+            ]
+            [
+              ./llms/ollama.nix
 
-          ./home-manager/home.nix
-          ./desktop/fonts.nix
-          #./system/autologin.nix
-          ./desktop/environment.nix
-          ./system/garbage-collection.nix
-          ./system/locale.nix
-          ./network/basic.nix
-          ./desktop/packages.nix
-          ./desktop/darkmode.nix
-          ./desktop/shell-env.nix
-          ./virtualization/general.nix
-          ./virtualization/lxc.nix
-        ] true;
+              ./home-manager/home.nix
+              ./desktop/fonts.nix
+              #./system/autologin.nix
+              ./desktop/environment.nix
+              ./system/garbage-collection.nix
+              ./system/locale.nix
+              ./network/basic.nix
+              ./desktop/packages.nix
+              ./desktop/darkmode.nix
+              ./desktop/shell-env.nix
+              ./virtualization/general.nix
+              ./virtualization/lxc.nix
+            ]
+            true;
 
         # Private laptop with AMD GPU and other differences
-        l-esp = mkNixOS "l-esp" [
-          ./hardware/l-esp/hardware-configuration.nix
-          ./hardware/l-esp/bootloader.nix
-          ./hardware/l-esp/amd.nix
-        ] [
-          ./home-manager-l-esp/home.nix
-          #./hardware/l-esp/ssh-vim-and-basics.nix
-          #./hardware/l-esp/fuck.nix
-          ./desktop/fonts.nix
-          #./system/autologin.nix
-          ./desktop/environment.nix
-          ./system/garbage-collection.nix
-          ./system/locale.nix
-          ./network/basic.nix
-          ./desktop/packages.nix
-          #./desktop/darkmode.nix
-          ./desktop/shell-env.nix
-          ./virtualization/general.nix
-          ./virtualization/lxc.nix
-          {
-	     #home-manager.users.deadbeef.home.stateVersion = "25.05";
-             #home-manager.users.deadbeef.enable = false;
+        l-esp =
+          mkNixOS "l-esp"
+            [
+              ./hardware/l-esp/hardware-configuration.nix
+              ./hardware/l-esp/bootloader.nix
+              ./hardware/l-esp/amd.nix
+            ]
+            [
+              ./home-manager-l-esp/home.nix
+              #./hardware/l-esp/ssh-vim-and-basics.nix
+              #./hardware/l-esp/fuck.nix
+              ./desktop/fonts.nix
+              #./system/autologin.nix
+              ./desktop/environment.nix
+              ./system/garbage-collection.nix
+              ./system/locale.nix
+              ./network/basic.nix
+              ./desktop/packages.nix
+              #./desktop/darkmode.nix
+              ./desktop/shell-env.nix
+              ./virtualization/general.nix
+              ./virtualization/lxc.nix
+              {
+                networking.hostName = "l-esp";
+                networking.networkmanager.enable = true;
+                nixpkgs.config.allowUnfree = true;
+                services.gnome.gnome-keyring.enable = true;
+                services.desktopManager.plasma6.enable = true;
+                #services.xserver.displayManager.gdm.enable = true;
+                #services.xserver.desktopManager.gnome.enable = true;
 
-             #home-manager.users.deadbeef.home.enableNixpkgsReleaseCheck = false;
-             #home-manager.users.deadbeef.home.backupFileExtension = "backup";
-
-
-             #networking.hostName = "l-esp";
-             services.openssh.enable = true;
-             #networking.networkmanager.enable = true;
-             #services.xserver.enable = true;
-             services.xserver.videoDrivers = [ "amdgpu" ];
-             #services.xserver.displayManager.gdm.enable = true;
-             #services.displayManager.sddm.enable = true;
-             #services.desktopManager.plasma6.enable = true;
-             networking.hostName = "l-esp";
-             networking.networkmanager.enable = true;
-             nixpkgs.config.allowUnfree = true;
-
-             #services.autorandr.enable = true;
-             #programs.dconf.enable = true;
-             # services.xserver = {
-             #   enable = true;
-             #   desktopManager = {
-             #     xterm.enable = false;
-             #     xfce = {
-             #       enable    = true;
-             #       noDesktop = true;
-             #       enableXfwm = false;
-             #     };
-             #   };
-             # windowManager.i3 = {
-             #     enable = true;
-                  #extraPackages = with pkgs; [
-                  #    #dmenu
-                  #    rofi
-                  #    i3status
-                  #    i3lock
-                  #    i3blocks
-                  #    autotiling
-                 #];
-              #  configFile = builtins.toPath "/etc/nixos/home-manager/i3/config";
-                #extraSessionCommands = ''
-                #  exec --no-startup-id autotiling
-                #'';
-             # };
-             #     xkb = {
-             #         layout  = "us";
-             #         variant = "";
-             #     };
-             # };
-
-              #environment.variables.GTK_THEME = "Adwaita:dark";
-              services.gnome.gnome-keyring.enable = true;
-              services.desktopManager.plasma6.enable = true;
-              #services.xserver.displayManager.gdm.enable = true;
-              #services.xserver.desktopManager.gnome.enable = true;
-
-              programs.sway.enable = true;
-              services.displayManager.defaultSession = "none+i3";
-          }
-        ] true;
-        s-router-vpn-1 = mkNixOS "s-router-vpn-1" [
-          # configuration without secureboot and or lanzaboote
-          ./hardware/s-router-vpn-1/hardware-configuration.nix
-        ] [
-          ./hardware/s-router-vpn-1/ssh-vim-and-basics.nix
-          {
-             networking.hostName = "s-router-vpn-1";
-             services.openssh.enable = true;
-             networking.networkmanager.enable = true;
-             services.xserver.enable = true;
-             services.displayManager.sddm.enable = true;
-             services.desktopManager.plasma6.enable = true;
-          }
-          #./network/private-setup.nix
-          #./desktop/private-config.nix
-        ] false;
+                programs.sway.enable = true;
+                services.displayManager.defaultSession = "none+i3";
+              }
+            ]
+            true;
+        s-router-vpn-1 =
+          mkNixOS "s-router-vpn-1"
+            [
+              # configuration without secureboot and or lanzaboote
+              ./hardware/s-router-vpn-1/hardware-configuration.nix
+            ]
+            [
+              ./hardware/s-router-vpn-1/ssh-vim-and-basics.nix
+              {
+                networking.hostName = "s-router-vpn-1";
+                services.openssh.enable = true;
+                networking.networkmanager.enable = true;
+                services.xserver.enable = true;
+                services.displayManager.sddm.enable = true;
+                services.desktopManager.plasma6.enable = true;
+              }
+              #./network/private-setup.nix
+              #./desktop/private-config.nix
+            ]
+            false;
       };
 
       packages.x86_64-linux = {
@@ -179,4 +152,3 @@
       };
     };
 }
-

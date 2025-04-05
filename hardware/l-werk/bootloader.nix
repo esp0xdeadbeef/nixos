@@ -1,4 +1,10 @@
-{ config, pkgs, lib, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+{
 
   #############################
   # Bootloader and Kernel Options
@@ -31,8 +37,7 @@
 
   # Filesystem optimizations
   fileSystems."/".options = [ "noatime" ];
-  
+
   # Swap settings (commented out)
   #swapDevices = [ ];
 }
-
