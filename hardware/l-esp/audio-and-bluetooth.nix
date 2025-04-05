@@ -13,6 +13,8 @@
     # jack.enable = true;
   };
   
+  hardware.bluetooth.enable = true;
+  services.blueman.enable = true;
 
   # services.pipewire.wireplumber.extraConfig.bluetoothEnhancements = {
   #   "monitor.bluez.properties" = {
