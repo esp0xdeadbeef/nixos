@@ -27,16 +27,6 @@ bat_not_available = "\uf244 ? UNK" # fa-battery-empty
 block = "net"
 format = " $icon {$signal_strength $ssid $frequency|LAN} via $device "
 
-#[[block]]
-#block = "custom"
-#command = "~/.config/i3status-rust/get_ipv4.sh"
-#interval = 60
-
-#[[block]]
-#block = "custom"
-#command = "~/.config/i3status-rust/get_ipv6.sh"
-#interval = 60
-
 [[block]]
 block = "custom"
 cycle = [
