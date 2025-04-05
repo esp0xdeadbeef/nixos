@@ -12,6 +12,7 @@
     pulse.enable = true;
     # jack.enable = true;
   };
+  
 
   # services.pipewire.wireplumber.extraConfig.bluetoothEnhancements = {
   #   "monitor.bluez.properties" = {
