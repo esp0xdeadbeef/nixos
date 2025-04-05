@@ -1,4 +1,9 @@
-{ config, pkgs, nixpkgs-unstable, ... }:
+{
+  config,
+  pkgs,
+  nixpkgs-unstable,
+  ...
+}:
 
 {
   home.username = "deadbeef";
@@ -13,7 +18,7 @@
     rofi-wayland
     alacritty
     wofi
-    mako  # Notification daemon for Wayland
+    mako # Notification daemon for Wayland
     brightnessctl
     pavucontrol
     grim
@@ -59,4 +64,3 @@
   # Enable Home Manager itself
   programs.home-manager.enable = true;
 }
-

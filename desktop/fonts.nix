@@ -16,11 +16,22 @@
     ];
 
     fontconfig.defaultFonts = {
-      monospace = [ "DejaVu Sans Mono" "Terminus" "JetBrainsMono Nerd Font" ];
-      sansSerif = [ "Noto Sans" "DejaVu Sans" "Liberation Sans" ];
-      serif = [ "Noto Serif" "DejaVu Serif" "Liberation Serif" ];
+      monospace = [
+        "DejaVu Sans Mono"
+        "Terminus"
+        "JetBrainsMono Nerd Font"
+      ];
+      sansSerif = [
+        "Noto Sans"
+        "DejaVu Sans"
+        "Liberation Sans"
+      ];
+      serif = [
+        "Noto Serif"
+        "DejaVu Serif"
+        "Liberation Serif"
+      ];
       emoji = [ "Noto Color Emoji" ];
     };
   };
 }
-

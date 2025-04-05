@@ -1,5 +1,9 @@
-{ config, pkgs, nixpkgs-unstable, ... }:
-
+{
+  config,
+  pkgs,
+  nixpkgs-unstable,
+  ...
+}:
 
 {
   systemd.user.services.searchsploit-update = {
@@ -21,15 +25,15 @@
     };
   };
 
-  
   nixpkgs.config.allowUnfree = true;
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;
-    users.deadbeef = {  # Replace with your username
+    users.deadbeef = {
+      # Replace with your username
       home.enableNixpkgsReleaseCheck = false;
-      home.stateVersion = "24.11";  # Match your system state version
-      
+      home.stateVersion = "24.11"; # Match your system state version
+
       home.packages = with pkgs; [
         htop
         teams-for-linux

@@ -1,4 +1,9 @@
-{ config, pkgs, nixpkgs-unstable, ... }:
+{
+  config,
+  pkgs,
+  nixpkgs-unstable,
+  ...
+}:
 
 {
   home.username = "deadbeef";
@@ -13,12 +18,33 @@
     rofi-wayland
     alacritty
     wofi
-    mako  # Notification daemon for Wayland
+    mako # Notification daemon for Wayland
     brightnessctl
     pavucontrol
     grim
     slurp
     wl-clipboard
+
+    htop
+    teams-for-linux
+    microsoft-edge
+    xdotool
+    i3status-rust
+    discord
+    obsidian
+    autorandr
+    fast-cli
+    vscode
+    google-chrome
+    flameshot
+    rofi
+    remmina
+    mitmproxy
+    netexec
+    #exploitdb
+    nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
+    nixpkgs-unstable.legacyPackages.x86_64-linux.i3lock
+    #(nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
   ];
 
   # Sway Configuration
@@ -59,4 +85,3 @@
   # Enable Home Manager itself
   programs.home-manager.enable = true;
 }
-
