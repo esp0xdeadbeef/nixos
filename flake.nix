@@ -77,7 +77,7 @@
         l-esp = mkNixOS "l-esp" [
           ./hardware/l-esp/hardware-configuration.nix
           ./hardware/l-esp/bootloader.nix
-          #./hardware/amd.nix
+          ./hardware/l-esp/amd.nix
         ] [
           ./home-manager-l-esp/home.nix
           #./hardware/l-esp/ssh-vim-and-basics.nix
