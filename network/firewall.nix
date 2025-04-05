@@ -3,6 +3,9 @@
 
   networking.firewall = {
     enable = true;
+    # new rule to allow wireguard through:
+    # writeup https://ifup.org/posts/reverse-path-filter-rp_filter-by-example/
+    checkReversePath = false;
     allowedTCPPorts = [ 
       #80 
       #443 
