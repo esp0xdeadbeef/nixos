@@ -44,6 +44,9 @@
               ./desktop/users-and-groups.nix
               ./system/version.nix
               ./system/autoupdate.nix
+              {
+                services.fwupd.enable = true;
+              }
               (if secureBoot then lanzaboote.nixosModules.lanzaboote else null)
               home-manager.nixosModules.home-manager
               #./home-manager/home-manager-module.nix
@@ -81,7 +84,7 @@
               ./system/locale.nix
               ./network/basic.nix
               ./desktop/packages.nix
-              ./desktop/darkmode.nix
+              # ./desktop/darkmode.nix
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
@@ -95,13 +98,13 @@
               ./hardware/l-esp/hardware-configuration.nix
               ./hardware/l-esp/bootloader.nix
               ./hardware/l-esp/amd.nix
+              ./hardware/l-esp/swap-and-tmpfs.nix
+              # ./hardware/l-esp/audio-and-bluetooth.nix
             ]
             [
               ./home-manager-l-esp/home.nix
-              #./hardware/l-esp/ssh-vim-and-basics.nix
-              #./hardware/l-esp/fuck.nix
               ./desktop/fonts.nix
-              #./system/autologin.nix
+              # ./system/autologin.nix
               ./desktop/environment.nix
               ./system/garbage-collection.nix
               ./system/locale.nix
@@ -117,9 +120,6 @@
                 nixpkgs.config.allowUnfree = true;
                 services.gnome.gnome-keyring.enable = true;
                 services.desktopManager.plasma6.enable = true;
-                #services.xserver.displayManager.gdm.enable = true;
-                #services.xserver.desktopManager.gnome.enable = true;
-
                 programs.sway.enable = true;
                 services.displayManager.defaultSession = "none+i3";
               }
