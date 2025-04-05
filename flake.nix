@@ -98,7 +98,7 @@
               ./hardware/l-esp/hardware-configuration.nix
               ./hardware/l-esp/bootloader.nix
               ./hardware/l-esp/amd.nix
-              ./hardware/l-esp/swap-and-tmpfs.nix
+              # ./hardware/l-esp/swap-and-tmpfs.nix
               # ./hardware/l-esp/audio-and-bluetooth.nix
             ]
             [
