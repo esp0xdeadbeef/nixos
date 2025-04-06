@@ -1,42 +1,3 @@
-
-
-This works (ignores .git):
-```bash
-vim /etc/nixos/flake.nix; nixos-rebuild switch --impure --flake path:/etc/nixos#l-werk
-```
-
-This also works:
-```bash
-$ cat ~/.config/nix/nix.conf
-extra-experimental-features = nix-command flakes
-access-tokens = github.com=ghp_......
-
-# make it the same...
-# update the respitory with nixos:
-nix flake update --flake github:esp0xdeadbeef/nixos
-# Then update with:
-nixos-rebuild switch --impure --flake "github:esp0xdeadbeef/nixos#$(hostname)"
-
-```
-
-
-
-
-# some testing with nixos on x13s
-
-```
-mount /dev/nvme0n1p2 /mnt
-mount /dev/nvme0n1p1 /mnt/boot
-
-(cd /mnt/ && rm -r ./cdrom ./dev ./home ./lib ./lib64 ./lost+found ./media ./mnt ./opt ./proc ./root ./run ./sbin ./snap ./srv ./swap.img ./sys ./tmp ./tmp.* ./usr ./var)
-```
-
-```bash
-mkdir -p /mnt/etc/nixos/
-vim /mnt/etc/nixos/flake.nix
-```
-
-```nix
 {
   inputs = {
     #nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -82,18 +43,3 @@ vim /mnt/etc/nixos/flake.nix
       };
     };
 }
-```
-
-This will boot.
-
-```bash
-nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/nixos-24.11#nixos-install -- --impure --flake /mnt/etc/nixos#example && systemctl reboot -i
-```
-
-update the system will not fail i guess :D:
-
-```bash
-nixos-rebuild switch --flake /etc/nixos#example
-```
-
-
