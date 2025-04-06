@@ -1,6 +1,5 @@
 { config, pkgs, ... }:
 {
-  networking.hostName = "l-x13s";
   nixos-x13s.enable = true;
   nixos-x13s.bluetoothMac = "E9:1C:3B:F0:FD:8C";
   nixos-x13s.wifiMac = "8c:fd:f0:1c:3b:0a";
@@ -14,6 +13,13 @@
     };
   };
   fileSystems."/".device = "/dev/mapper/root";
+  swapDevices = [
+    {
+      device = "/var/lib/swapfile";
+      size = 16 * 1024;
+    }
+  ];
+
   system.stateVersion = "24.11";
   services.openssh.enable = true;
   environment.systemPackages = with pkgs; [ util-linux ];
