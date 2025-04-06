@@ -8,8 +8,6 @@
   time.timeZone = "Europe/Amsterdam";
 
 
-  # new rule to allow wireguard through:
-  networking.firewall.checkReversePath = false;
 
 
 }
