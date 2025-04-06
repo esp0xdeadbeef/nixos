@@ -8,7 +8,10 @@ in {
   system.autoUpgrade = {
     enable = true;
     flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;  # Use the hostname
-    flags = [ "--impure" ];
+    flags = [ 
+      "--impure"
+      "--no-write-lock-file"
+    ];
     dates = "Mon 9:00";
     randomizedDelaySec = "45min";
     operation = "switch";  # Avoid switching to a new kernel immediately
