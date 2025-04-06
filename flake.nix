@@ -158,6 +158,24 @@
           modules = [
             nixos-x13s.nixosModules.default
             ./hardware/l-x13s/hardware-configuration.nix
+            {
+              networking.hostName = "l-x13s";
+            }
+            ./desktop/fonts.nix
+            ./system/autologin.nix
+            ./desktop/environment.nix
+            ./system/garbage-collection.nix
+            ./system/locale.nix
+            # ./network/hostname.nix
+            ./network/firewall.nix
+            # ./network/nat-lxc.nix
+            ./desktop/applets.nix
+            # ./desktop/packages.nix
+            #./desktop/darkmode.nix
+            ./desktop/shell-env.nix
+            ./desktop/users-and-groups.nix
+            ./system/version.nix
+            ./system/autoupdate.nix
           ];
         };
       };
