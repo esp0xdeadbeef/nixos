@@ -6,7 +6,7 @@
   #############################
   users.users.deadbeef = {
     isNormalUser = true;
-    linger = true; # not sure what this does...
+    linger = true; # deamon capabilities
     description = "deadbeef";
     extraGroups = [
       "networkmanager"
