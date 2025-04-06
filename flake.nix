@@ -158,6 +158,7 @@
           modules = [
             nixos-x13s.nixosModules.default
             ({ config, pkgs, ... }: {
+              networking.hostName = "l-x13s";
               nixos-x13s.enable = true;
               nixos-x13s.bluetoothMac = "E9:1C:3B:F0:FD:8C";
               nixos-x13s.wifiMac = "8c:fd:f0:1c:3b:0a";
