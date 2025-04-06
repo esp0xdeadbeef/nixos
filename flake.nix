@@ -16,6 +16,7 @@
     # Add Home Manager as an input
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    nixos-x13s.url = "github:BrainWart/x13s-nixos";
 
   };
 
@@ -26,6 +27,7 @@
       nixpkgs-unstable,
       lanzaboote,
       home-manager,
+      nixos-x13s,
       ...
     }:
     let
@@ -151,6 +153,28 @@
               #./desktop/private-config.nix
             ]
             false;
+        l-x13s = nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          modules = [
+            nixos-x13s.nixosModules.default
+            ({ config, pkgs, ... }: {
+              nixos-x13s.enable = true;
+              nixos-x13s.bluetoothMac = "E9:1C:3B:F0:FD:8C";
+              nixos-x13s.wifiMac = "8c:fd:f0:1c:3b:0a";
+              specialisation = {
+                mainline.configuration.nixos-x13s.kernel = "mainline";
+              };
+              nixpkgs.config.allowUnfree = true;
+              boot.initrd.luks.devices = {
+                root = { device = "/dev/nvme0n1p2"; };
+              };
+              fileSystems."/".device = "/dev/mapper/root";
+              system.stateVersion = "24.11";
+              services.openssh.enable = true;
+              environment.systemPackages = with pkgs; [ util-linux ];
+            })
+          ];
+        };
       };
 
       packages.x86_64-linux = {
