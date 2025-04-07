@@ -97,3 +97,11 @@ nixos-rebuild switch --flake /etc/nixos#example
 ```
 
 
+```
+# l-werk libvirtd, commit:
+# Dead
+# e0efcc4e9c6824881a7a428504120fb961ebe274
+# Works:
+# 65208e8043d59493cbf5adcb9ab346291a07fe3d
+git diff 65208e8043d59493cbf5adcb9ab346291a07fe3d e0efcc4e9c6824881a7a428504120fb961ebe274
+```
