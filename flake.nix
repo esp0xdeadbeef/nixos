@@ -96,6 +96,7 @@
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
+              ./virtualization/libvirt.nix
 
               {
                 environment.interactiveShellInit = ''
