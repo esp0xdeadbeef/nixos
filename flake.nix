@@ -180,7 +180,10 @@
           system = "aarch64-linux";
           modules = [
             nixos-x13s.nixosModules.default
+
+
             home-manager.nixosModules.home-manager
+            ./home-manager/l-x13s/home.nix
 
 
             ./hardware/l-x13s/hardware-configuration.nix
