@@ -180,6 +180,9 @@
           system = "aarch64-linux";
           modules = [
             nixos-x13s.nixosModules.default
+            home-manager.nixosModules.home-manager
+
+
             ./hardware/l-x13s/hardware-configuration.nix
             {
               networking.hostName = "l-x13s";
