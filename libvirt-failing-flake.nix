@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-    #nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    # nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     lanzaboote = {
@@ -16,7 +16,10 @@
     # Add Home Manager as an input
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    nixos-x13s.url = "github:BrainWart/x13s-nixos";
 
+    # widevine:
+    nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
   };
 
   outputs =
@@ -26,6 +29,8 @@
       nixpkgs-unstable,
       lanzaboote,
       home-manager,
+      nixos-x13s,
+      nixos-aarch64-widevine,
       ...
     }:
     let
@@ -79,7 +84,7 @@
               ./home-manager/l-werk/home.nix
               ./desktop/fonts.nix
               #./system/autologin.nix
-              ./desktop/l-werk/environment.nix
+              ./desktop/environment.nix
               ./system/garbage-collection.nix
               ./system/locale.nix
               ./network/hostname.nix
@@ -87,11 +92,17 @@
               ./network/nat-lxc.nix
               ./desktop/applets.nix
               ./desktop/packages.nix
-              # ./desktop/darkmode.nix
+              ./desktop/darkmode.nix
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
               ./virtualization/libvirt.nix
+
+              {
+                environment.interactiveShellInit = ''
+                  ZSH_THEME=clean
+                '';
+              }
             ]
             true;
 
@@ -117,7 +128,7 @@
               ./network/nat-lxc.nix
               ./desktop/applets.nix
               ./desktop/packages.nix
-              #./desktop/darkmode.nix
+              ./desktop/darkmode.nix
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
@@ -129,6 +140,12 @@
                 services.desktopManager.plasma6.enable = true;
                 programs.sway.enable = true;
                 services.displayManager.defaultSession = "none+i3";
+              }
+
+              {
+                environment.interactiveShellInit = ''
+                  ZSH_THEME=robbyrussell
+                '';
               }
             ]
             true;
@@ -152,6 +169,42 @@
               #./desktop/private-config.nix
             ]
             false;
+        l-x13s = nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          modules = [
+            nixos-x13s.nixosModules.default
+            ./hardware/l-x13s/hardware-configuration.nix
+            {
+              networking.hostName = "l-x13s";
+            }
+            ./desktop/fonts.nix
+            # ./system/autologin.nix
+            ./desktop/environment.nix
+            ./system/garbage-collection.nix
+            ./system/locale.nix
+            # ./network/hostname.nix
+            ./network/firewall.nix
+            # ./network/nat-lxc.nix
+            ./desktop/applets.nix
+            # ./desktop/packages.nix
+            ./desktop/darkmode.nix
+            ./desktop/shell-env.nix
+            ./desktop/users-and-groups.nix
+            ./system/version.nix
+            ./system/autoupdate.nix
+            ./packages/l-x13s/packages.nix
+            ./network/l-x13s/nmcli.nix
+            {
+              nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
+            }
+            ./packages/l-x13s/widevine.nix
+            {
+              environment.interactiveShellInit = ''
+                ZSH_THEME=trapd00r
+              '';
+            }
+          ];
+        };
       };
 
       packages.x86_64-linux = {
