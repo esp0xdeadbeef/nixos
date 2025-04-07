@@ -61,7 +61,6 @@
         rofi
         remmina
         mitmproxy
-        dropbox
 
       ];
     };
