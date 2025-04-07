@@ -31,14 +31,14 @@
   # Enable Dconf to apply settings properly
   programs.dconf.enable = true;
 
-  # User-specific GTK theme settings via Home Manager
-  home-manager.users.deadbeef = {
-    gtk.enable = true;
-    gtk.theme = {
-      name = "Adwaita-dark";
-      package = pkgs.gnome-themes-extra;
-    };
-  };
+  # # User-specific GTK theme settings via Home Manager
+  # home-manager.users.deadbeef = {
+  #   gtk.enable = true;
+  #   gtk.theme = {
+  #     name = "Adwaita-dark";
+  #     package = pkgs.gnome-themes-extra;
+  #   };
+  # };
 
   # Ensure applications respect dark mode
   services.dbus = {
