@@ -8,10 +8,10 @@ in {
   system.autoUpgrade = {
     enable = true;
     flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;
-    flags = [ "--impure" ]; # Remove --no-write-lock-file and --upgrade
+    flags = [ "--impure" "--no-write-lock-file" ]; # Remove --no-write-lock-file and --upgrade
     dates = "Mon 9:00";
     randomizedDelaySec = "45min";
-    operation = "switch";
+    operation = "boot";
     allowReboot = false;
   };
 }
