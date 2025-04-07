@@ -5,6 +5,7 @@
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
   nixpkgs.config.allowUnfree = true;
+  services.supergfxd.enable = true;
   security.polkit.enable = true;
   #services.openssh.enable = true;
   #services.openssh.settings.X11Forwarding = true;

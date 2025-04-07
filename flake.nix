@@ -16,10 +16,10 @@
     # Add Home Manager as an input
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    nixos-x13s.url = "github:BrainWart/x13s-nixos";
+    # nixos-x13s.url = "github:BrainWart/x13s-nixos";
 
     # widevine:
-    nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
+    # nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
   };
 
   outputs =
@@ -97,6 +97,7 @@
               ./virtualization/general.nix
               ./virtualization/lxc.nix
               ./virtualization/libvirt.nix
+              ./virtualization/podman.nix
 
               {
                 environment.interactiveShellInit = ''
@@ -115,6 +116,7 @@
               ./hardware/l-esp/amd.nix
               ./hardware/l-esp/swap-and-tmpfs.nix
               ./hardware/l-esp/audio-and-bluetooth.nix
+              ./hardware/l-esp/secondary-harddisk.nix
             ]
             [
               ./home-manager/l-esp/home.nix

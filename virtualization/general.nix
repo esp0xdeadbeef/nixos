@@ -5,8 +5,8 @@
   programs.virt-manager.enable = true;
   users.groups.libvirtd.members = [ "deadbeef" ];
 
-  boot.binfmt.emulatedSystems = [
-    "aarch64-linux"
-    "riscv64-linux"
-  ];
+  # boot.binfmt.emulatedSystems = [
+  #   "aarch64-linux"
+  #   "riscv64-linux"
+  # ];
 }
