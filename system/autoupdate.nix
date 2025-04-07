@@ -7,15 +7,12 @@ in {
   #############################
   system.autoUpgrade = {
     enable = true;
-    flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;  # Use the hostname
-    flags = [ 
-      "--impure"
-      "--no-write-lock-file"
-    ];
+    flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;
+    flags = [ "--impure" ]; # Remove --no-write-lock-file and --upgrade
     dates = "Mon 9:00";
     randomizedDelaySec = "45min";
-    operation = "switch";  # Avoid switching to a new kernel immediately
-    allowReboot = false;   # Prevent automatic reboots
+    operation = "switch";
+    allowReboot = false;
   };
 }
 
