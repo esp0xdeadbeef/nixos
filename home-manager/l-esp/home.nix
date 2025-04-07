@@ -15,7 +15,7 @@
     #   ExecStart = "${pkgs.exploitdb}/bin/searchsploit -u";
     # };
     serviceConfig = {
-      ExecStart = "${pkgs.alias}/bin/alias sudo='bash -c';${pkgs.exploitdb}/bin/searchsploit -u";
+      ExecStart = "${pkgs.exploitdb}/bin/searchsploit -u";
       Restart = "on-failure";
     };
   };
