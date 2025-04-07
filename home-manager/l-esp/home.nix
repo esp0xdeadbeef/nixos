@@ -1,14 +1,22 @@
-{ config, pkgs, nixpkgs-unstable, ... }:
-
+{
+  config,
+  pkgs,
+  nixpkgs-unstable,
+  ...
+}:
 
 {
   systemd.user.services.searchsploit-update = {
     description = "Update SearchSploit";
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
+    # serviceConfig = {
+    #   type = "oneshot";
+    #   ExecStart = "${pkgs.exploitdb}/bin/searchsploit -u";
+    # };
     serviceConfig = {
-      type = "oneshot";
-      execStart = "${pkgs.exploitdb}/bin/searchsploit -u";
+      ExecStart = "${pkgs.alias}/bin/alias sudo='bash -c';${pkgs.exploitdb}/bin/searchsploit -u";
+      Restart = "on-failure";
     };
   };
 
@@ -21,15 +29,25 @@
     };
   };
 
-  
+  systemd.user.services.dropbox = {
+    description = "Dropbox service";
+    wantedBy = [ "default.target" ];
+    after = [ "network-online.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.dropbox}/bin/dropbox";
+      Restart = "on-failure";
+    };
+  };
+
   #nixpkgs.config.allowUnfree = true;
   home-manager = {
     useGlobalPkgs = false;
     useUserPackages = true;
-    users.deadbeef = {  # Replace with your username
+    users.deadbeef = {
+      # Replace with your username
       home.enableNixpkgsReleaseCheck = false;
-      home.stateVersion = "24.11";  # Match your system state version
-      
+      home.stateVersion = "24.11"; # Match your system state version
+
       home.packages = with pkgs; [
         htop
         xdotool
@@ -43,7 +61,9 @@
         rofi
         remmina
         mitmproxy
-        
+
+        dropbox
+
       ];
     };
   };

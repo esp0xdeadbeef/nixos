@@ -177,7 +177,7 @@
               networking.hostName = "l-x13s";
             }
             ./desktop/fonts.nix
-            ./system/autologin.nix
+            # ./system/autologin.nix
             ./desktop/environment.nix
             ./system/garbage-collection.nix
             ./system/locale.nix
@@ -186,12 +186,13 @@
             # ./network/nat-lxc.nix
             ./desktop/applets.nix
             # ./desktop/packages.nix
-            #./desktop/darkmode.nix
+            ./desktop/darkmode.nix
             ./desktop/shell-env.nix
             ./desktop/users-and-groups.nix
             ./system/version.nix
             ./system/autoupdate.nix
             ./packages/l-x13s/packages.nix
+            ./network/l-x13s/nmcli.nix
             {
               nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
             }
@@ -201,8 +202,6 @@
                 ZSH_THEME=trapd00r
               '';
             }
-            
-            ./packages/l-x13s/packages.nix
           ];
         };
       };
