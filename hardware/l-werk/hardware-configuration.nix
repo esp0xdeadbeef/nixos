@@ -14,7 +14,6 @@
     (modulesPath + "/installer/scan/not-detected.nix")
   ];
 
-  #boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "rtsx_pci_sdmmc" ];
   boot.initrd.availableKernelModules = [
     "xhci_pci"
     "ahci"
@@ -24,18 +23,16 @@
     "sdhci_pci"
     "thunderbolt"
     "nvme"
-    "usb_storage"
     "sd_mod"
     "rtsx_pci_sdmmc"
   ];
+  
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
+  # allow nesting in vms:
+  boot.extraModprobeConfig = "options kvm_intel nested=1";
   boot.extraModulePackages = [ ];
 
-  #fileSystems."/" =
-  #  { device = "/dev/disk/by-uuid/004c1bab-e066-4b32-81b4-b42232fb9b34";
-  #    fsType = "ext4";
-  #  };
   fileSystems."/" = {
     device = "/dev/disk/by-uuid/c9569225-27ed-4c49-a7d9-090e72c58577";
     fsType = "ext4";
@@ -49,23 +46,8 @@
       "dmask=0022"
     ];
   };
-  #fileSystems."/boot" = {
-  #  device = "/dev/disk/by-uuid/679D-75A1";
-  #  fsType = "vfat";
-  #  options = [ "fmask=0077" "dmask=0077" ];
-  #};
-
-  #boot.initrd.luks.devices."root".device = "/dev/disk/by-uuid/F56F4756-60F0-46C8-A28E-8C82692DD515";
-  #  boot.initrd.luks.devices."root".device = "/dev/disk/by-uuid/f56f4756-60f0-46c8-a28e-8c82692dd515";
   boot.initrd.luks.devices."root".device = "/dev/disk/by-uuid/be6d5b2f-d108-4535-9646-249bd6ac8630";
 
-  #  fileSystems."/boot" =
-  #    { device = "/dev/disk/by-uuid/4EBC-A879";
-  #      fsType = "vfat";
-  #      options = [ "fmask=0022" "dmask=0022" ];
-  #    };
-
-  #swapDevices = [ ];
   swapDevices = [
     {
       device = "/var/lib/swapfile";
