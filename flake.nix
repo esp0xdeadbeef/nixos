@@ -16,10 +16,10 @@
     # Add Home Manager as an input
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    # nixos-x13s.url = "github:BrainWart/x13s-nixos";
+    nixos-x13s.url = "github:BrainWart/x13s-nixos";
 
     # widevine:
-    # nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
+    nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
   };
 
   outputs =
@@ -29,8 +29,8 @@
       nixpkgs-unstable,
       lanzaboote,
       home-manager,
-      # nixos-x13s,
-      # nixos-aarch64-widevine,
+      nixos-x13s,
+      nixos-aarch64-widevine,
       ...
     }:
     let
@@ -49,13 +49,15 @@
               ./desktop/users-and-groups.nix
               ./system/version.nix
               ./system/autoupdate.nix
+
+              home-manager.nixosModules.home-manager
+              # ./home-manager/home-manager-module.nix
+              # ./home-manager/home.nix
+              
               {
                 services.fwupd.enable = true;
               }
               (if secureBoot then lanzaboote.nixosModules.lanzaboote else null)
-              home-manager.nixosModules.home-manager
-              #./home-manager/home-manager-module.nix
-              #./home-manager/home.nix
             ]
             ++ hardwareModules # Hardware-specific modules
             ++ extraModules; # Additional per-machine modules
@@ -120,8 +122,8 @@
             ]
             [
               ./home-manager/l-esp/home.nix
-              ./desktop/fonts.nix
               # ./system/autologin.nix
+              ./desktop/fonts.nix
               ./desktop/environment.nix
               ./system/garbage-collection.nix
               ./system/locale.nix
@@ -134,6 +136,9 @@
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
+
+
+
               {
                 networking.hostName = "l-esp";
                 networking.networkmanager.enable = true;
@@ -171,42 +176,42 @@
               #./desktop/private-config.nix
             ]
             false;
-        # l-x13s = nixpkgs.lib.nixosSystem {
-        #   system = "aarch64-linux";
-        #   modules = [
-        #     nixos-x13s.nixosModules.default
-        #     ./hardware/l-x13s/hardware-configuration.nix
-        #     {
-        #       networking.hostName = "l-x13s";
-        #     }
-        #     ./desktop/fonts.nix
-        #     # ./system/autologin.nix
-        #     ./desktop/environment.nix
-        #     ./system/garbage-collection.nix
-        #     ./system/locale.nix
-        #     # ./network/hostname.nix
-        #     ./network/firewall.nix
-        #     # ./network/nat-lxc.nix
-        #     ./desktop/applets.nix
-        #     # ./desktop/packages.nix
-        #     ./desktop/darkmode.nix
-        #     ./desktop/shell-env.nix
-        #     ./desktop/users-and-groups.nix
-        #     ./system/version.nix
-        #     ./system/autoupdate.nix
-        #     ./packages/l-x13s/packages.nix
-        #     ./network/l-x13s/nmcli.nix
-        #     {
-        #       nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
-        #     }
-        #     ./packages/l-x13s/widevine.nix
-        #     {
-        #       environment.interactiveShellInit = ''
-        #         ZSH_THEME=trapd00r
-        #       '';
-        #     }
-        #   ];
-        # };
+        l-x13s = nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          modules = [
+            nixos-x13s.nixosModules.default
+            ./hardware/l-x13s/hardware-configuration.nix
+            {
+              networking.hostName = "l-x13s";
+            }
+            ./desktop/fonts.nix
+            # ./system/autologin.nix
+            ./desktop/environment.nix
+            ./system/garbage-collection.nix
+            ./system/locale.nix
+            # ./network/hostname.nix
+            ./network/firewall.nix
+            # ./network/nat-lxc.nix
+            ./desktop/applets.nix
+            # ./desktop/packages.nix
+            ./desktop/darkmode.nix
+            ./desktop/shell-env.nix
+            ./desktop/users-and-groups.nix
+            ./system/version.nix
+            ./system/autoupdate.nix
+            ./packages/l-x13s/packages.nix
+            ./network/l-x13s/nmcli.nix
+            {
+              nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
+            }
+            ./packages/l-x13s/widevine.nix
+            {
+              environment.interactiveShellInit = ''
+                ZSH_THEME=trapd00r
+              '';
+            }
+          ];
+        };
       };
 
       packages.x86_64-linux = {
