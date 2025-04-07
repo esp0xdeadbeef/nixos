@@ -92,7 +92,7 @@
               ./network/nat-lxc.nix
               ./desktop/applets.nix
               ./desktop/packages.nix
-              # ./desktop/darkmode.nix
+              ./desktop/darkmode.nix
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
@@ -127,7 +127,7 @@
               ./network/nat-lxc.nix
               ./desktop/applets.nix
               ./desktop/packages.nix
-              #./desktop/darkmode.nix
+              ./desktop/darkmode.nix
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
