@@ -14,6 +14,7 @@
 
   # Load nvidia driver for Xorg and Wayland
   #services.xserver.videoDrivers = ["nvidia"];
+  services.supergfxd.enable = true;
   hardware.nvidia.modesetting.enable = true;
   hardware.nvidia.powerManagement.enable = false;
   hardware.nvidia.powerManagement.finegrained = false;

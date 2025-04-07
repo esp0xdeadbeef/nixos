@@ -6,8 +6,8 @@
   programs.neovim.defaultEditor = true;
   nixpkgs.config.allowUnfree = true;
   security.polkit.enable = true;
-  #services.openssh.enable = true;
-  #services.openssh.settings.X11Forwarding = true;
+  # #services.openssh.enable = true;
+  # #services.openssh.settings.X11Forwarding = true;
 
   # creating a a softlink for burp shit (suite)
   environment.etc."burp/jython.jar" = {
@@ -34,23 +34,16 @@
   # $ nix search wget
 
   environment.systemPackages = with pkgs; [
-    home-manager
     nix-index
     arandr
-    #hyprland
-    #rofi
-    #autorandr
     fast-cli
-    #cudaPackages.cudatoolkit
     alacritty
-    #flameshot
-    #google-chrome
     navi
     nixfmt-rfc-style
     pulseaudio
     feroxbuster
     nuclei
-    gau # wayback machine
+    gau
     nmap
     unzip
     sqlmap
@@ -61,9 +54,8 @@
     samba4Full
     rlwrap
     lastpass-cli
-
     tpm2-tss
-    vim
+    neovim
     responder
     playerctl
     autorandr
@@ -80,65 +72,58 @@
     gron
     mokutil
     man
-    glxinfo
-    #dex
     pciutils
     autotiling
     lshw
     neofetch
     hashcat
-
-    # virtualization:
-    podman
-    docker
-    lxc
-
-    # easier searching:
     fzf
-    # package manager:
     git
     traceroute
     tmux
     dig
-    #(burpsuite.override { proEdition = true; })
     zap
     bindfs
     xclip
     wget
     obsidian
-    #qemu
-    libvirt
-    spotify
-    virt-manager
-    virt-viewer
-    spice
-    spice-gtk
-    spice-protocol
-    win-virtio
-    win-spice
+    # spotify
     python3
     libusb1
     firefox
     thunderbird
-    #discord
-    #slack
+    legcord
     kubectl
     docker
     kind
-    #teams
     brave
     python3.pkgs.evdev
     python3.pkgs.pygraphviz
     podman-compose
-    #google-chrome
-    #chromium
-    #signal-desktop
     sbctl
     tcpdump
     wireshark
     tshark
     ventoy-full
+    htop
 
+
+
+    # i3 shit:
+    xdotool
+    azure-cli
+    i3status-rust
+    obsidian
+    vscode
+
+    chromium
+    
+    # discord
+    # google-chrome
+    flameshot
+    rofi
+    remmina
+    mitmproxy
   ];
 
 }

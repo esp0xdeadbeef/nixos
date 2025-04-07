@@ -4,8 +4,10 @@
   environment.systemPackages = with pkgs; [
     rocmPackages.rocm-smi
   ];
-  boot.kernelParams = [
-    "amdgpu.secure_display=0"
-  ];
+  # still whihing that the vid card is "insecure":
+  # boot.kernelParams = [
+  #   "amdgpu.secure_display=0"
+  # ];
+  services.supergfxd.enable = true;
 
 }

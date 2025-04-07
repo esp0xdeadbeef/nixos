@@ -18,6 +18,8 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nixos-x13s.url = "github:BrainWart/x13s-nixos";
 
+    # widevine:
+    nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
   };
 
   outputs =
@@ -28,6 +30,7 @@
       lanzaboote,
       home-manager,
       nixos-x13s,
+      nixos-aarch64-widevine,
       ...
     }:
     let
@@ -93,6 +96,12 @@
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
+
+              {
+                environment.interactiveShellInit = ''
+                  ZSH_THEME=clean
+                '';
+              }
             ]
             true;
 
@@ -130,6 +139,12 @@
                 services.desktopManager.plasma6.enable = true;
                 programs.sway.enable = true;
                 services.displayManager.defaultSession = "none+i3";
+              }
+
+              {
+                environment.interactiveShellInit = ''
+                  ZSH_THEME=robbyrussell
+                '';
               }
             ]
             true;
@@ -176,6 +191,18 @@
             ./desktop/users-and-groups.nix
             ./system/version.nix
             ./system/autoupdate.nix
+            ./packages/l-x13s/packages.nix
+            {
+              nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
+            }
+            ./packages/l-x13s/widevine.nix
+            {
+              environment.interactiveShellInit = ''
+                ZSH_THEME=trapd00r
+              '';
+            }
+            
+            ./packages/l-x13s/packages.nix
           ];
         };
       };
