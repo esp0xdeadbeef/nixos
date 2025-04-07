@@ -29,15 +29,15 @@
     };
   };
 
-  systemd.user.services.dropbox = {
-    description = "Dropbox service";
-    wantedBy = [ "default.target" ];
-    after = [ "network-online.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.dropbox}/bin/dropbox";
-      Restart = "on-failure";
-    };
-  };
+  # systemd.user.services.dropbox = {
+  #   description = "Dropbox service";
+  #   wantedBy = [ "default.target" ];
+  #   after = [ "network-online.target" ];
+  #   serviceConfig = {
+  #     ExecStart = "${pkgs.dropbox}/bin/dropbox";
+  #     Restart = "on-failure";
+  #   };
+  # };
 
   #nixpkgs.config.allowUnfree = true;
   home-manager = {
