@@ -8,5 +8,6 @@
     fzf
     networkmanager
     konsole
+    tmux
   ];
 }
