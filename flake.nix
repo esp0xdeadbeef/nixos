@@ -49,6 +49,7 @@
               ./desktop/users-and-groups.nix
               ./system/version.nix
               ./system/autoupdate.nix
+              ./time/timezone.nix
 
               home-manager.nixosModules.home-manager
               # ./home-manager/home-manager-module.nix
@@ -183,10 +184,12 @@
 
             home-manager.nixosModules.home-manager
             ./home-manager/l-x13s/home.nix
+            ./time/timezone.nix
 
             ./hardware/l-x13s/hardware-configuration.nix
             {
               networking.hostName = "l-x13s";
+              networking.networkmanager.enable = true;
               nixpkgs.config.allowUnfree = true;
             }
             ./desktop/fonts.nix
@@ -194,18 +197,14 @@
             ./desktop/environment.nix
             ./system/garbage-collection.nix
             ./system/locale.nix
-            # ./network/hostname.nix
             ./network/firewall.nix
-            # ./network/nat-lxc.nix
             ./desktop/applets.nix
-            # ./desktop/packages.nix
             ./desktop/darkmode.nix
             ./desktop/shell-env.nix
             ./desktop/users-and-groups.nix
             ./system/version.nix
             ./system/autoupdate.nix
             ./packages/l-x13s/packages.nix
-            ./network/l-x13s/nmcli.nix
             {
               nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
             }
@@ -220,7 +219,7 @@
       };
 
       packages.x86_64-linux = {
-        #default = self.nixosConfigurations.default.config.system.build.toplevel;
+        # default = self.nixosConfigurations.default.config.system.build.toplevel;
       };
     };
 }
