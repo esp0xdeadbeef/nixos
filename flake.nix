@@ -191,6 +191,7 @@
             ./hardware/l-x13s/hardware-configuration.nix
             {
               networking.hostName = "l-x13s";
+              nixpkgs.config.allowUnfree = true;
             }
             ./desktop/fonts.nix
             # ./system/autologin.nix
