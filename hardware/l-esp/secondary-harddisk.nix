@@ -15,7 +15,7 @@
   };
 
   # Veracrypt mount
-  fileSystems."/home/deadbeef/second-ssd" = {
+  fileSystems."/mnt/second-ssd" = {
     device = "/dev/mapper/second_ssd";
     # For customising filesystem type
     # fsType = "ntfs-3g";
