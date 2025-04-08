@@ -1,75 +1,70 @@
-{ config, pkgs, ... }:
-
 {
-  # networking = {
-  #   interfaces = {
-  #     enp0s18.useDHCP = true;
-  #     enp0s19.useDHCP = false;
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 
-  #     vlan004.useDHCP = true;
-  #     vlan005.useDHCP = true;
+let
+  vlanRange = lib.range 1 10;
+  # Build a list of tuples: [ { name = "vlan001"; id = 1; } ... ]
+  vlanData = map (n: {
+    name = "vlan" + (lib.fixedWidthString 3 "0" (toString n));
+    id = n;
+  }) vlanRange;
 
-  #     # Uncomment this to use static instead of DHCP
-  #     # vlan004.ipv4.addresses = [{
-  #     #   address = "10.1.1.2";
-  #     #   prefixLength = 24;
-  #     # }];
-  #     # vlan005.ipv4.addresses = [{
-  #     #   address = "10.10.10.3";
-  #     #   prefixLength = 24;
-  #     # }];
-  #   };
+  vlanList = lib.listToAttrs (
+    map (v: {
+      name = v.name;
+      value = {
+        id = v.id;
+        interface = "br0";
+      };
+    }) vlanData
+  );
 
-  #   vlans = {
-  #     vlan004 = {
-  #       id = 4;
-  #       interface = "ens19";
-  #     };
-  #     vlan005 = {
-  #       id = 5;
-  #       interface = "ens19";
-  #     };
-  #   };
-  # };
+  generatedInterfaces = lib.listToAttrs (
+    map (v: {
+      name = v.name;
+      value = {
+        useDHCP = true;
+      };
+    }) vlanData
+  );
+
+in
+{
   networking = {
-    useNetworkd = false;
-    useDHCP = false; # off by defalut, enable per-interface
-    # zfs needs hostId, so we derive it from hostname
+    useNetworkd = true;
+    useDHCP = false;
+
+    vlans = vlanList;
+
+    bridges = {
+      "br0" = {
+        interfaces = [ "enp0s19" ];
+      };
+    };
+
+    interfaces = generatedInterfaces // {
+      enp0s18.useDHCP = true;
+      br0.useDHCP = false;
+
+      # manual overide:
+      # vlan007 = {
+      #   ipv4.addresses = [
+      #     {
+      #       address = "10.0.5.5";
+      #       prefixLength = 24;
+      #     }
+      #   ];
+      # };
+    };
+
     hostId = lib.mkDefault (
       builtins.substring 0 8 (builtins.hashString "md5" config.networking.hostName)
     );
-    firewall.enable = false; # let's not complicate things while debugging
-    bridges = {
-      "br0" = {
-        interfaces = [ "enp0s19" ]; # sits on top of eth0
-      };
-    };
 
-    vlans = {
-      vlan2 = {
-        id = 2;
-        interface = "br0";
-      };
-      vlan398 = {
-        id = 398;
-        interface = "br0";
-      };
-    };
-
-    interfaces = {
-      enp0s18.useDHCP = true; # Management network
-      # eth0.useDHCP = false; # Interface is bridged
-      br0.useDHCP = false; # Bridge gets IP via DHCP
-      vlan2.useDHCP = true; # VLAN 50 gets IP via DHCP
-      vlan398 = {
-        ipv4.addresses = [
-          {
-            address = "10.99.99.30";
-            prefixLength = 24;
-          }
-        ];
-      };
-    };
+    firewall.enable = false;
   };
-
 }
