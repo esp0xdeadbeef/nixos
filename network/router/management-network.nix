@@ -1,126 +1,75 @@
-{
-  config,
-  pkgs,
-  ...
-}:
-{
+{ config, pkgs, ... }:
 
+{
   # networking = {
-  #   hostId = "deadb33f";
-  #   hostName = "nixos";
-  #   domain = "example.com";
-  #   dhcpcd.enable = false;
-  #   interfaces.enp2s1.ipv4.addresses = [
-  #     {
-  #       address = "192.168.1.2";
-  #       prefixLength = 28;
-  #     }
-  #   ];
+  #   interfaces = {
+  #     enp0s18.useDHCP = true;
+  #     enp0s19.useDHCP = false;
+
+  #     vlan004.useDHCP = true;
+  #     vlan005.useDHCP = true;
+
+  #     # Uncomment this to use static instead of DHCP
+  #     # vlan004.ipv4.addresses = [{
+  #     #   address = "10.1.1.2";
+  #     #   prefixLength = 24;
+  #     # }];
+  #     # vlan005.ipv4.addresses = [{
+  #     #   address = "10.10.10.3";
+  #     #   prefixLength = 24;
+  #     # }];
+  #   };
+
   #   vlans = {
-  #     vlan100 = {
-  #       id = 100;
-  #       interface = "enp2s0";
+  #     vlan004 = {
+  #       id = 4;
+  #       interface = "ens19";
   #     };
-  #     vlan101 = {
-  #       id = 101;
-  #       interface = "enp2s0";
+  #     vlan005 = {
+  #       id = 5;
+  #       interface = "ens19";
   #     };
   #   };
-  #   interfaces.vlan100.ipv4.addresses = [
-  #     {
-  #       address = "10.1.1.2";
-  #       prefixLength = 24;
-  #     }
-  #   ];
-  #   interfaces.vlan101.ipv4.addresses = [
-  #     {
-  #       address = "10.10.10.3";
-  #       prefixLength = 24;
-  #     }
-  #   ];
-  #   defaultGateway = "192.168.1.1";
-  #   nameservers = [
-  #     "1.1.1.1"
-  #     "8.8.8.8"
-  #   ];
   # };
-
   networking = {
-
-    # hostName = "s-router-vpn-1";
-    # nameservers = [ "${publicDnsServer}" ];
-    # firewall.enable = false;
-
-    interfaces = {
-      ens18 = {
-        useDHCP = true;
+    useNetworkd = false;
+    useDHCP = false; # off by defalut, enable per-interface
+    # zfs needs hostId, so we derive it from hostname
+    hostId = lib.mkDefault (
+      builtins.substring 0 8 (builtins.hashString "md5" config.networking.hostName)
+    );
+    firewall.enable = false; # let's not complicate things while debugging
+    bridges = {
+      "lan" = {
+        interfaces = [ "enp0s19" ]; # sits on top of eth0
       };
-      ens19 = {
-        useDHCP = false;
-      };
-      vlans = {
-        vlan100 = {
-          id = 4;
-          interface = "ens19";
-        };
-        vlan101 = {
-          id = 5;
-          interface = "ens19";
-        };
-      };
-      # interfaces.vlan100.ipv4.addresses = [
-      #   {
-      #     address = "10.1.1.2";
-      #     prefixLength = 24;
-      #   }
-      # ];
-      # interfaces.vlan101.ipv4.addresses = [
-      #   {
-      #     address = "10.10.10.3";
-      #     prefixLength = 24;
-      #   }
-      # ];
-      interfaces.vlan100.useDHCP = true;
-      interfaces.vlan101.useDHCP = true;
-
     };
 
-    # nftables = {
-    #   enable = true;
-    #   ruleset = ''
-    #     table ip filter {
-    #       chain input {
-    #         type filter hook input priority 0; policy drop;
+    vlans = {
+      vlan2 = {
+        id = 2;
+        interface = "lan";
+      };
+      vlan398 = {
+        id = 398;
+        interface = "lan";
+      };
+    };
 
-    #         iifname { "enp2s0" } accept comment "Allow local network to access the router"
-    #         iifname "enp1s0" ct state { established, related } accept comment "Allow established traffic"
-    #         iifname "enp1s0" icmp type { echo-request, destination-unreachable, time-exceeded } counter accept comment "Allow select ICMP"
-    #         iifname "enp1s0" counter drop comment "Drop all other unsolicited traffic from wan"
-    #       }
-    #       chain forward {
-    #         type filter hook forward priority 0; policy drop;
-    #         iifname { "enp2s0" } oifname { "enp1s0" } accept comment "Allow trusted LAN to WAN"
-    #         iifname { "enp1s0" } oifname { "enp2s0" } ct state established, related accept comment "Allow established back to LANs"
-    #       }
-    #     }
-
-    #     table ip nat {
-    #       chain postrouting {
-    #         type nat hook postrouting priority 100; policy accept;
-    #         oifname "enp1s0" masquerade
-    #       }
-    #     }
-
-    #     table ip6 filter {
-    #       chain input {
-    #         type filter hook input priority 0; policy drop;
-    #       }
-    #       chain forward {
-    #         type filter hook forward priority 0; policy drop;
-    #       }
-    #     }
-    #   '';
-    # };
+    interfaces = {
+      enp0s18.useDHCP = true; # Management network
+      # eth0.useDHCP = false; # Interface is bridged
+      br0.useDHCP = false; # Bridge gets IP via DHCP
+      vlan2.useDHCP = true; # VLAN 50 gets IP via DHCP
+      vlan398 = {
+        ipv4.addresses = [
+          {
+            address = "10.99.99.30";
+            prefixLength = 24;
+          }
+        ];
+      };
+    };
   };
 
 }
