@@ -55,19 +55,34 @@
       ens18 = {
         useDHCP = true;
       };
-    #   ens19 = {
-    #     useDHCP = false;
-    #     ipv4.addresses = [{
-    #       address = "10.13.84.1";
-    #       prefixLength = 24;
-    #     }];
-    #   };
-    #   enp3s0 = {
-    #     useDHCP = false;
-    #   };
-    #   enp4s0 = {
-    #     useDHCP = false;
-    #   };
+      ens19 = {
+        useDHCP = false;
+      };
+      vlans = {
+        vlan100 = {
+          id = 4;
+          interface = "ens19";
+        };
+        vlan101 = {
+          id = 5;
+          interface = "ens19";
+        };
+      };
+      # interfaces.vlan100.ipv4.addresses = [
+      #   {
+      #     address = "10.1.1.2";
+      #     prefixLength = 24;
+      #   }
+      # ];
+      # interfaces.vlan101.ipv4.addresses = [
+      #   {
+      #     address = "10.10.10.3";
+      #     prefixLength = 24;
+      #   }
+      # ];
+      interfaces.vlan100.useDHCP = true;
+      interfaces.vlan101.useDHCP = true;
+
     };
 
     # nftables = {

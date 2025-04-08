@@ -169,7 +169,7 @@
               {
                 networking.hostName = "s-router-vpn-1";
                 services.openssh.enable = true;
-                networking.networkmanager.enable = true;
+                # networking.networkmanager.enable = true;
                 services.xserver.enable = true;
                 services.displayManager.sddm.enable = true;
                 services.desktopManager.plasma6.enable = true;
