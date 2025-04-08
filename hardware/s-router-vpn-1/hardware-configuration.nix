@@ -31,6 +31,9 @@
     fsType = "ext4";
   };
 
+  boot.loader.grub.enable = true;
+  boot.loader.grub.device = "/dev/sda";
+  
   swapDevices = [ ];
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
