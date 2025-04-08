@@ -53,7 +53,7 @@
               home-manager.nixosModules.home-manager
               # ./home-manager/home-manager-module.nix
               # ./home-manager/home.nix
-              
+
               {
                 services.fwupd.enable = true;
                 nixpkgs.config.allowUnfree = true;
@@ -140,8 +140,6 @@
               ./virtualization/podman.nix
               ./virtualization/libvirt.nix
 
-
-
               {
                 networking.hostName = "l-esp";
                 networking.networkmanager.enable = true;
@@ -183,10 +181,8 @@
           modules = [
             nixos-x13s.nixosModules.default
 
-
             home-manager.nixosModules.home-manager
             ./home-manager/l-x13s/home.nix
-
 
             ./hardware/l-x13s/hardware-configuration.nix
             {
