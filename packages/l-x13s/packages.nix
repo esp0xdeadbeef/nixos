@@ -4,7 +4,6 @@
   programs.firefox.enable = true;
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
-  nixpkgs.config.allowUnfree = true;
   security.polkit.enable = true;
   # #services.openssh.enable = true;
   # #services.openssh.settings.X11Forwarding = true;

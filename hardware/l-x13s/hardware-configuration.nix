@@ -6,7 +6,6 @@
   specialisation = {
     mainline.configuration.nixos-x13s.kernel = "mainline";
   };
-  nixpkgs.config.allowUnfree = true;
   boot.initrd.luks.devices = {
     root = {
       device = "/dev/nvme0n1p2";
