@@ -56,6 +56,7 @@
               
               {
                 services.fwupd.enable = true;
+                nixpkgs.config.allowUnfree = true;
               }
               (if secureBoot then lanzaboote.nixosModules.lanzaboote else null)
             ]
@@ -136,13 +137,14 @@
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
+              ./virtualization/podman.nix
+              ./virtualization/libvirt.nix
 
 
 
               {
                 networking.hostName = "l-esp";
                 networking.networkmanager.enable = true;
-                nixpkgs.config.allowUnfree = true;
                 services.gnome.gnome-keyring.enable = true;
                 services.desktopManager.plasma6.enable = true;
                 programs.sway.enable = true;
