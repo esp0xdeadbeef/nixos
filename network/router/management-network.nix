@@ -40,7 +40,7 @@
     );
     firewall.enable = false; # let's not complicate things while debugging
     bridges = {
-      "lan" = {
+      "br0" = {
         interfaces = [ "enp0s19" ]; # sits on top of eth0
       };
     };
@@ -48,11 +48,11 @@
     vlans = {
       vlan2 = {
         id = 2;
-        interface = "lan";
+        interface = "br0";
       };
       vlan398 = {
         id = 398;
-        interface = "lan";
+        interface = "br0";
       };
     };
 
