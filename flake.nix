@@ -50,6 +50,7 @@
               ./system/version.nix
               ./system/autoupdate.nix
               ./time/timezone.nix
+              ./general/tooling.nix
 
               home-manager.nixosModules.home-manager
               # ./home-manager/home-manager-module.nix
@@ -204,6 +205,8 @@
             ./system/version.nix
             ./system/autoupdate.nix
             ./packages/l-x13s/packages.nix
+
+            ./general/tooling.nix
             {
               nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
             }
