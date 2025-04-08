@@ -162,6 +162,7 @@
             [
               # configuration without secureboot and or lanzaboote
               ./hardware/s-router-vpn-1/hardware-configuration.nix
+              ./network/router/management-network.nix
             ]
             [
               ./hardware/s-router-vpn-1/ssh-vim-and-basics.nix
@@ -173,8 +174,6 @@
                 services.displayManager.sddm.enable = true;
                 services.desktopManager.plasma6.enable = true;
               }
-              #./network/private-setup.nix
-              #./desktop/private-config.nix
             ]
             false;
         l-x13s = nixpkgs.lib.nixosSystem {
