@@ -52,6 +52,8 @@
     nuclei
     gau # wayback machine
     nmap
+    # inotify service (otherwise flameshot crashes)
+    dunst
     unzip
     sqlmap
     certipy
