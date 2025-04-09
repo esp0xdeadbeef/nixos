@@ -9,7 +9,7 @@ in {
     enable = true;
     flake = "github:esp0xdeadbeef/nixos#" + lib.strings.removeSuffix "\n" hostname;
     flags = [ "--impure" "--no-write-lock-file" ]; # Remove --no-write-lock-file and --upgrade
-    dates = "Mon 9:00";
+    dates = "9:00";
     randomizedDelaySec = "45min";
     operation = "boot";
     allowReboot = false;
