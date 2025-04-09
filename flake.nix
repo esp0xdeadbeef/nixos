@@ -164,9 +164,12 @@
               # configuration without secureboot and or lanzaboote
               ./hardware/s-router-vpn-1/hardware-configuration.nix
               ./network/router/management-network.nix
+              ./network/router/vlan-configuration-phys0.nix
             ]
             [
               ./hardware/s-router-vpn-1/ssh-vim-and-basics.nix
+              ./desktop/shell-env.nix
+              # ./general/tooling.nix
               {
                 networking.hostName = "s-router-vpn-1";
                 services.openssh.enable = true;
@@ -174,6 +177,25 @@
                 services.xserver.enable = true;
                 services.displayManager.sddm.enable = true;
                 services.desktopManager.plasma6.enable = true;
+                # boot.loader.systemd-boot.configurationLimit = 15;
+                boot.loader.grub.configurationLimit = 15;
+                environment.interactiveShellInit = ''
+                  ZSH_THEME=agnoster
+                '';
+
+                security.sudo.enable = true;
+                security.sudo.extraRules = [
+                  {
+                    groups = [ "wheel" ];
+                    commands = [
+                      {
+                        command = "ALL";
+                        options = [ "NOPASSWD" ];
+                      }
+                    ];
+                  }
+                ];
+
               }
             ]
             false;
@@ -191,6 +213,7 @@
               networking.hostName = "l-x13s";
               networking.networkmanager.enable = true;
               nixpkgs.config.allowUnfree = true;
+              boot.loader.systemd-boot.configurationLimit = 15;
             }
             ./desktop/fonts.nix
             # ./system/autologin.nix
