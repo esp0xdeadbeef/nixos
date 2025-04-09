@@ -54,6 +54,9 @@ environment = {
       mkpasswd
       #traceroute tool
       mtr
+      # traceroute self
+      traceroute
+      # file editing
       neovim
 
       # ipv6 - Looks up an on-link IPv6 node link-layer address (Neighbor Discovery)
@@ -68,6 +71,11 @@ environment = {
       # network port scan tool
       nmap
 
+      # wireshark but then in the terminal
+      tshark
+
+      # it's always dns ;)
+      dnsutils
       # some stats about the CPU
       nmon
 
