@@ -81,6 +81,7 @@
               ./hardware/l-werk/nvidia-l-werk.nix
               ./hardware/l-werk/secondary-harddisk-l-werk.nix
               ./hardware/l-werk/bootloader.nix
+              ./hardware/l-werk/swap-and-tmpfs.nix
               #./hardware/usb-firewall.nix
             ]
             [
@@ -158,6 +159,59 @@
               }
             ]
             true;
+        s-test-vm =
+          mkNixOS "s-test-vm"
+            [
+              ./hardware/s-test-vm/hardware-configuration.nix
+              ./hardware/l-werk/swap-and-tmpfs.nix
+              ./hardware/l-werk/bootloader.nix
+              # ./network/router/management-network.nix
+              # ./network/router/vlan-configuration-phys0.nix
+            ]
+            [
+              home-manager.nixosModules.home-manager
+              ./home-manager/l-x13s/home.nix
+              ./desktop/fonts.nix
+              ./desktop/environment.nix
+              ./system/garbage-collection.nix
+              ./system/locale.nix
+              ./network/hostname.nix
+              ./network/firewall.nix
+              ./network/nat-lxc.nix
+              ./desktop/applets.nix
+              ./desktop/packages.nix
+              ./desktop/darkmode.nix
+              ./desktop/shell-env.nix
+              # ./general/tooling.nix
+              {
+                networking.hostName = "s-test-vm";
+                services.openssh.enable = true;
+                # networking.networkmanager.enable = true;
+                services.xserver.enable = true;
+                services.displayManager.sddm.enable = true;
+                services.desktopManager.plasma6.enable = true;
+                boot.loader.systemd-boot.configurationLimit = 15;
+                # boot.loader.grub.configurationLimit = 15;
+                environment.interactiveShellInit = ''
+                  ZSH_THEME=random
+                '';
+
+                security.sudo.enable = true;
+                security.sudo.extraRules = [
+                  {
+                    groups = [ "wheel" ];
+                    commands = [
+                      {
+                        command = "ALL";
+                        options = [ "NOPASSWD" ];
+                      }
+                    ];
+                  }
+                ];
+
+              }
+            ]
+            true;
         s-router-vpn-1 =
           mkNixOS "s-router-vpn-1"
             [
@@ -199,6 +253,7 @@
               }
             ]
             false;
+        
         l-x13s = nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [
