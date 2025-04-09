@@ -60,6 +60,7 @@
         rofi
         remmina
         mitmproxy
+        ffuf
 
         dropbox
 
