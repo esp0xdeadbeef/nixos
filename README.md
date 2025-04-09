@@ -111,3 +111,25 @@ git diff 65208e8043d59493cbf5adcb9ab346291a07fe3d e0efcc4e9c6824881a7a428504120f
 
 https://discourse.nixos.org/t/nixos-access-point-via-hostapd/1060/3
 
+
+
+# secrets (github tokens) in nixos
+
+https://github.com/NixOS/nix/issues/6536
+
+
+```nix
+{
+  nix = {
+    extraOptions = ''
+      experimental-features = nix-command flakes
+      !include ${config.sops.secrets.nixAccessTokens.path}
+    '';
+  };
+
+  sops.secrets.nixAccessTokens = {
+    mode = "0440";
+    group = config.users.groups.keys.name;
+  };
+}
+```
