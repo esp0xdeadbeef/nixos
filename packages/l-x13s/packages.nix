@@ -44,6 +44,8 @@
     nuclei
     gau
     nmap
+    # inotify service (otherwise flameshot crashes)
+    dunst
     unzip
     sqlmap
     certipy
