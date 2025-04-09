@@ -139,8 +139,8 @@
               ./desktop/shell-env.nix
               ./virtualization/general.nix
               ./virtualization/lxc.nix
-              ./virtualization/podman.nix
               ./virtualization/libvirt.nix
+              ./virtualization/podman.nix
 
               {
                 networking.hostName = "l-esp";
