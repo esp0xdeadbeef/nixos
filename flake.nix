@@ -163,8 +163,8 @@
           mkNixOS "s-test-vm"
             [
               ./hardware/s-test-vm/hardware-configuration.nix
-              ./hardware/l-werk/swap-and-tmpfs.nix
-              ./hardware/l-werk/bootloader.nix
+              ./hardware/s-test-vm/swap-and-tmpfs.nix
+              ./hardware/s-test-vm/bootloader.nix
               # ./network/router/management-network.nix
               # ./network/router/vlan-configuration-phys0.nix
             ]
@@ -188,12 +188,12 @@
                 services.openssh.enable = true;
                 # networking.networkmanager.enable = true;
                 services.xserver.enable = true;
-                services.displayManager.sddm.enable = true;
+                # services.displayManager.sddm.enable = true;
                 services.desktopManager.plasma6.enable = true;
                 boot.loader.systemd-boot.configurationLimit = 15;
                 # boot.loader.grub.configurationLimit = 15;
                 environment.interactiveShellInit = ''
-                  ZSH_THEME=random
+                  ZSH_THEME=fishy
                 '';
 
                 security.sudo.enable = true;

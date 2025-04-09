@@ -49,6 +49,7 @@
         remmina
         mitmproxy
         netexec
+        ffuf
         #exploitdb
         nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
         (nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
