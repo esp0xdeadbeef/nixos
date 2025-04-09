@@ -165,6 +165,7 @@
               ./hardware/s-test-vm/hardware-configuration.nix
               ./hardware/s-test-vm/swap-and-tmpfs.nix
               ./hardware/s-test-vm/bootloader.nix
+              ./hardware/is-vm/qemu-guest.nix
               # ./network/router/management-network.nix
               # ./network/router/vlan-configuration-phys0.nix
             ]
@@ -196,6 +197,7 @@
                   ZSH_THEME=fishy
                 '';
 
+
                 security.sudo.enable = true;
                 security.sudo.extraRules = [
                   {
@@ -217,8 +219,10 @@
             [
               # configuration without secureboot and or lanzaboote
               ./hardware/s-router-vpn-1/hardware-configuration.nix
+              ./hardware/is-vm/qemu-guest.nix
               ./network/router/management-network.nix
               ./network/router/vlan-configuration-phys0.nix
+
             ]
             [
               ./hardware/s-router-vpn-1/ssh-vim-and-basics.nix
