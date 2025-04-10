@@ -40,7 +40,6 @@
           impermanence
           home-manager
           nixpkgs
-          nixpkgs-unstable
           ;
       };
       nixosConfigurations =
