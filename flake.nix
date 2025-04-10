@@ -37,6 +37,10 @@
     }:
     let
       lib = nixpkgs.lib;
+        mkNixOS_import = import ./lib/mkNixOS.nix {
+    inherit lib lanzaboote impermanence home-manager nixpkgs;
+  };
+
 
       mkNixOS =
         system: hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
@@ -78,12 +82,15 @@
     in
     {
       nixosConfigurations = {
+        s-test-vm = import ./hosts/s-test-vm.nix { inherit mkNixOS_import; };
+
+        
         # Default config (no hardware, just the base system)
-        default = mkNixOS "default" [ ] [ ] false;
+        default = mkNixOS "x86_64-linux" "default" [ ] [ ] false false;
 
         # Work laptop with NVIDIA
         l-werk =
-          mkNixOS "l-werk"
+          mkNixOS "x86_64-linux" "l-werk"
             [
               ./hardware/l-werk/hardware-configuration.nix
               ./hardware/l-werk/audio-and-bluetooth.nix
@@ -127,7 +134,7 @@
 
         # Private laptop with AMD GPU and other differences
         l-esp =
-          mkNixOS "l-esp"
+          mkNixOS "x86_64-linux" "l-esp"
             [
               ./hardware/l-esp/hardware-configuration.nix
               ./hardware/l-esp/bootloader.nix
@@ -173,61 +180,9 @@
             true # secure boot
             false # impermanence.nix
         ;
-        s-test-vm =
-          mkNixOS "s-test-vm"
-            [
-              ./hardware/s-test-vm/hardware-configuration.nix
-              ./hardware/s-test-vm/swap-and-tmpfs.nix
-              ./hardware/s-test-vm/bootloader.nix
-              ./hardware/is-vm/qemu-guest.nix
-              # ./network/router/management-network.nix
-              # ./network/router/vlan-configuration-phys0.nix
-            ]
-            [
-              home-manager.nixosModules.home-manager
-              ./home-manager/l-x13s/home.nix
-              ./desktop/fonts.nix
-              ./desktop/environment.nix
-              ./system/garbage-collection.nix
-              ./system/locale.nix
-              ./network/hostname.nix
-              ./network/firewall.nix
-              ./network/nat-lxc.nix
-              ./desktop/applets.nix
-              ./desktop/packages.nix
-              ./desktop/darkmode.nix
-              ./desktop/shell-env.nix
-              {
-                networking.hostName = "s-test-vm";
-                services.openssh.enable = true;
-                # networking.networkmanager.enable = true;
-                services.xserver.enable = true;
-                # services.displayManager.sddm.enable = true;
-                services.desktopManager.plasma6.enable = true;
-                boot.loader.systemd-boot.configurationLimit = 15;
-                # boot.loader.grub.configurationLimit = 15;
-                environment.interactiveShellInit = ''
-                  ZSH_THEME=fishy
-                '';
-                security.sudo.enable = true;
-                security.sudo.extraRules = [
-                  {
-                    groups = [ "wheel" ];
-                    commands = [
-                      {
-                        command = "ALL";
-                        options = [ "NOPASSWD" ];
-                      }
-                    ];
-                  }
-                ];
-              }
-            ]
-            true # secure boot
-            true # impermanence.nix
-        ;
+        # s-test-vm = import ./hosts/s-test-vm.nix { inherit mkNixOS_import; };
         s-router-vpn-1 =
-          mkNixOS "s-router-vpn-1"
+          mkNixOS "x86_64-linux" "s-router-vpn-1"
             [
               # configuration without secureboot and or lanzaboote
               ./hardware/s-router-vpn-1/hardware-configuration.nix
