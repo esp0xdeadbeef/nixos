@@ -24,6 +24,8 @@
     enable = true;
     pkiBundle = "/etc/secureboot";
   };
+  # allow nesting in vms:
+  boot.extraModprobeConfig = "options kvm_intel nested=1";
 
   # Initrd settings
   boot.initrd.systemd.enable = true;
