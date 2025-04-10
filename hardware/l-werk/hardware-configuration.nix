@@ -29,8 +29,6 @@
   
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
-  # allow nesting in vms:
-  boot.extraModprobeConfig = "options kvm_intel nested=1";
   boot.extraModulePackages = [ ];
 
   fileSystems."/" = {
