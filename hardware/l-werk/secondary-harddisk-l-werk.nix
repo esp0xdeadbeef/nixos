@@ -21,5 +21,9 @@
     # fsType = "ntfs-3g";
     # options = [ "defaults,rw,dmask=027,fmask=037,uid=1000,guid=1000,windows_names,permissions,nofail 0 0" ];
   };
+  # I would like to change it to:
+  # fileSystems."/mnt/second-ssd" = {
+  #   device = "/dev/mapper/second_ssd";
+  # };
 
 }
