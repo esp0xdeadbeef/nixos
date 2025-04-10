@@ -39,9 +39,9 @@
       lib = nixpkgs.lib;
 
       mkNixOS =
-        hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
+        system: hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
         nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
+          inherit system;
 
           specialArgs = {
             inherit nixpkgs hostname;
@@ -123,7 +123,7 @@
             ]
             true # secure boot
             false # impermanence.nix
-            ;
+        ;
 
         # Private laptop with AMD GPU and other differences
         l-esp =
@@ -172,7 +172,7 @@
             ]
             true # secure boot
             false # impermanence.nix
-            ;
+        ;
         s-test-vm =
           mkNixOS "s-test-vm"
             [
@@ -225,7 +225,7 @@
             ]
             true # secure boot
             true # impermanence.nix
-            ;
+        ;
         s-router-vpn-1 =
           mkNixOS "s-router-vpn-1"
             [
@@ -267,44 +267,49 @@
             ]
             true # secure boot
             false # impermanence.nix
-            ;
+        ;
 
-        l-x13s = nixpkgs.lib.nixosSystem {
-          system = "aarch64-linux";
-          modules = [
-            nixos-x13s.nixosModules.default
-            home-manager.nixosModules.home-manager
-            ./home-manager/l-x13s/home.nix
-            ./time/timezone.nix
-            ./hardware/l-x13s/hardware-configuration.nix
-            {
-              networking.hostName = "l-x13s";
-              networking.networkmanager.enable = true;
-              nixpkgs.config.allowUnfree = true;
-              boot.loader.systemd-boot.configurationLimit = 15;
-              nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
-            }
-            ./packages/l-x13s/widevine.nix
-            ./desktop/fonts.nix
-            ./desktop/environment.nix
-            ./system/garbage-collection.nix
-            ./system/locale.nix
-            ./network/firewall.nix
-            ./desktop/applets.nix
-            ./desktop/darkmode.nix
-            ./desktop/shell-env.nix
-            ./desktop/users-and-groups.nix
-            ./system/version.nix
-            ./system/autoupdate.nix
-            ./packages/l-x13s/packages.nix
-            ./general/tooling.nix
-            {
-              environment.interactiveShellInit = ''
-                ZSH_THEME=trapd00r
-              '';
-            }
-          ];
-        };
+        l-x13s =
+          mkNixOS "aarch64-linux" "l-x13s"
+            [
+              nixos-x13s.nixosModules.default
+              ./hardware/l-x13s/hardware-configuration.nix
+            ]
+            [
+              home-manager.nixosModules.home-manager
+              ./home-manager/l-x13s/home.nix
+              ./time/timezone.nix
+              {
+                networking.hostName = "l-x13s";
+                networking.networkmanager.enable = true;
+                nixpkgs.config.allowUnfree = true;
+                boot.loader.systemd-boot.configurationLimit = 15;
+                nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
+              }
+              ./packages/l-x13s/widevine.nix
+              ./desktop/fonts.nix
+              ./desktop/environment.nix
+              ./system/garbage-collection.nix
+              ./system/locale.nix
+              ./network/firewall.nix
+              ./desktop/applets.nix
+              ./desktop/darkmode.nix
+              ./desktop/shell-env.nix
+              ./desktop/users-and-groups.nix
+              ./system/version.nix
+              ./system/autoupdate.nix
+              ./packages/l-x13s/packages.nix
+              ./general/tooling.nix
+              {
+                environment.interactiveShellInit = ''
+                  ZSH_THEME=trapd00r
+                '';
+              }
+            ]
+            true # secure boot
+            false # impermanence
+        ;
+
       };
 
       packages.x86_64-linux = {
