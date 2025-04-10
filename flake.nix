@@ -23,7 +23,6 @@
     {
       self,
       nixpkgs,
-      nixpkgs-unstable,
       lanzaboote,
       home-manager,
       nixos-x13s,
@@ -41,6 +40,7 @@
           impermanence
           home-manager
           nixpkgs
+      nixpkgs-unstable
           ;
       };
       nixosConfigurations =
