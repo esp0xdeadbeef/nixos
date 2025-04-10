@@ -17,6 +17,7 @@
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nixos-x13s.url = "github:BrainWart/x13s-nixos";
+    impermanence.url = "github:nix-community/impermanence";
 
     # widevine:
     nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
@@ -31,30 +32,37 @@
       home-manager,
       nixos-x13s,
       nixos-aarch64-widevine,
+      impermanence,
       ...
     }:
     let
+      lib = nixpkgs.lib;
+
       mkNixOS =
-        hostname: hardwareModules: extraModules: secureBoot:
+        hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
         nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
-          specialArgs = { inherit nixpkgs-unstable hostname; };
+
+          specialArgs = {
+            inherit nixpkgs hostname;
+            username = "deadbeef";
+          };
+          # specialArgs = { inherit nixpkgs-unstable hostname; };
           modules =
             nixpkgs.lib.filter (module: module != null) [
-              # This is not a complete NixOS configuration and you need to reference
-              # your normal configuration here.
-              # ls /etc/nixos | grep 'nix$' | grep -v flake | grep -v 'secboot\|nvidia' | sed 's/^/.\//g'
-
-              #./hardware/usb-firewall.nix
               ./desktop/users-and-groups.nix
               ./system/version.nix
               ./system/autoupdate.nix
               ./time/timezone.nix
               ./general/tooling.nix
-
               home-manager.nixosModules.home-manager
-              # ./home-manager/home-manager-module.nix
-              # ./home-manager/home.nix
+              # {
+              #   specialArgs = {
+              #     inherit nixpkgs-unstable hostname;
+              #     username = "deadbeef";
+              #   };
+              # }
+              impermanence.nixosModules.impermanence
 
               {
                 services.fwupd.enable = true;
@@ -62,8 +70,10 @@
               }
               (if secureBoot then lanzaboote.nixosModules.lanzaboote else null)
             ]
-            ++ hardwareModules # Hardware-specific modules
-            ++ extraModules; # Additional per-machine modules
+            ++ hardwareModules
+            ++ lib.optional isEphemeral ./modules/impermanence.nix
+            ++ extraModules;
+
         };
     in
     {
@@ -111,7 +121,9 @@
                 '';
               }
             ]
-            true;
+            true # secure boot
+            false # impermanence.nix
+            ;
 
         # Private laptop with AMD GPU and other differences
         l-esp =
@@ -158,7 +170,9 @@
                 '';
               }
             ]
-            true;
+            true # secure boot
+            false # impermanence.nix
+            ;
         s-test-vm =
           mkNixOS "s-test-vm"
             [
@@ -183,7 +197,6 @@
               ./desktop/packages.nix
               ./desktop/darkmode.nix
               ./desktop/shell-env.nix
-              # ./general/tooling.nix
               {
                 networking.hostName = "s-test-vm";
                 services.openssh.enable = true;
@@ -196,8 +209,6 @@
                 environment.interactiveShellInit = ''
                   ZSH_THEME=fishy
                 '';
-
-
                 security.sudo.enable = true;
                 security.sudo.extraRules = [
                   {
@@ -210,10 +221,11 @@
                     ];
                   }
                 ];
-
               }
             ]
-            true;
+            true # secure boot
+            true # impermanence.nix
+            ;
         s-router-vpn-1 =
           mkNixOS "s-router-vpn-1"
             [
@@ -227,15 +239,12 @@
             [
               ./hardware/s-router-vpn-1/ssh-vim-and-basics.nix
               ./desktop/shell-env.nix
-              # ./general/tooling.nix
               {
                 networking.hostName = "s-router-vpn-1";
                 services.openssh.enable = true;
-                # networking.networkmanager.enable = true;
                 services.xserver.enable = true;
                 services.displayManager.sddm.enable = true;
                 services.desktopManager.plasma6.enable = true;
-                # boot.loader.systemd-boot.configurationLimit = 15;
                 boot.loader.grub.configurationLimit = 15;
                 environment.interactiveShellInit = ''
                   ZSH_THEME=agnoster
@@ -256,26 +265,27 @@
 
               }
             ]
-            false;
-        
+            true # secure boot
+            false # impermanence.nix
+            ;
+
         l-x13s = nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [
             nixos-x13s.nixosModules.default
-
             home-manager.nixosModules.home-manager
             ./home-manager/l-x13s/home.nix
             ./time/timezone.nix
-
             ./hardware/l-x13s/hardware-configuration.nix
             {
               networking.hostName = "l-x13s";
               networking.networkmanager.enable = true;
               nixpkgs.config.allowUnfree = true;
               boot.loader.systemd-boot.configurationLimit = 15;
+              nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
             }
+            ./packages/l-x13s/widevine.nix
             ./desktop/fonts.nix
-            # ./system/autologin.nix
             ./desktop/environment.nix
             ./system/garbage-collection.nix
             ./system/locale.nix
@@ -287,12 +297,7 @@
             ./system/version.nix
             ./system/autoupdate.nix
             ./packages/l-x13s/packages.nix
-
             ./general/tooling.nix
-            {
-              nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
-            }
-            ./packages/l-x13s/widevine.nix
             {
               environment.interactiveShellInit = ''
                 ZSH_THEME=trapd00r
