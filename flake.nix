@@ -23,6 +23,7 @@
     {
       self,
       nixpkgs,
+nixpkgs-unstable,
       lanzaboote,
       home-manager,
       nixos-x13s,
@@ -31,6 +32,12 @@
       ...
     }:
     let
+      #specialArgs = {
+      #  inherit nixpkgs nixpkgs-unstable hostname;
+      #  username = "deadbeef";
+     #};
+
+
       lib = nixpkgs.lib;
 
       mkNixOS = import ./lib/mkNixOS.nix {
@@ -40,6 +47,7 @@
           impermanence
           home-manager
           nixpkgs
+	  nixpkgs-unstable
           ;
       };
       nixosConfigurations =
@@ -59,7 +67,7 @@
                 nixpkgs
                 ;
             }
-            // import ./hosts/l-werk.nix { inherit mkNixOS; }
+	    // import ./hosts/l-werk.nix { inherit mkNixOS nixpkgs-unstable; }
             // import ./hosts/l-esp.nix { inherit mkNixOS; }
             // import ./hosts/s-router-vpn-1.nix { inherit mkNixOS; }
             // import ./hosts/s-test-vm.nix { inherit mkNixOS; }
