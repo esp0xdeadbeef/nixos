@@ -5,8 +5,9 @@ system: hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
 nixpkgs.lib.nixosSystem {
   inherit system;
 
+
   specialArgs = {
-    inherit nixpkgs hostname;
+    inherit nixpkgs nixpkgs-unstable hostname;
     username = "deadbeef";
   };
 

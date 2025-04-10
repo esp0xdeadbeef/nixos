@@ -1,4 +1,5 @@
-{ mkNixOS }:
+{ mkNixOS, nixpkgs-unstable }:
+
 
 {
  l-werk =
