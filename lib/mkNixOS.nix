@@ -1,4 +1,4 @@
-{ lib, lanzaboote, impermanence, home-manager, nixpkgs }:
+{ lib, lanzaboote, impermanence, home-manager, nixpkgs, nixpkgs-unstable }:
 
 system: hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
 
