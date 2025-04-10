@@ -48,7 +48,7 @@
           inherit system;
 
           specialArgs = {
-            inherit nixpkgs hostname;
+            inherit nixpkgs-unstable hostname;
             username = "deadbeef";
           };
           # specialArgs = { inherit nixpkgs-unstable hostname; };
