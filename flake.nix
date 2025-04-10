@@ -23,6 +23,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-unstable,
       lanzaboote,
       home-manager,
       nixos-x13s,
