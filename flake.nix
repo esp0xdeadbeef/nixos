@@ -5,18 +5,20 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     # nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    impermanence.url = "github:nix-community/impermanence";
 
     lanzaboote = {
       url = "github:nix-community/lanzaboote/v0.4.2";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    home-manager.url = "github:nix-community/home-manager";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
-    nixos-x13s.url = "github:BrainWart/x13s-nixos";
-    impermanence.url = "github:nix-community/impermanence";
     nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
+    nixos-x13s.url = "github:BrainWart/x13s-nixos";
   };
 
   outputs =
@@ -66,7 +68,6 @@
             // import ./hosts/s-router-vpn-1.nix { inherit mkNixOS; }
             // import ./hosts/s-test-vm.nix { inherit mkNixOS; }
           );
-
     in
     {
       inherit nixosConfigurations;

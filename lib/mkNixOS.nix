@@ -1,10 +1,16 @@
-{ lib, lanzaboote, impermanence, home-manager, nixpkgs, nixpkgs-unstable }:
+{
+  lib,
+  lanzaboote,
+  impermanence,
+  home-manager,
+  nixpkgs,
+  nixpkgs-unstable,
+}:
 
 system: hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
 
 nixpkgs.lib.nixosSystem {
   inherit system;
-
 
   specialArgs = {
     inherit nixpkgs nixpkgs-unstable hostname;
@@ -16,6 +22,7 @@ nixpkgs.lib.nixosSystem {
       ../hosts/desktop/users-and-groups.nix
       ../hosts/system/version.nix
       ../hosts/system/autoupdate.nix
+      ../hosts/system/garbage-collection.nix
       ../hosts/time/timezone.nix
       ../hosts/general/tooling.nix
       home-manager.nixosModules.home-manager
