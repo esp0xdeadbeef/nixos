@@ -10,8 +10,15 @@ environment = {
     # Put ~/bin in PATH.
     # homeBinInPath = true;
     systemPackages = with pkgs; [
+
+      # encryption:
       # cli encrypt a message with key generator:
       age
+      # sops:
+      sops
+      # pgp
+      gnupg
+
       # taskmanager in linux, holy shit this is cool!
       btop
       # check out byobu-tmux (f12=ctrl+b)

@@ -1,9 +1,9 @@
 {
   mkNixOS,
-  nixos-x13s,
-  nixos-aarch64-widevine,
   home-manager,
   nixpkgs,
+  nixos-x13s,
+  nixos-aarch64-widevine,
 }:
 
 {
@@ -24,6 +24,7 @@
           boot.loader.systemd-boot.configurationLimit = 15;
           nixpkgs.overlays = [ nixos-aarch64-widevine.overlays.default ];
         }
+        ./secrets/import-secrets.nix
         ./packages/l-x13s/widevine.nix
         ./desktop/fonts.nix
         ./desktop/environment.nix

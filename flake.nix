@@ -7,6 +7,10 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     impermanence.url = "github:nix-community/impermanence";
 
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+    };
+
     lanzaboote = {
       url = "github:nix-community/lanzaboote/v0.4.2";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -31,6 +35,7 @@
       nixos-x13s,
       nixos-aarch64-widevine,
       impermanence,
+      sops-nix,
       ...
     }:
     let
@@ -44,6 +49,7 @@
           home-manager
           nixpkgs
           nixpkgs-unstable
+          sops-nix
           ;
       };
       nixosConfigurations =
@@ -57,16 +63,24 @@
             import ./hosts/l-x13s.nix {
               inherit
                 mkNixOS
-                nixos-x13s
-                nixos-aarch64-widevine
                 home-manager
                 nixpkgs
+                nixos-x13s
+                nixos-aarch64-widevine
                 ;
             }
             // import ./hosts/l-werk.nix { inherit mkNixOS nixpkgs-unstable; }
             // import ./hosts/l-esp.nix { inherit mkNixOS; }
             // import ./hosts/s-router-vpn-1.nix { inherit mkNixOS; }
-            // import ./hosts/s-test-vm.nix { inherit mkNixOS; }
+            // import ./hosts/s-test-vm.nix {
+              inherit
+                mkNixOS
+                nixpkgs
+                nixpkgs-unstable
+                home-manager
+                sops-nix
+                ;
+            }
           );
     in
     {

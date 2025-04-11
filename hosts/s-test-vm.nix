@@ -1,6 +1,12 @@
-{ mkNixOS }:
-
 {
+  mkNixOS,
+  nixpkgs,
+  nixpkgs-unstable,
+  home-manager,
+  sops-nix,
+}:
+{
+  # Add the sops-nix module import.
   s-test-vm =
     mkNixOS "x86_64-linux" "s-test-vm"
       [
@@ -10,6 +16,36 @@
         ./hardware/is-vm/qemu-guest.nix
       ]
       [
+        # { config, pkgs, ... }:
+        # {
+        #   # Import the sops-nix module.
+        #   imports = [ sops-nix.nixosModules ];
+        #   # Define the sops options.
+        #   sops = {
+        #     unwrap = true;  # Automatically unwrap decrypted secrets.
+        #     secrets = {
+        #       mysecret = {
+        #         file = ./hosts/secrets/secrets.yaml;
+        #       };
+        #     };
+        #   };
+
+        #   # A simple service to output the decrypted message.
+        #   systemd.services.echoSecret = {
+        #     description = "Echo secret for testing";
+        #     serviceConfig = {
+        #       Type = "oneshot";
+        #       ExecStart = "${pkgs.bash}/bin/bash -c 'echo \"${config.sops.secrets.mysecret.message}\"'";
+        #     };
+        #     wantedBy = [ "multi-user.target" ];
+        #   };
+        # }
+
+        # You can comment out or remove any additional module imports while testing.
+        # Remove or postpone the use of ./secrets/import-secrets.nix if it’s causing conflicts.
+        # Also temporarily reduce your module stack to isolate sops functionality.
+
+
         ./home-manager/l-x13s/home.nix
         ./desktop/fonts.nix
         ./desktop/environment.nix
