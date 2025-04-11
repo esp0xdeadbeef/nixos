@@ -66,7 +66,7 @@
       matchConfig.Name = "vlan-natted-internal";
       addresses = [
         { Address = "192.168.80.20/24"; }
-        { Address = "fd80:dead:beef:0:be24:11ff:fe28:1fb6/64"; }
+        { Address = "fd80:dead:beef::1/64"; }
       ];
       networkConfig = {
         DHCP         = "no";

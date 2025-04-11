@@ -5,6 +5,7 @@
   home-manager,
   nixpkgs,
   nixpkgs-unstable,
+  sops-nix,
 }:
 
 system: hostname: hardwareModules: extraModules: secureBoot: isEphemeral:
