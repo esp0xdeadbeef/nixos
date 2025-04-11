@@ -20,50 +20,78 @@
       linkConfig.Name = "phys0";
     };
 
-    # VLAN 2 - LAN
+    # VLAN for LAN (ID: 4) with DHCP
     netdevs."10-vlan-lan" = {
       netdevConfig = {
         Kind = "vlan";
         Name = "vlan-lan";
       };
-      vlanConfig.Id = 3;
-    };
-
-    # VLAN 3 - IoT
-    netdevs."10-vlan-forwarded-vpn" = {
-      netdevConfig = {
-        Kind = "vlan";
-        Name = "vlan-forwarded-vpn";
-      };
       vlanConfig.Id = 4;
     };
-
-    # Attach VLANs to phys0
-    networks."10-phys0" = {
-      matchConfig.Name = "phys0";
-      networkConfig.VLAN = [ "vlan-lan" "vlan-forwarded-vpn" ];
-    };
-
-    # DHCP for vlan-lan (no default route)
-    networks."20-vlan-lan" = {
+    networks."10-vlan-lan" = {
       matchConfig.Name = "vlan-lan";
       networkConfig = {
         DHCP = "yes";
         IPv6AcceptRA = true;
       };
       dhcpConfig.RouteMetric = 150;
-      dhcpV4Config.UseGateway = false;
     };
 
-    # DHCP for vlan-iot (no default route)
-    networks."20-vlan-forwarded-vpn" = {
-      matchConfig.Name = "vlan-forwarded-vpn";
+    # VLAN for Test (ID: 5) with DHCP
+    netdevs."20-vlan-test" = {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "vlan-test";
+      };
+      vlanConfig.Id = 5;
+    };
+    networks."20-vlan-test" = {
+      matchConfig.Name = "vlan-test";
       networkConfig = {
         DHCP = "yes";
         IPv6AcceptRA = true;
       };
       dhcpConfig.RouteMetric = 150;
-      dhcpV4Config.UseGateway = false;
+    };
+
+    # VLAN for vlan-natted-internal (ID: 10) with static IP and a high default route metric
+    netdevs."30-vlan-natted-internal" = {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "vlan-natted-internal";
+      };
+      vlanConfig.Id = 10;
+    };
+    networks."30-vlan-natted-internal" = {
+      matchConfig.Name = "vlan-natted-internal";
+      addresses = [
+        { Address = "192.168.80.20/24"; }
+        { Address = "fd80:dead:beef:0:be24:11ff:fe28:1fb6/64"; }
+      ];
+      networkConfig = {
+        DHCP         = "no";
+        IPv6AcceptRA = false;
+        DNS          = "192.168.80.1";
+        # Remove Gateway here to avoid automatic default route creation.
+      };
+      routes = [
+        {
+          Destination = "0.0.0.0/0";
+          Gateway     = "192.168.80.1";
+          Metric      = 1024;  # This sets the default route with a high metric.
+        }
+      ];
+    };
+
+
+    # Attach only the DHCP VLANs to phys0
+    networks."10-phys0" = {
+      matchConfig.Name = "phys0";
+      networkConfig.VLAN = [
+        "vlan-lan"
+        "vlan-test"
+        "vlan-natted-internal"
+      ];
     };
   };
 }
