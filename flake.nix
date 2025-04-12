@@ -1,89 +1,116 @@
 {
-  description = "An optionally SecureBoot-enabled NixOS configuration";
+  description = "Your new nix config";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-    # nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    impermanence.url = "github:nix-community/impermanence";
-
-    sops-nix = {
-      url = "github:Mic92/sops-nix";
-    };
+    # Nixpkgs
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
+    # You can access packages and modules from different nixpkgs revs
+    # at the same time. Here's an working example:
+    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
+    # Also see the 'unstable-packages' overlay at 'overlays/default.nix'.
 
     lanzaboote = {
       url = "github:nix-community/lanzaboote";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    home-manager = {
-      url = "github:nix-community/home-manager";
-      inputs.nixpkgs.follows = "nixpkgs";
+    # Home manager
+    home-manager.url = "github:nix-community/home-manager/release-24.11";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    # sops:
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
     };
 
+    # (hardware related inputs) x13s:
     nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
     nixos-x13s.url = "github:BrainWart/x13s-nixos";
+
   };
 
   outputs =
     {
-      # self,
+      self,
       nixpkgs,
-      nixpkgs-unstable,
-      lanzaboote,
       home-manager,
-      nixos-x13s,
-      nixos-aarch64-widevine,
-      impermanence,
-      sops-nix,
+      lanzaboote,
       ...
-    }:
+    }@inputs:
     let
-      lib = nixpkgs.lib;
-
-      mkNixOS = import ./lib/mkNixOS.nix {
-        inherit
-          lib
-          lanzaboote
-          impermanence
-          home-manager
-          nixpkgs
-          nixpkgs-unstable
-          sops-nix
-          ;
-      };
-      nixosConfigurations =
-        lib.foldlAttrs
-          (
-            acc: name: value:
-            acc // { ${name} = value; }
-          )
-          { }
-          (
-            import ./hosts/l-x13s.nix {
-              inherit
-                mkNixOS
-                home-manager
-                nixpkgs
-                nixos-x13s
-                nixos-aarch64-widevine
-                ;
-            }
-            // import ./hosts/l-werk.nix { inherit mkNixOS nixpkgs-unstable; }
-            // import ./hosts/l-esp.nix { inherit mkNixOS; }
-            // import ./hosts/s-router-vpn-1.nix { inherit mkNixOS; }
-            // import ./hosts/s-test-vm.nix {
-              inherit
-                mkNixOS
-                nixpkgs
-                nixpkgs-unstable
-                home-manager
-                sops-nix
-                ;
-            }
-          );
+      inherit (self) outputs;
+      # Supported systems for your flake packages, shell, etc.
+      systems = [
+        "aarch64-linux"
+        "i686-linux"
+        "x86_64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
+      # This is a function that generates an attribute by calling a function you
+      # pass to it, with each system as an argument
+      forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
-      inherit nixosConfigurations;
+      # Your custom packages
+      # Accessible through 'nix build', 'nix shell', etc
+      packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
+      # Formatter for your nix files, available through 'nix fmt'
+      # Other options beside 'alejandra' include 'nixpkgs-fmt'
+      formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
+
+      # Your custom packages and modifications, exported as overlays
+      overlays = import ./overlays { inherit inputs; };
+      # Reusable nixos modules you might want to export
+      # These are usually stuff you would upstream into nixpkgs
+      nixosModules = import ./modules/nixos;
+      # Reusable home-manager modules you might want to export
+      # These are usually stuff you would upstream into home-manager
+      homeManagerModules = import ./modules/home-manager;
+
+      # NixOS configuration entrypoint
+      # Available through 'nixos-rebuild --flake .#your-hostname'
+      nixosConfigurations = {
+        # test vm:
+        s-test-vm = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            # required for secure boot:
+            lanzaboote.nixosModules.lanzaboote
+            # > Our main nixos configuration file <
+            ./nixos/s-test-vm/configuration.nix
+          ];
+        };
+        # x13s laptop:
+        l-x13s = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            # required for booting x13s:
+            
+            
+            # > Our main nixos configuration file <
+            ./nixos/l-x13s/configuration.nix
+            # # i don't understand it why it's not working in the configuration.nix:
+            {
+            #   # nixpkgs.overlays = [ inputs.nixos-aarch64-widevine.overlays.default ];
+              nixpkgs.hostPlatform = "aarch64-linux";
+            }
+          ];
+        };
+      };
+
+      # Standalone home-manager configuration entrypoint
+      # Available through 'home-manager --flake .#your-username@your-hostname'
+      homeConfigurations = {
+        # FIXME replace with your username@hostname
+        "deadbeef@s-test-vm" = home-manager.lib.homeManagerConfiguration {
+          pkgs = nixpkgs.legacyPackages.x86_64-linux; # Home-manager requires 'pkgs' instance
+          extraSpecialArgs = { inherit inputs outputs; };
+          modules = [
+            # > Our main home-manager configuration file <
+            ./home-manager/home.nix
+          ];
+        };
+      };
     };
 }
