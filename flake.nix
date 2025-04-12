@@ -27,7 +27,7 @@
 
   outputs =
     {
-      self,
+      # self,
       nixpkgs,
       nixpkgs-unstable,
       lanzaboote,
