@@ -1,3 +1,16 @@
+# todo
+
+
+1. Adding the auto-upgrade for home-manager:
+```
+home-manager.services.home-manager-auto-upgrade = true;
+```
+2. Adding sops-nix the correct way.
+
+
+
+# some notes;
+
 
 
 This works (ignores .git):
