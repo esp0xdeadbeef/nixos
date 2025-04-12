@@ -26,21 +26,31 @@
     ./hardware/swap-and-tmpfs.nix
     ../1-general/hardware/is-vm/qemu-guest.nix
 
-    # ../1-general/home-manager/l-x13s/home.nix
-    ../1-general/system/garbage-collection.nix
+    # autoupdate.nix requires --impure
+    # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep system | grep -v 'system$' | grep -v 'old$'
+    ../1-general/system/autoupdate.nix
     ../1-general/system/locale.nix
-    # ../1-general/network/hostname.nix
-    ../1-general/network/firewall.nix
+    # ../1-general/system/autologin.nix
+    ../1-general/system/version.nix
+    ../1-general/system/garbage-collection.nix
+    #cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep network | grep -v 'network$' | grep -v 'old$'
     ../1-general/network/nat-lxc.nix
+    ../1-general/network/nmcli.nix
+    ../1-general/network/firewall.nix
     # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep desktop | grep -v 'desktop$'
-../1-general/desktop/applets.nix
-../1-general/desktop/fonts.nix
-../1-general/desktop/darkmode.nix
-../1-general/desktop/environment.nix
-../1-general/desktop/users-and-groups.nix
-../1-general/desktop/packages.nix
-../1-general/desktop/shell-env.nix
-    
+    ../1-general/desktop/applets.nix
+    ../1-general/desktop/fonts.nix
+    ../1-general/desktop/darkmode.nix
+    ../1-general/desktop/environment.nix
+    ../1-general/desktop/users-and-groups.nix
+    # ../1-general/desktop/packages.nix
+    ../1-general/desktop/shell-env.nix
+
+    #cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep virtuali | grep -v 'virtualization$' | grep -v 'old$'
+    ../1-general/virtualization/libvirt.nix
+    ../1-general/virtualization/podman.nix
+    ../1-general/virtualization/general.nix
+    ../1-general/virtualization/lxc.nix
 
   ];
 
