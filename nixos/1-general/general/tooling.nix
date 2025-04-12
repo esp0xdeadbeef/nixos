@@ -13,6 +13,12 @@ environment = {
 
       # nix home manager
       home-manager
+      # required for my (esp0xdeadbeef) lxc mounts
+      bindfs
+
+      # terminals
+      xterm
+      alacritty
 
       # encryption:
       # cli encrypt a message with key generator:
@@ -125,11 +131,9 @@ environment = {
       unzip
       # usb listing services like lsusb
       usbutils
-      # curl / wget
+      # curl / wget (http and simular tooling):
       wget
       curl
-      # a terminal
-      xterm
     ];
   };
 }
