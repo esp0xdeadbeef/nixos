@@ -78,8 +78,6 @@
       # Disable if you don't want unfree packages
       allowUnfree = true;
     };
-    # specify that it is aarch64-linux:
-    hostPlatform = "aarch64-linux";
   };
 
   nix =
