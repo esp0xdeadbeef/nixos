@@ -20,7 +20,6 @@
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
   ];
-
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -45,17 +44,35 @@
       allowUnfree = true;
     };
   };
-
-  # TODO: Set your username
+  home.enableNixpkgsReleaseCheck = false;
   home = {
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
 
-  # Add stuff for your user as you see fit:
-  # programs.neovim.enable = true;
-  home.packages = with pkgs; [ home-manager ];
 
+  home.packages = with pkgs; [
+    htop
+    teams-for-linux
+    #intune-portal
+    microsoft-edge
+    xdotool
+    azure-cli
+    i3status-rust
+    discord
+    obsidian
+    vscode
+    google-chrome
+    flameshot
+    rofi
+    remmina
+    mitmproxy
+    netexec
+    ffuf
+    #exploitdb
+    inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
+    (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+  ];
   # Enable home-manager and git
   programs.home-manager.enable = true;
   programs.git.enable = true;
@@ -65,4 +82,5 @@
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "24.11";
+
 }
