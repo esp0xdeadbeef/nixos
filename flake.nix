@@ -6,7 +6,8 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
     # You can access packages and modules from different nixpkgs revs
     # at the same time. Here's an working example:
-    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
+    #nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-24.11";
     # Also see the 'unstable-packages' overlay at 'overlays/default.nix'.
 
     lanzaboote = {
@@ -104,12 +105,16 @@
       # Available through 'home-manager --flake .#your-username@your-hostname'
       homeConfigurations = {
         # FIXME replace with your username@hostname
-        "deadbeef@s-test-vm" = home-manager.lib.homeManagerConfiguration {
+        "deadbeef@l-werk" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux; # Home-manager requires 'pkgs' instance
           extraSpecialArgs = { inherit inputs outputs; };
           modules = [
             # > Our main home-manager configuration file <
             ./home-manager/home.nix
+            ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
+#../../backup-of-old-nixos/hosts/network/hostname.nix
+./backup-of-old-nixos/hosts/desktop/darkmode.nix
+            
           ];
         };
       };

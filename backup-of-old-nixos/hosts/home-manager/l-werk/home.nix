@@ -1,33 +1,37 @@
 {
+  inputs,
+  outputs,
+  lib,
   config,
   pkgs,
-  nixpkgs-unstable,
   ...
 }:
-
 {
-  systemd.user.services.searchsploit-update = {
-    description = "Update SearchSploit";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    serviceConfig = {
-      type = "oneshot";
-      execStart = "${pkgs.exploitdb}/bin/searchsploit -u";
-    };
-  };
 
-  systemd.user.timers.searchsploit-update = {
-    description = "Run SearchSploit Update Daily";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      onCalendar = "daily";
-      persistent = true;
+  nixpkgs = {
+    # You can add overlays here
+    overlays = [
+      # Add overlays your own flake exports (from overlays and pkgs dir):
+      outputs.overlays.additions
+      outputs.overlays.modifications
+      outputs.overlays.unstable-packages
+
+      # You can also add overlays exported from other flakes:
+      # neovim-nightly-overlay.overlays.default
+
+      # Or define it inline, for example:
+      # (final: prev: {
+      #   hi = final.hello.overrideAttrs (oldAttrs: {
+      #     patches = [ ./change-hello-to-hi.patch ];
+      #   });
+      # })
+    ];
+    # Configure your nixpkgs instance
+    config = {
+      # Disable if you don't want unfree packages
+      allowUnfree = true;
     };
   };
-  home-manager = {
-    useGlobalPkgs = true;
-    useUserPackages = true;
-    users.deadbeef = {
       # Replace with your username
       home.enableNixpkgsReleaseCheck = false;
       home.stateVersion = "24.11"; # Match your system state version
@@ -51,9 +55,7 @@
         netexec
         ffuf
         #exploitdb
-        nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
-        (nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+        inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
+        (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
       ];
-    };
-  };
 }
