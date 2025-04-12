@@ -26,11 +26,14 @@
     ./hardware/swap-and-tmpfs.nix
     ../1-general/hardware/is-vm/qemu-guest.nix
 
+    # quality of life upgrade:
+    ../1-general/general/tooling.nix
+
     # autoupdate.nix requires --impure
     # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep system | grep -v 'system$' | grep -v 'old$'
     ../1-general/system/autoupdate.nix
     ../1-general/system/locale.nix
-    # ../1-general/system/autologin.nix
+    ../1-general/system/autologin.nix
     ../1-general/system/version.nix
     ../1-general/system/garbage-collection.nix
     #cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep network | grep -v 'network$' | grep -v 'old$'
@@ -142,7 +145,7 @@
   services.xserver.enable = true;
   # services.displayManager.sddm.enable = true;
   services.desktopManager.plasma6.enable = true;
-  boot.loader.grub.configurationLimit = 15;
+  boot.loader.grub.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster

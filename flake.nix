@@ -126,7 +126,7 @@
           extraSpecialArgs = { inherit inputs outputs; };
           modules = [
             # > Our main home-manager configuration file <
-            ./home-manager/home.nix
+            ./home-manager/s-test-vm/home.nix
             # ./home-manager/l-werk/home.nix
             # ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
             #../../backup-of-old-nixos/hosts/network/hostname.nix
