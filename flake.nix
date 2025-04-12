@@ -85,16 +85,8 @@
         l-x13s = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            # required for booting x13s:
-            
-            
             # > Our main nixos configuration file <
             ./nixos/l-x13s/configuration.nix
-            # # i don't understand it why it's not working in the configuration.nix:
-            {
-            #   # nixpkgs.overlays = [ inputs.nixos-aarch64-widevine.overlays.default ];
-              nixpkgs.hostPlatform = "aarch64-linux";
-            }
           ];
         };
       };

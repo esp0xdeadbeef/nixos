@@ -22,35 +22,37 @@
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
     ./hardware-configuration.nix
+    ./hardware/bootloader.nix
+    ./hardware/hardware-configuration.nix
+    ./hardware/audio-and-bluetooth.nix
+    ./hardware/sound-fix-l-werk.nix
+    ./hardware/nvidia-l-werk.nix
+    ./hardware/secondary-harddisk-l-werk.nix
+    ./hardware/bootloader.nix
+    ./hardware/swap-and-tmpfs.nix
 
-    ../../backup-of-old-nixos/hosts/time/timezone.nix
-    ../../backup-of-old-nixos/hosts/secrets/import-secrets.nix
-    # ../backup-of-old-nixos/packages/l-x13s/widevine.nix
-    ../../backup-of-old-nixos/hosts/desktop/fonts.nix
-    ../../backup-of-old-nixos/hosts/desktop/environment.nix
-    ../../backup-of-old-nixos/hosts/system/garbage-collection.nix
-    ../../backup-of-old-nixos/hosts/system/locale.nix
-    ../../backup-of-old-nixos/hosts/network/firewall.nix
-    ../../backup-of-old-nixos/hosts/desktop/applets.nix
-    # ../../backup-of-old-nixos/hosts/desktop/darkmode.nix
-    ../../backup-of-old-nixos/hosts/desktop/shell-env.nix
-    ../../backup-of-old-nixos/hosts/desktop/users-and-groups.nix
-    ../../backup-of-old-nixos/hosts/system/version.nix
-    ../../backup-of-old-nixos/hosts/system/autoupdate.nix
-    ../../backup-of-old-nixos/hosts/packages/l-x13s/packages.nix
-    ../../backup-of-old-nixos/hosts/general/tooling.nix
-inputs.nixos-x13s.nixosModules.default
-    {
-      nixpkgs.config.allowUnfree = true;
-      boot.loader.systemd-boot.configurationLimit = 15;
-      nixpkgs.overlays = [ inputs.nixos-aarch64-widevine.overlays.default ];
-      # inputs.nixos-x13s.nixosModules.default
-    }
-    {
-      environment.interactiveShellInit = ''
-        ZSH_THEME=trapd00r
-      '';
-    }
+
+
+
+../../backup-of-old-nixos/hosts/llms/ollama.nix
+
+../../backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
+../../backup-of-old-nixos/hosts/desktop/fonts.nix
+        #./system/autologin.nix
+../../backup-of-old-nixos/hosts/desktop/environment.nix
+../../backup-of-old-nixos/hosts/system/garbage-collection.nix
+../../backup-of-old-nixos/hosts/system/locale.nix
+../../backup-of-old-nixos/hosts/network/hostname.nix
+../../backup-of-old-nixos/hosts/network/firewall.nix
+../../backup-of-old-nixos/hosts/network/nat-lxc.nix
+../../backup-of-old-nixos/hosts/desktop/applets.nix
+../../backup-of-old-nixos/hosts/desktop/packages.nix
+../../backup-of-old-nixos/hosts/desktop/darkmode.nix
+../../backup-of-old-nixos/hosts/desktop/shell-env.nix
+../../backup-of-old-nixos/hosts/virtualization/general.nix
+../../backup-of-old-nixos/hosts/virtualization/lxc.nix
+../../backup-of-old-nixos/hosts/virtualization/libvirt.nix
+../../backup-of-old-nixos/hosts/virtualization/podman.nix
   ];
 
   nixpkgs = {
@@ -76,6 +78,7 @@ inputs.nixos-x13s.nixosModules.default
       # Disable if you don't want unfree packages
       allowUnfree = true;
     };
+    # specify that it is aarch64-linux:
     hostPlatform = "aarch64-linux";
   };
 
@@ -101,9 +104,10 @@ inputs.nixos-x13s.nixosModules.default
     };
 
   # FIXME: Add the rest of your current configuration
-  networking.hostName = "l-x13s";
-  networking.networkmanager.enable = true;
 
+  networking.hostName = "s-test-vm";
+
+  # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
     deadbeef = {
