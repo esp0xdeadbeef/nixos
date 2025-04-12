@@ -24,6 +24,24 @@
     ./hardware/hardware-configuration.nix
     ./hardware/bootloader.nix
     ./hardware/swap-and-tmpfs.nix
+    ../1-general/hardware/is-vm/qemu-guest.nix
+
+    # ../1-general/home-manager/l-x13s/home.nix
+    ../1-general/system/garbage-collection.nix
+    ../1-general/system/locale.nix
+    # ../1-general/network/hostname.nix
+    ../1-general/network/firewall.nix
+    ../1-general/network/nat-lxc.nix
+    # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep desktop | grep -v 'desktop$'
+../1-general/desktop/applets.nix
+../1-general/desktop/fonts.nix
+../1-general/desktop/darkmode.nix
+../1-general/desktop/environment.nix
+../1-general/desktop/users-and-groups.nix
+../1-general/desktop/packages.nix
+../1-general/desktop/shell-env.nix
+    
+
   ];
 
   nixpkgs = {
@@ -112,10 +130,10 @@
   # networking.hostName = "s-router-vpn-1";
   # services.openssh.enable = true;
   services.xserver.enable = true;
-  services.displayManager.sddm.enable = true;
+  # services.displayManager.sddm.enable = true;
   services.desktopManager.plasma6.enable = true;
   boot.loader.grub.configurationLimit = 15;
-  
+
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster
   '';
