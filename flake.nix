@@ -93,6 +93,7 @@
         l-werk = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
+            lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
             ./nixos/l-werk/configuration.nix
           ];
