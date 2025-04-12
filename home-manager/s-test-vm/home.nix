@@ -1,3 +1,5 @@
+# This is your home-manager configuration file
+# Use this to configure your home environment (it replaces ~/.config/nixpkgs/home.nix)
 {
   inputs,
   outputs,
@@ -7,7 +9,17 @@
   ...
 }:
 {
+  # You can import other home-manager modules here
+  imports = [
+    # If you want to use modules your own flake exports (from modules/home-manager):
+    # outputs.homeManagerModules.example
 
+    # Or modules exported from other flakes (such as nix-colors):
+    # inputs.nix-colors.homeManagerModules.default
+
+    # You can also split up your configuration and import pieces of it here:
+    # ./nvim.nix
+  ];
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -32,11 +44,12 @@
       allowUnfree = true;
     };
   };
-  home.username = "deadbeef";
-  home.homeDirectory = "/home/deadbeef";
-  # Replace with your username
   home.enableNixpkgsReleaseCheck = false;
-  home.stateVersion = "24.11"; # Match your system state version
+  home = {
+    username = "deadbeef";
+    homeDirectory = "/home/deadbeef";
+  };
+
 
   home.packages = with pkgs; [
     htop
@@ -60,4 +73,14 @@
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
     (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
   ];
+  # Enable home-manager and git
+  programs.home-manager.enable = true;
+  programs.git.enable = true;
+
+  # Nicely reload system units when changing configs
+  systemd.user.startServices = "sd-switch";
+
+  # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
+  home.stateVersion = "24.11";
+
 }
