@@ -16,35 +16,34 @@
         ./hardware/is-vm/qemu-guest.nix
       ]
       [
-        # { config, pkgs, ... }:
-        # {
-        #   # Import the sops-nix module.
-        #   imports = [ sops-nix.nixosModules ];
-        #   # Define the sops options.
-        #   sops = {
-        #     unwrap = true;  # Automatically unwrap decrypted secrets.
-        #     secrets = {
-        #       mysecret = {
-        #         file = ./hosts/secrets/secrets.yaml;
+        # (
+        #   { config, pkgs, ... }:
+        #   {
+        #     imports = [ sops-nix.nixosModules ];
+
+        #     sops = {
+        #       unwrap = true;
+        #       secrets = {
+        #         mysecret = {
+        #           file = ./hosts/secrets/secrets.yaml;
+        #         };
         #       };
         #     };
-        #   };
 
-        #   # A simple service to output the decrypted message.
-        #   systemd.services.echoSecret = {
-        #     description = "Echo secret for testing";
-        #     serviceConfig = {
-        #       Type = "oneshot";
-        #       ExecStart = "${pkgs.bash}/bin/bash -c 'echo \"${config.sops.secrets.mysecret.message}\"'";
+        #     systemd.services.echoSecret = {
+        #       description = "Echo secret for testing";
+        #       serviceConfig = {
+        #         Type = "oneshot";
+        #         ExecStart = "${pkgs.bash}/bin/bash -c 'echo \"${config.sops.secrets.default.message}\"'";
+        #       };
+        #       wantedBy = [ "multi-user.target" ];
         #     };
-        #     wantedBy = [ "multi-user.target" ];
-        #   };
-        # }
+        #   }
+        # )
 
         # You can comment out or remove any additional module imports while testing.
         # Remove or postpone the use of ./secrets/import-secrets.nix if it’s causing conflicts.
         # Also temporarily reduce your module stack to isolate sops functionality.
-
 
         ./home-manager/l-x13s/home.nix
         ./desktop/fonts.nix
