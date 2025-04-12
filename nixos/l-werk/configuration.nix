@@ -36,7 +36,7 @@
 
 ../../backup-of-old-nixos/hosts/llms/ollama.nix
 
-../../backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
+#../../backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
 ../../backup-of-old-nixos/hosts/desktop/fonts.nix
         #./system/autologin.nix
 ../../backup-of-old-nixos/hosts/desktop/environment.nix
