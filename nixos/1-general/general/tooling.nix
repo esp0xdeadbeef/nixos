@@ -11,6 +11,9 @@ environment = {
     # homeBinInPath = true;
     systemPackages = with pkgs; [
 
+      # nix home manager
+      home-manager
+
       # encryption:
       # cli encrypt a message with key generator:
       age
@@ -18,6 +21,10 @@ environment = {
       sops
       # pgp
       gnupg
+
+
+      # fuzzy finder in terminal
+      fzf
 
       # taskmanager in linux, holy shit this is cool!
       btop
