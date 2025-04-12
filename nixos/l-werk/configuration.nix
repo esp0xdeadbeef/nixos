@@ -105,7 +105,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-test-vm";
+  networking.hostName = "l-werk";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
