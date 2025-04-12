@@ -42,7 +42,7 @@
 ../../backup-of-old-nixos/hosts/desktop/environment.nix
 ../../backup-of-old-nixos/hosts/system/garbage-collection.nix
 ../../backup-of-old-nixos/hosts/system/locale.nix
-../../backup-of-old-nixos/hosts/network/hostname.nix
+# ../../backup-of-old-nixos/hosts/network/hostname.nix
 ../../backup-of-old-nixos/hosts/network/firewall.nix
 ../../backup-of-old-nixos/hosts/network/nat-lxc.nix
 ../../backup-of-old-nixos/hosts/desktop/applets.nix
