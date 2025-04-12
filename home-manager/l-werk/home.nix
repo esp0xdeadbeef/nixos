@@ -60,12 +60,6 @@
   programs.home-manager.enable = true;
   programs.git.enable = true;
 
-  # User-specific GTK theme settings via Home Manager
-  gtk.enable = true;
-  gtk.theme = {
-    name = "Adwaita-dark";
-    package = pkgs.gnome-themes-extra;
-  };
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
 
