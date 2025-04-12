@@ -31,31 +31,28 @@
       # Disable if you don't want unfree packages
       allowUnfree = true;
     };
+    # hostPlatform = "aarch64-linux";
   };
-      # Replace with your username
-      home.enableNixpkgsReleaseCheck = false;
-      home.stateVersion = "24.11"; # Match your system state version
+  home.username = "deadbeef";
+  home.homeDirectory = "/home/deadbeef";
+  home.enableNixpkgsReleaseCheck = false;
 
-      home.packages = with pkgs; [
-        htop
-        teams-for-linux
-        #intune-portal
-        microsoft-edge
-        xdotool
-        azure-cli
-        i3status-rust
-        discord
-        obsidian
-        vscode
-        google-chrome
-        flameshot
-        rofi
-        remmina
-        mitmproxy
-        netexec
-        ffuf
-        #exploitdb
-        inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
-        (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
-      ];
+  home.packages = with pkgs; [
+    htop
+    xdotool
+    azure-cli
+    i3status-rust
+    # discord
+    obsidian
+    vscode
+    # google-chrome
+    flameshot
+    ffuf
+    rofi
+    remmina
+    mitmproxy
+    home-manager
+  ];
+
+  home.stateVersion = "24.11"; # Match your system state version
 }

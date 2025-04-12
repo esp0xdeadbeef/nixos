@@ -88,9 +88,12 @@
           modules = [
             # > Our main nixos configuration file <
             ./nixos/l-x13s/configuration.nix
+            {
+              # home-manager.users.deadbeef = import ./home-manager/l-x13s/home.nix;
+            }
           ];
         };
-        # l-werk laptop:
+        # work laptop:
         l-werk = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
@@ -103,6 +106,7 @@
 
       # Standalone home-manager configuration entrypoint
       # Available through 'home-manager --flake .#your-username@your-hostname'
+      # NIXPKGS_ALLOW_UNFREE=1 home-manager switch --flake path:.#$(whoami)@$(hostname)
       homeConfigurations = {
         # FIXME replace with your username@hostname
         "deadbeef@l-werk" = home-manager.lib.homeManagerConfiguration {
@@ -110,11 +114,23 @@
           extraSpecialArgs = { inherit inputs outputs; };
           modules = [
             # > Our main home-manager configuration file <
-            ./home-manager/home.nix
-            ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
-#../../backup-of-old-nixos/hosts/network/hostname.nix
-./backup-of-old-nixos/hosts/desktop/darkmode.nix
-            
+            ./home-manager/l-werk/home.nix
+            # ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
+            #../../backup-of-old-nixos/hosts/network/hostname.nix
+            # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
+
+          ];
+        };
+        "deadbeef@l-x13s" = home-manager.lib.homeManagerConfiguration {
+          pkgs = nixpkgs.legacyPackages.aarch64-linux; # Home-manager requires 'pkgs' instance
+          extraSpecialArgs = { inherit inputs outputs; };
+          modules = [
+            # > Our main home-manager configuration file <
+            # ./home-manager/home.nix
+            ./home-manager/l-x13s/home.nix
+            #../../backup-of-old-nixos/hosts/network/hostname.nix
+            # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
+
           ];
         };
       };

@@ -23,7 +23,6 @@
     # Import your generated (nixos-generate-config) hardware configuration
     ./hardware/hardware-configuration.nix
     ./hardware/bootloader.nix
-    ./hardware/hardware-configuration.nix
     ./hardware/audio-and-bluetooth.nix
     ./hardware/sound-fix-l-werk.nix
     ./hardware/nvidia-l-werk.nix
@@ -31,28 +30,28 @@
     ./hardware/bootloader.nix
     ./hardware/swap-and-tmpfs.nix
 
+    ../1-general/theme/darkmode.nix
 
+    
+    ../1-general/llms/ollama.nix
 
-
-../../backup-of-old-nixos/hosts/llms/ollama.nix
-
-#../../backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
-../../backup-of-old-nixos/hosts/desktop/fonts.nix
-        #./system/autologin.nix
-../../backup-of-old-nixos/hosts/desktop/environment.nix
-../../backup-of-old-nixos/hosts/system/garbage-collection.nix
-../../backup-of-old-nixos/hosts/system/locale.nix
-# ../../backup-of-old-nixos/hosts/network/hostname.nix
-../../backup-of-old-nixos/hosts/network/firewall.nix
-../../backup-of-old-nixos/hosts/network/nat-lxc.nix
-../../backup-of-old-nixos/hosts/desktop/applets.nix
-../../backup-of-old-nixos/hosts/desktop/packages.nix
-# ../../backup-of-old-nixos/hosts/desktop/darkmode.nix
-../../backup-of-old-nixos/hosts/desktop/shell-env.nix
-../../backup-of-old-nixos/hosts/virtualization/general.nix
-../../backup-of-old-nixos/hosts/virtualization/lxc.nix
-../../backup-of-old-nixos/hosts/virtualization/libvirt.nix
-../../backup-of-old-nixos/hosts/virtualization/podman.nix
+    #../1-general/home-manager/l-werk/home.nix
+    ../1-general/desktop/fonts.nix
+    #./system/autologin.nix
+    ../1-general/desktop/environment.nix
+    ../1-general/system/garbage-collection.nix
+    ../1-general/system/locale.nix
+    # ../1-general/network/hostname.nix
+    ../1-general/network/firewall.nix
+    ../1-general/network/nat-lxc.nix
+    ../1-general/desktop/applets.nix
+    ../1-general/desktop/packages.nix
+    # ../1-general/desktop/darkmode.nix
+    ../1-general/desktop/shell-env.nix
+    ../1-general/virtualization/general.nix
+    ../1-general/virtualization/lxc.nix
+    ../1-general/virtualization/libvirt.nix
+    ../1-general/virtualization/podman.nix
   ];
 
   nixpkgs = {
@@ -126,7 +125,7 @@
   };
 
   environment = {
-    systemPackages = [ 
+    systemPackages = [
       (pkgs.writeShellScriptBin "qemu-system-x86_64-uefi" ''
         qemu-system-x86_64 \
           -bios ${pkgs.OVMF.fd}/FV/OVMF.fd \
