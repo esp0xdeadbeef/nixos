@@ -21,7 +21,7 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
-    ./hardware-configuration.nix
+    ./hardware/hardware-configuration.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./hardware/audio-and-bluetooth.nix
@@ -47,7 +47,7 @@
 ../../backup-of-old-nixos/hosts/network/nat-lxc.nix
 ../../backup-of-old-nixos/hosts/desktop/applets.nix
 ../../backup-of-old-nixos/hosts/desktop/packages.nix
-../../backup-of-old-nixos/hosts/desktop/darkmode.nix
+# ../../backup-of-old-nixos/hosts/desktop/darkmode.nix
 ../../backup-of-old-nixos/hosts/desktop/shell-env.nix
 ../../backup-of-old-nixos/hosts/virtualization/general.nix
 ../../backup-of-old-nixos/hosts/virtualization/lxc.nix
@@ -111,7 +111,7 @@
   users.users = {
     # FIXME: Replace with your username
     deadbeef = {
-      # TODO: You can set an initial password for your user.
+      # TODO: You can ss-test-vmet an initial password for your user.
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
       initialPassword = " ";
