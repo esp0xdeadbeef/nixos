@@ -104,6 +104,8 @@
   # FIXME: Add the rest of your current configuration
 
   networking.hostName = "l-werk";
+  networking.networkmanager.enable = true;
+  time.timeZone = "Europe/Amsterdam";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
