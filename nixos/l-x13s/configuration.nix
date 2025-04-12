@@ -23,24 +23,31 @@
     # Import your generated (nixos-generate-config) hardware configuration
     ./hardware/hardware-configuration.nix
 
-
-    ../1-general/theme/darkmode.nix
+    ../1-general/general/tooling.nix
 
     ../1-general/time/timezone.nix
     ../1-general/secrets/import-secrets.nix
     # ../backup-of-old-nixos/packages/l-x13s/widevine.nix
-    ../1-general/desktop/fonts.nix
-    ../1-general/desktop/environment.nix
     ../1-general/system/garbage-collection.nix
     ../1-general/system/locale.nix
     ../1-general/network/firewall.nix
-    ../1-general/desktop/applets.nix
-    ../1-general/desktop/shell-env.nix
-    ../1-general/desktop/users-and-groups.nix
     ../1-general/system/version.nix
     ../1-general/system/autoupdate.nix
+
+    # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep desktop | grep -v 'desktop$\|\.bak$' | grep -v packages.nix
+    ../1-general/desktop/applets.nix
+    ../1-general/desktop/fonts.nix
+    ../1-general/desktop/darkmode.nix
+    ../1-general/desktop/environment.nix
+    ../1-general/desktop/users-and-groups.nix
+    # ../1-general/desktop/packages.nix
+    ../1-general/desktop/shell-env.nix
+
+
+    # packages is fucked in aarch:
     ../1-general/packages/l-x13s/packages.nix
-    ../1-general/general/tooling.nix
+
+
 inputs.nixos-x13s.nixosModules.default
     {
       nixpkgs.config.allowUnfree = true;
