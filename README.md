@@ -1,11 +1,11 @@
-# todo
+# Todo
+
+1. make the vm's for s-test and s-router bigger (64 gb each) it's too small at this moment.
 
 
-1. Adding the auto-upgrade for home-manager:
-```
-home-manager.services.home-manager-auto-upgrade = true;
-```
-2. Adding sops-nix the correct way.
+1. Adding sops-nix the correct way.
+
+
 
 
 
