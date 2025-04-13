@@ -108,6 +108,15 @@
             ./nixos/l-werk/configuration.nix
           ];
         };
+        # private intel (amd) laptop:
+        l-esp = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            lanzaboote.nixosModules.lanzaboote
+            # > Our main nixos configuration file <
+            ./nixos/l-esp/configuration.nix
+          ];
+        };
       };
 
       # Standalone home-manager configuration entrypoint
