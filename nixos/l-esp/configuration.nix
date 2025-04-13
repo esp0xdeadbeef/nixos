@@ -21,16 +21,8 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
-    ./hardware/hardware-configuration.nix
-    ./hardware/bootloader.nix
-    ./hardware/audio-and-bluetooth.nix
-    ./hardware/sound-fix-l-werk.nix
-    ./hardware/nvidia-l-werk.nix
-    ./hardware/secondary-harddisk-l-werk.nix
-    ./hardware/bootloader.nix
-    ./hardware/swap-and-tmpfs.nix
 
-    # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologincd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologin
+    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm' ; cd ../l-esp ; find . | grep -v 'old\|configuration.nix' | grep 'nix$' )
     ../1-general/desktop/applets.nix
     ../1-general/desktop/fonts.nix
     ../1-general/desktop/darkmode.nix
@@ -39,9 +31,7 @@
     ../1-general/desktop/packages.nix
     ../1-general/desktop/shell-env.nix
     ../1-general/time/timezone.nix
-    ../1-general/hardware/is-vm/qemu-guest.nix
     ../1-general/general/tooling.nix
-    # ../1-general/llms/ollama.nix
     ../1-general/virtualization/libvirt.nix
     ../1-general/virtualization/podman.nix
     ../1-general/virtualization/general.nix
@@ -49,11 +39,17 @@
     ../1-general/secrets/import-secrets.nix
     ../1-general/system/autoupdate.nix
     ../1-general/system/locale.nix
+    ../1-general/system/autologin.nix
     ../1-general/system/version.nix
     ../1-general/system/garbage-collection.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
     ../1-general/network/firewall.nix
+    ./hardware/secondary-harddisk.nix
+    ./hardware/audio-and-bluetooth.nix
+    ./hardware/amd.nix
+    ./hardware/bootloader.nix
+    ./hardware/swap-and-tmpfs.nix
 
   ];
 
