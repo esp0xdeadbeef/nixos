@@ -16,14 +16,16 @@
 
     # Or modules from other flakes (such as nixos-hardware):
     # inputs.hardware.nixosModules.common-cpu-intel
-    # inputs.hardware.nixosModules.common-ssd
+    # inputs.nixos-hardware.nixosModules.common-ssd
 
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
-    ./hardware/hardware-configuration.nix
 
-    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization')
+    # cd /home/deadbeef/github/nixos/nixos/l-x13s ; ./generate-imports.sh
+    ./hardware/hardware-configuration.nix
+    ./packages/widevine.nix
+    ./packages/packages.nix
     ../1-general/desktop/applets.nix
     ../1-general/desktop/fonts.nix
     ../1-general/desktop/darkmode.nix
@@ -40,15 +42,11 @@
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
     ../1-general/network/firewall.nix
-    # (cd /home/deadbeef/github/nixos/nixos/l-x13s ; find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' )
-    ./hardware/hardware-configuration.nix
-    ./packages/widevine.nix
-    ./packages/packages.nix
+
+
     inputs.nixos-x13s.nixosModules.default
     {
-      nixpkgs.config.allowUnfree = true;
-      boot.loader.systemd-boot.configurationLimit = 15;
-      nixpkgs.overlays = [ inputs.nixos-aarch64-widevine.overlays.default ];
+      nixpkgs.overlays = [  ];
       # inputs.nixos-x13s.nixosModules.default
     }
     {
@@ -85,6 +83,10 @@
       #     patches = [ ./change-hello-to-hi.patch ];
       #   });
       # })
+
+      # widevine patch:
+      inputs.nixos-aarch64-widevine.overlays.default
+
     ];
     # Configure your nixpkgs instance
     config = {
