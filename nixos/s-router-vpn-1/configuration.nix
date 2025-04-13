@@ -22,38 +22,20 @@
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
     ./hardware/hardware-configuration.nix
-    ./hardware/bootloader.nix
-    ./hardware/audio-and-bluetooth.nix
-    ./hardware/sound-fix-l-werk.nix
-    ./hardware/nvidia-l-werk.nix
-    ./hardware/secondary-harddisk-l-werk.nix
-    ./hardware/bootloader.nix
-    ./hardware/swap-and-tmpfs.nix
-
-    # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologincd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologin
-    ../1-general/desktop/applets.nix
-    ../1-general/desktop/fonts.nix
-    ../1-general/desktop/darkmode.nix
-    ../1-general/desktop/environment.nix
-    ../1-general/desktop/users-and-groups.nix
-    ../1-general/desktop/packages.nix
-    ../1-general/desktop/shell-env.nix
+    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'desktop\|llms\|virtualization\|network' ; cd ../s-router-vpn-1 ; find . | grep -v 'old\|configuration.nix' | grep 'nix$' )
     ../1-general/time/timezone.nix
-    ../1-general/hardware/is-vm/qemu-guest.nix
-    ../1-general/general/tooling.nix
-    ../1-general/llms/ollama.nix
-    ../1-general/virtualization/libvirt.nix
-    ../1-general/virtualization/podman.nix
-    ../1-general/virtualization/general.nix
-    ../1-general/virtualization/lxc.nix
-    ../1-general/secrets/import-secrets.nix
-    ../1-general/system/autoupdate.nix
-    ../1-general/system/locale.nix
-    ../1-general/system/version.nix
-    ../1-general/system/garbage-collection.nix
-    ../1-general/network/nat-lxc.nix
-    ../1-general/network/nmcli.nix
-    ../1-general/network/firewall.nix
+    # ../1-general/hardware/is-vm/qemu-guest.nix
+    # ../1-general/general/tooling.nix
+    # ../1-general/secrets/import-secrets.nix
+    # ../1-general/system/autoupdate.nix
+    # ../1-general/system/locale.nix
+    # ../1-general/system/autologin.nix
+    # ../1-general/system/version.nix
+    # ../1-general/system/garbage-collection.nix
+    # ./ssh-vim-and-basics.nix
+    ./network/management-network.nix
+    ./network/vlan-configuration-phys0.nix
+    ./network/firewall.nix
 
   ];
 
@@ -80,6 +62,8 @@
       # Disable if you don't want unfree packages
       allowUnfree = true;
     };
+    # specify that it is aarch64-linux:
+    hostPlatform = "x86_64-linux";
   };
 
   nix =
@@ -105,50 +89,62 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "l-werk";
-  networking.networkmanager.enable = true;
-  time.timeZone = "Europe/Amsterdam";
+  networking.hostName = "s-test-vm";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
     deadbeef = {
-      # TODO: You can ss-test-vmet an initial password for your user.
+      # TODO: You can set an initial password for your user.
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
       initialPassword = " ";
       isNormalUser = true;
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
-        # "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
       ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];
     };
   };
 
-  environment = {
-    systemPackages = [
-      (pkgs.writeShellScriptBin "qemu-system-x86_64-uefi" ''
-        qemu-system-x86_64 \
-          -bios ${pkgs.OVMF.fd}/FV/OVMF.fd \
-          "$@"
-      '')
-    ];
-  };
   # This setups a SSH server. Very important if you're setting up a headless system.
   # Feel free to remove if you don't need it.
-  # services.openssh = {
-  #   enable = false;
-  #   settings = {
-  #     # Opinionated: forbid root login through SSH.
-  #     PermitRootLogin = "no";
-  #     # Opinionated: use keys only.
-  #     # Remove if you want to SSH using passwords
-  #     PasswordAuthentication = true;
-  #   };
-  # };
+  services.openssh = {
+    enable = true;
+    settings = {
+      # Opinionated: forbid root login through SSH.
+      PermitRootLogin = "no";
+      # Opinionated: use keys only.
+      # Remove if you want to SSH using passwords
+      PasswordAuthentication = true;
+    };
+  };
 
+  # networking.hostName = "s-router-vpn-1";
+  # services.openssh.enable = true;
+  services.xserver.enable = true;
+  # services.displayManager.sddm.enable = true;
+  # services.desktopManager.plasma6.enable = true;
+  boot.loader.grub.configurationLimit = 2;
+
+  environment.interactiveShellInit = ''
+    ZSH_THEME=agnoster
+  '';
+
+  security.sudo.enable = true;
+  security.sudo.extraRules = [
+    {
+      groups = [ "wheel" ];
+      commands = [
+        {
+          command = "ALL";
+          options = [ "NOPASSWD" ];
+        }
+      ];
+    }
+  ];
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   system.stateVersion = "24.11";
 }
