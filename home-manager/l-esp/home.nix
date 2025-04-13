@@ -19,6 +19,7 @@
 
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
+    ./dropbox/packages.nix
   ];
   nixpkgs = {
     # You can add overlays here
@@ -72,10 +73,8 @@
     flameshot
     rofi
     remmina
-    mitmproxy
     netexec
     ffuf
-    dropbox
     #exploitdb
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
     # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
