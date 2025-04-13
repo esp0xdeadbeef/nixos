@@ -58,7 +58,7 @@
 
 
   home.packages = with pkgs; [
-    htop
+    # htop
     # teams-for-linux
     #intune-portal
     # microsoft-edge
