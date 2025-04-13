@@ -1,5 +1,8 @@
 { config, pkgs, ... }:
 {
+  users.groups.lxc-user = {
+    members = [ "deadbeef" ];
+  };
   virtualisation.lxc = {
     enable = true;
     unprivilegedContainers = true;
@@ -19,9 +22,6 @@
     '';
     lxcfs.enable = true;
   };
-  users.groups.lxc-user = {
-    members = [ "deadbeef" ];
-  };
   system.activationScripts.setLxcHomeACL = {
     text = ''
       export PATH=${pkgs.acl}/bin:$PATH
@@ -37,5 +37,8 @@
       setfacl -m u:100000:--x /home/deadbeef/.local/share/lxc
     '';
   };
-
+  environment.systemPackages = with pkgs; [
+    # required for my (esp0xdeadbeef) lxc mounts
+    bindfs
+  ];
 }
