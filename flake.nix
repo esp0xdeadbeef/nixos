@@ -3,40 +3,102 @@
 
   inputs = {
     # Nixpkgs
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
-    # You can access packages and modules from different nixpkgs revs
-    # at the same time. Here's an working example:
+    # nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
+    # # You can access packages and modules from different nixpkgs revs
+    # # at the same time. Here's an working example:
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
-    # nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-24.11";
-    # Also see the 'unstable-packages' overlay at 'overlays/default.nix'.
+    # # nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-24.11";
+    # # Also see the 'unstable-packages' overlay at 'overlays/default.nix'.
 
     lanzaboote = {
       url = "github:nix-community/lanzaboote";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Home manager
+    # # Home manager
+    # home-manager = {
+    #   url = "github:nix-community/home-manager/release-24.11";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
+    # nixos-hardware = {
+    #   url = "github:NixOS/nixos-hardware";
+    #   inputs.nixpkgs.follows = "nixpkgs-unstable";
+    # };
+
+    # # sops:
+    # sops-nix = {
+    #   url = "github:Mic92/sops-nix";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
+    # Nix ecosystem
+    nixpkgs = {
+      url = "github:nixos/nixpkgs/nixos-unstable";
+    };
+    nixpkgs-stable = {
+      url = "github:nixos/nixpkgs/nixos-24.11";
+    };
+    systems = {
+      url = "github:nix-systems/default-linux";
+    };
+
+    hardware = {
+      url = "github:nixos/nixos-hardware";
+    };
+    impermanence = {
+      url = "github:nix-community/impermanence";
+    };
+    nix-colors = {
+      url = "github:misterio77/nix-colors";
+    };
     home-manager = {
-      url = "github:nix-community/home-manager/release-24.11";
+      url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # sops:
     sops-nix = {
-      url = "github:Mic92/sops-nix";
+      url = "github:mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixos-mailserver = {
+      url = "gitlab:simple-nixos-mailserver/nixos-mailserver";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs-24_11.follows = "nixpkgs-stable";
+    };
+    nix-gl = {
+      url = "github:nix-community/nixgl";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nix-minecraft = {
+      url = "github:misterio77/nix-minecraft";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    disko = {
+      url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # lenovo x13s laptop configurations:
+    # nixos-x13s branch:
+    nixos-x13s = {
+      url = "github:BrainWart/x13s-nixos";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # To get spotify / widevine working on a x13s laptop:
     nixos-aarch64-widevine = {
       url = "github:epetousis/nixos-aarch64-widevine";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # nixos-x13s branch to follow:
-    nixos-x13s = {
-      url = "github:BrainWart/x13s-nixos";
+
+    # Third party programs, packaged with nix
+    firefox-addons = {
+      url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-gaming = {
+      # url = "github:fufexan/nix-gaming";
+      url = "github:misterio77/nix-gaming";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
   };
 
   outputs =
