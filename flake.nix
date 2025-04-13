@@ -27,11 +27,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # (hardware related inputs) x13s:
+    # To get spotify / widevine working on a x13s laptop:
     nixos-aarch64-widevine = {
       url = "github:epetousis/nixos-aarch64-widevine";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # nixos-x13s branch to follow:
     nixos-x13s = {
       url = "github:BrainWart/x13s-nixos";
       inputs.nixpkgs.follows = "nixpkgs";
