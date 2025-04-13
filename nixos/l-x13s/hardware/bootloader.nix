@@ -6,5 +6,5 @@
 }:
 {
 
-  boot.loader.systemd-boot.configurationLimit = 15;
+  boot.loader.systemd-boot.configurationLimit = 10;
 }
