@@ -88,9 +88,6 @@
           modules = [
             # > Our main nixos configuration file <
             ./nixos/l-x13s/configuration.nix
-            {
-              # home-manager.users.deadbeef = import ./home-manager/l-x13s/home.nix;
-            }
           ];
         };
         # work laptop:
@@ -118,7 +115,6 @@
             # ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
             #../../backup-of-old-nixos/hosts/network/hostname.nix
             # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
-
           ];
         };
         "deadbeef@s-test-vm" = home-manager.lib.homeManagerConfiguration {

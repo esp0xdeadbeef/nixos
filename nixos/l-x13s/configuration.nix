@@ -43,12 +43,11 @@
     # ../1-general/desktop/packages.nix
     ../1-general/desktop/shell-env.nix
 
-
     # packages is fucked in aarch:
-    ../1-general/packages/l-x13s/packages.nix
+    ./packages/packages.nix
 
 
-inputs.nixos-x13s.nixosModules.default
+    inputs.nixos-x13s.nixosModules.default
     {
       nixpkgs.config.allowUnfree = true;
       boot.loader.systemd-boot.configurationLimit = 15;
@@ -60,7 +59,11 @@ inputs.nixos-x13s.nixosModules.default
         ZSH_THEME=trapd00r
       '';
     }
+    # (import "${inputs.home-manager}")
+    # {inputs.home-manager.users.deadbeef = import ./home-manager/l-werk/home.nix;}
   ];
+
+  
 
   nixpkgs = {
     # You can add overlays here
