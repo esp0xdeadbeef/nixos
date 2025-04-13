@@ -53,25 +53,25 @@
 
   home.packages = with pkgs; [
     htop
-    teams-for-linux
+    # teams-for-linux
     #intune-portal
-    microsoft-edge
+    # microsoft-edge
     xdotool
-    azure-cli
+    # azure-cli
     i3status-rust
-    discord
-    obsidian
+    # discord
+    # obsidian
     vscode
     google-chrome
     flameshot
     rofi
-    remmina
+    # remmina
     mitmproxy
-    netexec
+    # netexec
     ffuf
     #exploitdb
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
-    (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+    # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
   ];
   # Enable home-manager and git
   programs.home-manager.enable = true;

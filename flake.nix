@@ -82,6 +82,15 @@
             ./nixos/s-test-vm/configuration.nix
           ];
         };
+        s-router-vpn-1 = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            # required for secure boot:
+            lanzaboote.nixosModules.lanzaboote
+            # > Our main nixos configuration file <
+            ./nixos/s-router-vpn-1/configuration.nix
+          ];
+        };
         # x13s laptop:
         l-x13s = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
