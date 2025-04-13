@@ -14,8 +14,8 @@
     };
     nixpkgs = {
       # url = "github:nixos/nixpkgs/nixos-unstable";
-      # url = "github:nixos/nixpkgs/nixos-24.11";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
+      url = "github:nixos/nixpkgs/nixos-24.11";
+      # inputs.nixpkgs.follows = "nixpkgs-stable";
     };
     systems = {
       url = "github:nix-systems/default-linux";
@@ -45,7 +45,7 @@
     # hardware:
     hardware = {
       url = "github:nixos/nixos-hardware";
-      inputs.nixpkgs.follows = "nixpkgs";
+      # inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # To get spotify / widevine working on a x13s laptop:
