@@ -16,18 +16,26 @@
     };
 
     # Home manager
-    home-manager.url = "github:nix-community/home-manager/release-24.11";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager = {
+      url = "github:nix-community/home-manager/release-24.11";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # sops:
     sops-nix = {
       url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # (hardware related inputs) x13s:
-    nixos-aarch64-widevine.url = "github:epetousis/nixos-aarch64-widevine";
-    nixos-x13s.url = "github:BrainWart/x13s-nixos";
-
+    nixos-aarch64-widevine = {
+      url = "github:epetousis/nixos-aarch64-widevine";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixos-x13s = {
+      url = "github:BrainWart/x13s-nixos";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
