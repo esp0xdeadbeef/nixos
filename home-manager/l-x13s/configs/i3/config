@@ -280,7 +280,8 @@ bindsym $mod+F4 exec discord-canary
 #doesn't work somehow :S
 #bindsym $mod+Escape exec "i3lock -i ~/.config/i3/i3-lock-screen.png -p default|win -t" && systemctl hibernate
 # while this does work :)
-bindsym $mod+Escape exec i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
+#bindsym $mod+Escape exec i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
+bindsym $mod+Escape exec "betterlockscreen -l dimblur"
 bindsym $mod+c exec google-chrome-stable
 bindsym $mod+F3 exec spotify
 exec --no-startup-id nm-applet
