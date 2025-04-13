@@ -22,7 +22,14 @@
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
 
-    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm' ;)
+    # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
+    ./hardware/audio.nix
+    ./hardware/secondary-harddisk.nix
+    ./hardware/hardware-configuration.nix
+    ./hardware/amd.nix
+    ./hardware/bluetooth.nix
+    ./hardware/bootloader.nix
+    ./hardware/swap-and-tmpfs.nix
     ../1-general/desktop/applets.nix
     ../1-general/desktop/fonts.nix
     ../1-general/desktop/darkmode.nix
@@ -33,13 +40,11 @@
     ../1-general/enable-etc-hosts-editing/default.nix
     ../1-general/security/default.nix
     ../1-general/packages/graphics/packages.nix
-    ../1-general/packages/browsers-mail-media-social-media/work/packages.nix
+    ../1-general/packages/browsers-mail-media-social-media/not-on-aarch64/packages.nix
     ../1-general/packages/browsers-mail-media-social-media/packages.nix
     ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
     ../1-general/packages/window-managers/X-org/packages.nix
     ../1-general/packages/data-tranformation/packages.nix
-    ../1-general/packages/network-troubleshooting/packages.nix
-    ../1-general/packages/pentesting/work/packages.nix
     ../1-general/packages/pentesting/packages.nix
     ../1-general/packages/editors/packages.nix
     ../1-general/packages/scripting-languages/packages.nix
@@ -61,21 +66,7 @@
     ../1-general/secrets/import-secrets.nix
     ../1-general/system/autoupdate.nix
     ../1-general/system/locale.nix
-    ../1-general/system/autologin.nix
     ../1-general/system/garbage-collection.nix
-    ../1-general/network/nat-lxc.nix
-    ../1-general/network/nmcli.nix
-    ../1-general/network/firewall.nix
-
-    
-    # (cd /home/deadbeef/github/nixos/nixos/l-esp ; find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' )
-    ./hardware/bootloader.nix
-    ./hardware/swap-and-tmpfs.nix
-    ./hardware/amd.nix
-    ./hardware/hardware-configuration.nix
-    ./hardware/secondary-harddisk.nix
-    ./hardware/bluetooth.nix
-    ./hardware/audio.nix
 
     inputs.home-manager.nixosModules.home-manager
   ];
