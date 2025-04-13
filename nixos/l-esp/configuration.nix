@@ -40,7 +40,6 @@
     ../1-general/system/autoupdate.nix
     ../1-general/system/locale.nix
     ../1-general/system/autologin.nix
-    ../1-general/system/version.nix
     ../1-general/system/garbage-collection.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
@@ -50,7 +49,6 @@
     ./hardware/amd.nix
     ./hardware/bootloader.nix
     ./hardware/swap-and-tmpfs.nix
-
   ];
 
   nixpkgs = {

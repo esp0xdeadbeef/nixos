@@ -108,7 +108,7 @@
             ./nixos/l-werk/configuration.nix
           ];
         };
-        # private intel (amd) laptop:
+        # private (amd) laptop:
         l-esp = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
