@@ -36,6 +36,11 @@
   home.username = "deadbeef";
   home.homeDirectory = "/home/deadbeef";
   home.enableNixpkgsReleaseCheck = false;
+  gtk.enable = true;
+  gtk.theme = {
+    name = "Adwaita-dark";
+    package = pkgs.gnome-themes-extra;
+  };
 
   home.packages = with pkgs; [
     htop

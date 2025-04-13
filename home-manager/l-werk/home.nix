@@ -48,7 +48,13 @@
   home = {
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
-  };
+  }; 
+   gtk.enable = true;
+   gtk.theme = {
+     name = "Adwaita-dark";
+     package = pkgs.gnome-themes-extra;
+   };
+
 
 
   home.packages = with pkgs; [
