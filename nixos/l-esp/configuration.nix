@@ -52,7 +52,19 @@
     ./hardware/secondary-harddisk.nix
     ./hardware/bluetooth.nix
     ./hardware/audio.nix
+
+
+
+    inputs.home-manager.nixosModules.home-manager
   ];
+
+  home-manager = {
+    extraSpecialArgs = { inherit inputs outputs; };
+    users = {
+      # Import your home-manager configuration
+      deadbeef = import ../../home-manager/l-esp/home.nix;
+    };
+  };
 
   nixpkgs = {
     # You can add overlays here

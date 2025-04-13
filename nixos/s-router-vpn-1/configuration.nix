@@ -20,19 +20,21 @@
 
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
-    # Import your generated (nixos-generate-config) hardware configuration
-    ./hardware/hardware-configuration.nix
-    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'desktop\|llms\|virtualization\|network' ; cd ../s-router-vpn-1 ; find . | grep -v 'old\|configuration.nix' | grep 'nix$' )
+    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
+    ../1-general/desktop/fonts.nix
+    ../1-general/desktop/environment.nix
+    ../1-general/desktop/users-and-groups.nix
+    ../1-general/desktop/shell-env.nix
     ../1-general/time/timezone.nix
-    # ../1-general/hardware/is-vm/qemu-guest.nix
-    # ../1-general/general/tooling.nix
-    # ../1-general/secrets/import-secrets.nix
-    # ../1-general/system/autoupdate.nix
-    # ../1-general/system/locale.nix
-    # ../1-general/system/autologin.nix
-    # ../1-general/system/version.nix
-    # ../1-general/system/garbage-collection.nix
-    # ./ssh-vim-and-basics.nix
+    ../1-general/general/tooling.nix
+    ../1-general/secrets/import-secrets.nix
+    ../1-general/system/autoupdate.nix
+    ../1-general/system/locale.nix
+    ../1-general/system/garbage-collection.nix
+
+    # (cd /home/deadbeef/github/nixos/nixos/s-router-vpn-1 ; find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' )
+    ./hardware/hardware-configuration.nix
+    ./ssh-vim-and-basics.nix
     ./network/management-network.nix
     ./network/vlan-configuration-phys0.nix
     ./network/firewall.nix

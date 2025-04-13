@@ -19,18 +19,17 @@
     # inputs.hardware.nixosModules.common-ssd
 
     # You can also split up your configuration and import pieces of it here:
-    # ./users.nix
-    # Import your generated (nixos-generate-config) hardware configuration
-    ./hardware/hardware-configuration.nix
-    ./hardware/bootloader.nix
-    ./hardware/audio-and-bluetooth.nix
+    # (cd /home/deadbeef/github/nixos/nixos/l-werk ; find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' )
     ./hardware/sound-fix-l-werk.nix
-    ./hardware/nvidia-l-werk.nix
+    ./hardware/audio-and-bluetooth.nix
+    ./hardware/hardware-configuration.nix
     ./hardware/secondary-harddisk-l-werk.nix
+    ./hardware/usb-firewall.nix
     ./hardware/bootloader.nix
+    ./hardware/nvidia-l-werk.nix
     ./hardware/swap-and-tmpfs.nix
 
-    # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologincd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologin
+    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologin)
     ../1-general/desktop/applets.nix
     ../1-general/desktop/fonts.nix
     ../1-general/desktop/darkmode.nix
@@ -49,14 +48,22 @@
     ../1-general/secrets/import-secrets.nix
     ../1-general/system/autoupdate.nix
     ../1-general/system/locale.nix
-    ../1-general/system/version.nix
     ../1-general/system/garbage-collection.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
     ../1-general/network/firewall.nix
 
+    inputs.home-manager.nixosModules.home-manager
+
   ];
 
+  home-manager = {
+    extraSpecialArgs = { inherit inputs outputs; };
+    users = {
+      # Import your home-manager configuration
+      deadbeef = import ../../home-manager/l-werk/home.nix;
+    };
+  };
   nixpkgs = {
     # You can add overlays here
     overlays = [

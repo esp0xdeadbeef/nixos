@@ -23,30 +23,27 @@
     # Import your generated (nixos-generate-config) hardware configuration
     ./hardware/hardware-configuration.nix
 
-    ../1-general/general/tooling.nix
-
-    ../1-general/time/timezone.nix
-    ../1-general/secrets/import-secrets.nix
-    # ../backup-of-old-nixos/packages/l-x13s/widevine.nix
-    ../1-general/system/garbage-collection.nix
-    ../1-general/system/locale.nix
-    ../1-general/network/firewall.nix
-    ../1-general/system/version.nix
-    ../1-general/system/autoupdate.nix
-
-    # cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep desktop | grep -v 'desktop$\|\.bak$' | grep -v packages.nix
+    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization')
     ../1-general/desktop/applets.nix
     ../1-general/desktop/fonts.nix
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
     ../1-general/desktop/users-and-groups.nix
-    # ../1-general/desktop/packages.nix
     ../1-general/desktop/shell-env.nix
-
-    # packages is fucked in aarch:
+    ../1-general/time/timezone.nix
+    ../1-general/general/tooling.nix
+    ../1-general/secrets/import-secrets.nix
+    ../1-general/system/autoupdate.nix
+    ../1-general/system/locale.nix
+    ../1-general/system/autologin.nix
+    ../1-general/system/garbage-collection.nix
+    ../1-general/network/nat-lxc.nix
+    ../1-general/network/nmcli.nix
+    ../1-general/network/firewall.nix
+    # (cd /home/deadbeef/github/nixos/nixos/l-x13s ; find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' )
+    ./hardware/hardware-configuration.nix
+    ./packages/widevine.nix
     ./packages/packages.nix
-
-
     inputs.nixos-x13s.nixosModules.default
     {
       nixpkgs.config.allowUnfree = true;
@@ -61,10 +58,16 @@
     }
     # (import "${inputs.home-manager}")
     # {inputs.home-manager.users.deadbeef = import ./home-manager/l-werk/home.nix;}
+    inputs.home-manager.nixosModules.home-manager
   ];
 
-  
-
+  home-manager = {
+    extraSpecialArgs = { inherit inputs outputs; };
+    users = {
+      # Import your home-manager configuration
+      deadbeef = import ../../home-manager/l-x13s/home.nix;
+    };
+  };
   nixpkgs = {
     # You can add overlays here
     overlays = [
