@@ -75,6 +75,7 @@
     mitmproxy
     netexec
     ffuf
+    dropbox
     #exploitdb
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
     # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
