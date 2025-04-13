@@ -118,6 +118,16 @@
     ZSH_THEME=robbyrussell
   '';
 
+  systemd.user.services.dropbox = {
+    description = "Dropbox service";
+    wantedBy = [ "default.target" ];
+    after = [ "network-online.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.dropbox}/bin/dropbox";
+      Restart = "on-failure";
+    };
+  };
+
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
