@@ -5,17 +5,11 @@
   ...
 }:
 {
-#shamelessly joinked from https://github.com/mdlayher/homelab/blob/main/nixos/lib/system.nix
-environment = {
+  #shamelessly joinked from https://github.com/mdlayher/homelab/blob/main/nixos/lib/system.nix
+  environment = {
     # Put ~/bin in PATH.
     # homeBinInPath = true;
     systemPackages = with pkgs; [
-
-      # nix home manager
-      home-manager
-      # required for my (esp0xdeadbeef) lxc mounts
-      bindfs
-
       # terminals
       xterm
       alacritty
@@ -28,12 +22,22 @@ environment = {
       # pgp
       gnupg
 
+      # hardware Secure Boot Manager
+      sbctl
+
+      # utility to manipulate machine owner keys
+      mokutil
 
       # fuzzy finder in terminal
       fzf
 
+      # always install man pages:
+      man
+      man-pages
+
       # taskmanager in linux, holy shit this is cool!
       btop
+
       # check out byobu-tmux (f12=ctrl+b)
       byobu
       # bios / uefi tool
@@ -120,6 +124,7 @@ environment = {
 
       # wireshark cli.
       tcpdump
+      tshark
 
       # multiple shells in one terminal session
       tmux
@@ -131,9 +136,12 @@ environment = {
       unzip
       # usb listing services like lsusb
       usbutils
+      libusb1
       # curl / wget (http and simular tooling):
       wget
       curl
+      
+      
     ];
   };
 }

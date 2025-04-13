@@ -35,12 +35,34 @@
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
     ../1-general/desktop/users-and-groups.nix
-    ../1-general/desktop/packages.nix
     ../1-general/desktop/shell-env.nix
     ../1-general/time/timezone.nix
     ../1-general/hardware/is-vm/qemu-guest.nix
-    ../1-general/general/tooling.nix
+    ../1-general/enable-etc-hosts-editing/default.nix
+    ../1-general/security/default.nix
     ../1-general/llms/ollama.nix
+    ../1-general/packages/graphics/packages.nix
+    ../1-general/packages/browsers-mail-media-social-media/work/packages.nix
+    ../1-general/packages/browsers-mail-media-social-media/packages.nix
+    ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
+    ../1-general/packages/window-managers/X-org/packages.nix
+    ../1-general/packages/data-tranformation/packages.nix
+    ../1-general/packages/network-troubleshooting/packages.nix
+    ../1-general/packages/pentesting/work/packages.nix
+    ../1-general/packages/pentesting/packages.nix
+    ../1-general/packages/editors/packages.nix
+    ../1-general/packages/scripting-languages/packages.nix
+    ../1-general/packages/encryption-and-password-management/packages.nix
+    ../1-general/packages/services/packages.nix
+    ../1-general/packages/audio/packages.nix
+    ../1-general/packages/git/packages.nix
+    ../1-general/packages/nix-specific/packages.nix
+    ../1-general/packages/terminals/terminal-optimisers/packages.nix
+    ../1-general/packages/terminals/packages.nix
+    ../1-general/packages/virtualization/packages.nix
+    ../1-general/packages/1-general/tooling.nix
+    ../1-general/packages/usb-tools/packages.nix
+    ../1-general/packages/packages.nix
     ../1-general/virtualization/libvirt.nix
     ../1-general/virtualization/podman.nix
     ../1-general/virtualization/general.nix

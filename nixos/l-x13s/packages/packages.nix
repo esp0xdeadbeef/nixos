@@ -9,25 +9,25 @@
   # #services.openssh.settings.X11Forwarding = true;
 
   # creating a a softlink for burp shit (suite)
-  environment.etc."burp/jython.jar" = {
-    # If you have a jython package in your Nixpkgs, you can use it like:
-    source = "${pkgs.jython}/jython.jar";
-    # Alternatively, if you want to hardcode the current store path, you can:
-    # source = "/nix/store/akb86svs9qd561a5l27252pqyd8dyds4-jython-2.7.4/jython.jar";
-  };
+  # environment.etc."burp/jython.jar" = {
+  #   # If you have a jython package in your Nixpkgs, you can use it like:
+  #   source = "${pkgs.jython}/jython.jar";
+  #   # Alternatively, if you want to hardcode the current store path, you can:
+  #   # source = "/nix/store/akb86svs9qd561a5l27252pqyd8dyds4-jython-2.7.4/jython.jar";
+  # };
 
-  environment.etc."burp/jruby.jar" = {
-    source = "${pkgs.jruby}/lib/jruby.jar";
-  };
+  # environment.etc."burp/jruby.jar" = {
+  #   source = "${pkgs.jruby}/lib/jruby.jar";
+  # };
 
   programs.wireshark.enable = true;
   # also check nix-index btw :)
-  services.locate = {
-    enable = true;
-    package = pkgs.plocate;
-    #localuser = null;
-    # prunePaths = options.services.locate.prunePaths.default ++ [ "/mnt/pool" ];
-  };
+  # services.locate = {
+  #   enable = true;
+  #   package = pkgs.plocate;
+  #   #localuser = null;
+  #   # prunePaths = options.services.locate.prunePaths.default ++ [ "/mnt/pool" ];
+  # };
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
@@ -44,6 +44,7 @@
     nuclei
     gau
     nmap
+    azure-cli
     # inotify service (otherwise flameshot crashes)
     dunst
     unzip
@@ -62,6 +63,8 @@
     autorandr
     gh
     sshpass
+    
+    man
     man-pages
     sbctl
     openssl
@@ -110,13 +113,8 @@
 
 
 
-    # i3 shit:
-    xdotool
-    azure-cli
-    i3status-rust
-    obsidian
-    vscode
 
+    # browser
     chromium
     
     # discord
