@@ -135,6 +135,18 @@
             # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
           ];
         };
+        # FIXME replace with your username@hostname
+        "deadbeef@l-esp" = home-manager.lib.homeManagerConfiguration {
+          pkgs = nixpkgs.legacyPackages.x86_64-linux; # Home-manager requires 'pkgs' instance
+          extraSpecialArgs = { inherit inputs outputs; };
+          modules = [
+            # > Our main home-manager configuration file <
+            ./home-manager/l-esp/home.nix
+            # ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
+            #../../backup-of-old-nixos/hosts/network/hostname.nix
+            # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
+          ];
+        };
         "deadbeef@s-test-vm" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux; # Home-manager requires 'pkgs' instance
           extraSpecialArgs = { inherit inputs outputs; };
