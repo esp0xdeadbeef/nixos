@@ -42,7 +42,7 @@
     ../1-general/desktop/applets.nix
     ../1-general/system/locale.nix
     ../1-general/system/garbage-collection.nix
-    ../1-general/system/autologin.nix
+    # ../1-general/system/autologin.nix
     ../1-general/system/autoupdate.nix
     # (cd /home/deadbeef/github/nixos/nixos/l-esp ; find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' )
     ./hardware/bootloader.nix
