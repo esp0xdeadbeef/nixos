@@ -19,17 +19,14 @@
     # inputs.hardware.nixosModules.common-ssd
 
     # You can also split up your configuration and import pieces of it here:
-    # (cd /home/deadbeef/github/nixos/nixos/l-werk ; find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' )
+    # ./generate-imports.sh
     ./hardware/sound-fix-l-werk.nix
     ./hardware/audio-and-bluetooth.nix
     ./hardware/hardware-configuration.nix
     ./hardware/secondary-harddisk-l-werk.nix
-    ./hardware/usb-firewall.nix
     ./hardware/bootloader.nix
     ./hardware/nvidia-l-werk.nix
     ./hardware/swap-and-tmpfs.nix
-
-    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v autologin)
     ../1-general/desktop/applets.nix
     ../1-general/desktop/fonts.nix
     ../1-general/desktop/darkmode.nix
@@ -37,12 +34,13 @@
     ../1-general/desktop/users-and-groups.nix
     ../1-general/desktop/shell-env.nix
     ../1-general/time/timezone.nix
-    ../1-general/hardware/is-vm/qemu-guest.nix
     ../1-general/enable-etc-hosts-editing/default.nix
     ../1-general/security/default.nix
     ../1-general/llms/ollama.nix
     ../1-general/packages/graphics/packages.nix
+    ../1-general/packages/rdp/packages.nix
     ../1-general/packages/browsers-mail-media-social-media/work/packages.nix
+    ../1-general/packages/browsers-mail-media-social-media/not-on-aarch64/packages.nix
     ../1-general/packages/browsers-mail-media-social-media/packages.nix
     ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
     ../1-general/packages/window-managers/X-org/packages.nix
