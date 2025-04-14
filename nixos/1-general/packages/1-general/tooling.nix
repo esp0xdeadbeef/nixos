@@ -14,6 +14,9 @@
       xterm
       alacritty
 
+      # file command, what type of file do we have on our hands:
+      file
+
       # encryption:
       # cli encrypt a message with key generator:
       age
