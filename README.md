@@ -6,8 +6,9 @@
 1. Adding sops-nix the correct way.
 
 
+1. rename nixos/nixos/1-general/packages/virtualization to kvm
 
-
+1. rename /home/deadbeef/github/nixos/nixos/1-general/packages/services to filesharing
 
 # some notes;
 

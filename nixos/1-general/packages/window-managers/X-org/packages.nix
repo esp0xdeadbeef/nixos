@@ -8,5 +8,8 @@
     docker
     kind
     podman-compose
+
+    xorg.xkill
+    
   ];
 }
