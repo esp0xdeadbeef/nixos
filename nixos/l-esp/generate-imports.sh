@@ -8,7 +8,7 @@
     echo # empty row
     (
         cd /home/deadbeef/github/nixos/nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|work\|werk\|autologin'
+        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v mxbuild | grep -v 'llms\|is-vm\|work\|werk\|autologin'
     ) | sort
 ) | tee /tmp/includes-l-werk.txt
 

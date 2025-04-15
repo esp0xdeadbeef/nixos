@@ -29,6 +29,7 @@
 ./hardware/steam.nix
 ./hardware/swap-and-tmpfs.nix
 
+../1-general/1-custom-packages/azurehound/azurehound.nix
 ../1-general/desktop/applets.nix
 ../1-general/desktop/darkmode.nix
 ../1-general/desktop/environment.nix
