@@ -23,58 +23,52 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     # cd /home/deadbeef/github/nixos/nixos/l-x13s ; ./generate-imports.sh
-    ./hardware/hardware-configuration.nix
+
     ./hardware/bootloader.nix
-    ./packages/widevine.nix
+    ./hardware/hardware-configuration.nix
     ./packages/packages.nix
+    ./packages/widevine.nix
+
+    ../1-general/1-custom-packages/azurehound/azurehound.nix
     ../1-general/desktop/applets.nix
-    ../1-general/desktop/fonts.nix
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
-    ../1-general/desktop/users-and-groups.nix
+    ../1-general/desktop/fonts.nix
     ../1-general/desktop/shell-env.nix
-    ../1-general/time/timezone.nix
+    ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
-    ../1-general/security/default.nix
-    ../1-general/packages/graphics/packages.nix
+    ../1-general/packages/1-general/tooling.nix
+    ../1-general/packages/audio/packages.nix
     ../1-general/packages/browsers-mail-media-social-media/packages.nix
+    ../1-general/packages/data-tranformation/packages.nix
+    ../1-general/packages/editors/packages.nix
+    ../1-general/packages/encryption-and-password-management/packages.nix
+    ../1-general/packages/git/packages.nix
+    ../1-general/packages/graphics/packages.nix
+    ../1-general/packages/nix-specific/packages.nix
+    ../1-general/packages/packages.nix
+    ../1-general/packages/pdf/packages.nix
+    ../1-general/packages/pentesting/packages.nix
+    ../1-general/packages/rdp/packages.nix
+    ../1-general/packages/scripting-languages/packages.nix
+    ../1-general/packages/services/packages.nix
+    ../1-general/packages/terminals/packages.nix
+    ../1-general/packages/terminals/terminal-optimisers/packages.nix
+    ../1-general/packages/usb-tools/packages.nix
     ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
     ../1-general/packages/window-managers/X-org/packages.nix
-    ../1-general/packages/data-tranformation/packages.nix
-    ../1-general/packages/pentesting/packages.nix
-    ../1-general/packages/editors/packages.nix
-    ../1-general/packages/scripting-languages/packages.nix
-    ../1-general/packages/encryption-and-password-management/packages.nix
-    ../1-general/packages/services/packages.nix
-    ../1-general/packages/audio/packages.nix
-    ../1-general/packages/git/packages.nix
-    ../1-general/packages/nix-specific/packages.nix
-    ../1-general/packages/terminals/terminal-optimisers/packages.nix
-    ../1-general/packages/terminals/packages.nix
-    ../1-general/packages/1-general/tooling.nix
-    ../1-general/packages/usb-tools/packages.nix
-    ../1-general/packages/packages.nix
     ../1-general/secrets/import-secrets.nix
-    ../1-general/system/autoupdate.nix
-    ../1-general/system/locale.nix
+    ../1-general/security/default.nix
     ../1-general/system/autologin.nix
+    ../1-general/system/autoupdate.nix
     ../1-general/system/garbage-collection.nix
+    ../1-general/system/locale.nix
+    ../1-general/time/timezone.nix
 
-    inputs.nixos-x13s.nixosModules.default
-    {
-      nixpkgs.overlays = [ ];
-      # inputs.nixos-x13s.nixosModules.default
-    }
-    {
-      environment.interactiveShellInit = ''
-        ZSH_THEME=trapd00r
-      '';
-    }
-    # (import "${inputs.home-manager}")
-    # {inputs.home-manager.users.deadbeef = import ./home-manager/l-werk/home.nix;}
     inputs.home-manager.nixosModules.home-manager
   ];
 
+  
   home-manager = {
     extraSpecialArgs = { inherit inputs outputs; };
     users = {
@@ -134,6 +128,11 @@
     };
 
   # FIXME: Add the rest of your current configuration
+
+  environment.interactiveShellInit = ''
+    ZSH_THEME=trapd00r
+  '';
+
   networking.hostName = "l-x13s";
   networking.networkmanager.enable = true;
 
