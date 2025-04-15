@@ -16,6 +16,6 @@ echo # empty row
             echo "    $line"
         done
 ) | sort
-) | tee /tmp/includes-l-werk.txt
+) | grep -v '/build_'  | tee /tmp/includes-l-werk.txt
 
 awk -v r="$(< /tmp/includes-l-werk.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' build_configuration.nix > configuration.nix

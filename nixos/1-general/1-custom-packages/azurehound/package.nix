@@ -1,6 +1,6 @@
 { config, pkgs, ... }:
 let
-  azurehound = import ./build_azurehound.nix {
+  azurehound = import ./build_package.nix {
     inherit (pkgs)
       stdenv
       lib
