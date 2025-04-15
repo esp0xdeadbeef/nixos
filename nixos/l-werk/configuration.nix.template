@@ -20,7 +20,9 @@
 
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-werk ; ./generate-imports.sh
-    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+
+STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+
 
     inputs.home-manager.nixosModules.home-manager
 

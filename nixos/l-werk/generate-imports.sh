@@ -3,12 +3,18 @@
 (
 (
     cd /home/deadbeef/github/nixos/nixos/l-werk
-    find . | grep -v 'old\|./configuration.nix$' | grep 'nix$'
+    find . | grep -v 'old\|./configuration.nix$' | grep 'nix$'| while read line;
+        do
+            echo "    $line"
+        done
 ) | sort
 echo # empty row
 (
     cd /home/deadbeef/github/nixos/nixos/1-general
-    find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'is-vm\|autologin\|usb-firewall.nix'
+    find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'is-vm\|autologin\|usb-firewall.nix'| while read line;
+        do
+            echo "    $line"
+        done
 ) | sort
 ) | tee /tmp/includes-l-werk.txt
 
