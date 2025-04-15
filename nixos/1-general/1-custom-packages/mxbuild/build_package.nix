@@ -56,6 +56,6 @@ stdenv.mkDerivation rec {
   meta = {
     description = "MxBuild - a tool to create a Mendix Deployment Package.";
     homepage = "https://mendix.com/";
-    license = lib.licenses.mit;
+    # license = can not find;
   };
 }

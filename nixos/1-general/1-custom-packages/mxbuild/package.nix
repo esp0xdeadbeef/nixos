@@ -1,6 +1,6 @@
 { config, pkgs, ... }:
 let
-  mxbuild = import ./build_mxbuild.nix {
+  mxbuild = import ./build_package.nix {
     inherit (pkgs)
       stdenv
       lib
