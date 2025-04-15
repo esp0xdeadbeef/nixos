@@ -29,8 +29,8 @@
     ./hardware/sound-fix-l-werk.nix
     ./hardware/swap-and-tmpfs.nix
 
-    ../1-general/1-custom-packages/azurehound/azurehound.nix
-    ../1-general/1-custom-packages/mxbuild/mxbuild.nix
+    ../1-general/1-custom-packages/azurehound/package.nix
+    ../1-general/1-custom-packages/mxbuild/package.nix
     ../1-general/desktop/applets.nix
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
@@ -73,6 +73,7 @@
     ../1-general/system/autoupdate.nix
     ../1-general/system/garbage-collection.nix
     ../1-general/system/locale.nix
+    ../1-general/terminals/tmux/settings.nix
     ../1-general/time/timezone.nix
     ../1-general/virtualization/general.nix
     ../1-general/virtualization/libvirt.nix
