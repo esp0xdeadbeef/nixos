@@ -1,14 +1,14 @@
 { config, pkgs, ... }:
 {
   programs.java.enable = true;
-  programs.steam.package = pkgs.steam.override {
-    withPrimus = true;
-    extraPkgs = pkgs: [
-      bumblebee
-      glxinfo
-    ];
-    withJava = true;
-  };
+  # programs.steam.package = pkgs.steam.override {
+  #   withPrimus = true;
+  #   extraPkgs = pkgs: [
+  #     # bumblebee
+  #     # glxinfo
+  #   ];
+  #   withJava = true;
+  # };
 
   programs.steam = {
     enable = true;
@@ -18,4 +18,3 @@
   };
 
 }
-N
