@@ -36,6 +36,9 @@
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
+    ../1-general/network/firewall.nix
+    ../1-general/network/nat-lxc.nix
+    ../1-general/network/nmcli.nix
     ../1-general/packages/1-general/tooling.nix
     ../1-general/packages/audio/packages.nix
     ../1-general/packages/browsers-mail-media-social-media/packages.nix
@@ -44,6 +47,7 @@
     ../1-general/packages/encryption-and-password-management/packages.nix
     ../1-general/packages/git/packages.nix
     ../1-general/packages/graphics/packages.nix
+    ../1-general/packages/network-troubleshooting/packages.nix
     ../1-general/packages/nix-specific/packages.nix
     ../1-general/packages/packages.nix
     ../1-general/packages/pdf/packages.nix
