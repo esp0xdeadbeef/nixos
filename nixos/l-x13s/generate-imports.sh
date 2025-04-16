@@ -11,7 +11,7 @@
     echo # empty row
     (
         cd /home/deadbeef/github/nixos/nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v mxbuild | grep -v 'llms\|is-vm\|virtualization\|not-on-aarch64\|work\|werk\|1-custom-packages' | while read line;
+        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v mxbuild | grep -v 'llms\|is-vm\|virtualization\|not-on-aarch64\|/work\|/werk\|1-custom-packages' | while read line;
         do
             echo "    $line"
         done
