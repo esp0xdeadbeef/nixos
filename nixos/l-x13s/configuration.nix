@@ -23,8 +23,7 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     # cd /home/deadbeef/github/nixos/nixos/l-x13s ; ./generate-imports.sh
-
-    ./hardware/bootloader.nix
+        ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./packages/packages.nix
     ./packages/widevine.nix
@@ -69,10 +68,21 @@
     ../1-general/terminals/tmux/settings.nix
     ../1-general/time/timezone.nix
 
+    inputs.nixos-x13s.nixosModules.default
+    {
+      nixpkgs.overlays = [ ];
+      # inputs.nixos-x13s.nixosModules.default
+    }
+    {
+      environment.interactiveShellInit = ''
+        ZSH_THEME=trapd00r
+      '';
+    }
+    # (import "${inputs.home-manager}")
+    # {inputs.home-manager.users.deadbeef = import ./home-manager/l-werk/home.nix;}
     inputs.home-manager.nixosModules.home-manager
   ];
 
-  
   home-manager = {
     extraSpecialArgs = { inherit inputs outputs; };
     users = {
@@ -132,11 +142,6 @@
     };
 
   # FIXME: Add the rest of your current configuration
-
-  environment.interactiveShellInit = ''
-    ZSH_THEME=trapd00r
-  '';
-
   networking.hostName = "l-x13s";
   networking.networkmanager.enable = true;
 
