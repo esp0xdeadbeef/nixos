@@ -1,5 +1,7 @@
 # Todo
 
+1. create a new github account, share only the nix project to that account.
+
 1. Adding sops-nix the correct way.
 
 
@@ -12,6 +14,8 @@
 1. segment personal laptops from the servers in 1-general / home-manager
 
 1. make the home-manager incorperate the i3 configs that are used on the hosts now.
+
+
 
 # some notes;
 
