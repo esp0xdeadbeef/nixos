@@ -33,6 +33,7 @@
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
+    ../1-general/hardware/is-vm/qemu-guest.nix
     ../1-general/packages/1-general/tooling.nix
     ../1-general/packages/data-tranformation/packages.nix
     ../1-general/packages/editors/packages.nix
@@ -42,8 +43,11 @@
     ../1-general/packages/packages.nix
     ../1-general/packages/terminals/packages.nix
     ../1-general/packages/terminals/terminal-optimisers/packages.nix
+    ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
+    ../1-general/packages/window-managers/X-org/packages.nix
     ../1-general/secrets/import-secrets.nix
     ../1-general/security/default.nix
+    ../1-general/system/autologin.nix
     ../1-general/system/autoupdate.nix
     ../1-general/system/garbage-collection.nix
     ../1-general/system/locale.nix
