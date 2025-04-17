@@ -23,7 +23,7 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     # cd /home/deadbeef/github/nixos/nixos/l-x13s ; ./generate-imports.sh
-        ./hardware/bootloader.nix
+    ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./packages/packages.nix
     ./packages/widevine.nix
