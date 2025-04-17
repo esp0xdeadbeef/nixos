@@ -23,7 +23,7 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     # cd /home/deadbeef/github/nixos/nixos/l-x13s ; ./generate-imports.sh
-    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     inputs.nixos-x13s.nixosModules.default
     {

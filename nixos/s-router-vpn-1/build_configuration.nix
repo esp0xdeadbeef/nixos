@@ -21,34 +21,7 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
-    ./hardware/hardware-configuration.nix
-    ./network/firewall.nix
-    ./network/management-network.nix
-    ./network/vlan-configuration-phys0.nix
-    ./ssh-vim-and-basics.nix
-
-    ../1-general/desktop/applets.nix
-    ../1-general/desktop/environment.nix
-    ../1-general/desktop/fonts.nix
-    ../1-general/desktop/shell-env.nix
-    ../1-general/desktop/users-and-groups.nix
-    ../1-general/enable-etc-hosts-editing/default.nix
-    ../1-general/packages/1-general/tooling.nix
-    ../1-general/packages/data-tranformation/packages.nix
-    ../1-general/packages/editors/packages.nix
-    ../1-general/packages/encryption-and-password-management/packages.nix
-    ../1-general/packages/git/packages.nix
-    ../1-general/packages/network-troubleshooting/packages.nix
-    ../1-general/packages/packages.nix
-    ../1-general/packages/terminals/packages.nix
-    ../1-general/packages/terminals/terminal-optimisers/packages.nix
-    ../1-general/secrets/import-secrets.nix
-    ../1-general/security/default.nix
-    ../1-general/system/autoupdate.nix
-    ../1-general/system/garbage-collection.nix
-    ../1-general/system/locale.nix
-    ../1-general/terminals/tmux/settings.nix
-    ../1-general/time/timezone.nix
+STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     
 
   ];

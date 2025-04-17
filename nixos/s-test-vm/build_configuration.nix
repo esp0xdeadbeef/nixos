@@ -21,29 +21,8 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
-    ./hardware/hardware-configuration.nix
-    ./hardware/bootloader.nix
-    ./hardware/swap-and-tmpfs.nix
-    ../1-general/hardware/is-vm/qemu-guest.nix
-
-    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|/packages.nix\|virtualization')
-    ../1-general/desktop/applets.nix
-    ../1-general/desktop/fonts.nix
-    ../1-general/desktop/darkmode.nix
-    ../1-general/desktop/environment.nix
-    ../1-general/desktop/users-and-groups.nix
-    ../1-general/desktop/shell-env.nix
-    ../1-general/time/timezone.nix
-    ../1-general/hardware/is-vm/qemu-guest.nix
-    ../1-general/general/tooling.nix
-    ../1-general/secrets/import-secrets.nix
-    ../1-general/system/autoupdate.nix
-    ../1-general/system/locale.nix
-    ../1-general/system/autologin.nix
-    ../1-general/system/garbage-collection.nix
-    ../1-general/network/nat-lxc.nix
-    ../1-general/network/nmcli.nix
-    ../1-general/network/firewall.nix
+    
+STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
   ];
 
