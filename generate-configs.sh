@@ -79,3 +79,24 @@ export CURRENT_CONFIG="s-router-vpn-1"
 
 awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' /home/deadbeef/github/nixos/nixos/$CURRENT_CONFIG/build_configuration.nix >  /home/deadbeef/github/nixos/nixos/$CURRENT_CONFIG/configuration.nix
 
+
+
+export CURRENT_CONFIG="s-test-vm"
+(
+    (
+        cd /home/deadbeef/github/nixos/nixos/$CURRENT_CONFIG
+        find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' | while read line; do
+            echo "    $line"
+        done
+    ) | sort
+    echo # empty row
+    (
+        cd /home/deadbeef/github/nixos/nixos/1-general
+        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|/network/\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|darkmode\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio\|nix-specific' | while read line; do
+            echo "    $line"
+        done
+    ) | sort
+) | grep -v '/build_' | tee /tmp/results.txt
+
+awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' /home/deadbeef/github/nixos/nixos/$CURRENT_CONFIG/build_configuration.nix >  /home/deadbeef/github/nixos/nixos/$CURRENT_CONFIG/configuration.nix
+
