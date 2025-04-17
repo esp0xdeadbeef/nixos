@@ -92,7 +92,7 @@ export CURRENT_CONFIG="s-test-vm"
     echo # empty row
     (
         cd /home/deadbeef/github/nixos/nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|/network/\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|darkmode\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio\|nix-specific' | while read line; do
+        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio' | while read line; do
             echo "    $line"
         done
     ) | sort
