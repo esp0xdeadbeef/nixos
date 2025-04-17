@@ -107,7 +107,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-test-vm";
+  networking.hostName = "s-router-vpn-1";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
