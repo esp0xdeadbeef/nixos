@@ -1,14 +1,17 @@
 # Todo
 
-1. make the vm's for s-test and s-router bigger (64 gb each) it's too small at this moment.
-
-
 1. Adding sops-nix the correct way.
 
 
 1. rename nixos/nixos/1-general/packages/virtualization to kvm
 
+
 1. rename /home/deadbeef/github/nixos/nixos/1-general/packages/services to filesharing
+
+
+1. segment personal laptops from the servers in 1-general / home-manager
+
+1. make the home-manager incorperate the i3 configs that are used on the hosts now.
 
 # some notes;
 
