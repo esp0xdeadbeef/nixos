@@ -182,6 +182,15 @@
             ./nixos/l-esp/configuration.nix
           ];
         };
+        # lxc server
+        s-lxc-test = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            # lanzaboote.nixosModules.lanzaboote
+            # > Our main nixos configuration file <
+            ./nixos/s-lxc-test/configuration.nix
+          ];
+        };
       };
 
       # Standalone home-manager configuration entrypoint
