@@ -6,6 +6,7 @@
   lib,
   config,
   pkgs,
+  modulesPath,
   ...
 }:
 {
@@ -13,8 +14,11 @@
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
+    (modulesPath + "/virtualisation/proxmox-lxc.nix")
     ./hardware/hardware-configuration.nix
 
+    ../1-general/1-custom-packages/azurehound/package.nix
+    ../1-general/1-custom-packages/mxbuild/package.nix
     ../1-general/desktop/applets.nix
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
@@ -23,19 +27,34 @@
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
     ../1-general/hardware/is-vm/qemu-guest.nix
+    ../1-general/llms/lmstudio.nix
+    ../1-general/llms/ollama.nix
     ../1-general/network/firewall.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
     ../1-general/packages/1-general/tooling.nix
+    ../1-general/packages/audio/packages.nix
+    ../1-general/packages/browsers-mail-media-social-media/not-on-aarch64/packages.nix
+    ../1-general/packages/browsers-mail-media-social-media/packages.nix
+    ../1-general/packages/browsers-mail-media-social-media/work/packages.nix
     ../1-general/packages/data-tranformation/packages.nix
     ../1-general/packages/editors/packages.nix
     ../1-general/packages/encryption-and-password-management/packages.nix
     ../1-general/packages/git/packages.nix
+    ../1-general/packages/graphics/packages.nix
     ../1-general/packages/network-troubleshooting/packages.nix
     ../1-general/packages/nix-specific/packages.nix
     ../1-general/packages/packages.nix
+    ../1-general/packages/pdf/packages.nix
+    ../1-general/packages/pentesting/packages.nix
+    ../1-general/packages/pentesting/work/packages.nix
+    ../1-general/packages/rdp/packages.nix
+    ../1-general/packages/scripting-languages/packages.nix
+    ../1-general/packages/services/packages.nix
     ../1-general/packages/terminals/packages.nix
     ../1-general/packages/terminals/terminal-optimisers/packages.nix
+    ../1-general/packages/usb-tools/packages.nix
+    ../1-general/packages/virtualization/packages.nix
     ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
     ../1-general/packages/window-managers/X-org/packages.nix
     ../1-general/secrets/import-secrets.nix
@@ -46,6 +65,10 @@
     ../1-general/system/locale.nix
     ../1-general/terminals/tmux/settings.nix
     ../1-general/time/timezone.nix
+    ../1-general/virtualization/general.nix
+    ../1-general/virtualization/libvirt.nix
+    ../1-general/virtualization/lxc.nix
+    ../1-general/virtualization/podman.nix
     {
       environment.interactiveShellInit = ''
         ZSH_THEME=random
@@ -141,7 +164,7 @@
     enable = true;
     settings = {
       # Opinionated: forbid root login through SSH.
-      PermitRootLogin = "no";
+      # PermitRootLogin = "no";
       # Opinionated: use keys only.
       # Remove if you want to SSH using passwords
       PasswordAuthentication = true;
