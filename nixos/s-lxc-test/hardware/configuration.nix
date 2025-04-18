@@ -1,6 +1,6 @@
 { config, modulesPath, pkgs, lib, ... }:
 {
-  imports = [ (modulesPath + "/virtualisation/proxmox-lxc.nix") ./hardware/hardware-configuration.nix ];
+  imports = [ (modulesPath + "/virtualisation/proxmox-lxc.nix") ];
   nix.settings = { sandbox = false; };
   proxmoxLXC = {
     manageNetwork = false;
