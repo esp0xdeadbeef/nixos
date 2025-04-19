@@ -23,7 +23,7 @@
 
 This works (ignores .git):
 ```bash
-vim /etc/nixos/flake.nix; nixos-rebuild switch --impure --flake path:/etc/nixos#l-werk
+nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname)
 ```
 
 This also works:
@@ -115,6 +115,7 @@ update the system will not fail i guess :D:
 
 ```bash
 nixos-rebuild switch --flake /etc/nixos#example
+nixos-rebuild switch --flake /home/deadbeef/github/nixos#example
 ```
 
 
