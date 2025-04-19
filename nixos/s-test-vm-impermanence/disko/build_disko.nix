@@ -42,7 +42,7 @@
                     };
                     "/home/deadbeef" = {
                       mountOptions = ["compress=zstd"];
-                      mountpoint = "/home/bastian";
+                      mountpoint = "/home/deadbeef";
                     };
                     "/nix" = {
                       mountOptions = ["compress=zstd" "noatime"];

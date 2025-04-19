@@ -14,50 +14,50 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "/dev/disk/by-uuid/799f2e03-fd93-4bc9-917a-3ee2c9624a39";
+    { device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
       fsType = "btrfs";
       options = [ "subvol=root" ];
     };
 
-  boot.initrd.luks.devices."crypted".device = "/dev/disk/by-uuid/780b8fcd-32e3-4844-b6e2-1661b69dfc3b";
+  boot.initrd.luks.devices."crypted".device = "/dev/disk/by-uuid/c5c3e4e1-f22d-429f-b3a2-50775c673279";
 
   fileSystems."/.swapvol" =
-    { device = "/dev/disk/by-uuid/799f2e03-fd93-4bc9-917a-3ee2c9624a39";
+    { device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
       fsType = "btrfs";
       options = [ "subvol=swap" ];
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/DE4E-57A4";
+    { device = "/dev/disk/by-uuid/40D2-3914";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
 
   fileSystems."/games" =
-    { device = "/dev/disk/by-uuid/799f2e03-fd93-4bc9-917a-3ee2c9624a39";
+    { device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
       fsType = "btrfs";
       options = [ "subvol=games" ];
     };
 
-  fileSystems."/home/bastian" =
-    { device = "/dev/disk/by-uuid/799f2e03-fd93-4bc9-917a-3ee2c9624a39";
+  fileSystems."/home/deadbeef" =
+    { device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
       fsType = "btrfs";
-      options = [ "subvol=home/bastian" ];
+      options = [ "subvol=home/deadbeef" ];
     };
 
   fileSystems."/nix" =
-    { device = "/dev/disk/by-uuid/799f2e03-fd93-4bc9-917a-3ee2c9624a39";
+    { device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
       fsType = "btrfs";
       options = [ "subvol=nix" ];
     };
 
   fileSystems."/partition-root" =
-    { device = "/dev/disk/by-uuid/799f2e03-fd93-4bc9-917a-3ee2c9624a39";
+    { device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
       fsType = "btrfs";
     };
 
   fileSystems."/persist" =
-    { device = "/dev/disk/by-uuid/799f2e03-fd93-4bc9-917a-3ee2c9624a39";
+    { device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
       fsType = "btrfs";
       options = [ "subvol=persist" ];
     };
