@@ -13,10 +13,20 @@
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
-    ./hardware/hardware-configuration.nix
 
-    ../1-general/1-custom-packages/azurehound/package.nix
-    ../1-general/1-custom-packages/mxbuild/package.nix
+    # Or modules from other flakes (such as nixos-hardware):
+    # inputs.hardware.nixosModules.common-cpu-intel
+    # inputs.hardware.nixosModules.common-ssd
+
+    # You can also split up your configuration and import pieces of it here:
+    # ./users.nix
+    # Import your generated (nixos-generate-config) hardware configuration
+    inputs.impermanence.nixosModules.impermanence
+
+    ./hardware/bootloader.nix
+    ./hardware/hardware-configuration.nix
+    ./hardware/swap-and-tmpfs.nix
+
     ../1-general/desktop/applets.nix
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
@@ -25,34 +35,19 @@
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
     ../1-general/hardware/is-vm/qemu-guest.nix
-    ../1-general/llms/lmstudio.nix
-    ../1-general/llms/ollama.nix
     ../1-general/network/firewall.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
     ../1-general/packages/1-general/tooling.nix
-    ../1-general/packages/audio/packages.nix
-    ../1-general/packages/browsers-mail-media-social-media/not-on-aarch64/packages.nix
-    ../1-general/packages/browsers-mail-media-social-media/packages.nix
-    ../1-general/packages/browsers-mail-media-social-media/work/packages.nix
     ../1-general/packages/data-tranformation/packages.nix
     ../1-general/packages/editors/packages.nix
     ../1-general/packages/encryption-and-password-management/packages.nix
     ../1-general/packages/git/packages.nix
-    ../1-general/packages/graphics/packages.nix
     ../1-general/packages/network-troubleshooting/packages.nix
     ../1-general/packages/nix-specific/packages.nix
     ../1-general/packages/packages.nix
-    ../1-general/packages/pdf/packages.nix
-    ../1-general/packages/pentesting/packages.nix
-    ../1-general/packages/pentesting/work/packages.nix
-    ../1-general/packages/rdp/packages.nix
-    ../1-general/packages/scripting-languages/packages.nix
-    ../1-general/packages/services/packages.nix
     ../1-general/packages/terminals/packages.nix
     ../1-general/packages/terminals/terminal-optimisers/packages.nix
-    ../1-general/packages/usb-tools/packages.nix
-    ../1-general/packages/virtualization/packages.nix
     ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
     ../1-general/packages/window-managers/X-org/packages.nix
     ../1-general/secrets/import-secrets.nix
@@ -63,27 +58,9 @@
     ../1-general/system/locale.nix
     ../1-general/terminals/tmux/settings.nix
     ../1-general/time/timezone.nix
-    ../1-general/virtualization/general.nix
-    ../1-general/virtualization/libvirt.nix
-    ../1-general/virtualization/lxc.nix
-    ../1-general/virtualization/podman.nix
-    {
-      environment.interactiveShellInit = ''
-        ZSH_THEME=random
-      '';
-    }
-    # (import "${inputs.home-manager}")
-    # {inputs.home-manager.users.deadbeef = import ./home-manager/l-werk/home.nix;}
-    inputs.home-manager.nixosModules.home-manager
+
   ];
 
-  home-manager = {
-    extraSpecialArgs = { inherit inputs outputs; };
-    users = {
-      # Import your home-manager configuration
-      deadbeef = import ../../home-manager/s-test-vm/home.nix;
-    };
-  };
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -101,16 +78,13 @@
       #     patches = [ ./change-hello-to-hi.patch ];
       #   });
       # })
-
-      # widevine patch:
-      # inputs.nixos-aarch64-widevine.overlays.default
-
     ];
     # Configure your nixpkgs instance
     config = {
       # Disable if you don't want unfree packages
       allowUnfree = true;
     };
+    # specify that it is aarch64-linux:
     hostPlatform = "x86_64-linux";
   };
 
@@ -136,9 +110,10 @@
     };
 
   # FIXME: Add the rest of your current configuration
-  networking.hostName = "l-x13s";
-  networking.networkmanager.enable = true;
 
+  networking.hostName = "s-test-vm-impermanence";
+
+  # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
     deadbeef = {
@@ -162,13 +137,93 @@
     enable = true;
     settings = {
       # Opinionated: forbid root login through SSH.
-      # PermitRootLogin = "no";
+      PermitRootLogin = "no";
       # Opinionated: use keys only.
       # Remove if you want to SSH using passwords
       PasswordAuthentication = true;
     };
   };
 
+  # networking.hostName = "s-router-vpn-1";
+  # services.openssh.enable = true;
+  services.xserver.enable = true;
+  # services.displayManager.sddm.enable = true;
+  services.desktopManager.plasma6.enable = true;
+  boot.loader.grub.configurationLimit = 10;
+
+  environment.interactiveShellInit = ''
+    ZSH_THEME=example
+  '';
+
+  environment.persistence."/persist" = {
+    enable = true; # NB: Defaults to true, not needed
+    hideMounts = true;
+    directories = [
+      "/var/log"
+      "/var/lib/bluetooth"
+      "/var/lib/nixos"
+      "/var/lib/systemd/coredump"
+      "/etc/NetworkManager/system-connections"
+      {
+        directory = "/var/lib/colord";
+        user = "colord";
+        group = "colord";
+        mode = "u=rwx,g=rx,o=";
+      }
+    ];
+    files = [
+      "/etc/machine-id"
+      {
+        file = "/var/keys/secret_file";
+        parentDirectory = {
+          mode = "u=rwx,g=,o=";
+        };
+      }
+    ];
+    users.deadbeef = {
+      directories = [
+        "Downloads"
+        "Music"
+        "Pictures"
+        "Documents"
+        "Videos"
+        "VirtualBox VMs"
+        {
+          directory = ".gnupg";
+          mode = "0700";
+        }
+        {
+          directory = ".ssh";
+          mode = "0700";
+        }
+        {
+          directory = ".nixops";
+          mode = "0700";
+        }
+        {
+          directory = ".local/share/keyrings";
+          mode = "0700";
+        }
+        ".local/share/direnv"
+      ];
+      files = [
+        ".screenrc"
+      ];
+    };
+  };
+
+  security.sudo.enable = true;
+  security.sudo.extraRules = [
+    {
+      groups = [ "wheel" ];
+      commands = [
+        {
+          command = "ALL";
+          options = [ "NOPASSWD" ];
+        }
+      ];
+    }
+  ];
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   system.stateVersion = "24.11";
 }
