@@ -94,10 +94,11 @@ sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+4+11 --wipe-slot=tpm
 ```
 
 
-# switch to a different config
+# Switch to a different config
 
 
 ```bash
 nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname)
+nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+4+11 --wipe-slot=tpm2 /dev/sda3 && reboot
 ```
 
