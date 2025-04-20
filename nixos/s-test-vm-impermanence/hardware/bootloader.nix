@@ -7,67 +7,33 @@
 }:
 
 {
-  # boot.loader.systemd-boot.enable = true;
-  # boot.loader.efi.canTouchEfiVariables = true;
-  # boot.loader.efi.efiSysMountPoint = "/boot";
-  boot.lanzaboote = {
-    enable = true;
-    pkiBundle = "/persist/etc/secureboot";
-  };
 
-  fileSystems."/persist".neededForBoot = true;
-  fileSystems."/boot".neededForBoot = true;
+  boot.initrd.systemd.tpm2.enable = true;
+  # boot.initrd.luks.devices.root = {
+  #   device = "/dev/disk/by-partuuid/c5c3e4e1-f22d-429f-b3a2-50775c673279";
+  # };
+  # security.tpm2.enable = true;
 
-  environment.systemPackages = with pkgs; [ sbctl ];
+  #   fileSystems."/" = {
+  #     device = "/dev/root_vg/root";
+  #     fsType = "btrfs";
+  #     options = [ "subvol=root" ];
+  # };
+  # Set systemd-boot configuration limit
+  boot.loader.systemd-boot.configurationLimit = 15;
 
+  # # Force disable systemd-boot as Lanzaboote replaces it
+  # boot.loader.systemd-boot.enable = lib.mkForce false;
 
-#   fileSystems."/" = {
-#     device = "/dev/root_vg/root";
-#     fsType = "btrfs";
-#     options = [ "subvol=root" ];
-# };
+  # Allow modifying EFI variables
+  boot.loader.efi.canTouchEfiVariables = true;
 
-#   boot.initrd.postResumeCommands = lib.mkAfter ''
-#     mkdir /btrfs_tmp
-#     mount /dev/root_vg/root /btrfs_tmp
-#     if [[ -e /btrfs_tmp/root ]]; then
-#         mkdir -p /btrfs_tmp/old_roots
-#         timestamp=$(date --date="@$(stat -c %Y /btrfs_tmp/root)" "+%Y-%m-%-d_%H:%M:%S")
-#         mv /btrfs_tmp/root "/btrfs_tmp/old_roots/$timestamp"
-#     fi
+  # allow nesting in vms:
+  # boot.extraModprobeConfig = "options kvm_intel nested=1";
 
-#     delete_subvolume_recursively() {
-#         IFS=$'\n'
-#         for i in $(btrfs subvolume list -o "$1" | cut -f 9- -d ' '); do
-#             delete_subvolume_recursively "/btrfs_tmp/$i"
-#         done
-#         btrfs subvolume delete "$1"
-#     }
+  # Initrd settings
+  boot.initrd.systemd.enable = true;
+  boot.initrd.systemd.enableTpm2 = true;
 
-#     for i in $(find /btrfs_tmp/old_roots/ -maxdepth 1 -mtime +30); do
-#         delete_subvolume_recursively "$i"
-#     done
-
-#     btrfs subvolume create /btrfs_tmp/root
-#     umount /btrfs_tmp
-#   '';
-
-#   fileSystems."/persistent" = {
-#     device = "/dev/root_vg/root";
-#     neededForBoot = true;
-#     fsType = "btrfs";
-#     options = [ "subvol=persistent" ];
-#   };
-
-#   fileSystems."/nix" = {
-#     device = "/dev/root_vg/root";
-#     fsType = "btrfs";
-#     options = [ "subvol=nix" ];
-#   };
-
-#   fileSystems."/boot" = {
-#     device = "/dev/disk/by-uuid/XXXX-XXXX";
-#     fsType = "vfat";
-#   };
+  
 }
-
