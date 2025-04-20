@@ -90,8 +90,7 @@ nix-shell -p sbctl --run 'sbctl status'
 # Setup Mode:	✓ Disabled
 # Secure Boot:	✓ Enabled
 # Vendor Keys:	none
-
-sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3
+sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+4+11 --wipe-slot=tpm2 /dev/sda3
 ```
 
 

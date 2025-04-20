@@ -115,7 +115,7 @@ update the system will not fail i guess :D:
 
 ```bash
 nixos-rebuild switch --flake /etc/nixos#example
-nixos-rebuild switch --flake /home/deadbeef/github/nixos#example
+nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname)
 ```
 
 

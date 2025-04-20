@@ -6,14 +6,20 @@
   ...
 }:
 {
-  swapDevices = [
-    {
-      device = "/var/lib/swapfile";
-      size = 5 * 1024;
-    }
-  ];
-  fileSystems."/tmp" = {
-    device = "tmpfs";
-    fsType = "tmpfs";
-  };
+  # swapDevices = [
+  #   {
+  #     device = "/.swapvol";
+  #     # size = 5 * 1024;
+  #   }
+  # ];
+  #   swapDevices = [
+  # {
+  #   device = "/.swapvol"
+  #   }
+  #   ];
+
+  # fileSystems."/tmp" = {
+  #   device = "tmpfs";
+  #   fsType = "tmpfs";
+  # };
 }
