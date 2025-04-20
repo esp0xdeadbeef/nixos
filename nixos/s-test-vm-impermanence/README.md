@@ -90,7 +90,11 @@ nix-shell -p sbctl --run 'sbctl status'
 # Setup Mode:	✓ Disabled
 # Secure Boot:	✓ Enabled
 # Vendor Keys:	none
-sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+4+11 --wipe-slot=tpm2 /dev/sda3
+# use this setting on fysical devices (7 is important here):
+# doesn't look like applicable to us, this works for me 
+# https://superuser.com/questions/1640985/how-to-enable-bitlocker-when-booting-windows-10-from-a-non-microsoft-boot-manage
+# It still works for me though in a qemu image on proxmox:
+sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3
 ```
 
 
@@ -99,6 +103,6 @@ sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+4+11 --wipe-slot=tpm
 
 ```bash
 nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname)
-nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+4+11 --wipe-slot=tpm2 /dev/sda3 && reboot
+nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3 && reboot
 ```
 
