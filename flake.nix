@@ -157,6 +157,16 @@
             ./nixos/s-test-vm-impermanence/configuration.nix
           ];
         };
+        s-test-vm-impermanence-2 = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            # required for secure boot:
+            lanzaboote.nixosModules.lanzaboote
+
+            # > Our main nixos configuration file <
+            ./nixos/s-test-vm-impermanence-2/configuration.nix
+          ];
+        };
         s-router-vpn-1 = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
