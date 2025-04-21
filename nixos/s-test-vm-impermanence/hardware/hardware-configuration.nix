@@ -49,7 +49,7 @@
       "fmask=0022"
       "dmask=0022"
     ];
-    neededForBoot = true;
+    # neededForBoot = true;
   };
 
   fileSystems."/games" = {
