@@ -1,4 +1,14 @@
 
+# Before setting up
+
+1. use the gnome iso (vim installed by default)
+2. disable sec boot for the setup (otherwise you can not find the iso / image)
+3. sed this file with the ip and path to this file like so (so the documentation will be easier to read):
+
+```bash
+sed -i 's|/home/deadbeef/github/nixos|<your-new-path>/g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
+sed -i 's/192.168.1.109/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
+```
 
 
 # Setup the disks like this:
@@ -16,6 +26,8 @@ head -c 512 /dev/urandom > /tmp/disk.key
 # sed -i 's/\/dev\/sda/<your-disk-to-format>/g' $PATH_TO_DISKO
 sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- --mode destroy,format,mount $PATH_TO_DISKO
 cryptsetup luksAddKey /dev/disk/by-partlabel/disk-vda-luks -d /tmp/disk.key
+# generate the hardware configuration
+nixos-generate-config --root /mnt/
 ```
 
 To sign the keys:
@@ -28,15 +40,11 @@ cp /etc/secureboot/* /mnt/persist/etc/secureboot/ -r
 nix-shell -p openssl --run 'openssl x509 -outform der -in /etc/secureboot/keys/PK/PK.pem -out /mnt/boot/PK.cer'
 nix-shell -p openssl --run 'openssl x509 -outform der -in /etc/secureboot/keys/KEK/KEK.pem -out /mnt/boot/KEK.cer'
 nix-shell -p openssl --run 'openssl x509 -outform der -in /etc/secureboot/keys/db/db.pem -out /mnt/boot/db.cer'
+
 ```
 
 
 # Generate the hardware configuration
-
-```bash
-# inside the vm:
-nixos-generate-config --root /mnt/
-```
 
 ```bash
 # host that contain the nixos configuration:
@@ -52,14 +60,18 @@ rsync -va /home/deadbeef/github/nixos nixos@192.168.1.109:~/github/
 
 ```bash
 nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/nixos-24.11#nixos-install -- --impure --flake path:/home/nixos/github/nixos#s-test-vm-impermanence
-```
-
-```bash
+# .....
 # setting root password...
 # New password: 
 # Retype new password: 
 # passwd: password updated successfully
 # installation finished!
+# reboot now, we can not setup the tpm, because the driver is not loaded in the live env
+reboot
+# change the settings in your bios to secure boot, delete the PK keys, add the new keys generated in /boot/ (one by one.)
+```
+
+```bash
 sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3
 # 🔐 Please enter current passphrase for disk /dev/sda3: •                       
 # New TPM2 token enrolled as key slot 2.
