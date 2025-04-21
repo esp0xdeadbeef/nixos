@@ -40,18 +40,18 @@
                     "/root" = {
                       mountpoint = "/";
                     };
-                    "/home/deadbeef" = {
-                      mountOptions = ["compress=zstd"];
-                      mountpoint = "/home/deadbeef";
-                    };
+                    # "/home/deadbeef" = {
+                    #   mountOptions = ["compress=zstd"];
+                    #   mountpoint = "/home/deadbeef";
+                    # };
                     "/nix" = {
                       mountOptions = ["compress=zstd" "noatime"];
                       mountpoint = "/nix";
                     };
-                    "/games" = {
-                      mountOptions = ["compress=zstd" "noatime"];
-                      mountpoint = "/games";
-                    };
+                    # "/games" = {
+                    #   mountOptions = ["compress=zstd" "noatime"];
+                    #   mountpoint = "/games";
+                    # };
                     "/persist" = {
                       mountOptions = ["compress=zstd" "noatime"];
                       mountpoint = "/persist";
