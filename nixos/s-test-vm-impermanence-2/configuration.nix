@@ -28,39 +28,10 @@
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
-    ./hardware/swap-and-tmpfs.nix
 
-    ../1-general/desktop/applets.nix
-    ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
-    ../1-general/desktop/fonts.nix
-    ../1-general/desktop/shell-env.nix
-    ../1-general/desktop/users-and-groups.nix
-    ../1-general/enable-etc-hosts-editing/default.nix
-    ../1-general/hardware/is-vm/qemu-guest.nix
-    ../1-general/network/firewall.nix
-    ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
-    ../1-general/packages/1-general/tooling.nix
-    ../1-general/packages/data-tranformation/packages.nix
-    ../1-general/packages/editors/packages.nix
-    ../1-general/packages/encryption-and-password-management/packages.nix
-    ../1-general/packages/git/packages.nix
-    ../1-general/packages/network-troubleshooting/packages.nix
-    ../1-general/packages/nix-specific/packages.nix
-    ../1-general/packages/packages.nix
-    ../1-general/packages/terminals/packages.nix
     ../1-general/packages/terminals/terminal-optimisers/packages.nix
-    ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
-    ../1-general/packages/window-managers/X-org/packages.nix
-    ../1-general/secrets/import-secrets.nix
-    ../1-general/security/default.nix
-    ../1-general/system/autologin.nix
-    ../1-general/system/autoupdate.nix
-    ../1-general/system/garbage-collection.nix
-    ../1-general/system/locale.nix
-    ../1-general/terminals/tmux/settings.nix
-    ../1-general/time/timezone.nix
 
   ];
 

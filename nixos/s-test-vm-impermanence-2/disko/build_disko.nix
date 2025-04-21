@@ -56,14 +56,14 @@
                       mountOptions = ["compress=zstd" "noatime"];
                       mountpoint = "/persist";
                     };
-                    "/swap" = {
-                      mountpoint = "/.swapvol";
-                      swap = {
-                        swapfile.size = "20M";
-                        swapfile2.size = "20M";
-                        swapfile2.path = "rel-path";
-                      };
-                    };
+                    # "/swap" = {
+                    #   mountpoint = "/.swapvol";
+                    #   swap = {
+                    #     swapfile.size = "20M";
+                    #     swapfile2.size = "20M";
+                    #     swapfile2.path = "rel-path";
+                    #   };
+                    # };
                   };
                   mountpoint = "/partition-root";
                 };
