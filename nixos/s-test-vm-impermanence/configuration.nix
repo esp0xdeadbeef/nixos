@@ -26,7 +26,6 @@
     ./hardware/bootloader.nix
     ./hardware/boot-package.nix
     ./hardware/hardware-configuration.nix
-    ./hardware/impermanence-fucking-sucks.nix
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
