@@ -82,11 +82,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Third party programs, packaged with nix
-    firefox-addons = {
-      url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # # Third party programs, packaged with nix
+    # doesn't exist anymore:
+    # firefox-addons = {
+    #   url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
+
     nix-gaming = {
       # url = "github:fufexan/nix-gaming";
       url = "github:misterio77/nix-gaming";
