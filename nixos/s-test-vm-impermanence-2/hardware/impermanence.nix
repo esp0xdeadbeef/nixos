@@ -102,6 +102,7 @@
         "Pictures"
         "Documents"
         "Videos"
+        ".local/share/lxc"
         {
           directory = ".gnupg";
           mode = "0700";
@@ -118,15 +119,12 @@
           directory = ".local/share/keyrings";
           mode = "0700";
         }
-        {
-          directory = ".local/share/lxc";
-          mode = "0700";
-        }
         ".local/share/direnv"
       ];
       files = [
         ".screenrc"
-        # ".zsh_history" # why the fuck does this give errors?
+        "~/.config/nix/nix.conf"
+        ".zsh_history" # why the fuck does this give errors?
       ];
     };
   };
