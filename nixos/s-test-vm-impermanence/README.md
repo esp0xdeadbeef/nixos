@@ -7,7 +7,7 @@
 
 ```bash
 sed -i 's|/home/deadbeef/github/nixos|<your-new-path>/g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
-sed -i 's/192.168.1.109/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
+sed -i 's/192.168.1.123/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
 ```
 
 
@@ -16,7 +16,7 @@ sed -i 's/192.168.1.109/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/s-tes
 
 ```bash
 # host that contain the nixos configuration:
-rsync -va /home/deadbeef/github/nixos nixos@192.168.1.109:~/github/
+rsync -va /home/deadbeef/github/nixos nixos@192.168.1.123:~/github/
 ```
 
 ```bash
@@ -33,6 +33,9 @@ nixos-generate-config --root /mnt/
 To sign the keys:
 ```bash
 nix-shell -p sbctl --run 'sbctl create-keys'
+
+
+# only need to do this if you're not using MS products, and want to wipe all the EFI keys:
 mkdir /mnt/persist/etc/secureboot/ -p
 cp /etc/secureboot/* /mnt/persist/etc/secureboot/ -r
 
@@ -48,12 +51,12 @@ nix-shell -p openssl --run 'openssl x509 -outform der -in /etc/secureboot/keys/d
 
 ```bash
 # host that contain the nixos configuration:
-rsync -va nixos@192.168.1.109:/mnt/etc/nixos/hardware-configuration.nix /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/hardware/hardware-configuration.nix
+rsync -va nixos@192.168.1.123:/mnt/etc/nixos/hardware-configuration.nix /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/hardware/hardware-configuration.nix
 ```
 
 ```bash
 # rsync everything back from the host that contains the configs to the vm:
-rsync -va /home/deadbeef/github/nixos nixos@192.168.1.109:~/github/
+rsync -va /home/deadbeef/github/nixos nixos@192.168.1.123:~/github/
 ```
 
 # Installing the vm:
@@ -66,7 +69,7 @@ nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/
 # Retype new password: 
 # passwd: password updated successfully
 # installation finished!
-# reboot now, we can not setup the tpm, because the driver is not loaded in the live env
+# reboot now, we can not setup the tpm, because the driver is not loaded in the live env and we are not in sec mode
 reboot
 # change the settings in your bios to secure boot, delete the PK keys, add the new keys generated in /boot/ (one by one.)
 ```
@@ -75,26 +78,43 @@ reboot
 sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3
 # 🔐 Please enter current passphrase for disk /dev/sda3: •                       
 # New TPM2 token enrolled as key slot 2.
-nix-shell -p sbctl --run 'sbctl status'
-# Installed:      ✓ sbctl is installed
-# Owner GUID:     fbbe9b29-dbf3-4044-a5fa-73def0a822f5
-# Setup Mode:     ✓ Disabled
-# Secure Boot:    ✗ Disabled
-# Vendor Keys:    microsoft 
+# we can not do the next step because:
 ls /mnt/boot/
 # db.cer  EFI  KEK.cer  loader  PK.cer
+
+# if the output is like this we can enroll the keys:
+nix-shell -p sbctl --run 'sbctl status'
+# Installed:      ✓ sbctl is installed
+# Owner GUID:     c48257e4-f5b8-447a-9ae9-c78aae5e7021
+# Setup Mode:     ✗ Enabled
+# Secure Boot:    ✗ Disabled
+# Vendor Keys:    none
+
+
+# with microsoft:
+nix-shell -p sbctl --run 'sbctl enroll-keys -m'
+# Enrolling keys to EFI variables...
+# With vendor keys from microsoft...✓ 
+# Enrolled keys to the EFI variables!
+nix-shell -p sbctl --run 'sbctl status'
+# Installed:      ✓ sbctl is installed
+# Owner GUID:     c48257e4-f5b8-447a-9ae9-c78aae5e7021
+# Setup Mode:     ✓ Disabled
+# Secure Boot:    ✗ Disabled
+# Vendor Keys:    microsoft
+
+# without microsoft (read the wiki - know what you're doing - https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot):
+nix-shell -p sbctl --run 'sbctl enroll-keys'
 
 # add them to the bios (boot into the firmware) -> secureboot -> add PK KEK db cer files from the first entry (boot directory)
 reboot
 ```
 
-# reboot the machine and enable sec boot:
-
-
-
 # Setup the environment so it is using safeboot
 
 ```bash
+
+
 # check if you're enrolled:
 nix-shell -p sbctl --run 'sbctl status'
 # Installed:	✓ sbctl is installed
@@ -102,6 +122,8 @@ nix-shell -p sbctl --run 'sbctl status'
 # Setup Mode:	✓ Disabled
 # Secure Boot:	✓ Enabled
 # Vendor Keys:	none
+
+
 # use this setting on fysical devices (7 is important here):
 # doesn't look like applicable to us, this works for me 
 # https://superuser.com/questions/1640985/how-to-enable-bitlocker-when-booting-windows-10-from-a-non-microsoft-boot-manage
@@ -114,6 +136,8 @@ sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm
 
 
 ```bash
+# deadbeef i my user (ssh) don't worry about the eavedropping error in ssh, to get rid of the errors, rm the last two LINES of the `~/.ssh/known_hosts` of your host, then do a rsync:
+rsync -va /home/deadbeef/github/nixos deadbeef@192.168.1.123:~/github/
 nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname)
 nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3 && reboot
 ```
