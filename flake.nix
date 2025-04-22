@@ -41,7 +41,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-
     # hardware:
     hardware = {
       url = "github:nixos/nixos-hardware";
@@ -61,26 +60,25 @@
     impermanence = {
       url = "github:nix-community/impermanence";
     };
-    # nix-colors = {
-    #   url = "github:misterio77/nix-colors";
-    # };
-    nixos-mailserver = {
-      url = "gitlab:simple-nixos-mailserver/nixos-mailserver";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nixpkgs-24_11.follows = "nixpkgs-stable";
-    };
-    nix-gl = {
-      url = "github:nix-community/nixgl";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nix-minecraft = {
-      url = "github:misterio77/nix-minecraft";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+
+
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+
+
+    ## The packages that are listed below, are NOT used at this moment
+    ## This can be ignored, the inputs will be fetched, but not used in the core nix configuration on hosts.
+    # nix-colors = {
+    #   url = "github:misterio77/nix-colors";
+    # };
+    # nixos-mailserver = {
+    #   url = "gitlab:simple-nixos-mailserver/nixos-mailserver";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    #   inputs.nixpkgs-24_11.follows = "nixpkgs-stable";
+    # };
 
     # # Third party programs, packaged with nix
     # doesn't exist anymore:
@@ -89,11 +87,21 @@
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
 
-    nix-gaming = {
-      # url = "github:fufexan/nix-gaming";
-      url = "github:misterio77/nix-gaming";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # nix-gaming = {
+    #   # url = "github:fufexan/nix-gaming";
+    #   url = "github:misterio77/nix-gaming";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
+
+    # nix-minecraft = {
+    #   url = "github:misterio77/nix-minecraft";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
+
+    # nix-gl = {
+    #   url = "github:nix-community/nixgl";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
 
   };
 
