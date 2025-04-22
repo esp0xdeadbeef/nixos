@@ -1,0 +1,25 @@
+keys:
+  - &key_general_1 age1xm8ftcjlqsns5a4m74593hur7ltuxh2wqcrsl6ja2vqee664dclsq4yrkv
+  - &key_general_2 age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
+
+creation_rules:
+  - path_regex: '^secrets/general-.*\.(env|ya?ml)$'
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *key_general_1
+          - *key_general_2
+
+  - path_regex: '^secrets/l-esp-.*\.env$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *key_general_2
+
+  - path_regex: '^secrets/l-x13s-.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *key_general_1
