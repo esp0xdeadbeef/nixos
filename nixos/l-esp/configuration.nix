@@ -87,7 +87,7 @@
       deadbeef = import ../../home-manager/l-esp/home.nix;
     };
   };
-  
+
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -149,6 +149,9 @@
   services.displayManager.defaultSession = "none+i3";
 
   environment.interactiveShellInit = ''
+    fpath+=(${pkgs.sops}/share/zsh/site-functions)
+    autoload -Uz compinit
+    compinit
     ZSH_THEME=robbyrussell
   '';
 
