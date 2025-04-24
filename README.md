@@ -1,3 +1,5 @@
+tltr; this repo was never ment to be public, but someone wanted it so i published it.
+
 # Todo
 
 1. create a new github account, share only the nix project to that account.
