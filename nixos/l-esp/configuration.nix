@@ -35,6 +35,7 @@
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
     ../1-general/desktop/fonts.nix
+    ../1-general/desktop/screen-recording.nix
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
@@ -87,7 +88,7 @@
       deadbeef = import ../../home-manager/l-esp/home.nix;
     };
   };
-
+  
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -149,9 +150,6 @@
   services.displayManager.defaultSession = "none+i3";
 
   environment.interactiveShellInit = ''
-    fpath+=(${pkgs.sops}/share/zsh/site-functions)
-    autoload -Uz compinit
-    compinit
     ZSH_THEME=robbyrussell
   '';
 
