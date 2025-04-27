@@ -6,6 +6,7 @@
   lib,
   config,
   pkgs,
+  sopsSecrets,
   ...
 }:
 {
@@ -20,17 +21,21 @@
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
     ./i3/packages.nix
+
+    
+    inputs.sops-nix.homeManagerModules.sops
   ];
   sops = {
     defaultSopsFile = ../../secrets/l-werk-default-deadbeef.yaml;
+    #withPlaceholders = true;
 
     age = {
       sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
       generateKey = true;
     };
 
-    secrets.burpLicenseCompanyname = { };
   };
+
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -59,22 +64,20 @@
   home = {
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
-  }; 
-   gtk.enable = true;
-   gtk.theme = {
-     name = "Adwaita-dark";
-     package = pkgs.gnome-themes-extra;
-   };
-
-
+  };
+  gtk.enable = true;
+  gtk.theme = {
+    name = "Adwaita-dark";
+    package = pkgs.gnome-themes-extra;
+  };
 
   home.packages = with pkgs; [
-    htop
-    teams-for-linux
+    # htop
+    # teams-for-linux
     #intune-portal
-    microsoft-edge
+    # microsoft-edge
     xdotool
-    azure-cli
+    # azure-cli
     i3status-rust
     discord
     obsidian
@@ -83,12 +86,11 @@
     flameshot
     rofi
     remmina
-    mitmproxy
     netexec
     ffuf
     #exploitdb
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
-    (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+    # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
   ];
   # Enable home-manager and git
   programs.home-manager.enable = true;
