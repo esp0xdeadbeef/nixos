@@ -6,6 +6,7 @@
   lib,
   config,
   pkgs,
+  sopsSecrets,
   ...
 }:
 {
@@ -21,7 +22,19 @@
     # ./nvim.nix
     ./dropbox/packages.nix
     ./steam/packages.nix
+    ./i3/packages.nix
   ];
+  sops = {
+    defaultSopsFile = ../../secrets/l-esp-default.yaml;
+
+    age = {
+      sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
+      generateKey = true;
+    };
+
+    secrets.burpLicenseCompanyname = { };
+  };
+
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -50,14 +63,12 @@
   home = {
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
-  }; 
-   gtk.enable = true;
-   gtk.theme = {
-     name = "Adwaita-dark";
-     package = pkgs.gnome-themes-extra;
-   };
-
-
+  };
+  gtk.enable = true;
+  gtk.theme = {
+    name = "Adwaita-dark";
+    package = pkgs.gnome-themes-extra;
+  };
 
   home.packages = with pkgs; [
     # htop
