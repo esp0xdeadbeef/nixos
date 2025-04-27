@@ -19,7 +19,18 @@
 
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
+    ./i3/packages.nix
   ];
+  sops = {
+    defaultSopsFile = ../../secrets/l-werk-default-deadbeef.yaml;
+
+    age = {
+      sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
+      generateKey = true;
+    };
+
+    secrets.burpLicenseCompanyname = { };
+  };
   nixpkgs = {
     # You can add overlays here
     overlays = [
