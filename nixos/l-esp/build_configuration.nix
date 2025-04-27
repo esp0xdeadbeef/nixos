@@ -75,7 +75,6 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       # Disable if you don't want unfree packages
       allowUnfree = true;
     };
-    hostPlatform = "x86_64-linux";
   };
 
   nix =
