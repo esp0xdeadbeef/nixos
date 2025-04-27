@@ -23,6 +23,9 @@
 
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
+
+
+    inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;

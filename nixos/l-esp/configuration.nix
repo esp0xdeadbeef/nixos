@@ -77,8 +77,9 @@
     ../1-general/virtualization/lxc.nix
     ../1-general/virtualization/podman.nix
 
-    inputs.home-manager.nixosModules.home-manager
 
+
+    inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
@@ -104,7 +105,7 @@
       deadbeef = import ../../home-manager/l-esp/home.nix;
     };
   };
-
+  
   nixpkgs = {
     # You can add overlays here
     overlays = [
