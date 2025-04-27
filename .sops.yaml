@@ -2,6 +2,7 @@ keys:
   - &key_general_1 age1xm8ftcjlqsns5a4m74593hur7ltuxh2wqcrsl6ja2vqee664dclsq4yrkv
   - &key_general_2 age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
   - &l-werk age1pglvs7ljmfxpx68wmlc2s7s79k6dnm69m0eccdzu8hz56a6hcfrqd8qhgp
+  - &l-werk-deadbeef age1vnwm6x6j9grqaejell6df9vr6nzwrdzxwk4wyfjyqva23rxu5c6sswsd6y
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -11,12 +12,20 @@ creation_rules:
           - *key_general_1
           - *key_general_2
 
-  - path_regex: '^(secrets/)*l-esp-.*\.(env|ya?ml)$'
+  - path_regex: '^(secrets/)*l-esp-default\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
     key_groups:
       - age:
           - *key_general_2
+ 
+  - path_regex: '^(secrets/)*l-werk-default-deadbeef\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-werk
+          - *l-werk-deadbeef
 
   - path_regex: '^(secrets/)*l-werk-.*\.(env|ya?ml)$'
     input_type: env
@@ -24,6 +33,7 @@ creation_rules:
     key_groups:
       - age:
           - *l-werk
+
 
   - path_regex: '^(secrets/)*l-x13s-.*\.(env|ya?ml)$'
     input_type: env
