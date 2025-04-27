@@ -23,18 +23,33 @@
 
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
-
     inputs.home-manager.nixosModules.home-manager
-
+    inputs.sops-nix.nixosModules.sops
   ];
+  sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
+  # This will automatically import SSH keys as age keys
+  sops.age.sshKeyPaths = [ "/home/deadbeef/.ssh/id_ed25519" ];
+  # This is using an age key that is expected to already be in the filesystem
+  # sops.age.keyFile = "/var/lib/sops-nix/key.txt";
+  # This will generate a new key if the key specified above does not exist
+  sops.age.generateKey = true;
+  # This is the actual specification of the secrets.
+  # sops.secrets.example-key = { };
+  # sops.secrets."myservice/my_subdir/my_secret" = { };
 
   home-manager = {
-    extraSpecialArgs = { inherit inputs outputs; };
+    sharedModules = [
+      inputs.sops-nix.homeManagerModules.sops
+    ];
+    extraSpecialArgs = {
+      inherit inputs outputs;
+    };
     users = {
       # Import your home-manager configuration
       deadbeef = import ../../home-manager/l-werk/home.nix;
     };
   };
+
   nixpkgs = {
     # You can add overlays here
     overlays = [
