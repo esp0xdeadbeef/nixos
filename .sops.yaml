@@ -10,7 +10,7 @@ creation_rules:
           - *key_general_1
           - *key_general_2
 
-  - path_regex: '^(secrets/)*l-esp-.*\.env$'
+  - path_regex: '^(secrets/)*l-esp-.*\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
     key_groups:
