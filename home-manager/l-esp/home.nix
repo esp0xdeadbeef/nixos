@@ -32,7 +32,6 @@
       generateKey = true;
     };
 
-    secrets.burpLicenseCompanyname = { };
   };
 
   nixpkgs = {
