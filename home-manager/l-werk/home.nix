@@ -72,12 +72,12 @@
   };
 
   home.packages = with pkgs; [
-    # htop
-    # teams-for-linux
-    #intune-portal
-    # microsoft-edge
+    htop
+    teams-for-linux
+    intune-portal
+    microsoft-edge
     xdotool
-    # azure-cli
+    azure-cli
     i3status-rust
     discord
     obsidian
@@ -88,9 +88,9 @@
     remmina
     netexec
     ffuf
-    #exploitdb
+    exploitdb
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
-    # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+    (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
   ];
   # Enable home-manager and git
   programs.home-manager.enable = true;
