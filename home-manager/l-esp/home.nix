@@ -22,7 +22,7 @@
     # ./nvim.nix
     ./dropbox/packages.nix
     ./steam/packages.nix
-    ./i3/packages.nix
+    #./i3/packages.nix
   ];
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default.yaml;
