@@ -88,7 +88,7 @@
     remmina
     netexec
     ffuf
-    exploitdb
+    # exploitdb # using the latest, conflict if uncommented.
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
     (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
   ];
