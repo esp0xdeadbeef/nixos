@@ -369,6 +369,7 @@
       #exec_always --no-startup-id xss-lock -- i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png &
       exec --no-startup-id autorandr
       exec --no-startup-id spotify
+      exec --no-startup-id dunst
     '';
     path = "${config.home.homeDirectory}/.config/i3/config";
   };
