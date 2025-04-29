@@ -302,7 +302,7 @@ exec --no-startup-id nm-applet
 # --no-sandbox
 bindsym $mod+F2 exec teams  
 
-#bindsym Print exec "flameshot gui"
+bindsym Print exec "flameshot gui"
 # Replace Flameshot with Ksnip for Print key
 bindsym Print exec "sway-screenshot -m region"
 bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
@@ -311,14 +311,12 @@ bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
 bindsym $mod+Print exec "ksnip"
 
 
-#bindsym Print exec "~/Dropbox/Prive/flameshot_editing_screen.sh"
 #bindsym Print exec "spectacle"
 #bindsym $mod+x exec "rofi -show calc -modi calc -no-show-match -no-sort"
 # move workspace to the left.
 bindsym $mod+comma move workspace to output left
 bindsym $mod+period move workspace to output right
 
-#bindsym $mod+m exec --no-startup-id ~/Dropbox/Prive/computers_and_prog/i3_setup/move_to_primary_screen.sh
 
 #exec --no-startup-id xautolock -time 5 -locker fuzzy_lock -notify 20 -notifier 'xset dpms force off' 
 #exec --no-startup-id xautolock -time 7 -locker "systemctl suspend"
