@@ -374,6 +374,7 @@ exec --no-startup-id xsetroot -solid "#000000"
 exec --no-startup-id teams-for-linux
 exec --no-startup-id autorandr
 exec --no-startup-id spotify
+exec --no-startup-id dunst
   '';
   path = "${config.home.homeDirectory}/.config/i3/config";
 };
