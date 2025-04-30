@@ -304,7 +304,7 @@ bindsym $mod+F2 exec teams
 
 bindsym Print exec "flameshot gui"
 # Replace Flameshot with Ksnip for Print key
-bindsym Print exec "sway-screenshot -m region"
+# bindsym Print exec "sway-screenshot -m region"
 bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
 
 # Add Alt + Print to open Ksnip
