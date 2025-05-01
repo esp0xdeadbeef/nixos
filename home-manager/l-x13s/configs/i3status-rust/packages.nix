@@ -11,6 +11,7 @@
 sops.templates.i3status-rust = {
   content = ''
 # Config for i3blocks-rs
+
 icons_format = "{icon}"
 
 [theme]
@@ -38,16 +39,6 @@ bat_not_available = "\uf244 ? UNK" # fa-battery-empty
 block = "net"
 format = " $icon {$signal_strength $ssid $frequency|LAN} via $device "
 
-#[[block]]
-#block = "custom"
-#command = "~/.config/i3status-rust/get_ipv4.sh"
-#interval = 60
-
-#[[block]]
-#block = "custom"
-#command = "~/.config/i3status-rust/get_ipv6.sh"
-#interval = 60
-
 [[block]]
 block = "custom"
 cycle = [
@@ -56,12 +47,6 @@ cycle = [
     "(echo -n '🌍 '; curl -s ifconfig.me -4)",
     "(echo -n '🌍 '; curl -s ifconfig.me -6)",
 ]
-
-#prefix = "🌍 "
-#cycle_format = "🌍 {}"
-#format = "🌐 {output}"
-#format = "🌍 {}"
-#format = "🌍 {}"  # This adds an icon prefix without modifying the script
 interval = 60
 
 [[block]]
@@ -79,26 +64,6 @@ cycle = [
 ]
 interval = 20
 
-#[[block]]
-#block = "disk_space"
-#path = "/"
-#info_type = "available"
-#alert_unit = "GB"
-#interval = 20
-#warning = 20.0
-#alert = 10.0
-#format = " $icon /: $available.eng(w:2) "
-
-#[[block]]
-#block = "disk_space"
-#path = "/home/deadbeef/second-ssd"
-#info_type = "available"
-#alert_unit = "GB"
-#interval = 20
-#warning = 20.0
-#alert = 10.0
-#format = " $icon mnt: $available.eng(w:2) "
-
 [[block]]
 block = "memory"
 format = " $icon $mem_total_used_percents.eng(w:2) "
@@ -109,12 +74,6 @@ block = "cpu"
 info_cpu = 20
 warning_cpu = 50
 critical_cpu = 90
-
-#[[block]]
-#block = "custom"
-#command = "~/.config/i3status-rust/gpu-load.sh"
-#interval = 1
-#json = true
 
 [[block]]
 block = "battery"
