@@ -9,6 +9,12 @@
   sopsSecrets,
   ...
 }:
+let
+  unstablePkgs = import inputs.nixpkgs-unstable {
+    # system = "x86_64-linux";
+    config.allowUnfree = true;
+  };
+in
 {
   # You can import other home-manager modules here
   imports = [
@@ -19,7 +25,6 @@
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-    # ./nvim.nix
     ./configs/dropbox/packages.nix
     ./configs/steam/packages.nix
     ./configs/i3/packages.nix
@@ -80,7 +85,6 @@
     i3status-rust
     discord
     obsidian
-    vscode
     google-chrome
     flameshot
     rofi
@@ -89,9 +93,12 @@
     legcord
     ffuf
     #exploitdb
-    inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
-    # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+    unstablePkgs.vscode
+    unstablePkgs.firefox
+    unstablePkgs.exploitdb
+    unstablePkgs.firefox
   ];
+
   # Enable home-manager and git
   programs.home-manager.enable = true;
   programs.git.enable = true;
