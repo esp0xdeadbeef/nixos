@@ -291,9 +291,6 @@ bindsym $mod+c exec google-chrome-stable
 bindsym $mod+F3 exec spotify
 exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet
 
-# --no-sandbox
-bindsym $mod+F2 exec teams  
-
 # flameshot crashes
 bindsym Print exec "${pkgs.flameshot}/bin/flameshot gui"
 # Replace Flameshot with Ksnip for Print key
@@ -314,14 +311,11 @@ bindsym $mod+bracketleft exec ${pkgs.pamixer}/bin/pamixer --decrease 10
 for_window [class="google-chrome" class="Google-chrome"] move window to workspace 2
 for_window [class="Chromium" title=".*"] move container to workspace 2
 for_window [class="Spotify"] move to workspace 4
-for_window [class="Slack"] move window to workspace 5
 for_window [class="discord"] move to workspace 5
 for_window [class="legcord"] move to workspace 5
 for_window [class="Navigator" class="firefox"] move window to workspace 8
 for_window [class="Firefox"] move window to workspace 8
 for_window [class="firefox"] move window to workspace 8
-for_window [class="burp-StartBurp" title="^Burp Suite Professional$"] move container to workspace 10
-for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
 
 bindsym $mod+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 8
 bindsym $mod+shift+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 9
