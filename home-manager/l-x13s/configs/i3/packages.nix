@@ -281,29 +281,20 @@ mode "exit: [l]ogout, [r]eboot, [s]hutdown" {
   bindsym Escape mode "default"
   bindsym Return mode "default"
 }
-#bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
+bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
 
 bindsym $mod+i exec ${pkgs.xfce.thunar}/bin/thunar
-#bindsym $mod+F4 exec discord-canary
 bindsym $mod+F4 exec ${pkgs.legcord}/bin/legcord
-#bindsym Control+Shift+c [class="Firefox"] exec xdotool key --clearmodifiers ctrl+c
 
-
-#bindsym $mod+l exec i3lock
-
-#doesn't work somehow :S
-#bindsym $mod+Escape exec "i3lock -i ~/.config/i3/i3-lock-screen.png -p default|win -t" && systemctl hibernate
-# while this does work :)
 bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
 bindsym $mod+c exec google-chrome-stable
 bindsym $mod+F3 exec spotify
 exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet
-# exec --no-startup-id /home/deadbeef/.screenlayout/1_default_3.sh
 
 # --no-sandbox
 bindsym $mod+F2 exec teams  
 
-# hack for dunst running, otherwise flameshot crashes;
+# flameshot crashes
 bindsym Print exec "${pkgs.flameshot}/bin/flameshot gui"
 # Replace Flameshot with Ksnip for Print key
 # bindsym Print exec "sway-screenshot -m region"
@@ -312,70 +303,45 @@ bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
 # Add Alt + Print to open Ksnip
 bindsym $mod+Print exec "${pkgs.ksnip}/bin/ksnip"
 
-
-#bindsym Print exec "spectacle"
-#bindsym $mod+x exec "rofi -show calc -modi calc -no-show-match -no-sort"
 # move workspace to the left.
 bindsym $mod+comma move workspace to output left
 bindsym $mod+period move workspace to output right
 
 
-#exec --no-startup-id ${pkgs.xautolock}/bin/xautolock -time 5 -locker fuzzy_lock -notify 20 -notifier 'xset dpms force off' 
-#exec --no-startup-id ${pkgs.xautolock}/bin/xautolock -time 7 -locker "systemctl suspend"
-
-#bindsym $mod+i exec ${pkgs.x2goclient}/bin/x2goclient --session=kali-linux-v2 --close-disconnect
-#bindsym $mod+i exec x2goclient --session=arch --close-disconnect
-#bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c '/home/deadbeef/.local/share/remmina/group_rdp_win11-office_192-168-100-142.remmina'
-#bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "$(ls /home/deadbeef/.local/share/remmina/group_rdp_win11-office-ad*.remmina)"
-bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "$(ls /home/deadbeef/.local/share/remmina/*$(echo -n ${config.sops.placeholder.remminaOfficeIP} | sed 's|\.|-|g')*)"
-bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c "$(ls /home/deadbeef/.local/share/remmina/*$(echo -n ${config.sops.placeholder.remminaPentestIP} | sed 's|\.|-|g')*)"
-#bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c /home/deadbeef/.local/share/remmina/group_rdp_i5-laptop_192-168-1-165.remmina 
 bindsym $mod+bracketright exec ${pkgs.pamixer}/bin/pamixer --increase 10
 bindsym $mod+bracketleft exec ${pkgs.pamixer}/bin/pamixer --decrease 10
-# disable numlock
-exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
-exec --no-startup-id ${pkgs.parcellite}/bin/parcellite
-exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
-#exec --no-startup-id ${pkgs.legcord}/bin/legcord
-
-#for_window [class="burp-StartBurp" title="Burp Suite Professional"] move window to workspace 8
-#for_window [class="burp-StartBurp" title="Burp Suite Professional"] move container to workspace 10
-for_window [class="burp-StartBurp" title="^Burp Suite Professional$"] move container to workspace 10
-for_window [class="burp-StartBurp" title="licensed to ${config.sops.placeholder.burpLicenseCompanyname}"] move container to workspace 8
-for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
 
 for_window [class="google-chrome" class="Google-chrome"] move window to workspace 2
-
-#for_window [class="Firefox"] move window to workspace 8
-#for_window [class="firefox"] move window to workspace 8
-for_window [class="Navigator" class="firefox"] move window to workspace 8
-for_window [class="discord"] move to workspace "5"
+for_window [class="Chromium" title=".*"] move container to workspace 2
 for_window [class="Spotify"] move to workspace 4
 for_window [class="Slack"] move window to workspace 5
-for_window [class="teams-for-linux"] move window to workspace 5
-#for_window [class="*Microsoft Teams classic"] move window to workspace 5
-#for_window [class="microsoft teams - preview"] move window to workspace 5
-#for_window [class="Microsoft Teams - Preview"] move window to workspace 5
-for_window [class="Office 365 on Electron" title="${config.sops.placeholder.workRelatedXlsx}"] move container to workspace 5
-#for_window [class="Chromium" title=".*"] move container to workspace 10
-bindsym $mod+b exec --no-startup-id xdotool click 8
-bindsym $mod+shift+b exec --no-startup-id xdotool click 9
-bindsym Mod1+b exec --no-startup-id xdotool click 8
-bindsym Mod1+shift+b exec --no-startup-id xdotool click 9
+for_window [class="discord"] move to workspace 5
+for_window [class="legcord"] move to workspace 5
+for_window [class="Navigator" class="firefox"] move window to workspace 8
+for_window [class="Firefox"] move window to workspace 8
+for_window [class="firefox"] move window to workspace 8
+for_window [class="burp-StartBurp" title="^Burp Suite Professional$"] move container to workspace 10
+for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
+
+bindsym $mod+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 8
+bindsym $mod+shift+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 9
+bindsym Mod1+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 8
+bindsym Mod1+shift+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 9
 
 
 
 exec --no-startup-id export XDG_SESSION_TYPE=x11
 exec --no-startup-id xsetroot -solid "#333333" #gray
 exec --no-startup-id xsetroot -solid "#000000"
-#exec --no-startup-id ${pkgs.picom}/bin/picom
-#exec_always --no-startup-id xss-lock -- i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png & 
-exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux
+exec --no-startup-id ${pkgs.picom}/bin/picom
 exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
 exec --no-startup-id ${pkgs.dunst}/bin/dunst
-#exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux
-#exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
-#exec --no-startup-id ${pkgs.dunst}/bin/dunst
+exec --no-startup-id ${pkgs.legcord}/bin/legcord
+
+# disable numlock
+exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
+exec --no-startup-id ${pkgs.parcellite}/bin/parcellite
+exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
   '';
   path = "${config.home.homeDirectory}/.config/i3/config";
 };
