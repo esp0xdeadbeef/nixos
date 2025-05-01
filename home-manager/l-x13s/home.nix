@@ -7,7 +7,28 @@
   ...
 }:
 {
+  imports = [
+    # If you want to use modules your own flake exports (from modules/home-manager):
+    # outputs.homeManagerModules.example
 
+    # Or modules exported from other flakes (such as nix-colors):
+    # inputs.nix-colors.homeManagerModules.default
+
+    # You can also split up your configuration and import pieces of it here:
+    # ./nvim.nix
+    # ./steam/packages.nix
+    ./configs/i3/packages.nix
+    inputs.sops-nix.homeManagerModules.sops
+  ];
+  sops = {
+    defaultSopsFile = ../../secrets/l-x13s-default.yaml;
+
+    age = {
+      sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
+      generateKey = true;
+    };
+
+  };
   nixpkgs = {
     # You can add overlays here
     overlays = [
