@@ -86,6 +86,7 @@
     rofi
     remmina
     netexec
+    legcord
     ffuf
     #exploitdb
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
