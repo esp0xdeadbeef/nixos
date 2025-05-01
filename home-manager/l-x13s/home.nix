@@ -18,6 +18,7 @@
     # ./nvim.nix
     # ./steam/packages.nix
     ./configs/i3/packages.nix
+    ./configs/i3status-rust/packages.nix
     inputs.sops-nix.homeManagerModules.sops
   ];
   sops = {
