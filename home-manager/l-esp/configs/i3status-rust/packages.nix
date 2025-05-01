@@ -1,5 +1,16 @@
-# Config for i3blocks-rs
+{
+  config,
+  lib,
+  pkgs,
+  sopsSecrets,
+  ...
+}:
 
+{
+
+sops.templates.i3status-rust = {
+  content = ''
+# Config for i3blocks-rs
 icons_format = "{icon}"
 
 [theme]
@@ -27,6 +38,7 @@ bat_not_available = "\uf244 ? UNK" # fa-battery-empty
 block = "net"
 format = " $icon {$signal_strength $ssid $frequency|LAN} via $device "
 
+
 [[block]]
 block = "custom"
 cycle = [
@@ -36,11 +48,6 @@ cycle = [
     "(echo -n '🌍 '; curl -s ifconfig.me -6)",
 ]
 
-#prefix = "🌍 "
-#cycle_format = "🌍 {}"
-#format = "🌐 {output}"
-#format = "🌍 {}"
-#format = "🌍 {}"  # This adds an icon prefix without modifying the script
 interval = 60
 
 [[block]]
@@ -54,29 +61,9 @@ cmd = "pavucontrol"
 block = "custom"
 cycle = [
     "df -h / | awk 'NR==2 {print \"/: \"$4}'",
-    "df -h /home/deadbeef/second-ssd | awk 'NR==2 {print \"mnt: \"$4}'"
+    "df -h /mnt/second-ssd | awk 'NR==2 {print \"mnt: \"$4}'"
 ]
 interval = 20
-
-#[[block]]
-#block = "disk_space"
-#path = "/"
-#info_type = "available"
-#alert_unit = "GB"
-#interval = 20
-#warning = 20.0
-#alert = 10.0
-#format = " $icon /: $available.eng(w:2) "
-
-#[[block]]
-#block = "disk_space"
-#path = "/home/deadbeef/second-ssd"
-#info_type = "available"
-#alert_unit = "GB"
-#interval = 20
-#warning = 20.0
-#alert = 10.0
-#format = " $icon mnt: $available.eng(w:2) "
 
 [[block]]
 block = "memory"
@@ -105,3 +92,7 @@ driver = "upower"
 block = "time"
 interval = 1
 format = " $timestamp.datetime(f:'%Y-%m-%d %R:%S') "
+'';
+  path = "${config.home.homeDirectory}/.config/i3status-rust/config.toml";
+};
+}

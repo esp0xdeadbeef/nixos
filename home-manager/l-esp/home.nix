@@ -20,9 +20,10 @@
 
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
-    ./dropbox/packages.nix
-    ./steam/packages.nix
-    #./i3/packages.nix
+    ./configs/dropbox/packages.nix
+    ./configs/steam/packages.nix
+    ./configs/i3/packages.nix
+    ./configs/i3status-rust/packages.nix
   ];
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default.yaml;
