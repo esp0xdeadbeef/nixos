@@ -6,7 +6,7 @@
 3. sed this file with the ip and path to this file like so (so the documentation will be easier to read):
 
 ```bash
-sed -i 's|/home/deadbeef/github/nixos|<your-new-path>/g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
+sed -i 's|/home/deadbeef/github/nixos|<your-new-path>|g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
 sed -i 's/192.168.1.123/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/s-test-vm-impermanence/README.md
 ```
 
