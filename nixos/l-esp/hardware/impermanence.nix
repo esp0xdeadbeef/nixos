@@ -140,6 +140,7 @@
         ".config/nix/nix.conf"
         ".zsh_history"
         ".zshrc"
+        ".aliases"
       ];
     };
   };
