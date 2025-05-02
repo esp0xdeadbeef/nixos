@@ -24,6 +24,7 @@
   # I would like to change it to:
   fileSystems."/mnt/second-ssd" = {
     device = "/dev/mapper/second_ssd";
+    neededForBoot = false;
   };
 
 }
