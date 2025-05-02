@@ -75,29 +75,28 @@ in
     package = pkgs.gnome-themes-extra;
   };
 
-  home.packages = with pkgs; [
-    # htop
-    # teams-for-linux
-    #intune-portal
-    # microsoft-edge
-    xdotool
-    # azure-cli
-    i3status-rust
-    # discord
-    obsidian
-    google-chrome
-    flameshot
-    rofi
-    remmina
-    # netexec
-    legcord
-    ffuf
-    #exploitdb
-    unstablePkgs.vscode
-    unstablePkgs.firefox
-    unstablePkgs.exploitdb
-    unstablePkgs.netexec
-  ];
+  home.packages =
+  let
+    stable = with pkgs; [
+      xdotool
+      i3status-rust
+      obsidian
+      google-chrome
+      flameshot
+      rofi
+      remmina
+      legcord
+      ffuf
+    ];
+    unstable = with unstablePkgs; [
+      vscode
+      firefox
+      exploitdb
+      netexec
+    ];
+  in
+    stable ++ unstable;
+
 
   # Enable home-manager and git
   programs.home-manager.enable = true;
