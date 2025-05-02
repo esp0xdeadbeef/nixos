@@ -114,6 +114,11 @@
         ".config/sops"
         ".config/gh"
 
+        # vscode ?
+        ".config/Code" # vscode itself
+        ".vscode" # plugins
+        ".local/share/keyrings"
+
         {
           directory = ".gnupg";
           mode = "0700";
