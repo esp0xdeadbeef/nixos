@@ -103,6 +103,8 @@
         "Documents"
         "Videos"
         ".local/share/lxc"
+        ".config/legcord" # (legcord -> armcord -> discord)
+
         {
           directory = ".gnupg";
           mode = "0700";
@@ -125,7 +127,7 @@
         ".screenrc"
         ".config/nix/nix.conf"
         ".zsh_history"
-        ".config/legcord" # i want to persist legcord (discord also for arm)
+        ".zshrc"
       ];
     };
   };
