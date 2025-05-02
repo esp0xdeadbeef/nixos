@@ -105,6 +105,8 @@
         ".local/share/lxc"
         "github" # custom dir for my github projects
         ".config/legcord" # (legcord -> armcord -> discord)
+        ".config/discord"
+        ".config/spotify"
         ".config/autorandr" # autorandr profile
 
         {
