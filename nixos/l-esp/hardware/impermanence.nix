@@ -124,7 +124,8 @@
       files = [
         ".screenrc"
         ".config/nix/nix.conf"
-        ".zsh_history" # why the fuck does this give errors?
+        ".zsh_history"
+        ".config/legcord" # i want to persist legcord (discord also for arm)
       ];
     };
   };
