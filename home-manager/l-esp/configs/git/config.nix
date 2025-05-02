@@ -7,8 +7,8 @@
 }:
 {
   programs.git = {
-  enable    = true;
-  userName  = "esp0xdeadbeef";
-  userEmail = "esp0xdeadbeef@gmail.com";
-};
+    enable = true;
+    userName = "esp0xdeadbeef";
+    userEmail = "esp0xdeadbeef@gmail.com";
+  };
 }
