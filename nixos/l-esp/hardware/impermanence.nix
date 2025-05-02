@@ -108,6 +108,7 @@
         ".config/discord"
         ".config/spotify"
         ".config/autorandr" # autorandr profile
+        ".config/Code"
 
         {
           directory = ".gnupg";
