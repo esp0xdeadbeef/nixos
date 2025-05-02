@@ -109,6 +109,8 @@
         ".config/spotify"
         ".config/autorandr" # autorandr profile
         ".config/Code"
+        ".config/google-chrome"
+        ".config/chromium"
 
         {
           directory = ".gnupg";
