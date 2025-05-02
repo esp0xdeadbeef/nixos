@@ -41,7 +41,9 @@ echo "{\"icon\":\"\",\"state\":\"$STATE\", \"text\": \"$TEXT\"}"
     executable = true;
   };
 
-
+sops = {
+     secrets.burpLicenseCompanyname = { };
+};
 sops.templates.i3status-rust = {
   content = ''
 # Config for i3blocks-rs
