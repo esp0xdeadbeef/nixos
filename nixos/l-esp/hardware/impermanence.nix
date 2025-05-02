@@ -111,6 +111,7 @@
         ".config/Code"
         ".config/google-chrome"
         ".config/chromium"
+        ".config/sops"
 
         {
           directory = ".gnupg";
