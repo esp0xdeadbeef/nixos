@@ -8,7 +8,7 @@
 {
   swapDevices = [
     {
-      device = "/var/lib/swapfile";
+      device = "/persist/var/lib/swapfile";
       size = 20 * 1024;
     }
   ];
