@@ -83,20 +83,20 @@ in
     xdotool
     # azure-cli
     i3status-rust
-    discord
+    # discord
     obsidian
     google-chrome
     flameshot
     rofi
     remmina
-    netexec
+    # netexec
     legcord
     ffuf
     #exploitdb
     unstablePkgs.vscode
     unstablePkgs.firefox
     unstablePkgs.exploitdb
-    unstablePkgs.firefox
+    unstablePkgs.netexec
   ];
 
   # Enable home-manager and git
