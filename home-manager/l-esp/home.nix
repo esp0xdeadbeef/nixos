@@ -93,6 +93,7 @@ in
       firefox
       exploitdb
       netexec
+      gh
     ];
   in
     stable ++ unstable;
