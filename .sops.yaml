@@ -1,30 +1,42 @@
 keys:
-  - &key_general_1 age1xm8ftcjlqsns5a4m74593hur7ltuxh2wqcrsl6ja2vqee664dclsq4yrkv
-  - &key_general_2 age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
-  - &l-werk age1pglvs7ljmfxpx68wmlc2s7s79k6dnm69m0eccdzu8hz56a6hcfrqd8qhgp
+  - &l-x13s-deadbeef age1xm8ftcjlqsns5a4m74593hur7ltuxh2wqcrsl6ja2vqee664dclsq4yrkv
+  - &l-werk-root age1pglvs7ljmfxpx68wmlc2s7s79k6dnm69m0eccdzu8hz56a6hcfrqd8qhgp
   - &l-werk-deadbeef age1vnwm6x6j9grqaejell6df9vr6nzwrdzxwk4wyfjyqva23rxu5c6sswsd6y
+  - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
+  - &l-esp-deadbeef age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
     encrypted_regex: '.*'
     key_groups:
       - age:
-          - *key_general_1
-          - *key_general_2
-
-  - path_regex: '^(secrets/)*l-esp-default\.(env|ya?ml)$'
+          - *l-x13s-deadbeef
+          - *l-werk-root
+          - *l-werk-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+ 
+  - path_regex: '^(secrets/)*l-esp-default-deadbeef\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
     key_groups:
       - age:
-          - *key_general_2
- 
+          - *l-esp-root
+          - *l-esp-deadbeef
+
+  - path_regex: '^(secrets/)*l-esp-.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+
   - path_regex: '^(secrets/)*l-werk-default-deadbeef\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
     key_groups:
       - age:
-          - *l-werk
+          - *l-werk-root
           - *l-werk-deadbeef
 
   - path_regex: '^(secrets/)*l-werk-.*\.(env|ya?ml)$'
@@ -32,7 +44,7 @@ creation_rules:
     encrypted_regex: '.*'
     key_groups:
       - age:
-          - *l-werk
+          - *l-werk-root
 
 
   - path_regex: '^(secrets/)*l-x13s-.*\.(env|ya?ml)$'
@@ -40,4 +52,4 @@ creation_rules:
     encrypted_regex: '.*'
     key_groups:
       - age:
-          - *key_general_1
+          - *l-x13s-deadbeef

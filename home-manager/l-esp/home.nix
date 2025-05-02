@@ -31,7 +31,7 @@ in
     ./configs/i3status-rust/packages.nix
   ];
   sops = {
-    defaultSopsFile = ../../secrets/l-esp-default.yaml;
+    defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
 
     age = {
       sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
