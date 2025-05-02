@@ -26,7 +26,8 @@
     ./hardware/bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
-    ./hardware/secondary-harddisk.nix
+    ./hardware/impermanence.nix
+    ./hardware/lanzaboote.nix
     ./hardware/steam.nix
     ./hardware/swap-and-tmpfs.nix
 
@@ -78,7 +79,7 @@
     ../1-general/virtualization/podman.nix
 
 
-
+    inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];

@@ -24,7 +24,7 @@
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
 
-
+    inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];
