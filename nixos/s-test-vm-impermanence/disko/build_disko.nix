@@ -48,21 +48,9 @@
                       mountOptions = ["compress=zstd" "noatime"];
                       mountpoint = "/nix";
                     };
-                    "/games" = {
-                      mountOptions = ["compress=zstd" "noatime"];
-                      mountpoint = "/games";
-                    };
                     "/persist" = {
                       mountOptions = ["compress=zstd" "noatime"];
                       mountpoint = "/persist";
-                    };
-                    "/swap" = {
-                      mountpoint = "/.swapvol";
-                      swap = {
-                        swapfile.size = "20M";
-                        swapfile2.size = "20M";
-                        swapfile2.path = "rel-path";
-                      };
                     };
                   };
                   mountpoint = "/partition-root";
