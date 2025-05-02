@@ -61,48 +61,10 @@
       url = "github:nix-community/impermanence";
     };
 
-
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-
-
-    ## The packages that are listed below, are NOT used at this moment
-    ## This can be ignored, the inputs will be fetched, but not used in the core nix configuration on hosts.
-    # nix-colors = {
-    #   url = "github:misterio77/nix-colors";
-    # };
-    # nixos-mailserver = {
-    #   url = "gitlab:simple-nixos-mailserver/nixos-mailserver";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    #   inputs.nixpkgs-24_11.follows = "nixpkgs-stable";
-    # };
-
-    # # Third party programs, packaged with nix
-    # doesn't exist anymore:
-    # firefox-addons = {
-    #   url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
-
-    # nix-gaming = {
-    #   # url = "github:fufexan/nix-gaming";
-    #   url = "github:misterio77/nix-gaming";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
-
-    # nix-minecraft = {
-    #   url = "github:misterio77/nix-minecraft";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
-
-    # nix-gl = {
-    #   url = "github:nix-community/nixgl";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
-
   };
 
   outputs =
@@ -133,13 +95,15 @@
       packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
       # Formatter for your nix files, available through 'nix fmt'
       # Other options beside 'alejandra' include 'nixpkgs-fmt'
-      formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
+      # formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
+      formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
 
       # Your custom packages and modifications, exported as overlays
       overlays = import ./overlays { inherit inputs; };
       # Reusable nixos modules you might want to export
       # These are usually stuff you would upstream into nixpkgs
       nixosModules = import ./modules/nixos;
+
       # Reusable home-manager modules you might want to export
       # These are usually stuff you would upstream into home-manager
       homeManagerModules = import ./modules/home-manager;
@@ -222,60 +186,5 @@
           ];
         };
       };
-
-      # Standalone home-manager configuration entrypoint
-      # Available through 'home-manager --flake .#your-username@your-hostname'
-      # NIXPKGS_ALLOW_UNFREE=1 home-manager switch --flake path:.#$(whoami)@$(hostname)
-      # homeConfigurations = {
-      #   # FIXME replace with your username@hostname
-      #   "deadbeef@l-werk" = home-manager.lib.homeManagerConfiguration {
-      #     pkgs = nixpkgs.legacyPackages.x86_64-linux; # Home-manager requires 'pkgs' instance
-      #     extraSpecialArgs = { inherit inputs outputs; };
-      #     modules = [
-      #       # > Our main home-manager configuration file <
-      #       ./home-manager/l-werk/home.nix
-      #       # ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
-      #       #../../backup-of-old-nixos/hosts/network/hostname.nix
-      #       # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
-      #     ];
-      #   };
-      #   # FIXME replace with your username@hostname
-      #   "deadbeef@l-esp" = home-manager.lib.homeManagerConfiguration {
-      #     pkgs = nixpkgs.legacyPackages.x86_64-linux; # Home-manager requires 'pkgs' instance
-      #     extraSpecialArgs = { inherit inputs outputs; };
-      #     modules = [
-      #       # > Our main home-manager configuration file <
-      #       ./home-manager/l-esp/home.nix
-      #       # ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
-      #       #../../backup-of-old-nixos/hosts/network/hostname.nix
-      #       # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
-      #     ];
-      #   };
-      #   "deadbeef@s-test-vm" = home-manager.lib.homeManagerConfiguration {
-      #     pkgs = nixpkgs.legacyPackages.x86_64-linux; # Home-manager requires 'pkgs' instance
-      #     extraSpecialArgs = { inherit inputs outputs; };
-      #     modules = [
-      #       # > Our main home-manager configuration file <
-      #       ./home-manager/s-test-vm/home.nix
-      #       # ./home-manager/l-werk/home.nix
-      #       # ./backup-of-old-nixos/hosts/home-manager/l-werk/home.nix
-      #       #../../backup-of-old-nixos/hosts/network/hostname.nix
-      #       # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
-
-      #     ];
-      #   };
-      #   "deadbeef@l-x13s" = home-manager.lib.homeManagerConfiguration {
-      #     pkgs = nixpkgs.legacyPackages.aarch64-linux; # Home-manager requires 'pkgs' instance
-      #     extraSpecialArgs = { inherit inputs outputs; };
-      #     modules = [
-      #       # > Our main home-manager configuration file <
-      #       # ./home-manager/home.nix
-      #       ./home-manager/l-x13s/home.nix
-      #       #../../backup-of-old-nixos/hosts/network/hostname.nix
-      #       # ./backup-of-old-nixos/hosts/desktop/darkmode.nix
-
-      #     ];
-      #   };
-      # };
     };
 }
