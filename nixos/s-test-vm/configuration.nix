@@ -48,6 +48,7 @@
     ../1-general/packages/packages.nix
     ../1-general/packages/terminals/packages.nix
     ../1-general/packages/terminals/terminal-optimisers/packages.nix
+    ../1-general/packages/terminals/terminal-optimisers/updatedb.nix
     ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
     ../1-general/packages/window-managers/X-org/packages.nix
     ../1-general/secrets/import-secrets.nix

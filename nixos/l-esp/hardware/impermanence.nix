@@ -88,6 +88,7 @@
     ];
     files = [
       "/etc/machine-id"
+      "/var/cache/locatedb" # updatedb (locate <something>) history
       {
         file = "/var/keys/secret_file";
         parentDirectory = {
@@ -116,7 +117,7 @@
         ".dropbox-dist"
         ".local/share/containers" # podman containers, needed for osep.
         ".mitmproxy" # mitmproxy certificates
-
+      
         # vscode ?
         ".config/Code" # vscode itself
         ".vscode" # plugins
