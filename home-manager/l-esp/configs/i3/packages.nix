@@ -12,8 +12,7 @@
     # ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon
     # it will not export the SSH_AUTH_SOCK
     text = ''
-      eval $(gnome-keyring-daemon --start --components=secrets,pkcs11,ssh,gpg)
-      export SSH_AUTH_SOCK
+      export $(gnome-keyring-daemon --start --components=secrets,pkcs11,ssh,gpg)
     '';
     executable = true;
   };
