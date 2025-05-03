@@ -291,14 +291,14 @@
 
       bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
       bindsym $mod+c exec google-chrome-stable
-      bindsym $mod+F3 exec spotify
+      bindsym $mod+F3 exec ${pkgs.spotify}/bin/spotify
       exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet
 
       # flameshot crashes
       bindsym Print exec "${pkgs.flameshot}/bin/flameshot gui"
       # Replace Flameshot with Ksnip for Print key
       # bindsym Print exec "sway-screenshot -m region"
-      bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
+      # bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
 
       # Add Alt + Print to open Ksnip
       bindsym $mod+Print exec "${pkgs.ksnip}/bin/ksnip"
