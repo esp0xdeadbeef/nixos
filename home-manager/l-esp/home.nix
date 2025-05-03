@@ -30,6 +30,7 @@ in
     ./configs/git/config.nix
     ./configs/i3/packages.nix
     ./configs/i3status-rust/packages.nix
+    ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/steam/packages.nix
 
   ];
