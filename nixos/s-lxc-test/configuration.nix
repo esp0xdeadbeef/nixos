@@ -69,7 +69,6 @@
     ../1-general/virtualization/libvirt.nix
     ../1-general/virtualization/lxc.nix
     ../1-general/virtualization/podman.nix
-    ../1-general/virtualization/tuns-in-lxc-podman-and-docker.nix
     {
       environment.interactiveShellInit = ''
         ZSH_THEME=random
