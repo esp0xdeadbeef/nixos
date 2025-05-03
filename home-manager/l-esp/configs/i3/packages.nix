@@ -15,6 +15,12 @@
     executable = true;
   };
 
+  # want to patch it like this someday:
+  # https://faq.i3wm.org/question/1367/anyway-to-include-in-config-file/
+  # cat $HOME/.config/i3/config.base \
+  #     $HOME/.config/i3/config.local > $HOME/.config/i3/config
+  # exec /usr/bin/i3 
+
   # sops.templates.i3config = {
   #   content = ''
   home.file."${config.home.homeDirectory}/.config/i3/config" = {
