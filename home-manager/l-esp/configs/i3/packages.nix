@@ -340,6 +340,7 @@
       exec --no-startup-id ${pkgs.parcellite}/bin/parcellite
       exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
       exec_always --no-startup-id ${pkgs.dropbox}/bin/dropbox
+      exec_always --no-startup-id ${pkgs.spotify}/bin/spotify
     '';
     # path = "${config.home.homeDirectory}/.config/i3/config";
   };
