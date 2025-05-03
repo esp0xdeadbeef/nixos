@@ -87,6 +87,7 @@ in
       remmina
       legcord
       ffuf
+      distrobox
     ];
     unstable = with unstablePkgs; [
       vscode
