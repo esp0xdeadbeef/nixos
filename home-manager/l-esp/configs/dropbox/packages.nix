@@ -2,6 +2,8 @@
 {
   home.packages = with pkgs; [
     dropbox
+    libappindicator-gtk3
+    # sni-qt
   ];
 
   systemd.user.services.dropbox = {
