@@ -112,6 +112,8 @@
         ".config/chromium"
         ".config/sops"
         ".config/gh"
+        ".dropbox"
+        ".dropbox-dist"
 
         # vscode ?
         ".config/Code" # vscode itself
