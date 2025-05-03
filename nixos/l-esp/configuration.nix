@@ -77,6 +77,7 @@
     ../1-general/virtualization/libvirt.nix
     ../1-general/virtualization/lxc.nix
     ../1-general/virtualization/podman.nix
+    ../1-general/virtualization/tuns-in-lxc-podman-and-docker.nix
 
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager

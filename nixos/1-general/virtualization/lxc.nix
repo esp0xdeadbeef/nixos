@@ -40,5 +40,9 @@
   environment.systemPackages = with pkgs; [
     # required for my (esp0xdeadbeef) lxc mounts
     bindfs
+
+    # needed to export podman to lxc containers:
+    skopeo
+    umoci
   ];
 }
