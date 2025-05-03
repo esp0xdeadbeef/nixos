@@ -5,7 +5,7 @@
     libappindicator-gtk3
     # sni-qt
   ];
-
+  home.file."Dropbox".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/Documents/Dropbox";
   systemd.user.services.dropbox = {
     Unit = {
       Description = "Dropbox service";
