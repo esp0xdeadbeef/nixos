@@ -115,6 +115,7 @@
         ".dropbox"
         ".dropbox-dist"
         ".local/share/containers" # podman containers, needed for osep.
+        ".mitmproxy" # mitmproxy certificates
 
         # vscode ?
         ".config/Code" # vscode itself
