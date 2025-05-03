@@ -23,18 +23,18 @@
 
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
-
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys
-  sops.age.sshKeyPaths = [ "/home/deadbeef/.ssh/id_ed25519" ];
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   # This is using an age key that is expected to already be in the filesystem
   # sops.age.keyFile = "/var/lib/sops-nix/key.txt";
   # This will generate a new key if the key specified above does not exist
-  sops.age.generateKey = true;
+  # sops.age.generateKey = true;
+  sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
   # This is the actual specification of the secrets.
   # sops.secrets.example-key = { };
   # sops.secrets."myservice/my_subdir/my_secret" = { };
@@ -51,7 +51,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       deadbeef = import ../../home-manager/l-esp/home.nix;
     };
   };
-  
+
   nixpkgs = {
     # You can add overlays here
     overlays = [
@@ -107,6 +107,8 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   networking.hostName = "l-esp";
   networking.networkmanager.enable = true;
   services.gnome.gnome-keyring.enable = true;
+  # unlock gnome shit at unlock:
+  security.pam.services.login.enableGnomeKeyring = true;
   services.desktopManager.plasma6.enable = true;
   programs.sway.enable = true;
   services.displayManager.defaultSession = "none+i3";
@@ -125,7 +127,15 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   #     Restart = "on-failure";
   #   };
   # };
-
+  # secrets.deadbeef-passwd.neededForUsers = true;
+  # sops = {
+  #   secrets.deadbeef-passwd = {
+  #     neededForUsers = true;
+  #   };
+  # };
+  sops.secrets."deadbeef-passwd" = {
+    neededForUsers = true; # make it available before the user is created
+  };
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
@@ -133,7 +143,12 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       # TODO: You can ss-test-vmet an initial password for your user.
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
-      initialPassword = " ";
+
+
+      # initialPassword = " ";
+      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+
+      
       isNormalUser = true;
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
