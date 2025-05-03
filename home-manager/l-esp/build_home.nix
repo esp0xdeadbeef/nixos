@@ -25,12 +25,7 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-    ./configs/dropbox/packages.nix
-    ./configs/flameshot/packages.nix
-    ./configs/git/config.nix
-    ./configs/i3/packages.nix
-    ./configs/i3status-rust/packages.nix
-    ./configs/steam/packages.nix
+STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
   ];
   sops = {

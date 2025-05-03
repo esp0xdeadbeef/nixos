@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# nixos config:
 export CURRENT_CONFIG="l-esp"
 (
     (
@@ -18,6 +19,26 @@ export CURRENT_CONFIG="l-esp"
 ) | grep -v '/build_' | tee /tmp/results.txt
 
 awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' .//nixos/$CURRENT_CONFIG/build_configuration.nix > .//nixos/$CURRENT_CONFIG/configuration.nix
+
+echo homemanager:
+# homemanager config:
+(
+    (
+        cd ./home-manager/$CURRENT_CONFIG
+        find . | grep -v 'old\|./home.nix$' | grep 'nix$' | while read line; do
+            echo "    $line"
+        done
+    ) | sort
+    echo # empty row
+    (
+        cd ./home-manager/1-general
+        find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/work/\|/werk/\|autologin\|mxbuild' | while read line; do
+            echo "    $line"
+        done
+    ) | sort
+) | grep -v '/build_\|home.nix$\|sway' | tee /tmp/results.txt
+
+awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' ./home-manager/$CURRENT_CONFIG/build_home.nix > ./home-manager/$CURRENT_CONFIG/home.nix
 
 export CURRENT_CONFIG="l-werk"
 (
