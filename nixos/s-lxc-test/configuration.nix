@@ -52,6 +52,7 @@
     ../1-general/packages/services/packages.nix
     ../1-general/packages/terminals/packages.nix
     ../1-general/packages/terminals/terminal-optimisers/packages.nix
+    ../1-general/packages/terminals/terminal-optimisers/updatedb.nix
     ../1-general/packages/usb-tools/packages.nix
     ../1-general/packages/virtualization/packages.nix
     ../1-general/packages/window-managers/X-org/i3-wm/packages.nix

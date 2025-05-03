@@ -32,6 +32,7 @@
     ../1-general/desktop/environment.nix
     ../1-general/network/nmcli.nix
     ../1-general/packages/terminals/terminal-optimisers/packages.nix
+    ../1-general/packages/terminals/terminal-optimisers/updatedb.nix
 
   ];
 
