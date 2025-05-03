@@ -114,6 +114,7 @@
         ".config/gh"
         ".dropbox"
         ".dropbox-dist"
+        ".local/share/containers" # podman containers, needed for osep.
 
         # vscode ?
         ".config/Code" # vscode itself
