@@ -25,6 +25,7 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
+    ./configs/correct-sinks/pulseaudio.nix
     ./configs/dropbox/packages.nix
     ./configs/flameshot/packages.nix
     ./configs/git/config.nix
