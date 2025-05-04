@@ -45,4 +45,27 @@
     skopeo
     umoci
   ];
+
+  systemd.services.lxc-shutdownHook = {
+  description = "Shutdown hook to forcibly terminate any lingering LXC containers";
+  # Ensure this runs at shutdown
+  wantedBy = [ "shutdown.target" ];
+  before    = [ "shutdown.target" ];
+  serviceConfig = {
+    Type             = "oneshot";
+    ExecStart        = "${pkgs.bash}/bin/bash /etc/nuke-lxc-from-orbit-on-shutdown.sh";
+    RemainAfterExit  = true;
+  };
+};
+
+environment.etc."nuke-lxc-from-orbit-on-shutdown.sh".text = ''
+  #!/usr/bin/env bash
+  #
+  # Forcibly kill any LXC containers still running under UID 1000 at shutdown.
+  # Technique adapted from Ask Ubuntu:
+  # <https://askubuntu.com/questions/707743/how-can-i-kill-a-stuck-lxc-container>
+    ps -ef | grep "^100[0-9][0-9][0-9]" | tr -s " " | cut -f2 -d " " | xargs -I {} kill -9 {}
+  '';
+
+
 }
