@@ -25,7 +25,6 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-    ./configs/correct-sinks/pulseaudio.nix
     ./configs/dropbox/packages.nix
     ./configs/flameshot/packages.nix
     ./configs/git/config.nix
@@ -33,6 +32,7 @@ in
     ./configs/i3status-rust/packages.nix
     ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/steam/packages.nix
+    ./configs/sway/packages.nix
 
   ];
   sops = {

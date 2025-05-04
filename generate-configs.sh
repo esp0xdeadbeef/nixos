@@ -36,7 +36,7 @@ echo homemanager:
             echo "    $line"
         done
     ) | sort
-) | grep -v '/build_\|home.nix$\|sway' | tee /tmp/results.txt
+) | grep -v '/build_\|home.nix$' | tee /tmp/results.txt
 
 awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' ./home-manager/$CURRENT_CONFIG/build_home.nix > ./home-manager/$CURRENT_CONFIG/home.nix
 
