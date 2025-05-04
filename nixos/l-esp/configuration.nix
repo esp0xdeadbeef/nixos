@@ -21,6 +21,7 @@
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
 
+    ./connect-nas/default.nix
     ./hardware/amd.nix
     ./hardware/audio.nix
     ./hardware/bluetooth.nix
