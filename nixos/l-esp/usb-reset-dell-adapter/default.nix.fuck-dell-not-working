@@ -1,0 +1,38 @@
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+{
+  systemd.services."usb-reset-dell-da20" = {
+    description = "Reset Dell DA20 Adapter (unbind and bind USB device)";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ]; # Ensures we run late enough
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "usb-reset-dell-da20" ''
+        set -e
+
+        # Wait for device to appear
+        for i in $(seq 1 10); do
+          DEVICE_PATH=$(lsusb | grep "413c:b080" | ${pkgs.gawk}/bin/awk '{print $2 "/" $4}' | sed 's/://')
+          if [ -n "$DEVICE_PATH" ] && [ -e "/dev/bus/usb/$DEVICE_PATH" ]; then
+            echo "Resetting Dell DA20 Adapter at /dev/bus/usb/$DEVICE_PATH"
+            ${pkgs.usbutils}/bin/usbreset "/dev/bus/usb/$DEVICE_PATH"
+            break
+          else
+            echo "Waiting for Dell DA20 Adapter..."
+            sleep 1
+          fi
+        done
+
+        # Optional: power cycle hub (static, known to be stable on your system)
+        ${pkgs.uhubctl}/bin/uhubctl -l 1-1 -p 2 -a 0
+        sleep 2
+        ${pkgs.uhubctl}/bin/uhubctl -l 1-1 -p 2 -a 1
+      '';
+    };
+  };
+}
