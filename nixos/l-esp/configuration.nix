@@ -31,6 +31,8 @@
     ./hardware/lanzaboote.nix
     ./hardware/steam.nix
     ./hardware/swap-and-tmpfs.nix
+    ./osep/bind-to-lxc.nix
+    ./osep/x2go-client.nix
 
     ../1-general/1-custom-packages/azurehound/package.nix
     ../1-general/desktop/applets.nix

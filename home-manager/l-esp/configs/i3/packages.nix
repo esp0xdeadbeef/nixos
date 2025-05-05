@@ -324,6 +324,7 @@
       for_window [class="Spotify"] move to workspace 4
       for_window [class="discord"] move to workspace 5
       for_window [class="legcord"] move to workspace 5
+      for_window [class="X2GoAgent"] move window to workspace 7
       for_window [class="Navigator" class="firefox"] move window to workspace 8
       for_window [class="Firefox"] move window to workspace 8
       for_window [class="firefox"] move window to workspace 8
