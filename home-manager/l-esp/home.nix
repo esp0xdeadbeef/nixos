@@ -33,6 +33,7 @@ in
     ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/steam/packages.nix
     ./configs/sway/packages.nix
+    ./projects/osep/start-lxc.nix
 
   ];
   sops = {
