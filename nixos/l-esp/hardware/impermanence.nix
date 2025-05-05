@@ -88,7 +88,7 @@
     ];
     files = [
       "/etc/machine-id"
-      "/var/cache/locatedb" # updatedb (locate <something>) history
+      # "/var/cache/locatedb" # added it to persistent output in updatedb.nix (/persist/var/cache/locatedb); updatedb (locate <something>) history
       {
         file = "/var/keys/secret_file";
         parentDirectory = {
