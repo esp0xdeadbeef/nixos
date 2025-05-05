@@ -27,56 +27,25 @@ let
   startScript = "${config.home.homeDirectory}/.nix-profile/bin/osep-lxc-start";
 in
 {
-  # make sure this appears in your profile’s bin dir
   home.packages = [
     osepStart
   ];
 
-  # (optional) if you want to run it at login automatically:
   home.activation.xsessionCommands = ''
     /home/deadbeef/.nix-profile/bin/osep-lxc-start &
   '';
 
-  # Ensure systemd user support is on
-  # services.systemd.user = {
-  #   enable = true;
-  # };
-
-  # Define a user‐level service
-  # systemd.user.services."osep-lxc-start" = {
-  #   enable      = true;                    # <— make sure it's enabled
-  #   description = "Start the osep-lxc container";
-  #   after       = [ "default.target" ];    # run after your session is up
-  #   wantedBy    = [ "default.target" ];    # hook into the default session
-
-  #   serviceConfig = {
-  #     Type      = "oneshot";
-  #     ExecStart = startScript;
-  #     # keep it “active” so systemd knows it's done but still up
-  #     RemainAfterExit = true;
-  #     StandardOutput  = "journal";
-  #     StandardError   = "journal";
-  #   };
-  # };
   systemd.user.services."osep-lxc-start" = {
     Unit = {
       Description = "Start the osep-lxc container";
-      # user-mode can’t reliably order against system-bus units,
-      # so we just wait for “network-online.target” in the user session
       After = [ "network-online.target" ];
       Wants = [ "network-online.target" ];
     };
     Service = {
       Type = "simple";
-      # ① give the network a moment to come up
       ExecStartPre = [
-        # sleep for 5 seconds
-        # "${pkgs.coreutils}/bin/sleep 5"
-        # then wait up to 60s for the lxcbr0 bridge to exist
-        # "${pkgs.bash}/bin/bash -c \
-        # \"timeout 60 ${pkgs.coreutils}/bin/sh -c 'until ${pkgs.iproute2}/bin/ip link show lxcbr0 >/dev/null 2>&1; do sleep 1; done'\""
+        
       ];
-      # ② start lxc in-foreground with DEBUG logging
       ExecStart = "${pkgs.writeShellScript "osep-lxc-start-svc" ''
         #!${pkgs.bash}/bin/bash --noprofile --norc
         exec ${pkgs.lxc}/bin/lxc-start \
@@ -86,7 +55,7 @@ in
       ''}";
       Restart = "on-failure";
       RestartSec = "10s"; # back off between retries
-      TimeoutStartSec = "75s"; # must exceed the 60s poll+5s sleep
+      TimeoutStartSec = "75s";
       StandardOutput = "journal+console";
       StandardError = "journal+console";
     };
