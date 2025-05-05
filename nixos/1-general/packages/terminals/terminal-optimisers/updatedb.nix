@@ -21,7 +21,7 @@ in
     localuser = null;
 
     prunePaths = lib.mkAfter (
-      [ "/partition-root" "/persist" ] ++ userPrunes
+      [ "/partition-root" "/persist" "/mnt/nas" ] ++ userPrunes
     );
   };
 }
