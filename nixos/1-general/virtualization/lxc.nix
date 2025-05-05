@@ -3,6 +3,7 @@
   users.groups.lxc-user = {
     members = [ "deadbeef" ];
   };
+
   virtualisation.lxc = {
     enable = true;
     unprivilegedContainers = true;
@@ -22,10 +23,10 @@
     '';
     lxcfs.enable = true;
   };
+
   system.activationScripts.setLxcHomeACL = {
     text = ''
       export PATH=${pkgs.acl}/bin:$PATH
-      # Grant container root (mapped to uid 100000) x access on /home/deadbeef
       mkdir -p /home/deadbeef/.config/lxc/
       cp /etc/lxc/default.conf /home/deadbeef/.config/lxc/default.conf
       chown deadbeef:users /home/deadbeef/.config
@@ -37,35 +38,80 @@
       setfacl -m u:100000:--x /home/deadbeef/.local/share/lxc
     '';
   };
-  environment.systemPackages = with pkgs; [
-    # required for my (esp0xdeadbeef) lxc mounts
-    bindfs
 
-    # needed to export podman to lxc containers:
+  # 🔥 This script will forcibly kill any UID 1000 LXC containers
+  environment.etc."nuke-lxc-from-orbit-on-shutdown.sh" = {
+    text = ''
+      #!${pkgs.bash}/bin/bash
+
+      ${pkgs.util-linux}/bin/mount | grep rootfs/mnt | ${pkgs.gawk}/bin/awk '{print $3}' | while read line ; do
+        ${pkgs.procps}/bin/ps -ef | ${pkgs.gnugrep}/bin/grep "^100[0-9][0-9][0-9]" | ${pkgs.coreutils}/bin/tr -s " " | ${pkgs.coreutils}/bin/cut -f2 -d " " | ${pkgs.findutils}/bin/xargs -r ${pkgs.coreutils}/bin/kill -9
+        while ${pkgs.util-linux}/bin/umount "$line"; do :; done
+      done
+
+      ${pkgs.procps}/bin/ps -ef | ${pkgs.gnugrep}/bin/grep "^100[0-9][0-9][0-9]" | ${pkgs.coreutils}/bin/tr -s " " | ${pkgs.coreutils}/bin/cut -f2 -d " " | ${pkgs.findutils}/bin/xargs -r ${pkgs.coreutils}/bin/kill -9
+    '';
+    mode = "0755";
+  };
+
+  # ✅ Clean way to override reboot/poweroff/halt in systemd
+  systemd.services.reboot = {
+    overrideStrategy = "asDropin";
+    serviceConfig.ExecStartPre = [ "/etc/nuke-lxc-from-orbit-on-shutdown.sh" ];
+  };
+
+  systemd.services.poweroff = {
+    overrideStrategy = "asDropin";
+    serviceConfig.ExecStartPre = [ "/etc/nuke-lxc-from-orbit-on-shutdown.sh" ];
+  };
+
+  systemd.services.halt = {
+    overrideStrategy = "asDropin";
+    serviceConfig.ExecStartPre = [ "/etc/nuke-lxc-from-orbit-on-shutdown.sh" ];
+  };
+
+  # 🧨 Emergency kill service tied to shutdown/reboot/halt
+  systemd.services.nuke-before-anything = {
+    description = "Run BEFORE reboot, poweroff, shutdown, halt";
+    before = [
+      "reboot.target"
+      "poweroff.target"
+      "halt.target"
+      "shutdown.target"
+    ];
+    wantedBy = [
+      "reboot.target"
+      "poweroff.target"
+      "halt.target"
+      "shutdown.target"
+    ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "/etc/nuke-lxc-from-orbit-on-shutdown.sh";
+      TimeoutSec = 60;
+      RemainAfterExit = true;
+    };
+  };
+
+  # 🧰 Extra convenience: override CLI shutdown commands (userspace)
+  environment.systemPackages = with pkgs; [
+    bindfs
     skopeo
     umoci
+
+    (writeShellScriptBin "reboot" ''
+      /etc/nuke-lxc-from-orbit-on-shutdown.sh
+      exec ${pkgs.systemd}/bin/reboot "$@"
+    '')
+
+    (writeShellScriptBin "poweroff" ''
+      /etc/nuke-lxc-from-orbit-on-shutdown.sh
+      exec ${pkgs.systemd}/bin/poweroff "$@"
+    '')
+
+    (writeShellScriptBin "shutdown" ''
+      /etc/nuke-lxc-from-orbit-on-shutdown.sh
+      exec ${pkgs.systemd}/bin/shutdown "$@"
+    '')
   ];
-
-  systemd.services.lxc-shutdownHook = {
-  description = "Shutdown hook to forcibly terminate any lingering LXC containers";
-  # Ensure this runs at shutdown
-  wantedBy = [ "shutdown.target" ];
-  before    = [ "shutdown.target" ];
-  serviceConfig = {
-    Type             = "oneshot";
-    ExecStart        = "${pkgs.bash}/bin/bash /etc/nuke-lxc-from-orbit-on-shutdown.sh";
-    RemainAfterExit  = true;
-  };
-};
-
-environment.etc."nuke-lxc-from-orbit-on-shutdown.sh".text = ''
-  #!/usr/bin/env bash
-  #
-  # Forcibly kill any LXC containers still running under UID 1000 at shutdown.
-  # Technique adapted from Ask Ubuntu:
-  # <https://askubuntu.com/questions/707743/how-can-i-kill-a-stuck-lxc-container>
-    ps -ef | grep "^100[0-9][0-9][0-9]" | tr -s " " | cut -f2 -d " " | xargs -I {} kill -9 {}
-  '';
-
-
 }
