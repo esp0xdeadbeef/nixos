@@ -1,8 +1,25 @@
-{ config, pkgs, ... }:
 {
-  users.groups.lxc-user = {
-    members = [ "deadbeef" ];
-  };
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+
+let
+  # ── 1. All “normal” login names ────────────────────────────────
+  normalUserNames = lib.attrNames (
+    lib.filterAttrs (_: u: u.isNormalUser or false) config.users.users
+  );
+
+  # ── 2. Homes (respecting any per-user override) ────────────────
+  homeDirs = map (n: (config.users.users.${n}.home or "/home/${n}")) normalUserNames;
+  homeDirsStr = lib.escapeShellArgs homeDirs;
+
+  # ── 3. /etc/lxc/lxc-usernet needs one line per user ────────────
+  usernetLines = lib.concatStringsSep "\n" (map (u: "${u} veth lxcbr0 10") normalUserNames) + "\n"; # final newline keeps lxc quiet
+in
+{
+  users.groups.lxc-user.members = normalUserNames;
 
   virtualisation.lxc = {
     enable = true;
@@ -17,83 +34,114 @@
       lxc.apparmor.allow_nesting = 1
       lxc.idmap = u 0 100000 65535
       lxc.idmap = g 0 100000 65535
+
+      # new, include common and userns:
+      lxc.include = /run/current-system/sw/share/lxc/config/common.conf
+      lxc.include = /run/current-system/sw/share/lxc/config/userns.conf
+
+      # enable network inside container(s):
+      lxc.net.0.type = veth
+      lxc.net.0.link = lxcbr0
+      lxc.net.0.flags = up
+
+      # allow tun to be used in the lxc container:
+      lxc.cgroup.devices.allow = c 10:200 rwm
+      lxc.mount.entry = /dev/net dev/net none bind,create=dir 0 0
     '';
-    usernetConfig = ''
-      deadbeef veth lxcbr0 10
-    '';
+    usernetConfig = usernetLines;
     lxcfs.enable = true;
-  };
-
-  system.activationScripts.setLxcHomeACL = {
-    text = ''
-      export PATH=${pkgs.acl}/bin:$PATH
-      mkdir -p /home/deadbeef/.config/lxc/
-      cp /etc/lxc/default.conf /home/deadbeef/.config/lxc/default.conf
-      chown deadbeef:users /home/deadbeef/.config
-      chown deadbeef:users /home/deadbeef/.config/lxc
-      chown deadbeef:users /home/deadbeef/.config/lxc/default.conf
-      setfacl -m u:100000:--x /home/deadbeef
-      setfacl -m u:100000:--x /home/deadbeef/.local
-      setfacl -m u:100000:--x /home/deadbeef/.local/share/
-      setfacl -m u:100000:--x /home/deadbeef/.local/share/lxc
+    # doesn't work research needed:
+    bridgeConfig = ''
+      USE_LXC_BRIDGE="true"
+      LXC_BRIDGE="lxcbr0"
+      LXC_DHCP_CONFILE="/etc/lxc/dnsmasq.conf"
+      LXC_DOMAIN="lxc-net.local"
+      dhcp-host=osep-lxc,10.0.3.100
     '';
   };
 
-  # 🔥 This script will forcibly kill any UID 1000 LXC containers
+  # doesn't work, research needed:
+  environment.etc."lxc/dnsmasq.conf".text = ''
+    dhcp-host=osep-lxc,10.0.3.100
+  '';
+
+  # system.activationScripts.setLxcHomeACL = {
+  #   text = ''
+  #     export PATH=${pkgs.acl}/bin:$PATH
+  #     for home in ${homeDirsStr};
+  #     do
+  #       echo "usernetConfig = ${usernetLines}" | tee /tmp/test
+  #       ls $home > /dev/null || exit
+  #       mkdir -p $home/.config/lxc/ || exit
+  #       cp /etc/lxc/default.conf $home/.config/lxc/default.conf
+  #       chown deadbeef:users $home/.config
+  #       chown deadbeef:users $home/.config/lxc
+  #       chown deadbeef:users $home/.config/lxc/default.conf
+  #       setfacl -m u:100000:--x $home
+  #       setfacl -m u:100000:--x $home/.local
+  #       setfacl -m u:100000:--x $home/.local/share/
+  #       setfacl -m u:100000:--x $home/.local/share/lxc
+  #     done
+  #   '';
+  # };
+  system.activationScripts.setLxcHomeACL.text = ''
+    export PATH=${pkgs.acl}/bin:$PATH
+    for home in ${homeDirsStr}; do
+      user=$(basename "$home")                   # works even with /srv/users/alice
+      echo "$user" | tee /tmp/test
+      ls "$home" > /dev/null || exit             # die loudly if home missing
+      mkdir -p "$home/.config/lxc" || exit
+      cp /etc/lxc/default.conf "$home/.config/lxc/default.conf"
+      chown "$user":users "$home/.config" "$home/.config/lxc" \
+                    "$home/.config/lxc/default.conf"
+
+      # give the user-namespace UID 100000 execute perms
+      setfacl -m u:100000:--x "$home"
+      setfacl -m u:100000:--x "$home/.local"
+      setfacl -m u:100000:--x "$home/.local/share/"
+      setfacl -m u:100000:--x "$home/.local/share/lxc"
+    done
+  '';
+
   environment.etc."nuke-lxc-from-orbit-on-shutdown.sh" = {
     text = ''
       #!${pkgs.bash}/bin/bash
+      for home in ${homeDirsStr}; 
+      do
+        while sudo /run/current-system/sw/bin/umount $home/.local/share/lxc/osep-lxc/rootfs/mnt ; do :; done
+        ${pkgs.util-linux}/bin/mount | grep rootfs/mnt | ${pkgs.gawk}/bin/awk '{print $3}' | while read line ; do
+          ${pkgs.procps}/bin/ps -ef | ${pkgs.gnugrep}/bin/grep "^100[0-9][0-9][0-9]" | ${pkgs.coreutils}/bin/tr -s " " | ${pkgs.coreutils}/bin/cut -f2 -d " " | ${pkgs.findutils}/bin/xargs -r ${pkgs.coreutils}/bin/kill -9
+          while sudo /run/current-system/sw/bin/umount $home/.local/share/lxc/osep-lxc/rootfs/mnt ; do :; done
+        done
 
-      ${pkgs.util-linux}/bin/mount | grep rootfs/mnt | ${pkgs.gawk}/bin/awk '{print $3}' | while read line ; do
         ${pkgs.procps}/bin/ps -ef | ${pkgs.gnugrep}/bin/grep "^100[0-9][0-9][0-9]" | ${pkgs.coreutils}/bin/tr -s " " | ${pkgs.coreutils}/bin/cut -f2 -d " " | ${pkgs.findutils}/bin/xargs -r ${pkgs.coreutils}/bin/kill -9
-        while sudo /run/current-system/sw/bin/umount $line ; do :; done
       done
-
-      ${pkgs.procps}/bin/ps -ef | ${pkgs.gnugrep}/bin/grep "^100[0-9][0-9][0-9]" | ${pkgs.coreutils}/bin/tr -s " " | ${pkgs.coreutils}/bin/cut -f2 -d " " | ${pkgs.findutils}/bin/xargs -r ${pkgs.coreutils}/bin/kill -9
     '';
     mode = "0755";
   };
 
-  # ✅ Clean way to override reboot/poweroff/halt in systemd
-  systemd.services.reboot = {
-    overrideStrategy = "asDropin";
-    serviceConfig.ExecStartPre = [ "/etc/nuke-lxc-from-orbit-on-shutdown.sh" ];
-  };
+  # systemd.services.nuke-before-anything = {
+  #   description = "Run BEFORE reboot, poweroff, shutdown, halt";
+  #   before = [
+  #     "reboot.target"
+  #     "poweroff.target"
+  #     "halt.target"
+  #     "shutdown.target"
+  #   ];
+  #   wantedBy = [
+  #     "reboot.target"
+  #     "poweroff.target"
+  #     "halt.target"
+  #     "shutdown.target"
+  #   ];
+  #   serviceConfig = {
+  #     Type = "oneshot";
+  #     ExecStart = "/etc/nuke-lxc-from-orbit-on-shutdown.sh";
+  #     TimeoutSec = 3;
+  #     RemainAfterExit = true;
+  #   };
+  # };
 
-  systemd.services.poweroff = {
-    overrideStrategy = "asDropin";
-    serviceConfig.ExecStartPre = [ "/etc/nuke-lxc-from-orbit-on-shutdown.sh" ];
-  };
-
-  systemd.services.halt = {
-    overrideStrategy = "asDropin";
-    serviceConfig.ExecStartPre = [ "/etc/nuke-lxc-from-orbit-on-shutdown.sh" ];
-  };
-
-  # 🧨 Emergency kill service tied to shutdown/reboot/halt
-  systemd.services.nuke-before-anything = {
-    description = "Run BEFORE reboot, poweroff, shutdown, halt";
-    before = [
-      "reboot.target"
-      "poweroff.target"
-      "halt.target"
-      "shutdown.target"
-    ];
-    wantedBy = [
-      "reboot.target"
-      "poweroff.target"
-      "halt.target"
-      "shutdown.target"
-    ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = "/etc/nuke-lxc-from-orbit-on-shutdown.sh";
-      TimeoutSec = 60;
-      RemainAfterExit = true;
-    };
-  };
-
-  # 🧰 Extra convenience: override CLI shutdown commands (userspace)
   environment.systemPackages = with pkgs; [
     bindfs
     skopeo
