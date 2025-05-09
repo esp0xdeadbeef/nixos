@@ -24,7 +24,7 @@
         "sudo"
         "terraform"
         "systemadmin"
-        "vi-mode"
+        # "vi-mode"
         "fzf"
       ];
     };
