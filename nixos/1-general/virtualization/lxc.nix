@@ -46,7 +46,7 @@
 
       ${pkgs.util-linux}/bin/mount | grep rootfs/mnt | ${pkgs.gawk}/bin/awk '{print $3}' | while read line ; do
         ${pkgs.procps}/bin/ps -ef | ${pkgs.gnugrep}/bin/grep "^100[0-9][0-9][0-9]" | ${pkgs.coreutils}/bin/tr -s " " | ${pkgs.coreutils}/bin/cut -f2 -d " " | ${pkgs.findutils}/bin/xargs -r ${pkgs.coreutils}/bin/kill -9
-        while ${pkgs.util-linux}/bin/umount "$line"; do :; done
+        while sudo /run/current-system/sw/bin/umount $line ; do :; done
       done
 
       ${pkgs.procps}/bin/ps -ef | ${pkgs.gnugrep}/bin/grep "^100[0-9][0-9][0-9]" | ${pkgs.coreutils}/bin/tr -s " " | ${pkgs.coreutils}/bin/cut -f2 -d " " | ${pkgs.findutils}/bin/xargs -r ${pkgs.coreutils}/bin/kill -9
