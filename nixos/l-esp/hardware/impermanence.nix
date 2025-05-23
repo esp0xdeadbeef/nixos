@@ -92,15 +92,22 @@
     files = [
       "/etc/machine-id"
       # "/var/cache/locatedb" # added it to persistent output in updatedb.nix (/persist/var/cache/locatedb); updatedb (locate <something>) history
-      {
-        file = "/var/keys/secret_file";
-        parentDirectory = {
-          mode = "u=rwx,g=,o=";
-        };
-      }
+      # {
+      #   file = "/var/keys/secret_file";
+      #   parentDirectory = {
+      #     mode = "u=rwx,g=,o=";
+      #   };
+      # }
+      # {
+      #   file = "/var/cache/locatedb";
+      #   parentDirectory = {
+      #     mode = "u=rwx,g=rx,o=";
+      #   };
+      # }
       {
         file = "/var/cache/locatedb";
         parentDirectory = {
+          # leave group/owner alone—just set mode
           mode = "u=rwx,g=rx,o=";
         };
       }
