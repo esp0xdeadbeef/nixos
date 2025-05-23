@@ -34,6 +34,7 @@ in
         "/persist"
         "/mnt/nas"
         "/nix"
+        "/var/lib/flatpak"
       ]
       ++ userPrunes
     );
