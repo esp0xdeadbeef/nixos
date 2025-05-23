@@ -7,7 +7,7 @@
 
 {
   environment.systemPackages = with pkgs; [
-	peek
-        obs-studio
+    peek
+    obs-studio
   ];
 }
