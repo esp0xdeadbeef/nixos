@@ -126,6 +126,7 @@
         ".dropbox-dist"
         ".local/share/containers"
         ".mitmproxy" # mitmproxy certificates
+        ".mozilla" # firefox
 
         # vscode ?
         ".config/Code" # vscode itself
