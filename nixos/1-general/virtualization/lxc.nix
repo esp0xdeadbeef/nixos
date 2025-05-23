@@ -4,18 +4,12 @@
   lib,
   ...
 }:
-
 let
-  # ── 1. All “normal” login names ────────────────────────────────
   normalUserNames = lib.attrNames (
     lib.filterAttrs (_: u: u.isNormalUser or false) config.users.users
   );
-
-  # ── 2. Homes (respecting any per-user override) ────────────────
   homeDirs = map (n: (config.users.users.${n}.home or "/home/${n}")) normalUserNames;
   homeDirsStr = lib.escapeShellArgs homeDirs;
-
-  # ── 3. /etc/lxc/lxc-usernet needs one line per user ────────────
   usernetLines = lib.concatStringsSep "\n" (map (u: "${u} veth lxcbr0 10") normalUserNames) + "\n"; # final newline keeps lxc quiet
 in
 {
@@ -65,25 +59,6 @@ in
     dhcp-host=osep-lxc,10.0.3.100
   '';
 
-  # system.activationScripts.setLxcHomeACL = {
-  #   text = ''
-  #     export PATH=${pkgs.acl}/bin:$PATH
-  #     for home in ${homeDirsStr};
-  #     do
-  #       echo "usernetConfig = ${usernetLines}" | tee /tmp/test
-  #       ls $home > /dev/null || exit
-  #       mkdir -p $home/.config/lxc/ || exit
-  #       cp /etc/lxc/default.conf $home/.config/lxc/default.conf
-  #       chown deadbeef:users $home/.config
-  #       chown deadbeef:users $home/.config/lxc
-  #       chown deadbeef:users $home/.config/lxc/default.conf
-  #       setfacl -m u:100000:--x $home
-  #       setfacl -m u:100000:--x $home/.local
-  #       setfacl -m u:100000:--x $home/.local/share/
-  #       setfacl -m u:100000:--x $home/.local/share/lxc
-  #     done
-  #   '';
-  # };
   system.activationScripts.setLxcHomeACL.text = ''
     export PATH=${pkgs.acl}/bin:$PATH
     for home in ${homeDirsStr}; do
@@ -120,27 +95,6 @@ in
     mode = "0755";
   };
 
-  # systemd.services.nuke-before-anything = {
-  #   description = "Run BEFORE reboot, poweroff, shutdown, halt";
-  #   before = [
-  #     "reboot.target"
-  #     "poweroff.target"
-  #     "halt.target"
-  #     "shutdown.target"
-  #   ];
-  #   wantedBy = [
-  #     "reboot.target"
-  #     "poweroff.target"
-  #     "halt.target"
-  #     "shutdown.target"
-  #   ];
-  #   serviceConfig = {
-  #     Type = "oneshot";
-  #     ExecStart = "/etc/nuke-lxc-from-orbit-on-shutdown.sh";
-  #     TimeoutSec = 3;
-  #     RemainAfterExit = true;
-  #   };
-  # };
 
   environment.systemPackages = with pkgs; [
     bindfs
