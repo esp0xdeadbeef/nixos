@@ -133,11 +133,14 @@
         ".dropbox-dist"
         ".local/share/containers"
         ".mitmproxy" # mitmproxy certificates
-        ".mozilla" # firefox
+        ".mozilla" # firefox import certificates taking too long
+        ".local/state/wireplumber" # audio profiles
+        ".config/Code" # vscode settings and data
+        ".vscode"      # workspace-specific settings and plugins
 
-        # vscode ?
-        ".config/Code" # vscode itself
-        ".vscode" # plugins
+        
+        ".config/slack" # Slack configuration
+        ".config/zoom" # Zoom settings
 
         {
           directory = ".gnupg";
