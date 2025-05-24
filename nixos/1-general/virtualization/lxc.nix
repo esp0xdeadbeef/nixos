@@ -29,6 +29,15 @@ in
       lxc.idmap = u 0 100000 65535
       lxc.idmap = g 0 100000 65535
 
+      # # didn't work as expected (got g and uid 1000 inside container):
+      # # UID map: allow podman user inside container to work
+      # lxc.idmap = u 0 100000 1000
+      # lxc.idmap = g 0 100000 1000
+      # lxc.idmap = u 1000 1000 1
+      # lxc.idmap = g 1000 1000 1
+      # lxc.idmap = u 1001 101001 64534
+      # lxc.idmap = g 1001 101001 64534
+
       # new, include common and userns:
       lxc.include = /run/current-system/sw/share/lxc/config/common.conf
       lxc.include = /run/current-system/sw/share/lxc/config/userns.conf
