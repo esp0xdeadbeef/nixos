@@ -134,11 +134,11 @@
         ".local/share/containers"
         ".mitmproxy" # mitmproxy certificates
         ".mozilla" # firefox import certificates taking too long
-        ".local/state/wireplumber" # audio profiles
+        # ".local/state/wireplumber" # audio profiles
         ".config/Code" # vscode settings and data
         ".vscode"      # workspace-specific settings and plugins
 
-        
+
         ".config/slack" # Slack configuration
         ".config/zoom" # Zoom settings
 
@@ -150,17 +150,18 @@
           directory = ".ssh";
           mode = "0700";
         }
-        {
-          directory = ".nixops";
-          mode = "0700";
-        }
+        # {
+        #   directory = ".nixops";
+        #   mode = "0700";
+        # }
         {
           directory = ".local/share/keyrings";
           mode = "0700";
         }
-        ".local/share/direnv"
+        # ".local/share/direnv"
       ];
       files = [
+        ".local/state/wireplumber/default-nodes"
         ".screenrc"
         ".config/nix/nix.conf"
         ".zsh_history"
