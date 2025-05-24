@@ -17,12 +17,22 @@
       "lxc-user"
     ];
     subGidRanges = [
+      # # not what i want, but this is how you map 1:1 inside containers:
+      # {
+      #   startGid = 1000;
+      #   count = 1;
+      # }
       {
         startGid = 100000;
         count = 65536;
       }
     ];
     subUidRanges = [
+      # # not what i want, but this is how you map 1:1 inside containers:
+      # {
+      #   startUid = 1000;
+      #   count = 1;
+      # }
       {
         startUid = 100000;
         count = 65536;

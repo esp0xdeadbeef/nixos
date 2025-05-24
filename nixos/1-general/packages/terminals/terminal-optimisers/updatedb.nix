@@ -26,7 +26,7 @@ in
     enable = true;
     package = pkgs.plocate;
     localuser = null;
-    output = "/persist/var/cache/locatedb"; # where to write the DB :contentReference[oaicite:0]{index=0}
+    output = "/persist/var/cache/locatedb"; # where to write the DB
 
     prunePaths = lib.mkAfter (
       [
@@ -38,5 +38,10 @@ in
       ]
       ++ userPrunes
     );
+
+    interval = "hourly"; # Update the locate database every 2 hours
+    #   OnBootSec = "5min"; # Run 5 minutes after startup
+    #   OnUnitActiveSec = "2h"; # Run every 2 hours
+    # };
   };
 }
