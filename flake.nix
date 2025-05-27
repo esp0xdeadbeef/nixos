@@ -13,10 +13,8 @@
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
     nixpkgs = {
-      # url = "github:nixos/nixpkgs/nixos-unstable";
       url = "github:nixos/nixpkgs/nixos-24.11";
       # url = "github:nixos/nixpkgs/nixos-25.05";
-      # inputs.nixpkgs.follows = "nixpkgs-stable";
     };
     systems = {
       url = "github:nix-systems/default-linux";
