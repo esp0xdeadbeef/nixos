@@ -51,7 +51,7 @@ export CURRENT_CONFIG="l-werk"
     echo # empty row
     (
         cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'is-vm\|autologin\|usb-firewall.nix' | while read line; do
+        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'is-vm\|autologin\|usb-firewall.nix\|garbage-collection.nix' | while read line; do
             echo "    $line"
         done
     ) | sort
