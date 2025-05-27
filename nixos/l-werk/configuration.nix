@@ -73,7 +73,6 @@
     ../1-general/secrets/import-secrets.nix
     ../1-general/security/default.nix
     ../1-general/system/autoupdate.nix
-    ../1-general/system/garbage-collection.nix
     ../1-general/system/locale.nix
     ../1-general/terminals/tmux/settings.nix
     ../1-general/time/timezone.nix
