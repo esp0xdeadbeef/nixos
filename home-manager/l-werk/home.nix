@@ -75,7 +75,7 @@
     htop
     teams-for-linux
     intune-portal
-    microsoft-edge
+    #microsoft-edge
     xdotool
     azure-cli
     i3status-rust
