@@ -120,6 +120,8 @@
         "Documents"
         "Videos"
         ".local/share/lxc"
+        # ".cache/nix-index"
+        # ".cache/.keep"
         "github" # custom dir for my github projects
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/discord"
