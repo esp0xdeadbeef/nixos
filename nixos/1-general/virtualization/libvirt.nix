@@ -20,7 +20,4 @@
       };
     };
   };
-  programs.virt-manager.enable = true;
-  users.groups.libvirtd.members = [ "deadbeef" ];
-  virtualisation.spiceUSBRedirection.enable = true;
 }
