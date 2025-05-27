@@ -1,8 +1,9 @@
 { config, pkgs, ... }:
 {
-
-  # need to move this to docker.nix:
+  virtualisation.spiceUSBRedirection.enable = true;
   virtualisation.docker.enable = true;
+  programs.virt-manager.enable = true;
+  users.groups.libvirtd.members = [ "deadbeef" ];
 
   # boot.binfmt.emulatedSystems = [
   #   "aarch64-linux"
