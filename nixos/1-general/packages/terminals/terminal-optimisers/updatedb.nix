@@ -25,7 +25,7 @@ in
   services.locate = {
     enable = true;
     package = pkgs.plocate;
-    localuser = null;
+    # localuser = null;
     output = "/persist/var/cache/locatedb"; # where to write the DB
 
     prunePaths = lib.mkAfter (
