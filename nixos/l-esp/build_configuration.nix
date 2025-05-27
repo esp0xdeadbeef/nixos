@@ -23,6 +23,10 @@
 
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
+
+    inputs.hardware.nixosModules.common-cpu-amd
+    inputs.hardware.nixosModules.common-gpu-amd
+
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
