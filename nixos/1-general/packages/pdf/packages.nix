@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 {
   environment.systemPackages = with pkgs; [
-    okular
+    kdePackages.okular
     # firefox already installed
     
   ];
