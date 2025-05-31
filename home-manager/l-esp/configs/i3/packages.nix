@@ -328,6 +328,8 @@
       for_window [class="Navigator" class="firefox"] move window to workspace 8
       for_window [class="Firefox"] move window to workspace 8
       for_window [class="firefox"] move window to workspace 8
+      for_window [class="dropbox"] move window to workspace 10
+      for_window [class="Dropbox"] move window to workspace 10
 
       bindsym $mod+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 8
       bindsym $mod+shift+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 9
