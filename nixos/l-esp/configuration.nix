@@ -34,6 +34,7 @@
     ./osep/bind-to-lxc.nix
     ./osep/scraping-osep-material.nix
     ./osep/x2go-client.nix
+    ./torrents/qbittorrent.nix
 
     ../1-general/1-custom-packages/azurehound/package.nix
     ../1-general/desktop/applets.nix
