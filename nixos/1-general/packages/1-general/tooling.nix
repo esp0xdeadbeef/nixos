@@ -135,8 +135,7 @@
       tree
       # xxd hex dump:
       unixtools.xxd
-      #unziping a archive zip file:
-      unzip
+      
       # usb listing services like lsusb
       usbutils
       libusb1
