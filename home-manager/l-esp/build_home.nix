@@ -27,6 +27,10 @@ in
     # You can also split up your configuration and import pieces of it here:
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
+
+    # update nix-index database
+    inputs.nix-index-database.hmModules.nix-index
+
   ];
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
