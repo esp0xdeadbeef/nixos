@@ -72,7 +72,6 @@ in
     export PATH=${pkgs.acl}/bin:$PATH
     for home in ${homeDirsStr}; do
       user=$(basename "$home")                   # works even with /srv/users/alice
-      echo "$user" | tee /tmp/test
       ls "$home" > /dev/null || exit             # die loudly if home missing
       mkdir -p "$home/.config/lxc" || exit
       cp /etc/lxc/default.conf "$home/.config/lxc/default.conf"
