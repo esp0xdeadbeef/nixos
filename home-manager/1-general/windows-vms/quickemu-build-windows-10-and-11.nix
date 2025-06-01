@@ -17,8 +17,8 @@ in
   systemd.user.services.quickget-windows-10 = {
     Unit = {
       Description = "Download Windows 10 via quickget (user-service)";
-      Wants       = [ "network-online.target" ];
-      After       = [ "network-online.target" ];
+      Wants       = [ "network.target" ];
+      After       = [ "network.target" ];
     };
     Service = {
       Type = "oneshot";
@@ -35,8 +35,8 @@ in
   systemd.user.services.quickget-windows-11 = {
     Unit = {
       Description = "Download Windows 11 via quickget (user-service)";
-      Wants       = [ "network-online-target" ];
-      After       = [ "network-online.target" ];
+      Wants       = [ "network.target" ];
+      After       = [ "network.target" ];
     };
     Service = {
       Type = "oneshot";
