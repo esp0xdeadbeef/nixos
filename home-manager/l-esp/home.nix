@@ -38,6 +38,9 @@ in
 
     ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
 
+    inputs.nix-index-database.hmModules.nix-index
+
+
   ];
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
