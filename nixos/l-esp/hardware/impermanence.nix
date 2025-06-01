@@ -114,14 +114,18 @@
     ];
     users.deadbeef = {
       directories = [
+        "github" # custom dir for my github projects
+
         "Downloads"
         "Music"
         "Pictures"
         "Documents"
         "Videos"
         ".local/share/lxc"
-        "github" # custom dir for my github projects
+        ".local/share/containers"
+        
         ".config/legcord" # (legcord -> armcord -> discord)
+        ".config/libvirt/qemu" # libvirt qemu settings
         ".config/discord"
         ".config/spotify"
         ".config/autorandr" # autorandr profile
@@ -129,19 +133,21 @@
         ".config/chromium"
         ".config/sops"
         ".config/gh"
+        ".config/qBittorrent" # qBittorrent settings
+        ".config/obsidian" # Obsidian vault
+        ".config/remmina" # remmina remote desktop connections 
+        ".config/Code" # vscode settings and data
+        ".vscode"      # workspace-specific settings and plugins
+        ".quickget" # quickget downloads
+
+
         ".dropbox"
         ".dropbox-dist"
-        ".local/share/containers"
         ".mitmproxy" # mitmproxy certificates
         ".mozilla" # firefox import certificates taking too long
         # ".local/state/wireplumber" # audio profiles
-        ".config/Code" # vscode settings and data
-        ".vscode"      # workspace-specific settings and plugins
-        ".config/qBittorrent" # qBittorrent settings
-        ".config/obsidian" # Obsidian vault
-        
-        ".quickget" # quickget downloads
 
+        
         ".config/slack" # Slack configuration
         ".config/zoom" # Zoom settings
 
@@ -153,10 +159,6 @@
           directory = ".ssh";
           mode = "0700";
         }
-        # {
-        #   directory = ".nixops";
-        #   mode = "0700";
-        # }
         {
           directory = ".local/share/keyrings";
           mode = "0700";
