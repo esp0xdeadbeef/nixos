@@ -36,6 +36,8 @@ in
     ./projects/osep/create-x2go-profile.nix
     ./projects/osep/start-lxc.nix
 
+    ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
+
   ];
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;

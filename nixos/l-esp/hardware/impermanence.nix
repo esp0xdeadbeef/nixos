@@ -139,6 +139,8 @@
         ".vscode"      # workspace-specific settings and plugins
 
 
+        ".quickget" # quickget downloads
+
         ".config/slack" # Slack configuration
         ".config/zoom" # Zoom settings
 
