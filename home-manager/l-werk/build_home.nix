@@ -25,9 +25,7 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-    ./i3/packages.nix
-
-    ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
+STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     inputs.sops-nix.homeManagerModules.sops
   ];
