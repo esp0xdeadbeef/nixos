@@ -137,8 +137,9 @@
         # ".local/state/wireplumber" # audio profiles
         ".config/Code" # vscode settings and data
         ".vscode"      # workspace-specific settings and plugins
-
-
+        ".config/qBittorrent" # qBittorrent settings
+        ".config/obsidian" # Obsidian vault
+        
         ".quickget" # quickget downloads
 
         ".config/slack" # Slack configuration

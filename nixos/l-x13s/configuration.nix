@@ -39,6 +39,7 @@
     ../1-general/network/firewall.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
+    ../1-general/packages/1-general/archive-tools.nix
     ../1-general/packages/1-general/tooling.nix
     ../1-general/packages/audio/packages.nix
     ../1-general/packages/browsers-mail-media-social-media/packages.nix

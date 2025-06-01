@@ -35,6 +35,7 @@
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
     ../1-general/hardware/is-vm/qemu-guest.nix
+    ../1-general/packages/1-general/archive-tools.nix
     ../1-general/packages/1-general/tooling.nix
     ../1-general/packages/data-tranformation/packages.nix
     ../1-general/packages/editors/packages.nix
