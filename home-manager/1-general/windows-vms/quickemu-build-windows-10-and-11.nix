@@ -148,15 +148,8 @@ in
       # Note: inside single-quotes, ${targetDir} and ${inputs...quickget} get
       # interpolated at Nix-build time. At runtime, the shell sees something like:
       #   bash -c 'if [ ! -f "/home/you/.quickget/windows-11/virtio-win.iso" ]; then cd /home/you/.quickget && /nix/store/...-quickget/bin/quickget windows 11; fi'
-      ExecStart = ''
-        ${pkgs.bash}/bin/bash -c ' \
-          if [ ! -f "${targetDir}/windows-11/virtio-win.iso" ]; then \
-            cd "${targetDir}" && ls | grep -i 'windows-11' || \
-            ${inputs.nixpkgs-stable.legacyPackages.x86_64-linux.quickemu}/bin/quickget windows 11 && \
-            ${fixVirtio}/bin/fix-virtio-win11 \
-          fi \
-        '
-      '';
+      ExecStart = "${pkgs.bash}/bin/bash -c 'cd \"${targetDir}\"; if [ ! -d windows-11 ]; then ${inputs.nixpkgs-stable.legacyPackages.x86_64-linux.quickemu}/bin/quickget windows 11; fi; if [ -d windows-11 ] && [ ! -f windows-11/virtio-win ]; then ${fixVirtio}/bin/fix-virtio-win11; fi'";
+
       TimeoutStartSec = "0";
     };
     Install = {
