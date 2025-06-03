@@ -1,0 +1,129 @@
+{
+  config,
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
+
+let
+  homeDir = config.home.homeDirectory;
+  targetDir = "${homeDir}/.quickget";
+  vmPath = "${targetDir}/windows-11";
+in
+{
+  # 1) Ensure quickemu is installed in your user profile
+  home.packages = with pkgs; [
+    inputs.nixpkgs-stable.legacyPackages.x86_64-linux.quickemu
+
+    (pkgs.writeShellScriptBin "fix-virtio-win11" ''
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+
+      echo "Fixing VirtIO ISO under ${vmPath}"
+
+      echo "Create extraction directory"
+      mkdir -p "${vmPath}/virtio-cd"
+
+      echo "Extract only the driver folders+files, suppressing output"
+      "${pkgs.p7zip}/bin/7z" x "${vmPath}/virtio-win.iso" \
+        -o"${vmPath}/virtio-cd" -bso0 -bsp0
+
+      echo "Verify extraction succeeded"
+      if [[ ! -d "${vmPath}/virtio-cd" ]] || [[ -z "$(ls -A "${vmPath}/virtio-cd")" ]]; then
+        echo "Error: Extraction of virtio-cd failed!" >&2
+        exit 1
+      fi
+
+      echo "Prune everything except NetKVM, vioscsi, viostor, *.msi, and *.exe"
+      pushd "${vmPath}/virtio-cd" >/dev/null
+      find . -mindepth 1 -maxdepth 1 \
+        ! -name "NetKVM" \
+        ! -name "vioscsi" \
+        ! -name "viostor" \
+        ! -name "*.msi" \
+        ! -name "*.exe" \
+        -exec rm -rf {} +
+      popd >/dev/null
+
+      echo "move aside the old ISO and rebuild:"
+      mv "${vmPath}/virtio-win.iso" "${vmPath}/virtio-win-broke-with-quickemu.iso" || true
+
+      "${pkgs.cdrtools}/bin/mkisofs" -quiet \
+        -o "${vmPath}/virtio-win.iso" \
+        -V "fixed-cd" -J -R "${vmPath}/virtio-cd"
+
+
+      echo "Copying Windows 11 ISO to ${vmPath}/windows-11.iso because fuck microsoft."
+      cp ~/Downloads/windows-11-24h2-iso_202501/Win11_24H2_English_x64.iso "${vmPath}/windows-11.iso"
+
+
+      echo "Rebuilt ${vmPath}/virtio-win.iso successfully."
+
+    '')
+  ];
+
+  # 2) Create the base directory at activation time
+  home.activation.ensureQuickgetDir = ''
+    mkdir -p ${targetDir}
+  '';
+
+  # 3) Define the two one-shot services, using single-quoted shell commands
+  systemd.user.services.quickget-windows-10 = {
+    Unit = {
+      Description = "Download Windows 10 via quickget (user-service)";
+      Wants = [ "network.target" ];
+      After = [ "network.target" ];
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = ''
+        ${pkgs.bash}/bin/bash -c 'cd ${targetDir} && ls | grep -i 'windows-10' || ${inputs.nixpkgs-stable.legacyPackages.x86_64-linux.quickemu}/bin/quickget windows 10'
+      '';
+      TimeoutStartSec = "0";
+    };
+    Install = {
+      WantedBy = [ "default.target" ];
+    };
+  };
+
+  systemd.user.services.quickget-windows-11 = {
+    Unit = {
+      Description = "Download Windows 11 via quickget (user-service)";
+      Wants = [ "network.target" ];
+      After = [ "network.target" ];
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = ''
+        ${pkgs.bash}/bin/bash -c 'cd ${targetDir} && ls | grep -i 'windows-11' || ${inputs.nixpkgs-stable.legacyPackages.x86_64-linux.quickemu}/bin/quickget windows 11'
+      '';
+      TimeoutStartSec = "0";
+    };
+    Install = {
+      WantedBy = [ "default.target" ];
+    };
+  };
+
+  systemd.user.services.fix-virtio-windows-11 = {
+    Unit = {
+      Description = "Fix/Rebuild VirtIO ISO for Windows 11 VM";
+      # Ensure it only runs after the download has completed
+      Wants = [ "quickget-windows-11.service" ];
+      After = [ "quickget-windows-11.service" ];
+    };
+    Service = {
+      Type = "oneshot";
+
+      # Simply invoke our wrapper. Because we used writeShellScriptBin,
+      # `fix-virtio-win11` is guaranteed to be in $HOME/.nix-profile/bin
+      ExecStart = "${pkgs.bash}/bin/bash -c 'fix-virtio-win11'";
+
+      TimeoutStartSec = "0";
+    };
+    Install = {
+      WantedBy = [ "default.target" ];
+    };
+  };
+
+}
