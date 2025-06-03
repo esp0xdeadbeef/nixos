@@ -152,7 +152,7 @@ in
         ${pkgs.bash}/bin/bash -c ' \
           if [ ! -f "${targetDir}/windows-11/virtio-win.iso" ]; then \
             cd "${targetDir}" && ls | grep -i 'windows-11' || \
-            ${inputs.nixpkgs-stable.legacyPackages.x86_64-linux.quickemu}/bin/quickget windows 11; \
+            ${inputs.nixpkgs-stable.legacyPackages.x86_64-linux.quickemu}/bin/quickget windows 11 && \
             ${fixVirtio}/bin/fix-virtio-win11 \
           fi \
         '

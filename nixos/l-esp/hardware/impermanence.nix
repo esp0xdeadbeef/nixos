@@ -82,6 +82,7 @@
       "/var/lib/nixos"
       "/var/lib/systemd/coredump"
       "/etc/NetworkManager/system-connections"
+      "/var/lib/libvirt" # libvirt configurations
       {
         directory = "/var/lib/colord";
         user = "colord";
