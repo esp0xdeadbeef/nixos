@@ -97,7 +97,6 @@ in
     ffuf
     ];
     unstable = with unstablePkgs; [
-      vscode
       firefox
       exploitdb
       netexec
