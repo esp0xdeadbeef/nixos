@@ -91,7 +91,6 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     flameshot
     rofi
     remmina
-    netexec
     ffuf
     ];
     unstable = with unstablePkgs; [

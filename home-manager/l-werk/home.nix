@@ -93,7 +93,6 @@ in
     flameshot
     rofi
     remmina
-    netexec
     ffuf
     ];
     unstable = with unstablePkgs; [
