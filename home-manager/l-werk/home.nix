@@ -93,14 +93,13 @@ in
     flameshot
     rofi
     remmina
-    netexec
     ffuf
     ];
     unstable = with unstablePkgs; [
       firefox
       exploitdb
       netexec
-      burpsuite
+      (burpsuite.override { proEdition = true; })
       gh
     ];
   in
