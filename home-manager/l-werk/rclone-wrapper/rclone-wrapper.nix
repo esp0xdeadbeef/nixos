@@ -1,26 +1,25 @@
-{ config, pkgs, ... }: {
-  sops.secrets.rclone_password = {
-    path = "${config.home.homeDirectory}/.config/rclone/password_seed";
-  };
+{ config, pkgs, ... }:
 
-  home.file.".local/bin/rclone-crypt".text = ''
-    #!/usr/bin/env bash
+let
+  seedFile = "${config.home.homeDirectory}/.config/rclone/password_seed";
+
+  rcloneWrapper = pkgs.writeShellScriptBin "rclone-crypt" ''
     set -euo pipefail
 
-    SEED_FILE="$HOME/.config/rclone/password_seed"
+    SEED_FILE="${seedFile}"
     SEED=$(<"$SEED_FILE")
 
     TMP_CONF="$(mktemp)"
     TMP_AUTH="$(mktemp)"
 
     echo "[*] Deriving password from sops-managed seed..."
-    CRYPT_PASS=$(echo -n "$SEED" | sha256sum | cut -d ' ' -f 1)
-    CRYPT_OBS=$(${pkgs.rclone} obscure "$CRYPT_PASS")
-    SALT_OBS=$(${pkgs.rclone} obscure "static-salt")
+    CRYPT_PASS=$(echo -n "$SEED" | ${pkgs.coreutils}/bin/sha256sum | cut -d ' ' -f 1)
+    CRYPT_OBS=$(${pkgs.rclone}/bin/rclone obscure "$CRYPT_PASS")
+    SALT_OBS=$(${pkgs.rclone}/bin/rclone obscure "static-salt")
 
     echo "[*] Launching browser for OneDrive auth..."
-    ${pkgs.rclone} authorize onedrive --output-file "$TMP_AUTH"
-    TOKEN=$(${pkgs.jq} -c '.' < "$TMP_AUTH")
+    ${pkgs.rclone}/bin/rclone authorize onedrive --output-file "$TMP_AUTH"
+    TOKEN=$(${pkgs.jq}/bin/jq -c '.' < "$TMP_AUTH")
 
     echo -n "Enter your drive_id: "
     read DRIVE_ID
@@ -39,14 +38,16 @@
     directory_name_encryption = true
     password = $CRYPT_OBS
     password2 = $SALT_OBS
-    EOF
+EOF
 
     echo "[*] Running rclone with temporary config..."
-    ${pkgs.rclone} --config "$TMP_CONF" "$@"
+    ${pkgs.rclone}/bin/rclone --config "$TMP_CONF" "$@"
 
     rm -f "$TMP_CONF" "$TMP_AUTH"
   '';
+in
+{
+  sops.secrets.rclone-password.path = seedFile;
 
-  home.file.".local/bin/rclone-crypt".executable = true;
+  home.packages = [ rcloneWrapper ];
 }
-
