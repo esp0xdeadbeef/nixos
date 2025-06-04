@@ -1,6 +1,4 @@
-# This is your home-manager configuration file
-# Use this to configure your home environment (it replaces ~/.config/nixpkgs/home.nix)
-{
+args@{
   inputs,
   outputs,
   lib,
@@ -10,12 +8,23 @@
   ...
 }:
 let
+ _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
-    # system = "x86_64-linux";
+    config.allowUnfree = true;
+  };
+  stablePkgs = import inputs.nixpkgs-stable {
     config.allowUnfree = true;
   };
 in
 {
+  home.activation.debugArgs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    # this will log in journalctl -u home-manager-deadbeef.service -e
+
+    echo "[+] Home Manager activation: showing specialArgs"
+    echo "    -> ${lib.concatStringsSep " " (builtins.attrNames args)}"
+  '';
+
+
   # You can import other home-manager modules here
   imports = [
     # If you want to use modules your own flake exports (from modules/home-manager):
@@ -36,6 +45,7 @@ in
     ./projects/osep/create-x2go-profile.nix
     ./projects/osep/start-lxc.nix
 
+    ../1-general/pentesting/packages.nix
     ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
 
 
