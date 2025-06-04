@@ -1,14 +1,24 @@
 { config, pkgs, ... }:
 
 let
+  sops = {
+     secrets.rclone-password = {};
+     secrets.rclone-drive_id = {};
+  };
+  sops.template.rclone-template = {
+    content = ''
+
+    '';
+    };
+in 
+{
   rcloneWrapper = pkgs.writeShellScriptBin "rclone-crypt" ''
     set -euo pipefail
 
-    SEED="${builtins.readFile config.sops.secrets."rclone-password".path}"
-    DRIVE_ID="${builtins.readFile config.sops.secrets."rclone-drive_id".path}"
+    #SEED_FILE="\$\{seedFile}"
+    #SEED=$(<"$SEED_FILE")
+    SEED="${config.sops.placeholder.rclone-password}"
 
-    #echo $SEED
-    #echo $DRIVE_ID
     TMP_CONF="$(mktemp)"
     TMP_AUTH="$(mktemp)"
 
@@ -18,8 +28,12 @@ let
     SALT_OBS=$(${pkgs.rclone}/bin/rclone obscure "static-salt")
 
     echo "[*] Launching browser for OneDrive auth..."
-    ${pkgs.rclone}/bin/rclone authorize onedrive | grep -v Paste -i | tee "$TMP_AUTH"
+    ${pkgs.rclone}/bin/rclone authorize onedrive | tee "$TMP_AUTH"
     TOKEN=$(cat "$TMP_AUTH")
+
+    DRIVE_ID="${config.sops.placeholder.drive_id}"
+    echo -n "Enter your drive_id: $DEVICE_ID"
+    #read DRIVE_ID
 
     cat > "$TMP_CONF" <<EOF
     [rsync]
@@ -42,11 +56,8 @@ EOF
 
     rm -f "$TMP_CONF" "$TMP_AUTH"
   '';
-in
-{
-  sops.secrets.rclone-password = {};
-  sops.secrets.rclone-drive_id = {};
+  #sops.secrets.rclone-password.path = seedFile;
+  #sops.secrets.rclone-drive_id.path = driveId;
 
   home.packages = [ rcloneWrapper ];
 }
-
