@@ -26,6 +26,7 @@ in
 
     # You can also split up your configuration and import pieces of it here:
     ./i3/packages.nix
+./rclone-wrapper/rclone-wrapper.nix
 
     ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
 
