@@ -12,8 +12,8 @@
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
     nixpkgs = {
-      url = "github:nixos/nixpkgs/nixos-24.11";
-      # url = "github:nixos/nixpkgs/nixos-25.05";
+      # url = "github:nixos/nixpkgs/nixos-24.11";
+      url = "github:nixos/nixpkgs/nixos-25.05";
     };
     systems = {
       url = "github:nix-systems/default-linux";
