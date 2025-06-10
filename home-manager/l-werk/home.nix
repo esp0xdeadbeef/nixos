@@ -110,7 +110,7 @@ in
       firefox
       exploitdb
       netexec
-      burpsuite
+      (burpsuite.override { proEdition = true; })
       gh
     ];
   in

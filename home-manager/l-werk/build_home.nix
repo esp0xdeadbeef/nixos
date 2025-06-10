@@ -106,7 +106,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       firefox
       exploitdb
       netexec
-      burpsuite
+      (burpsuite.override { proEdition = true; })
       gh
     ];
   in
