@@ -37,6 +37,7 @@ in
     ./i3/packages.nix
     ./rclone-wrapper/rclone-wrapper.nix
 
+    ../1-general/pdf-reader/packages.nix
     ../1-general/pentesting/packages.nix
     ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
 
