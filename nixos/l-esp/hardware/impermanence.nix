@@ -136,7 +136,7 @@
         ".config/gh"
         ".config/qBittorrent" # qBittorrent settings
         ".config/obsidian" # Obsidian vault
-        ".config/remmina" # remmina remote desktop connections 
+        ".local/share/remmina" # remmina remote desktop connections 
         ".config/Code" # vscode settings and data
         ".vscode"      # workspace-specific settings and plugins
         ".quickget" # quickget downloads
