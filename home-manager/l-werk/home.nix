@@ -118,6 +118,12 @@ in
     stable ++ unstable;
 
 
+  programs.vscode = {
+    enable = true;
+    package = unstablePkgs.vscodium.fhs;
+    mutableExtensionsDir = true;
+  };
+
   # Enable home-manager and git
   programs.home-manager.enable = true;
   # programs.git.enable = true;
