@@ -1,8 +1,9 @@
 { config, pkgs, ... }:
 {
-  services.xserver.videoDrivers = [ "amdgpu" ];
+  services.xserver.videoDrivers = [ "amdgpu" "kfd" ];
   environment.systemPackages = with pkgs; [
     rocmPackages.rocm-smi
+    rocmPackages.rocminfo
   ];
   # still whihing that the vid card is "insecure":
   # boot.kernelParams = [

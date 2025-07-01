@@ -77,6 +77,7 @@
     hideMounts = true;
     directories = [
       "/root"
+      "/var/lib/ollama/" # AI models
       "/var/log"
       "/var/lib/bluetooth"
       "/var/lib/nixos"
@@ -142,6 +143,7 @@
         ".config/VSCodium" # vscode settings and data
         ".vscode-oss"      # workspace-specific settings and plugins
         ".quickget" # quickget downloads
+        ".continue" # quickget downloads
 
 
         ".dropbox"
