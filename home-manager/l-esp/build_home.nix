@@ -8,7 +8,7 @@ args@{
   ...
 }:
 let
- _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
+  _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
     config.allowUnfree = true;
   };
@@ -24,7 +24,6 @@ in
     echo "    -> ${lib.concatStringsSep " " (builtins.attrNames args)}"
   '';
 
-
   # You can import other home-manager modules here
   imports = [
     # If you want to use modules your own flake exports (from modules/home-manager):
@@ -35,7 +34,6 @@ in
 
     # You can also split up your configuration and import pieces of it here:
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
-
 
     # update nix-index database
     inputs.nix-index-database.hmModules.nix-index
@@ -87,29 +85,35 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   };
 
   home.packages =
-  let
-    stable = with pkgs; [
-      xdotool
-      i3status-rust
-      obsidian
-      google-chrome
-      flameshot
-      rofi
-      remmina
-      legcord
-      ffuf
-      distrobox
-    ];
-    unstable = with unstablePkgs; [
-      vscode
-      firefox
-      exploitdb
-      netexec
-      gh
-    ];
-  in
+    let
+      stable = with pkgs; [
+        xdotool
+        i3status-rust
+        obsidian
+        google-chrome
+        flameshot
+        rofi
+        remmina
+        legcord
+        ffuf
+        distrobox
+      ];
+      unstable = with unstablePkgs; [
+        vscode
+        firefox
+        exploitdb
+        netexec
+        gh
+      ];
+    in
     stable ++ unstable;
 
+  # home-manager
+  programs.vscode = {
+    enable = true;
+    package = unstablePkgs.vscodium.fhs;
+    mutableExtensionsDir = true;
+  };
 
   # Enable home-manager and git
   programs.home-manager.enable = true;

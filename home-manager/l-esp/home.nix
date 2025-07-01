@@ -8,7 +8,7 @@ args@{
   ...
 }:
 let
- _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
+  _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
     config.allowUnfree = true;
   };
@@ -23,7 +23,6 @@ in
     echo "[+] Home Manager activation: showing specialArgs"
     echo "    -> ${lib.concatStringsSep " " (builtins.attrNames args)}"
   '';
-
 
   # You can import other home-manager modules here
   imports = [
@@ -48,7 +47,6 @@ in
     ../1-general/pdf-reader/packages.nix
     ../1-general/pentesting/packages.nix
     ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
-
 
     # update nix-index database
     inputs.nix-index-database.hmModules.nix-index
@@ -100,29 +98,35 @@ in
   };
 
   home.packages =
-  let
-    stable = with pkgs; [
-      xdotool
-      i3status-rust
-      obsidian
-      google-chrome
-      flameshot
-      rofi
-      remmina
-      legcord
-      ffuf
-      distrobox
-    ];
-    unstable = with unstablePkgs; [
-      vscode
-      firefox
-      exploitdb
-      netexec
-      gh
-    ];
-  in
+    let
+      stable = with pkgs; [
+        xdotool
+        i3status-rust
+        obsidian
+        google-chrome
+        flameshot
+        rofi
+        remmina
+        legcord
+        ffuf
+        distrobox
+      ];
+      unstable = with unstablePkgs; [
+        vscode
+        firefox
+        exploitdb
+        netexec
+        gh
+      ];
+    in
     stable ++ unstable;
 
+  # home-manager
+  programs.vscode = {
+    enable = true;
+    package = unstablePkgs.vscodium.fhs;
+    mutableExtensionsDir = true;
+  };
 
   # Enable home-manager and git
   programs.home-manager.enable = true;
