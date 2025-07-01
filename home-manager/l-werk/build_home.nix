@@ -95,7 +95,6 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     i3status-rust
     discord
     obsidian
-    vscode
     google-chrome
     flameshot
     rofi
@@ -103,6 +102,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     ffuf
     ];
     unstable = with unstablePkgs; [
+      vscode
       firefox
       exploitdb
       netexec

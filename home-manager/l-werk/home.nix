@@ -100,7 +100,6 @@ in
     i3status-rust
     discord
     obsidian
-    vscode
     google-chrome
     flameshot
     rofi
@@ -108,6 +107,7 @@ in
     ffuf
     ];
     unstable = with unstablePkgs; [
+      vscode
       firefox
       exploitdb
       netexec
