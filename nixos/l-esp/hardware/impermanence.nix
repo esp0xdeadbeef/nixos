@@ -77,7 +77,9 @@
     hideMounts = true;
     directories = [
       "/root"
-      "/var/lib/ollama/" # AI models
+      # "/var/lib/ollama/models" # AI models
+      # "/var/lib/ollama/.ollama" # AI ssh keys
+      # "/var/lib/ollama"
       "/var/log"
       "/var/lib/bluetooth"
       "/var/lib/nixos"
