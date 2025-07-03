@@ -89,8 +89,9 @@
       # ipv6 - Looks up an on-link IPv6 node link-layer address (Neighbor Discovery)
       ndisc6
 
-      # flex tool:
-      neofetch
+      # flex tool 
+      # neofetch (depricated)
+      fastfetch
 
       # rfc formatter:
       nixfmt-rfc-style
