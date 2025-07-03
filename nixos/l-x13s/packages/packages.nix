@@ -79,7 +79,7 @@
     pciutils
     autotiling
     lshw
-    neofetch
+    # neofetch
     hashcat
     fzf
     git
