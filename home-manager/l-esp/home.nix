@@ -51,7 +51,15 @@ in
     # update nix-index database
     inputs.nix-index-database.hmModules.nix-index
 
+
+    # zen browser:
+    inputs.zen-browser.homeModules.beta
+    # or inputs.zen-browser.homeModules.twilight
+    # or inputs.zen-browser.homeModules.twilight-official
+
   ];
+
+  programs.zen-browser.enable = true;
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
 
@@ -61,6 +69,7 @@ in
     };
 
   };
+
 
   nixpkgs = {
     # You can add overlays here
