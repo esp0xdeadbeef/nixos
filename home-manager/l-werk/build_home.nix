@@ -8,7 +8,7 @@ args@{
   ...
 }:
 let
- _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
+  _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
     config.allowUnfree = true;
   };
@@ -24,7 +24,6 @@ in
     echo "    -> ${lib.concatStringsSep " " (builtins.attrNames args)}"
   '';
 
-
   # You can import other home-manager modules here
   imports = [
     # If you want to use modules your own flake exports (from modules/home-manager):
@@ -34,7 +33,7 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     inputs.sops-nix.homeManagerModules.sops
   ];
@@ -84,34 +83,34 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   };
 
   home.packages =
-  let
-    stable = with pkgs; [
-    htop
-    teams-for-linux
-    intune-portal
-    #microsoft-edge
-    xdotool
-    azure-cli
-    i3status-rust
-    discord
-    obsidian
-    google-chrome
-    flameshot
-    rofi
-    remmina
-    ffuf
-    ];
-    unstable = with unstablePkgs; [
-      vscode
-      firefox
-      exploitdb
-      netexec
-      (burpsuite.override { proEdition = true; })
-      gh
-    ];
-  in
+    let
+      stable = with pkgs; [
+        htop
+        teams-for-linux
+        intune-portal
+        #microsoft-edge
+        xdotool
+        azure-cli
+        i3status-rust
+        discord
+        obsidian
+        google-chrome
+        flameshot
+        rofi
+        remmina
+        ffuf
+        black 
+      ];
+      unstable = with unstablePkgs; [
+        vscode
+        firefox
+        exploitdb
+        netexec
+        (burpsuite.override { proEdition = true; })
+        gh
+      ];
+    in
     stable ++ unstable;
-
 
   programs.vscode = {
     enable = true;
