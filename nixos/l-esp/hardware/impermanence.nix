@@ -142,8 +142,8 @@
         ".local/share/remmina" # remmina remote desktop connections 
         ".config/Code" # vscode settings and data
         ".vscode"      # workspace-specific settings and plugins
-        ".config/VSCodium" # vscode settings and data
-        ".vscode-oss"      # workspace-specific settings and plugins
+        ".config/VSCodium" # VSCodium settings and data
+        ".vscode-oss"      # VSCodium workspace-specific settings and plugins
         ".quickget" # quickget downloads
         ".continue" # quickget downloads
 
