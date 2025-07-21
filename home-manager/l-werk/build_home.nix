@@ -100,6 +100,7 @@ in
         remmina
         ffuf
         black 
+        tmuxp
       ];
       unstable = with unstablePkgs; [
         vscode
