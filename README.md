@@ -23,7 +23,7 @@ tltr; this repo was never ment to be public, but someone wanted it so i publishe
 
 Update the lock file:
 
-```
+```bash
 nix flake update --flake path:/home/deadbeef/github/nixos
 ```
 
