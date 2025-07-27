@@ -19,6 +19,15 @@
       matchConfig.PermanentMACAddress = "bc:24:11:28:1f:b6";
       linkConfig.Name = "phys0";
     };
+    # Attach only the DHCP VLANs to phys0
+    networks."10-phys0" = {
+      matchConfig.Name = "phys0";
+      networkConfig.VLAN = [
+        "vlan-lan"
+        "vlan-test"
+        "vlan-natted-internal"
+      ];
+    };
 
     # VLAN for LAN (ID: 4) with DHCP
     netdevs."10-vlan-lan" = {
@@ -84,14 +93,5 @@
     };
 
 
-    # Attach only the DHCP VLANs to phys0
-    networks."10-phys0" = {
-      matchConfig.Name = "phys0";
-      networkConfig.VLAN = [
-        "vlan-lan"
-        "vlan-test"
-        "vlan-natted-internal"
-      ];
-    };
   };
 }
