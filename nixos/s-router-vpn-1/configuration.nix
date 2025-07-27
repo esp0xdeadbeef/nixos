@@ -22,10 +22,6 @@
     # ./users.nix
     # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
     ./hardware/hardware-configuration.nix
-    ./network/configs_from_container.nix
-    ./network/firewall.nix
-    ./network/management-network.nix
-    ./network/vlan-configuration-phys0.nix
     ./ssh-vim-and-basics.nix
 
     ../1-general/desktop/applets.nix
