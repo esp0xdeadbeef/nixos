@@ -16,17 +16,17 @@
     deps = [ "etc" ];
   };
 
-  services.cron.enable = true;
+  # services.cron.enable = true;
 
-  services.cron.systemCronJobs = [
-    "0 * * * * root /path/to/your/script.sh"
-    "*/5 * * * * root /root/update_iptables.sh"
-    "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf eth1\""
-    "@reboot root systemctl start isc-dhcp-server"
-    "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
-    "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
-  ];
-  # 2) Drop your “root/….” templates into /etc/root/
+  # services.cron.systemCronJobs = [
+  #   "0 * * * * root /path/to/your/script.sh"
+  #   "*/5 * * * * root /root/update_iptables.sh"
+  #   "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf eth1\""
+  #   "@reboot root systemctl start isc-dhcp-server"
+  #   "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
+  #   "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
+  # ];
+  
   environment.etc = {
 
     # # tun0.conf
@@ -71,26 +71,6 @@
     #     '';
     #   };
     #   mode = "0644";
-    # };
-
-    # "root/old_crontab_config" = {
-    #   source = pkgs.writeTextFile {
-    #     name = "old_crontab_config";
-    #     text = ''
-    #       #@reboot bash -c 'sleep 4;nmcli connection up tun0'
-    #       #@reboot bash -c "sleep 4; nmcli connection modify eth0 +connection.secondaries \$(nmcli connection show | grep tun0 | awk '{print \$2}')"
-    #       #@reboot bash -c "sleep 10; nmcli connection modify id eth0 +connection.secondaries \$(nmcli connection show | grep tun | awk '{print \$2}')"
-    #       #@reboot iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination 10.30.0.109:22
-    #       #@reboot bash -c "sleep 10; bash /root/update_iptables.sh"
-    #       */5 * * * * /root/update_iptables.sh
-    #       #@reboot touch /var/run/dhcpd.pid
-    #       @reboot bash -c "sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf eth1"
-    #       @reboot systemctl start  isc-dhcp-server
-    #       @reboot /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out
-    #       @reboot bash -c "sleep 10; /root/portforwards.sh ; /root/update_iptables.sh"
-    #     '';
-    #   };
-    #   mode = "0755";
     # };
 
     # calculate-prefix.py → /etc/root/calculate-prefix.py
