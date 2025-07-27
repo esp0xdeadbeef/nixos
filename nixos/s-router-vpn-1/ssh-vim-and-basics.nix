@@ -5,7 +5,9 @@
     vim
     fzf
     networkmanager
-    konsole
+    # konsole
     tmux
+    i3blocks
+    i3status
   ];
 }
