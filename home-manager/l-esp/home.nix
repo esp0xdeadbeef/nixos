@@ -53,13 +53,13 @@ in
 
 
     # zen browser:
-    inputs.zen-browser.homeModules.beta
+    # inputs.zen-browser.homeModules.beta
     # or inputs.zen-browser.homeModules.twilight
     # or inputs.zen-browser.homeModules.twilight-official
 
   ];
 
-  programs.zen-browser.enable = true;
+  # programs.zen-browser.enable = true;
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
 
