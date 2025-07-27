@@ -3,8 +3,6 @@
 
   inputs = {
 
-    # # Nix ecosystem
-    # Nixpkgs
     nixpkgs-stable = {
       url = "github:nixos/nixpkgs/nixos-25.05";
     };
@@ -14,17 +12,18 @@
     nixpkgs = {
       # url = "github:nixos/nixpkgs/nixos-24.11";
       url = "github:nixos/nixpkgs/nixos-25.05";
+      # url = "github:nixos/nixpkgs/nixos-unstable";
     };
     systems = {
       url = "github:nix-systems/default-linux";
     };
 
-    zen-browser = {
-      url = "github:0xc000022070/zen-browser-flake";
-      # IMPORTANT: we're using "libgbm" and is only available in unstable so ensure
-      # to have it up-to-date or simply don't specify the nixpkgs input
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # zen-browser = {
+    #   url = "github:0xc000022070/zen-browser-flake";
+    #   # IMPORTANT: we're using "libgbm" and is only available in unstable so ensure
+    #   # to have it up-to-date or simply don't specify the nixpkgs input
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
     # You can access packages and modules from different nixpkgs revs
     # Also see the 'unstable-packages' overlay at 'overlays/default.nix'.
 
@@ -45,10 +44,26 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+
     # hardware:
     hardware = {
       url = "github:nixos/nixos-hardware";
       # inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    impermanence = {
+      url = "github:nix-community/impermanence";
+      # inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nix-index-database = {
+      url = "github:nix-community/nix-index-database";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # To get spotify / widevine working on a x13s laptop:
@@ -61,21 +76,7 @@
       url = "github:BrainWart/x13s-nixos";
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
-    impermanence = {
-      url = "github:nix-community/impermanence";
-    };
-
-    disko = {
-      url = "github:nix-community/disko";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-
-    nix-index-database = {
-      url = "github:nix-community/nix-index-database";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
+    
   };
 
   outputs =
