@@ -22,6 +22,7 @@
     # ./users.nix
     # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
     ./hardware/hardware-configuration.nix
+    ./network/vibecoding-shit.nix
     ./ssh-vim-and-basics.nix
 
     ../1-general/desktop/applets.nix
@@ -146,7 +147,7 @@
   services.xserver.enable = true;
   # services.displayManager.sddm.enable = true;
   # services.desktopManager.plasma6.enable = true;
-  boot.loader.grub.configurationLimit = 2;
+  boot.loader.grub.configurationLimit = 3;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster

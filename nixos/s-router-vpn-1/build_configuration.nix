@@ -115,7 +115,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   services.xserver.enable = true;
   # services.displayManager.sddm.enable = true;
   # services.desktopManager.plasma6.enable = true;
-  boot.loader.grub.configurationLimit = 2;
+  boot.loader.grub.configurationLimit = 3;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster
