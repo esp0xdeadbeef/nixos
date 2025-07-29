@@ -23,16 +23,15 @@
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
 
     ./connect-nas/default.nix
-    ./hardware/amd.nix
     ./hardware/audio.nix
     ./hardware/bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
+    ./hardware/nvidia.nix
     ./hardware/steam.nix
     ./hardware/swap-and-tmpfs.nix
-    ./llms/llms.nix
     ./osep/bind-to-lxc.nix
     ./osep/scraping-osep-material.nix
     ./osep/x2go-client.nix
@@ -47,6 +46,8 @@
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
+    ../1-general/llms/lmstudio.nix
+    ../1-general/llms/ollama.nix
     ../1-general/network/firewall.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix
