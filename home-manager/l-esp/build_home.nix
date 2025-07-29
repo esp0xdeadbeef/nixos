@@ -36,7 +36,7 @@ in
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     # update nix-index database
-    inputs.nix-index-database.hmModules.nix-index
+    inputs.nix-index-database.homeModules.nix-index
 
 
     # zen browser:
