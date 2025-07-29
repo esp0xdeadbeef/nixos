@@ -144,7 +144,9 @@
       wget
       curl
       
-      
+      # formatting tools like:
+      # mkfs.ext4 /dev/sdX1
+      e2fsprogs
     ];
   };
 }
