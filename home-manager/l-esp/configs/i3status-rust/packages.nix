@@ -22,8 +22,8 @@ if command -v nvidia-smi &> /dev/null; then
   GPU_LOAD=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits)
   GPU_TYPE="nvidia"
 # Check if rocm-smi is available (for AMD GPU)
-elif command -v ${pkgs.rocmPackages.rocm-smi}/bin/rocm-smi &> /dev/null; then
-  GPU_LOAD=$(${pkgs.rocmPackages.rocm-smi}/bin/rocm-smi --showuse | grep "GPU use" | rev | awk '{print $1}')
+elif command -v rocm-smi &> /dev/null; then
+  GPU_LOAD=$(rocm-smi --showuse | grep "GPU use" | rev | awk '{print $1}')
   GPU_TYPE="amd"
 else
   STATE="Error"
