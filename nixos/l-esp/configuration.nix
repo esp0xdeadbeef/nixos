@@ -15,8 +15,10 @@
     # outputs.nixosModules.example
 
     # Or modules from other flakes (such as nixos-hardware):
-    inputs.hardware.nixosModules.common-cpu-amd
-    inputs.hardware.nixosModules.common-gpu-amd
+    # inputs.hardware.nixosModules.common-cpu-amd
+    # inputs.hardware.nixosModules.common-gpu-amd
+    inputs.hardware.nixosModules.common-cpu-intel
+    
     # inputs.hardware.nixosModules.common-ssd
 
     # You can also split up your configuration and import pieces of it here:
@@ -46,6 +48,7 @@
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
+    ../1-general/firmware-update/default.nix
     ../1-general/llms/lmstudio.nix
     ../1-general/llms/ollama.nix
     ../1-general/network/firewall.nix
