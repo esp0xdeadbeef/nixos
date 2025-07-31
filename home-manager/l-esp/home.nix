@@ -49,7 +49,7 @@ in
     ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
 
     # update nix-index database
-    inputs.nix-index-database.hmModules.nix-index
+    inputs.nix-index-database.home-manager.nix-index
 
 
     # zen browser:
