@@ -32,6 +32,7 @@
     ./hardware/lanzaboote.nix
     ./hardware/steam.nix
     ./hardware/swap-and-tmpfs.nix
+    ./hardware/temp.nix
     ./llms/llms.nix
     ./osep/bind-to-lxc.nix
     ./osep/scraping-osep-material.nix
