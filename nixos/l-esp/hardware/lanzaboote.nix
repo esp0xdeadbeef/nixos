@@ -11,6 +11,6 @@
   
   boot.lanzaboote = {
     enable = true;
-    pkiBundle = "/persist/etc/secureboot";
+    pkiBundle = "/persist/var/lib/sbctl";
   };
 }
