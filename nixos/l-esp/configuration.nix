@@ -23,13 +23,14 @@
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
 
     ./connect-nas/default.nix
-    ./hardware/amd.nix
     ./hardware/audio.nix
+    ./hardware/bak/amd.nix
     ./hardware/bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
+    ./hardware/nvidia.nix
     ./hardware/steam.nix
     ./hardware/swap-and-tmpfs.nix
     ./hardware/temp.nix
