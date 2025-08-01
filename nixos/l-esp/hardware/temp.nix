@@ -9,8 +9,11 @@
       ];
     };
   };
-  services.displayManager.defaultSession = "xfce+i3";
-  services.xserver.displayManager.gdm.enable = true;
+  programs.sway.enable = true;
+  # services.displayManager.defaultSession = "sway";
+  # services.xserver.displayManager.gdm.enable = true;
+  # services.displayManager.sddm.enable = true;
+  programs.xwayland.enable = true;
   # services.displayManager.autoLogin.user = "deadbeef";
   security.sudo.extraRules = [
     {

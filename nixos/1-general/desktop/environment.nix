@@ -49,7 +49,7 @@
       variant = "";
     };
   };
-  services.displayManager.defaultSession = "none+i3";
+  services.displayManager.defaultSession = "sway";
   # services.xserver.displayManager.gdm.enable = true;
   programs.xwayland.enable = true;
 

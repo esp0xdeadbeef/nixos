@@ -323,9 +323,9 @@ exec --no-startup-id ${pkgs.parcellite}/bin/parcellite
 exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
 # exec_always --no-startup-id ${pkgs.dropbox}/bin/dropbox
 exec_always --no-startup-id ${pkgs.spotify}/bin/spotify
-output DP-5 resolution 3840x2160 scale 1.25 position 0 0
-output DP-6 resolution 3840x2160 scale 1.25 position 3072 0
-output eDP-1 resolution 1920x1080 scale 1 position 6144 0
+# output DP-5 resolution 3840x2160 scale 1.25 position 0 0
+# output DP-6 resolution 3840x2160 scale 1.25 position 3072 0
+# output eDP-1 resolution 1920x1080 scale 1 position 6144 0
 
     '';
     # path = "${config.home.homeDirectory}/.config/i3/config";
