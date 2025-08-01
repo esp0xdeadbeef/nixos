@@ -139,7 +139,7 @@
     tcpdump
     wireshark
     tshark
-    ventoy-full
+    # ventoy-full
 
   ];
 

@@ -15,8 +15,8 @@
     # outputs.nixosModules.example
 
     # Or modules from other flakes (such as nixos-hardware):
-    inputs.hardware.nixosModules.common-cpu-amd
-    inputs.hardware.nixosModules.common-gpu-amd
+    # inputs.hardware.nixosModules.common-cpu-amd
+    # inputs.hardware.nixosModules.common-gpu-amd
     # inputs.hardware.nixosModules.common-ssd
 
     # You can also split up your configuration and import pieces of it here:
@@ -107,13 +107,8 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
   networking.hostName = "l-esp";
   networking.networkmanager.enable = true;
-  services.gnome.gnome-keyring.enable = true;
   # unlock gnome shit at unlock:
   security.pam.services.login.enableGnomeKeyring = true;
-  services.desktopManager.plasma6.enable = true;
-  programs.sway.enable = true;
-  services.displayManager.defaultSession = "none+i3";
-
   environment.interactiveShellInit = ''
     ZSH_THEME=robbyrussell
   '';
