@@ -49,15 +49,18 @@
       variant = "";
     };
   };
+  services.displayManager.defaultSession = "none+i3";
+  # services.xserver.displayManager.gdm.enable = true;
+  programs.xwayland.enable = true;
 
   #environment.variables.GTK_THEME = "Adwaita:dark";
   services.gnome.gnome-keyring.enable = true;
-  # services.desktopManager.plasma6.enable = true;
-  # services.xserver.displayManager.gdm.enable = true;
+  services.desktopManager.plasma6.enable = true;
+  services.xserver.displayManager.gdm.enable = true;
   # services.displayManager.sddm.enable = true;
-  
+
   # services.xserver.desktopManager.gnome.enable = true;
 
-  # programs.sway.enable = true;
+  programs.sway.enable = true;
   # services.displayManager.defaultSession = "none+i3";
 }
