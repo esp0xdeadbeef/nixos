@@ -37,6 +37,7 @@
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix
     ../1-general/enable-etc-hosts-editing/default.nix
+    ../1-general/firmware-update/default.nix
     ../1-general/network/firewall.nix
     ../1-general/network/nat-lxc.nix
     ../1-general/network/nmcli.nix

@@ -9,29 +9,14 @@
 {
 
 home.file."/.config/i3status-rust/gpu-load.sh" = {
-  text = ''
+    text = ''
 #!/usr/bin/env bash
 
-# Initialize variables
-GPU_LOAD=""
-STATE=""
-TEXT=""
+# Get GPU load percentage
+#GPU_LOAD_nvidia=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits)
+GPU_LOAD_amd=$(${pkgs.rocmPackages.rocm-smi}/bin/rocm-smi --showuse | grep "GPU use" | rev | awk '{print $1}')
 
-# Check if nvidia-smi is available (for NVIDIA GPU)
-if command -v nvidia-smi &> /dev/null; then
-  GPU_LOAD=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits)
-  GPU_TYPE="nvidia"
-# Check if rocm-smi is available (for AMD GPU)
-elif command -v rocm-smi &> /dev/null; then
-  GPU_LOAD=$(rocm-smi --showuse | grep "GPU use" | rev | awk '{print $1}')
-  GPU_TYPE="amd"
-else
-  STATE="Error"
-  TEXT="No GPU tool available"
-  echo "{\"icon\":\"\",\"state\":\"$STATE\", \"text\": \"$TEXT\"}"
-  exit 1
-fi
-
+GPU_LOAD=$(echo $GPU_LOAD_amd)
 # Determine the state based on GPU load percentage
 if [ "$GPU_LOAD" -le 25 ]; then
   STATE="Idle"
@@ -49,14 +34,12 @@ else
   STATE="Critical"
   TEXT=""
 fi
-
-TEXT="GPU ($GPU_TYPE): $GPU_LOAD%"
 TEXT="GPU: $GPU_LOAD%"
 # Output the JSON block
 echo "{\"icon\":\"\",\"state\":\"$STATE\", \"text\": \"$TEXT\"}"
     '';
-  executable = true;
-};
+    executable = true;
+  };
 
 sops = {
      secrets.burpLicenseCompanyname = { };
@@ -95,8 +78,8 @@ format = " $icon {$signal_strength $ssid $frequency|LAN} via $device "
 [[block]]
 block = "custom"
 cycle = [
-    "(echo -n '🏠 '; ip a s $(ip a | grep wlp | cut -d ' ' -f 2 | cut -d ':' -f 1) | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n2 | head -n1)",
-    "(echo -n '🏠 '; ip a s $(ip a | grep wlp | cut -d ' ' -f 2 | cut -d ':' -f 1) | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n1 | head -n1)",
+    "(echo -n '🏠 '; ip a s wlp5s0 | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n2 | head -n1)",
+    "(echo -n '🏠 '; ip a s wlp5s0 | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n1 | head -n1)",
     "(echo -n '🌍 '; ${pkgs.curl}/bin/curl -s ifconfig.me -4)",
     "(echo -n '🌍 '; ${pkgs.curl}/bin/curl -s ifconfig.me -6)",
 ]

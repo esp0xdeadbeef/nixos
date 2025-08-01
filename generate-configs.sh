@@ -12,7 +12,7 @@ export CURRENT_CONFIG="l-esp"
     echo # empty row
     (
         cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/work/\|/werk/\|autologin\|mxbuild' | while read line; do
+        find ../1-general | grep '\.nix$' | grep -v 'is-vm\|/work/\|/werk/\|autologin\|mxbuild' | while read line; do
             echo "    $line"
         done
     ) | sort
