@@ -28,6 +28,7 @@
     ../1-general/desktop/applets.nix
     ../1-general/desktop/environment.nix
     ../1-general/desktop/fonts.nix
+    ../1-general/desktop/packages.nix
     ../1-general/desktop/screen-recording.nix
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix

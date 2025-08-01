@@ -15,8 +15,8 @@
     # outputs.nixosModules.example
 
     # Or modules from other flakes (such as nixos-hardware):
-    inputs.hardware.nixosModules.common-cpu-amd
-    inputs.hardware.nixosModules.common-gpu-amd
+    # inputs.hardware.nixosModules.common-cpu-amd
+    # inputs.hardware.nixosModules.common-gpu-amd
     # inputs.hardware.nixosModules.common-ssd
 
     # You can also split up your configuration and import pieces of it here:
@@ -24,7 +24,6 @@
 
     ./connect-nas/default.nix
     ./hardware/audio.nix
-    ./hardware/bak/amd.nix
     ./hardware/bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
@@ -45,6 +44,7 @@
     ../1-general/desktop/darkmode.nix
     ../1-general/desktop/environment.nix
     ../1-general/desktop/fonts.nix
+    ../1-general/desktop/packages.nix
     ../1-general/desktop/screen-recording.nix
     ../1-general/desktop/shell-env.nix
     ../1-general/desktop/users-and-groups.nix
@@ -172,13 +172,8 @@
 
   networking.hostName = "l-esp";
   networking.networkmanager.enable = true;
-  services.gnome.gnome-keyring.enable = true;
   # unlock gnome shit at unlock:
   security.pam.services.login.enableGnomeKeyring = true;
-  services.desktopManager.plasma6.enable = true;
-  programs.sway.enable = true;
-  services.displayManager.defaultSession = "none+i3";
-
   environment.interactiveShellInit = ''
     ZSH_THEME=robbyrussell
   '';
