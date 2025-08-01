@@ -9,7 +9,9 @@
       ];
     };
   };
-  services.displayManager.autoLogin.user = "deadbeef";
+  services.displayManager.defaultSession = "xfce+i3";
+  services.xserver.displayManager.gdm.enable = true;
+  # services.displayManager.autoLogin.user = "deadbeef";
   security.sudo.extraRules = [
     {
       groups = [ "wheel" ];
