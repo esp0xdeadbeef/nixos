@@ -5,50 +5,32 @@
   ...
 }:
 {
-  # nixpkgs.config.allowUnfree = true;
-
-  environment.systemPackages = with pkgs; [
-    cudaPackages.cudatoolkit
-  ];
-
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = true;
-  };
-  # services.xserver.enable = lib.mkDefault false;
-  services.xserver.videoDrivers = [
-    "nvidia"
-  ];
-
-  hardware = {
-    nvidia-container-toolkit.enable = true;
-
-    nvidia = {
-      # datacenter.enable = true;
-      open = true;
-      package = config.boot.kernelPackages.nvidiaPackages.production;
-      prime = {
-        # reverseSync.enable = true;
-        # sync.enable = true;
-        intelBusId = "PCI:00:02:0"; # Intel GPU Bus ID
-        nvidiaBusId = "PCI:01:00:0"; # NVIDIA GPU Bus ID
-      };
-    };
-  };
-  # specialisation.on-the-go.configuration = {
-  #   system.nixos.tags = [ "on-the-go" ];
-  #   hardware.nvidia.prime = {
-  #     offload = {
-  #       enable = lib.mkForce true;
-  #       enableOffloadCmd = lib.mkForce true;
-  #     };
-  #     sync.enable = lib.mkForce false;    
+  # services.xserver.videoDrivers = [ "nvidia" ];
+  # hardware.nvidia = {
+  #   open = true;
+  #   modesetting.enable = true;
+  #   nvidiaSettings = true;
+  #   prime = {
+  #     sync.enable = false; # gpu always
+  #     offload.enable = false; # gpu on demand
+  #     #nvidiaBusId = "PCI:10:0:0"; #epgu
+  #     nvidiaBusId = "PCI:1:0:0"; # dedicated gpu
+  #     intelBusId = "PCI:0:2:0";
   #   };
   # };
-
-  # virtualisation.docker = {
-  #   enable = true;
-  #   enableOnBoot = true;
-  #   package = pkgs.docker;
+  # environment.sessionVariables = {
+  #   __GLX_VENDOR_LIBRARY_NAME = "nvidia";
+  #   GBM_BACKEND = "nvidia-drm";
+  #   WLR_NO_HARDWARE_CURSORS = "1";
+  #   WLR_RENDERER_ALLOW_SOFTWARE = "1";
   # };
+
+  # # # required for external monitor usage on nvidia offload
+  # # specialisation = {
+  # #   external-display.configuration = {
+  # #     system.nixos.tags = [ "external-display" ];
+  # #     hardware.nvidia.prime.offload.enable = lib.mkForce false;
+  # #     hardware.nvidia.powerManagement.enable = lib.mkForce false;
+  # #   };
+  # # };
 }
