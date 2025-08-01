@@ -14,29 +14,6 @@
     (modulesPath + "/installer/scan/not-detected.nix")
   ];
 
-<<<<<<< HEAD
-  # boot.initrd.availableKernelModules = [ "nvme" "xhci_pci" "ahci" "usbhid" "usb_storage" "sd_mod" "sdhci_pci" ];
-  # boot.initrd.kernelModules = [ ];
-  # boot.kernelModules = [ "kvm-amd" ];
-<<<<<<< HEAD
-=======
-  boot.initrd.availableKernelModules = [
-    "xhci_pci"
-    "ahci"
-    "usbhid"
-    "usb_storage"
-    "sd_mod"
-    "sdhci_pci"
-    "thunderbolt"
-    "nvme"
-    "sd_mod"
-    "rtsx_pci_sdmmc"
-  ];
-  
-  boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" ];
->>>>>>> work-laptop-merge-base
-=======
   # boot.extraModulePackages = [ ];
   boot.initrd.availableKernelModules = [
     "xhci_pci"
@@ -47,7 +24,6 @@
   ];
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
->>>>>>> 23542e05449baa94e5894abb6181b98615c2b6ad
   boot.extraModulePackages = [ ];
 
   fileSystems."/" = {
@@ -99,12 +75,5 @@
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   # hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
->>>>>>> work-laptop-merge-base
-=======
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
->>>>>>> 23542e05449baa94e5894abb6181b98615c2b6ad
 }
