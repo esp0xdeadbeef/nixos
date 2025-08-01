@@ -7,7 +7,7 @@
 #  • Skips scopes whose seed file is absent  → “skip: … (seed file absent)”
 #  • Writes **relative paths that match the old, correct form**
 #        • host‑local   →  ./hardware/…
-#        • shared tree  →  ../1-general/…
+#        • shared tree  →  ../01-general/…
 #  • Always strips files matching  build_*  (and any host‑specific extra‑excludes)
 #  • Cleans its tempfile automatically
 # ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ gen_imports() {
     while IFS= read -r -d '' f; do _emit_rel "$f"; done
 
   # ---------- 2. shared modules ---------------------------------------------
-  local shared="./${scope}/1-general"
+  local shared="./${scope}/01-general"
   if [[ -d $shared ]]; then
     find "$shared" -type f -name '*.nix' -print0 |
       while IFS= read -r -d '' f; do _emit_rel "$f"; done

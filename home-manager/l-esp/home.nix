@@ -44,10 +44,6 @@ in
     ./projects/osep/create-x2go-profile.nix
     ./projects/osep/start-lxc.nix
 
-    ../1-general/pdf-reader/packages.nix
-    ../1-general/pentesting/packages.nix
-    ../1-general/windows-vms/quickemu-build-windows-10-and-11.nix
-
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
 

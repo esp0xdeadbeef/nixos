@@ -25,37 +25,39 @@
     ./network/vibecoding-shit.nix
     ./ssh-vim-and-basics.nix
 
-    ../1-general/desktop/applets.nix
-    ../1-general/desktop/environment.nix
-    ../1-general/desktop/fonts.nix
-    ../1-general/desktop/packages.nix
-    ../1-general/desktop/screen-recording.nix
-    ../1-general/desktop/shell-env.nix
-    ../1-general/desktop/users-and-groups.nix
-    ../1-general/enable-etc-hosts-editing/default.nix
-    ../1-general/firmware-update/default.nix
-    ../1-general/hardware/is-vm/qemu-guest.nix
-    ../1-general/packages/1-general/archive-tools.nix
-    ../1-general/packages/1-general/tooling.nix
-    ../1-general/packages/data-tranformation/packages.nix
-    ../1-general/packages/editors/packages.nix
-    ../1-general/packages/encryption-and-password-management/packages.nix
-    ../1-general/packages/git/packages.nix
-    ../1-general/packages/network-troubleshooting/packages.nix
-    ../1-general/packages/packages.nix
-    ../1-general/packages/terminals/packages.nix
-    ../1-general/packages/terminals/terminal-optimisers/packages.nix
-    ../1-general/packages/terminals/terminal-optimisers/updatedb.nix
-    ../1-general/packages/window-managers/X-org/i3-wm/packages.nix
-    ../1-general/packages/window-managers/X-org/packages.nix
-    ../1-general/secrets/import-secrets.nix
-    ../1-general/security/default.nix
-    ../1-general/system/autologin.nix
-    ../1-general/system/autoupdate.nix
-    ../1-general/system/garbage-collection.nix
-    ../1-general/system/locale.nix
-    ../1-general/terminals/tmux/settings.nix
-    ../1-general/time/timezone.nix
+    ../01-general/desktop/applets.nix
+    ../01-general/desktop/environment.nix
+    ../01-general/desktop/fonts.nix
+    ../01-general/desktop/packages.nix
+    ../01-general/desktop/screen-recording.nix
+    ../01-general/desktop/shell-env.nix
+    ../01-general/desktop/users-and-groups.nix
+    ../01-general/enable-etc-hosts-editing/default.nix
+    ../01-general/firmware-update/default.nix
+    ../01-general/packages/1-general/archive-tools.nix
+    ../01-general/packages/1-general/tooling.nix
+    ../01-general/packages/data-tranformation/packages.nix
+    ../01-general/packages/editors/packages.nix
+    ../01-general/packages/encryption-and-password-management/packages.nix
+    ../01-general/packages/git/packages.nix
+    ../01-general/packages/network-troubleshooting/packages.nix
+    ../01-general/packages/packages.nix
+    ../01-general/packages/terminals/packages.nix
+    ../01-general/packages/terminals/terminal-optimisers/packages.nix
+    ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
+    ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
+    ../01-general/packages/window-managers/X-org/packages.nix
+    ../01-general/secrets/import-secrets.nix
+    ../01-general/security/default.nix
+    ../01-general/system/autoupdate.nix
+    ../01-general/system/garbage-collection.nix
+    ../01-general/system/locale.nix
+    ../01-general/terminals/tmux/settings.nix
+    ../01-general/time/timezone.nix
+    ../01-general/virtualization-as-host/general.nix
+    ../01-general/virtualization-as-host/libvirt.nix
+    ../01-general/virtualization-as-host/lxc.nix
+    ../01-general/virtualization-as-host/podman.nix
     
 
   ];

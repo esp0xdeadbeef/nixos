@@ -11,8 +11,8 @@ export CURRENT_CONFIG="l-esp"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v 'is-vm\|/work/\|/werk/\|autologin\|mxbuild' | while read line; do
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v 'is-vm\|/work/\|/werk/\|autologin\|mxbuild' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -31,8 +31,8 @@ echo homemanager:
     ) | sort
     echo # empty row
     (
-        cd ./home-manager/1-general
-        find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/work/\|/werk/\|autologin\|mxbuild' | while read line; do
+        cd ./home-manager/01-general
+        find ../01-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/work/\|/werk/\|autologin\|mxbuild' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -50,8 +50,8 @@ export CURRENT_CONFIG="l-werk"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'is-vm\|autologin\|usb-firewall.nix\|garbage-collection.nix' | while read line; do
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v '/build_' | grep -v 'is-vm\|autologin\|usb-firewall.nix\|garbage-collection.nix' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -71,8 +71,8 @@ echo homemanager:
     ) | sort
     echo # empty row
     (
-        cd ./home-manager/1-general
-        find ../1-general | grep '\.nix$' | while read line; do
+        cd ./home-manager/01-general
+        find ../01-general | grep '\.nix$' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -95,8 +95,8 @@ export CURRENT_CONFIG="l-x13s"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v mxbuild | grep -v 'llms\|is-vm\|virtualization\|not-on-aarch64\|/work\|/werk\|1-custom-packages' | while read line;
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v '/build_' | grep -v mxbuild | grep -v 'llms\|is-vm\|virtualization\|not-on-aarch64\|/work\|/werk\|1-custom-packages' | while read line;
         do
             echo "    $line"
         done
@@ -115,8 +115,8 @@ export CURRENT_CONFIG="s-router-vpn-1"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|/network/\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|darkmode\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio\|nix-specific' | while read line; do
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|/network/\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|darkmode\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio\|nix-specific' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -136,8 +136,8 @@ export CURRENT_CONFIG="s-test-vm"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio' | while read line; do
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -156,8 +156,8 @@ export CURRENT_CONFIG="s-test-vm-impermanence"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio' | while read line; do
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -176,8 +176,8 @@ export CURRENT_CONFIG="s-test-vm-impermanence-2"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep 'nmcli\|environment\|terminal-optimisers'| grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio' | while read line; do
+        cd .//nixos/01-general
+        find ../01-general | grep 'nmcli\|environment\|terminal-optimisers'| grep '\.nix$' | grep -v '/build_' | grep -v 'usb-firewall.nix\|/virtualization/\|llms\|browsers\|graphics\|pdf\|rdp\|scripting-languages\|pentesting\|usb-tools\|1-custom-packages\|services/\|audio' | while read line; do
             echo "    $line"
         done
     ) | sort
@@ -196,8 +196,8 @@ export CURRENT_CONFIG="s-lxc-test"
     ) | sort
     echo # empty row
     (
-        cd .//nixos/1-general
-        find ../1-general | grep '\.nix$' | grep -v '/build_'  | while read line; do
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v '/build_'  | while read line; do
             echo "    $line"
         done
     ) | sort
