@@ -23,68 +23,72 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     # cd /home/deadbeef/github/nixos/nixos/l-x13s ; ./generate-imports.sh
-    ./hardware/bootloader.nix
+        ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./packages/packages.nix
     ./packages/widevine.nix
 
-    ../01-general/desktop/applet-nm.nix
-    ../01-general/desktop/darkmode.nix
-    ../01-general/desktop/fonts.nix
-    ../01-general/desktop/packages.nix
-    ../01-general/desktop/screen-recording.nix
-    ../01-general/desktop/shell-env.nix
-    ../01-general/desktop/users-and-groups.nix
-    ../01-general/enable-etc-hosts-editing/default.nix
-    ../01-general/firmware-update/default.nix
-    ../01-general/network/firewall.nix
-    ../01-general/network/nat-lxc.nix
-    ../01-general/network/nmcli.nix
-    ../01-general/packages/1-general/archive-tools.nix
-    ../01-general/packages/1-general/tooling.nix
-    ../01-general/packages/audio/packages.nix
-    ../01-general/packages/browsers-mail-media-social-media/packages.nix
-    ../01-general/packages/data-tranformation/packages.nix
-    ../01-general/packages/editors/packages.nix
-    ../01-general/packages/encryption-and-password-management/packages.nix
-    ../01-general/packages/git/packages.nix
-    ../01-general/packages/graphics/packages.nix
-    ../01-general/packages/network-troubleshooting/packages.nix
-    ../01-general/packages/nix-specific/packages.nix
-    ../01-general/packages/packages.nix
-    ../01-general/packages/pdf/packages.nix
-    ../01-general/packages/pentesting/packages.nix
-    ../01-general/packages/rdp/packages.nix
-    ../01-general/packages/scripting-languages/packages.nix
-    ../01-general/packages/services/packages.nix
-    ../01-general/packages/terminals/packages.nix
-    ../01-general/packages/terminals/terminal-optimisers/packages.nix
-    ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
-    ../01-general/packages/usb-tools/packages.nix
-    ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
-    ../01-general/packages/window-managers/X-org/packages.nix
-    ../01-general/secrets/import-secrets.nix
-    ../01-general/security/default.nix
-    ../01-general/system/autoupdate.nix
-    ../01-general/system/garbage-collection.nix
-    ../01-general/system/locale.nix
-    ../01-general/terminals/tmux/settings.nix
-    ../01-general/time/timezone.nix
+    # ../01-general/desktop/applet-nm.nix
+    # ../01-general/desktop/darkmode.nix
+    # ../01-general/desktop/fonts.nix
+    # ../01-general/desktop/packages.nix
+    # ../01-general/desktop/screen-recording.nix
+    # ../01-general/desktop/shell-env.nix
+    # ../01-general/desktop/users-and-groups.nix
+    # ../01-general/enable-etc-hosts-editing/default.nix
+    # ../01-general/firmware-update/default.nix
+    # ../01-general/network/firewall.nix
+    # ../01-general/network/nat-lxc.nix
+    # ../01-general/network/nmcli.nix
+    # ../01-general/packages/1-general/archive-tools.nix
+    # ../01-general/packages/1-general/tooling.nix
+    # ../01-general/packages/audio/packages.nix
+    # ../01-general/packages/browsers-mail-media-social-media/packages.nix
+    # ../01-general/packages/data-tranformation/packages.nix
+    # ../01-general/packages/editors/packages.nix
+    # ../01-general/packages/encryption-and-password-management/packages.nix
+    # ../01-general/packages/git/packages.nix
+    # ../01-general/packages/graphics/packages.nix
+    # ../01-general/packages/network-troubleshooting/packages.nix
+    # ../01-general/packages/nix-specific/packages.nix
+    # ../01-general/packages/packages.nix
+    # ../01-general/packages/pdf/packages.nix
+    # ../01-general/packages/pentesting/packages.nix
+    # ../01-general/packages/rdp/packages.nix
+    # ../01-general/packages/scripting-languages/packages.nix
+    # ../01-general/packages/services/packages.nix
+    # ../01-general/packages/terminals/packages.nix
+    # ../01-general/packages/terminals/terminal-optimisers/packages.nix
+    # ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
+    # ../01-general/packages/usb-tools/packages.nix
+    # ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
+    # ../01-general/packages/window-managers/X-org/packages.nix
+    # ../01-general/secrets/import-secrets.nix
+    # ../01-general/security/default.nix
+    # ../01-general/system/autoupdate.nix
+    # ../01-general/system/garbage-collection.nix
+    # ../01-general/system/locale.nix
+    # ../01-general/terminals/tmux/settings.nix
+    # ../01-general/time/timezone.nix
 
-    inputs.nixos-x13s.nixosModules.default
-    {
-      nixpkgs.overlays = [ ];
-      # inputs.nixos-x13s.nixosModules.default
-    }
-    {
-      environment.interactiveShellInit = ''
-        ZSH_THEME=trapd00r
-      '';
-    }
+    inputs.hardware.nixosModules.lenovo-thinkpad-x13s
+
+    inputs.home-manager.nixosModules.home-manager
+    # inputs.nixos-x13s.nixosModules.default
+
     # (import "${inputs.home-manager}")
     # {inputs.home-manager.users.deadbeef = import ./home-manager/l-werk/home.nix;}
-    inputs.home-manager.nixosModules.home-manager
+    # inputs.home-manager.nixosModules.home-manager
   ];
+
+  # inputs.hardware.nixosModules.lenovo-thinkpad-x13s = {
+  #   enable = true;
+  #   bluetoothMac = "E9:1C:3B:F0:FD:8C";
+  #   wifiMac = "8C:FD:F0:1C:3B:0A";
+  #   kernel = "mainline";
+  # };
+
+  # inputs.nixos-x13s.nixosModules.default
 
   home-manager = {
     extraSpecialArgs = { inherit inputs outputs; };

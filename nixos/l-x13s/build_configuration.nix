@@ -23,22 +23,26 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     # cd /home/deadbeef/github/nixos/nixos/l-x13s ; ./generate-imports.sh
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
-    inputs.nixos-x13s.nixosModules.default
-    {
-      nixpkgs.overlays = [ ];
-      # inputs.nixos-x13s.nixosModules.default
-    }
-    {
-      environment.interactiveShellInit = ''
-        ZSH_THEME=trapd00r
-      '';
-    }
+    inputs.hardware.nixosModules.lenovo-thinkpad-x13s
+
+    inputs.home-manager.nixosModules.home-manager
+    # inputs.nixos-x13s.nixosModules.default
+
     # (import "${inputs.home-manager}")
     # {inputs.home-manager.users.deadbeef = import ./home-manager/l-werk/home.nix;}
-    inputs.home-manager.nixosModules.home-manager
+    # inputs.home-manager.nixosModules.home-manager
   ];
+
+  # inputs.hardware.nixosModules.lenovo-thinkpad-x13s = {
+  #   enable = true;
+  #   bluetoothMac = "E9:1C:3B:F0:FD:8C";
+  #   wifiMac = "8C:FD:F0:1C:3B:0A";
+  #   kernel = "mainline";
+  # };
+
+  # inputs.nixos-x13s.nixosModules.default
 
   home-manager = {
     extraSpecialArgs = { inherit inputs outputs; };

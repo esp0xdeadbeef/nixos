@@ -1,11 +1,6 @@
 { config, pkgs, ... }:
 {
-  nixos-x13s.enable = true;
-  nixos-x13s.bluetoothMac = "E9:1C:3B:F0:FD:8C";
-  nixos-x13s.wifiMac = "8c:fd:f0:1c:3b:0a";
-  specialisation = {
-    mainline.configuration.nixos-x13s.kernel = "mainline";
-  };
+  
   boot.initrd.luks.devices = {
     root = {
       device = "/dev/nvme0n1p2";

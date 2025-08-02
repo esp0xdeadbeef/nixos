@@ -35,6 +35,9 @@ in
     # You can also split up your configuration and import pieces of it here:
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
+
+    ../02-window-manager-i3/i3/packages.nix
+    ../02-window-manager-i3/i3status-rust/packages.nix
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
 

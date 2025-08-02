@@ -15,10 +15,8 @@
     # outputs.nixosModules.example
 
     # Or modules from other flakes (such as nixos-hardware):
-    # inputs.hardware.nixosModules.common-cpu-amd
-    # inputs.hardware.nixosModules.common-gpu-amd
     inputs.hardware.nixosModules.common-cpu-intel
-    # inputs.hardware.nixosModules.common-ssd
+    # inputs.hardware.nixosModules.common-gpu-nvidia
 
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
@@ -88,8 +86,9 @@
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix
 
-    ../03-window-manager-sway/environment.nix
-
+    ../02-window-manager-i3/environment.nix
+    ../99-testing/autologin-ssh-and-tty.nix
+  
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
