@@ -1,0 +1,12 @@
+diff --git a/server.c b/server.c
+--- a/server.c
++++ b/server.c
+@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
+         }
+         if (proprietary) {
+             sway_log(SWAY_ERROR, "!!! Proprietary Nvidia drivers are in use !!!");
+-            exit(EXIT_FAILURE);      // upstream aborts here
++            sway_log(SWAY_WARN, "Proprietary NVIDIA drivers detected, continuing anyway.");
+         }
+     }
+ }

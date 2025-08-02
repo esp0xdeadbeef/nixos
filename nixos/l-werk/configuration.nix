@@ -31,11 +31,12 @@
     ./hardware/secondary-harddisk-l-werk.nix
     ./hardware/sound-fix-l-werk.nix
     ./hardware/swap-and-tmpfs.nix
+    ./llms/lmstudio.nix
+    ./llms/ollama.nix
     ./work-packages/work/packages.nix
 
-    ../01-general/desktop/applets.nix
+    ../01-general/desktop/applet-nm.nix
     ../01-general/desktop/darkmode.nix
-    ../01-general/desktop/environment.nix
     ../01-general/desktop/fonts.nix
     ../01-general/desktop/packages.nix
     ../01-general/desktop/screen-recording.nix
@@ -43,8 +44,6 @@
     ../01-general/desktop/users-and-groups.nix
     ../01-general/enable-etc-hosts-editing/default.nix
     ../01-general/firmware-update/default.nix
-    ../01-general/llms/lmstudio.nix
-    ../01-general/llms/ollama.nix
     ../01-general/network/firewall.nix
     ../01-general/network/nat-lxc.nix
     ../01-general/network/nmcli.nix
@@ -83,6 +82,8 @@
     ../01-general/virtualization-as-host/libvirt.nix
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix
+
+    ../04-window-manager-other/environment.nix
 
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops

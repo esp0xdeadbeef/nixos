@@ -23,6 +23,8 @@
 
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
+    ../04-window-manager-other/environment.nix
+
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];

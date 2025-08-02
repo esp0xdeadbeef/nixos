@@ -36,6 +36,10 @@ in
         ./i3/packages.nix
     ./rclone-wrapper/rclone-wrapper.nix
 
+    ../01-general/pdf-reader/packages.nix
+    ../01-general/pentesting/packages.nix
+    ../01-general/windows-vms/quickemu-build-windows-10-and-11.nix
+
     inputs.sops-nix.homeManagerModules.sops
   ];
   sops = {

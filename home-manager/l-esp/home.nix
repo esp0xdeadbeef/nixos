@@ -36,13 +36,15 @@ in
     ./configs/dropbox/packages.nix
     ./configs/flameshot/packages.nix
     ./configs/git/config.nix
-    ./configs/i3/packages.nix
-    ./configs/i3status-rust/packages.nix
     ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/steam/packages.nix
     ./configs/sway/packages.nix
     ./projects/osep/create-x2go-profile.nix
     ./projects/osep/start-lxc.nix
+
+    ../01-general/pdf-reader/packages.nix
+    ../01-general/pentesting/packages.nix
+    ../01-general/windows-vms/quickemu-build-windows-10-and-11.nix
 
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index

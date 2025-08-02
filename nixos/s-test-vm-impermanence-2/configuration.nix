@@ -29,7 +29,6 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
 
-    ../01-general/desktop/environment.nix
     ../01-general/network/nmcli.nix
     ../01-general/packages/terminals/terminal-optimisers/packages.nix
     ../01-general/packages/terminals/terminal-optimisers/updatedb.nix

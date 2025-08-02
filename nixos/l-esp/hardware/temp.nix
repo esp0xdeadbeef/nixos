@@ -10,11 +10,14 @@
     };
   };
   programs.sway.enable = true;
-  services.displayManager.defaultSession = lib.mkForce "sway";
+  services.displayManager.defaultSession =  "sway";
   services.xserver.displayManager.gdm.enable = true;
   # services.displayManager.sddm.enable = true;
   programs.xwayland.enable = true;
   services.displayManager.autoLogin.user = "deadbeef";
+  services.getty.autologinUser = "deadbeef";
+  services.getty.autologinOnce = true;
+
   security.sudo.extraRules = [
     {
       groups = [ "wheel" ];

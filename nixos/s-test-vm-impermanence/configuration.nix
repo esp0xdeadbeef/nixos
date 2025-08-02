@@ -30,9 +30,8 @@
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
 
-    ../01-general/desktop/applets.nix
+    ../01-general/desktop/applet-nm.nix
     ../01-general/desktop/darkmode.nix
-    ../01-general/desktop/environment.nix
     ../01-general/desktop/fonts.nix
     ../01-general/desktop/packages.nix
     ../01-general/desktop/screen-recording.nix

@@ -15,7 +15,7 @@ SESSION_FILE="$SESSION_DIR/sessions"
 ID_FILE="$HOME/x2go-session-identifier"
 
 # make sure the session file exists
-mkdir -p "$SESSION_DIR"
+mkdir -p "$SESSION_DIR" || true
 touch "$SESSION_FILE"
 
 # grab the current container IP (adjust container name & iface if needed)
