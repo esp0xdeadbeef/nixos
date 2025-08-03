@@ -33,6 +33,7 @@
     ./hardware/swap-and-tmpfs.nix
     ./llms/lmstudio.nix
     ./llms/ollama.nix
+    ./lxc/bind-to-lxc.nix
     ./work-packages/work/packages.nix
 
     ../01-general/desktop/applet-nm.nix
