@@ -1,10 +1,11 @@
 { config, pkgs, ... }:
 {
-  services.ollama = {
+   services.ollama = {
     enable = true;
-    acceleration = "cuda";
     loadModels = [
-      "llama3.2:8b"
+      "llama3.1:8b"
+      "qwen2.5-coder:1.5b-base"
+      "nomic-embed-text"
       "deepseek-r1:1.5b"
     ];
   };
