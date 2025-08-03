@@ -28,48 +28,48 @@
     ./packages/packages.nix
     ./packages/widevine.nix
 
-    # ../01-general/desktop/applet-nm.nix
-    # ../01-general/desktop/darkmode.nix
-    # ../01-general/desktop/fonts.nix
-    # ../01-general/desktop/packages.nix
-    # ../01-general/desktop/screen-recording.nix
-    # ../01-general/desktop/shell-env.nix
-    # ../01-general/desktop/users-and-groups.nix
-    # ../01-general/enable-etc-hosts-editing/default.nix
-    # ../01-general/firmware-update/default.nix
-    # ../01-general/network/firewall.nix
-    # ../01-general/network/nat-lxc.nix
-    # ../01-general/network/nmcli.nix
-    # ../01-general/packages/1-general/archive-tools.nix
-    # ../01-general/packages/1-general/tooling.nix
-    # ../01-general/packages/audio/packages.nix
-    # ../01-general/packages/browsers-mail-media-social-media/packages.nix
-    # ../01-general/packages/data-tranformation/packages.nix
-    # ../01-general/packages/editors/packages.nix
-    # ../01-general/packages/encryption-and-password-management/packages.nix
-    # ../01-general/packages/git/packages.nix
-    # ../01-general/packages/graphics/packages.nix
-    # ../01-general/packages/network-troubleshooting/packages.nix
-    # ../01-general/packages/nix-specific/packages.nix
-    # ../01-general/packages/packages.nix
-    # ../01-general/packages/pdf/packages.nix
-    # ../01-general/packages/pentesting/packages.nix
-    # ../01-general/packages/rdp/packages.nix
-    # ../01-general/packages/scripting-languages/packages.nix
-    # ../01-general/packages/services/packages.nix
-    # ../01-general/packages/terminals/packages.nix
-    # ../01-general/packages/terminals/terminal-optimisers/packages.nix
-    # ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
-    # ../01-general/packages/usb-tools/packages.nix
-    # ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
-    # ../01-general/packages/window-managers/X-org/packages.nix
-    # ../01-general/secrets/import-secrets.nix
-    # ../01-general/security/default.nix
-    # ../01-general/system/autoupdate.nix
-    # ../01-general/system/garbage-collection.nix
-    # ../01-general/system/locale.nix
-    # ../01-general/terminals/tmux/settings.nix
-    # ../01-general/time/timezone.nix
+    ../01-general/desktop/applet-nm.nix
+    ../01-general/desktop/darkmode.nix
+    ../01-general/desktop/fonts.nix
+    ../01-general/desktop/packages.nix
+    ../01-general/desktop/screen-recording.nix
+    ../01-general/desktop/shell-env.nix
+    ../01-general/desktop/users-and-groups.nix
+    ../01-general/enable-etc-hosts-editing/default.nix
+    ../01-general/firmware-update/default.nix
+    ../01-general/network/firewall.nix
+    ../01-general/network/nat-lxc.nix
+    ../01-general/network/nmcli.nix
+    ../01-general/packages/1-general/archive-tools.nix
+    ../01-general/packages/1-general/tooling.nix
+    ../01-general/packages/audio/packages.nix
+    ../01-general/packages/browsers-mail-media-social-media/packages.nix
+    ../01-general/packages/data-tranformation/packages.nix
+    ../01-general/packages/editors/packages.nix
+    ../01-general/packages/encryption-and-password-management/packages.nix
+    ../01-general/packages/git/packages.nix
+    ../01-general/packages/graphics/packages.nix
+    ../01-general/packages/network-troubleshooting/packages.nix
+    ../01-general/packages/nix-specific/packages.nix
+    ../01-general/packages/packages.nix
+    ../01-general/packages/pdf/packages.nix
+    ../01-general/packages/pentesting/packages.nix
+    ../01-general/packages/rdp/packages.nix
+    ../01-general/packages/scripting-languages/packages.nix
+    ../01-general/packages/services/packages.nix
+    ../01-general/packages/terminals/packages.nix
+    ../01-general/packages/terminals/terminal-optimisers/packages.nix
+    ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
+    ../01-general/packages/usb-tools/packages.nix
+    ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
+    ../01-general/packages/window-managers/X-org/packages.nix
+    ../01-general/secrets/import-secrets.nix
+    ../01-general/security/default.nix
+    ../01-general/system/autoupdate.nix
+    ../01-general/system/garbage-collection.nix
+    ../01-general/system/locale.nix
+    ../01-general/terminals/tmux/settings.nix
+    ../01-general/time/timezone.nix
 
     inputs.hardware.nixosModules.lenovo-thinkpad-x13s
 

@@ -1,10 +1,16 @@
-{ config, pkgs, lib, inputs, ... }:
 {
-  
-  # # Allow proprietary NVIDIA drivers
-  # nixpkgs.config.allowUnfree = true;
+  config,
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
+{
 
-  # # Prevent NVIDIA modules from auto-loading unexpectedly
+  # Allow proprietary NVIDIA drivers
+  nixpkgs.config.allowUnfree = true;
+
+  # Prevent NVIDIA modules from auto-loading unexpectedly
   # boot.blacklistedKernelModules = [
   #   "nvidia"
   #   "nvidia_modeset"
@@ -12,16 +18,21 @@
   #   "nvidia_drm"
   # ];
 
-  # # Ensure modules are built into the initrd and available on-demand
-  # boot.initrd.kernelModules = [ "nvidia" "nvidia_modeset" "nvidia_uvm" "nvidia_drm" ];
-  # boot.extraModulePackages = [ config.boot.kernelPackages.nvidiaPackages.stable ];
+  # Ensure modules are built into the initrd and available on-demand
+  boot.initrd.kernelModules = [
+    "nvidia"
+    "nvidia_modeset"
+    "nvidia_uvm"
+    "nvidia_drm"
+  ];
+  boot.extraModulePackages = [ config.boot.kernelPackages.nvidiaPackages.stable ];
 
   # # One-shot systemd service to load NVIDIA modules on demand
   # systemd.services.load-nvidia = {
   #   description = "Load NVIDIA kernel modules on demand";
-  #   wantedBy    = [ "multi-user.target" ];
+  #   wantedBy = [ "multi-user.target" ];
   #   serviceConfig = {
-  #     Type      = "oneshot";
+  #     Type = "oneshot";
   #     # Load each module separately to avoid parameter confusion
   #     ExecStart = "${pkgs.bash}/bin/bash -c '
   #       ${pkgs.kmod}/bin/modprobe nvidia && \
@@ -33,51 +44,95 @@
   #   };
   # };
 
-  # # NVIDIA driver package and PRIME configuration
-  # hardware.nvidia = {
-  #   package        = config.boot.kernelPackages.nvidiaPackages.stable;
-  #   nvidiaSettings = true;
-  #   prime = {
-  #     intelBusId  = "PCI:00:02:0";
-  #     nvidiaBusId = "PCI:01:00:0";
-  #   };
-  # };
+  # NVIDIA driver package and PRIME configuration
+  hardware.nvidia = {
+    open = true;
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    nvidiaSettings = true;
+    prime = {
+      intelBusId = "PCI:00:02:0";
+      nvidiaBusId = "PCI:01:00:0";
+    };
+  };
 
-  # # Install CUDA toolkit and user-land tools (nvidia-smi, settings)
-  # environment.systemPackages = with pkgs; [
-  #   cudaPackages.cudatoolkit
-  #   (config.boot.kernelPackages).nvidia_x11
-  # ];
+  # Install CUDA toolkit and user-land tools (nvidia-smi, settings)
+  environment.systemPackages = with pkgs; [
+    cudaPackages.cudatoolkit
+    (config.boot.kernelPackages).nvidia_x11
+  ];
 
-  # # X server: boot with Intel, configure NVIDIA headlessly
-  # services.xserver = {
-  #   enable       = true;
-  #   videoDrivers = [ "i915" ];
-  #   extraConfig  = ''
-  #     Section "Device"
-  #       Identifier "NvidiaDevice"
-  #       Driver     "nvidia"
-  #       Option     "UseDisplayDevice" "none"
-  #       Option     "ConnectedMonitor"    "none"
-  #       Option     "AllowEmptyInitialConfiguration"    "True"
-  #     EndSection
+  # X server: boot with Intel, configure NVIDIA headlessly
+  services.xserver = {
+    enable = true;
+    videoDrivers = [ "i915" "nvidia" ];
+    # extraConfig = ''
+    #   Section "Device"
+    #     Identifier "NvidiaDevice"
+    #     Driver     "nvidia"
+    #     Option     "UseDisplayDevice" "none"
+    #     Option     "ConnectedMonitor"    "none"
+    #     Option     "AllowEmptyInitialConfiguration"    "True"
+    #   EndSection
 
-  #     Section "ServerFlags"
-  #       Option "AutoAddGPU" "off"
-  #     EndSection
-  #   '';
-  # };
+    #   Section "ServerFlags"
+    #     Option "AutoAddGPU" "off"
+    #   EndSection
+    # '';
+  };
+  services.xserver.config = ''
+    Section "ServerLayout"
+      Identifier "layout"
+      Screen "nvidia" 0 0
+    EndSection
 
-  # # Enable 32-bit OpenGL libraries
-  # hardware.graphics = { enable = true; enable32Bit = true; };
+    Section "Module"
+        Load "modesetting"
+        Load "glx"
+    EndSection
 
-  # # Docker with NVIDIA container runtime support
-  # virtualisation.docker = {
-  #   enable       = true;
-  #   enableOnBoot = true;
-  #   package      = pkgs.docker;
-  #   extraOptions = ''
-  #     --add-runtime=nvidia=/run/nvidia/driver
-  #   '';
-  # };
+    Section "Device"
+      Identifier "nvidia"
+      Driver "nvidia"
+      BusID "PCI:1:0:0"
+      Option "AllowEmptyInitialConfiguration"
+    EndSection
+
+    Section "Device"
+      Identifier "intel"
+      Driver "modesetting"
+      Option "AccelMethod" "sna"
+    EndSection
+
+    Section "Screen"
+      Identifier     "nvidia"
+      Device         "nvidia"
+      DefaultDepth    24
+      Option         "AllowEmptyInitialConfiguration"
+      SubSection     "Display"
+        Depth       24
+        Modes      "nvidia-auto-select"
+      EndSubSection
+    EndSection
+
+    Section "Screen"
+      Identifier "intel"
+      Device "intel"
+    EndSection
+  '';
+
+  # Enable 32-bit OpenGL libraries
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;
+  };
+
+  # Docker with NVIDIA container runtime support
+  virtualisation.docker = {
+    enable = true;
+    enableOnBoot = true;
+    package = pkgs.docker;
+    extraOptions = ''
+      --add-runtime=nvidia=/run/nvidia/driver
+    '';
+  };
 }

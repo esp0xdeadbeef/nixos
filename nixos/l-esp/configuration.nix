@@ -32,6 +32,8 @@
     ./hardware/steam.nix
     ./hardware/swap-and-tmpfs.nix
     ./hardware/temp.nix
+    ./llms/lmstudio.nix
+    ./llms/ollama.nix
     ./osep/bind-to-lxc.nix
     ./osep/scraping-osep-material.nix
     ./osep/x2go-client.nix
