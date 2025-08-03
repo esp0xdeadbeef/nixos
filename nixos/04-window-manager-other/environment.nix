@@ -50,8 +50,8 @@
     };
   };
   programs.sway.enable = true;
-  services.displayManager.defaultSession = "sway";
-  programs.xwayland.enable = true;
+  services.displayManager.defaultSession = "none+i3";
+  #programs.xwayland.enable = true;
   # services.gnome.gnome-keyring.enable = true;
   services.desktopManager.plasma6.enable = true;
   services.xserver.displayManager.gdm.enable = true;
