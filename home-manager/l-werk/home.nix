@@ -34,6 +34,7 @@ in
 
     # You can also split up your configuration and import pieces of it here:
         ./i3/packages.nix
+    ./rclone-wrapper/pentest-backup-and-remove-retired-pentests.nix
     ./rclone-wrapper/rclone-wrapper.nix
 
     ../01-general/pdf-reader/packages.nix

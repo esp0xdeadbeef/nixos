@@ -2,6 +2,7 @@
 
 # nixos config:
 export CURRENT_CONFIG="l-esp"
+echo "nixos config $CURRENT_CONFIG"
 (
     (
         cd .//nixos/$CURRENT_CONFIG
@@ -20,7 +21,7 @@ export CURRENT_CONFIG="l-esp"
 
 awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' .//nixos/$CURRENT_CONFIG/build_configuration.nix > .//nixos/$CURRENT_CONFIG/configuration.nix
 
-echo homemanager:
+echo homemanager $CURRENT_CONFIG:
 # homemanager config:
 (
     (
@@ -60,8 +61,7 @@ export CURRENT_CONFIG="l-werk"
 awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' .//nixos/$CURRENT_CONFIG/build_configuration.nix > .//nixos/$CURRENT_CONFIG/configuration.nix
 
 
-echo homemanager:
-# homemanager config:
+echo homemanager $CURRENT_CONFIG:
 (
     (
         cd ./home-manager/$CURRENT_CONFIG
