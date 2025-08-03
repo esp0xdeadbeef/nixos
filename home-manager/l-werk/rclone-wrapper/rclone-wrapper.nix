@@ -8,7 +8,7 @@ let
     DRIVE_ID="${builtins.readFile config.sops.secrets."rclone-drive_id".path}"
 
     TMP_CONF="$(mktemp)"
-    TOKEN_PATH="/tmp/rclone-auth-$USER.json"
+    TOKEN_PATH="$HOME/Documents/.rclone-auth-$USER.json"
 
     echo "[*] Deriving password from sops-managed seed..."
     CRYPT_PASS=$(echo -n "$SEED" | ${pkgs.coreutils}/bin/sha256sum | cut -d ' ' -f 1)
@@ -64,5 +64,7 @@ in
 
   # Make the wrapper available to the user
   home.packages = [ rcloneWrapper ];
+  _module.args.rcloneWrapper = rcloneWrapper;
+
 }
 
