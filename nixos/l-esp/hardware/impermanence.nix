@@ -72,6 +72,17 @@
     ];
   };
 
+  # fileSystems."/var/lib/private" = {
+  #   device = "/persist/var/lib/private";
+  #   fsType = "none";
+  #   options = [ "bind" ];
+  # };
+
+  # # 2) Make sure the source dir has the right perms
+  # systemd.tmpfiles.rules = [
+  #   "d /persist/var/lib/private 0700 root root -"
+  # ];
+
   environment.persistence."/persist" = {
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
@@ -79,7 +90,17 @@
       "/root"
       # "/var/lib/ollama/models" # AI models
       # "/var/lib/ollama/.ollama" # AI ssh keys
-      "/var/lib/ollama"
+      # "/var/lib/ollama"
+      {
+        # ls -la /var/lib/ollama # will output:
+        # lrwxrwxrwx 1 root root 14  3 aug 05:06 /var/lib/ollama -> private/ollama
+        directory = "/var/lib/private";
+        mode = "0700";
+      }
+      {
+        directory = "/var/lib/private/ollama";
+        mode = "0700";
+      }
       "/var/log"
       "/var/lib/bluetooth"
       "/var/lib/nixos"
@@ -128,7 +149,7 @@
         "Videos"
         ".local/share/lxc"
         ".local/share/containers"
-        
+
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/libvirt/qemu" # libvirt qemu settings
         ".config/discord"
@@ -140,14 +161,13 @@
         ".config/gh"
         ".config/qBittorrent" # qBittorrent settings
         ".config/obsidian" # Obsidian vault
-        ".local/share/remmina" # remmina remote desktop connections 
+        ".local/share/remmina" # remmina remote desktop connections
         ".config/Code" # vscode settings and data
-        ".vscode"      # workspace-specific settings and plugins
+        ".vscode" # workspace-specific settings and plugins
         ".config/VSCodium" # VSCodium settings and data
-        ".vscode-oss"      # VSCodium workspace-specific settings and plugins
+        ".vscode-oss" # VSCodium workspace-specific settings and plugins
         ".quickget" # quickget downloads
         ".continue" # quickget downloads
-
 
         ".dropbox"
         ".dropbox-dist"
@@ -155,7 +175,6 @@
         ".mozilla" # firefox import certificates taking too long
         # ".local/state/wireplumber" # audio profiles
 
-        
         ".config/slack" # Slack configuration
         ".config/zoom" # Zoom settings
 

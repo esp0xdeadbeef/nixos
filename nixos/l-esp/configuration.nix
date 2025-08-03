@@ -89,12 +89,22 @@
     ../01-general/virtualization-as-host/podman.nix
 
     ../02-window-manager-i3/environment.nix
-    ../99-testing/autologin-ssh-and-tty.nix
+    # ../99-testing/autologin-ssh-and-tty.nix
   
+
+    inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
+
+
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];
+
+  hardware.nvidia.prime = {
+    intelBusId = "PCI:00:02:0";
+    nvidiaBusId = "PCI:01:00:0";
+  };
+
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
