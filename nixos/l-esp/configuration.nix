@@ -31,7 +31,6 @@
     ./hardware/nvidia.nix
     ./hardware/steam.nix
     ./hardware/swap-and-tmpfs.nix
-    ./hardware/temp.nix
     ./llms/lmstudio.nix
     ./llms/ollama.nix
     ./osep/bind-to-lxc.nix
