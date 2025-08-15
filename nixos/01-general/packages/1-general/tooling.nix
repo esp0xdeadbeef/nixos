@@ -140,6 +140,10 @@
       # usb listing services like lsusb
       usbutils
       libusb1
+
+      # general purpose, and usb debugging:
+      screen
+
       # curl / wget (http and simular tooling):
       wget
       curl

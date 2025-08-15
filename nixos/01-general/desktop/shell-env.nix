@@ -15,6 +15,7 @@
       export HISTSIZE=1000000000
       export SAVEHIST=1000000000
       source <(fzf --zsh)
+      source <(op completion zsh 2>/dev/null || true)
     '';
     ohMyZsh = {
       enable = true;

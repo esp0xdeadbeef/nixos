@@ -24,6 +24,7 @@
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     ../02-window-manager-i3/environment.nix
+    ../30-physical-hardware-connections/why2025-badge/default.nix
     # ../99-testing/autologin-ssh-and-tty.nix
   
 

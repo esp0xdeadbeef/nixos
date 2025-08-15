@@ -63,6 +63,7 @@
     ../01-general/packages/network-troubleshooting/packages.nix
     ../01-general/packages/nix-specific/packages.nix
     ../01-general/packages/packages.nix
+    ../01-general/packages/password-managers/1password.nix
     ../01-general/packages/pdf/packages.nix
     ../01-general/packages/pentesting/packages.nix
     ../01-general/packages/rdp/packages.nix
@@ -88,6 +89,7 @@
     ../01-general/virtualization-as-host/podman.nix
 
     ../02-window-manager-i3/environment.nix
+    ../30-physical-hardware-connections/why2025-badge/default.nix
     # ../99-testing/autologin-ssh-and-tty.nix
   
 

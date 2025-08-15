@@ -41,6 +41,7 @@
     ../01-general/packages/git/packages.nix
     ../01-general/packages/network-troubleshooting/packages.nix
     ../01-general/packages/packages.nix
+    ../01-general/packages/password-managers/1password.nix
     ../01-general/packages/terminals/packages.nix
     ../01-general/packages/terminals/terminal-optimisers/packages.nix
     ../01-general/packages/terminals/terminal-optimisers/updatedb.nix

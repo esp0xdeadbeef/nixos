@@ -23,8 +23,8 @@
     # Import your generated (nixos-generate-config) hardware configuration
     inputs.impermanence.nixosModules.impermanence
 
-    ./hardware/boot-package.nix
     ./hardware/bootloader.nix
+    ./hardware/boot-package.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
@@ -51,6 +51,7 @@
     ../01-general/packages/network-troubleshooting/packages.nix
     ../01-general/packages/nix-specific/packages.nix
     ../01-general/packages/packages.nix
+    ../01-general/packages/password-managers/1password.nix
     ../01-general/packages/terminals/packages.nix
     ../01-general/packages/terminals/terminal-optimisers/packages.nix
     ../01-general/packages/terminals/terminal-optimisers/updatedb.nix

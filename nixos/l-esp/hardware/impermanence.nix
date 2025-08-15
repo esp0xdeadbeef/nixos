@@ -177,6 +177,7 @@
 
         ".config/slack" # Slack configuration
         ".config/zoom" # Zoom settings
+        ".config/1Password" # 1Password
 
         {
           directory = ".gnupg";

@@ -1,0 +1,18 @@
+{
+  config,
+  lib,
+  pkgs,
+  sopsSecrets,
+  ...
+}:
+
+{
+
+  # sops = {
+  #     secrets.iambEmail = { };
+  # };
+
+  # ${config.sops.placeholder.iambEmail}
+  # /home/deadbeef/.config/iamb/config.toml
+  
+}
