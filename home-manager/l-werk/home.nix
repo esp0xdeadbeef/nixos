@@ -109,10 +109,11 @@ in
         tmuxp
 
         # temp added files:
-        php84
-        php84Packages.composer
-        php83Packages.php-codesniffer
-        php84Packages.php-cs-fixer
+php84
+php84Packages.composer
+php84Packages.php-codesniffer
+#php84Packages.php-cs-fixer
+
       ];
       unstable = with unstablePkgs; [
         vscode
