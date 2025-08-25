@@ -101,6 +101,12 @@ in
         ffuf
         black 
         tmuxp
+        php84
+        php84Packages.composer
+        php84Packages.phpcs
+        php84Packages.phpcbf
+        php84Packages.php-cs-fixer
+
       ];
       unstable = with unstablePkgs; [
         vscode
