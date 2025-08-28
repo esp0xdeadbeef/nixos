@@ -22,6 +22,7 @@
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
 
     ./connect-nas/default.nix
+    ./disable-sleep-suspend-hibernate/default.nix
     ./hardware/audio.nix
     ./hardware/bluetooth.nix
     ./hardware/bootloader.nix
