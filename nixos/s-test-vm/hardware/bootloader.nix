@@ -10,8 +10,6 @@
   # Bootloader and Kernel Options
   #############################
 
-  # Set systemd-boot configuration limit
-  boot.loader.systemd-boot.configurationLimit = 15;
 
   # Force disable systemd-boot as Lanzaboote replaces it
   boot.loader.systemd-boot.enable = lib.mkForce false;

@@ -23,6 +23,7 @@
     # Import your generated (nixos-generate-config) hardware configuration
     
     ./hardware/bootloader.nix
+    ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
     ./hardware/nvidia.nix
     ./hardware/swap-and-tmpfs.nix
@@ -65,6 +66,8 @@
     ../01-general/virtualization-as-host/libvirt.nix
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix
+    ../04-window-manager-other/environment.nix
+
 
   ];
 
@@ -155,8 +158,9 @@
   # services.openssh.enable = true;
   services.xserver.enable = true;
   # services.displayManager.sddm.enable = true;
-  services.desktopManager.plasma6.enable = true;
+  # services.desktopManager.plasma6.enable = true;
   boot.loader.grub.configurationLimit = 2;
+  boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster

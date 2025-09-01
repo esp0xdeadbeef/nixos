@@ -23,6 +23,7 @@
     # Import your generated (nixos-generate-config) hardware configuration
     
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    ../04-window-manager-other/environment.nix
 
   ];
 
@@ -113,8 +114,11 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   # services.openssh.enable = true;
   services.xserver.enable = true;
   # services.displayManager.sddm.enable = true;
-  services.desktopManager.plasma6.enable = true;
-  boot.loader.grub.configurationLimit = 2;
+  # services.desktopManager.plasma6.enable = true;
+
+  
+  # Set systemd-boot configuration limit
+  boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster
