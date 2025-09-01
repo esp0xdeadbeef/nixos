@@ -24,6 +24,7 @@
     
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
+    ./hardware/nvidia.nix
     ./hardware/swap-and-tmpfs.nix
 
     ../01-general/desktop/applet-nm.nix
