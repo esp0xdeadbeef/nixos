@@ -68,7 +68,6 @@
     ../01-general/virtualization-as-host/podman.nix
     ../04-window-manager-other/environment.nix
 
-
   ];
 
   nixpkgs = {
@@ -159,8 +158,10 @@
   services.xserver.enable = true;
   # services.displayManager.sddm.enable = true;
   # services.desktopManager.plasma6.enable = true;
-  boot.loader.grub.configurationLimit = 2;
-  boot.loader.systemd-boot.configurationLimit = 2;
+
+  
+  # Set systemd-boot configuration limit
+  boot.loader.systemd-boot.configurationLimit = 5;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster

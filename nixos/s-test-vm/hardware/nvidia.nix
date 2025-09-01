@@ -9,14 +9,14 @@
   hardware.graphics.enable = true;
 
   # Use bochs or QEMU display (not NVIDIA)
-  services.xserver.videoDrivers = [ "bochs" ];
+  # services.xserver.videoDrivers = [ "bochs" ];
 
   hardware.nvidia = {
-    modesetting.enable = false; # not for display
-    powerManagement.enable = false; # don't send ioctl signals to the powermanager
+    modesetting.enable = true;
+    powerManagement.enable = false;
     powerManagement.finegrained = false;
-    open = false;  # Use proprietary driver
-    nvidiaSettings = false;  # You don't need the GUI settings tool
+    open = false;
+    nvidiaSettings = false;
     # containerToolkit.enable = true;  # For Docker CUDA support
   };
 
