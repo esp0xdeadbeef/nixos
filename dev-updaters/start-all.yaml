@@ -1,0 +1,13 @@
+session_name: rsync update reboot
+windows:
+  - window_name: main
+    layout: main-vertical
+    panes:
+      - shell_command: |
+          ./rsync-update-reboot.sh s-lxc-test
+      - shell_command: |
+          ./rsync-update-reboot.sh s-router-vpn-1
+      - shell_command: |
+          ./rsync-update-reboot.sh s-test-vm-impermanence
+      - shell_command: |
+          ./rsync-update-reboot.sh s-test-vm

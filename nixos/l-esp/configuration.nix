@@ -34,9 +34,6 @@
     ./hardware/swap-and-tmpfs.nix
     ./llms/lmstudio.nix
     ./llms/ollama.nix
-    ./osep/bind-to-lxc.nix
-    ./osep/scraping-osep-material.nix
-    ./osep/x2go-client.nix
     ./torrents/qbittorrent.nix
 
     ../01-general/desktop/applet-nm.nix
