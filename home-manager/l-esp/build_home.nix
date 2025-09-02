@@ -112,7 +112,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       ];
       unstable = with unstablePkgs; [
         vscode
-        firefox
+        # firefox
         exploitdb
         netexec
         gh

@@ -94,7 +94,7 @@
     # spotify
     python3
     libusb1
-    firefox
+    # firefox
     thunderbird
     legcord
     kubectl

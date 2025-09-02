@@ -123,7 +123,7 @@ in
       ];
       unstable = with unstablePkgs; [
         vscode
-        firefox
+        # firefox
         exploitdb
         netexec
         gh

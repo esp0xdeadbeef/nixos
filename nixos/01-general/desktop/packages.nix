@@ -120,8 +120,8 @@
     win-spice
     python3
     libusb1
-    firefox
-    thunderbird
+    # firefox
+    # thunderbird
     #discord
     #slack
     kubectl
