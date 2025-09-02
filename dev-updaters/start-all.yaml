@@ -4,10 +4,10 @@ windows:
     layout: main-vertical
     panes:
       - shell_command: |
-          ./rsync-update-reboot.sh s-lxc-test
+          while :; do ./rsync-update-reboot.sh s-lxc-test ; done
       - shell_command: |
-          ./rsync-update-reboot.sh s-router-vpn-1
+          while :; do ./rsync-update-reboot.sh s-router-vpn-1 ; done
       - shell_command: |
-          ./rsync-update-reboot.sh s-test-vm-impermanence
+          while :; do ./rsync-update-reboot.sh s-test-vm-impermanence ; done
       - shell_command: |
-          ./rsync-update-reboot.sh s-test-vm
+          while :; do ./rsync-update-reboot.sh s-test-vm ; done
