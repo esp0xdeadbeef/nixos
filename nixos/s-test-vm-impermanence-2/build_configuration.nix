@@ -25,6 +25,10 @@
 
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
+
+
+
+    ../02-window-manager-i3/environment.nix
   ];
 
   nixpkgs = {

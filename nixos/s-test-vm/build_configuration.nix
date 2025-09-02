@@ -23,7 +23,9 @@
     # Import your generated (nixos-generate-config) hardware configuration
     
 STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
-    ../04-window-manager-other/environment.nix
+
+
+    ../02-window-manager-i3/environment.nix
 
   ];
 

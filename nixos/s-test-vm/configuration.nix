@@ -66,7 +66,9 @@
     ../01-general/virtualization-as-host/libvirt.nix
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix
-    ../04-window-manager-other/environment.nix
+
+
+    ../02-window-manager-i3/environment.nix
 
   ];
 

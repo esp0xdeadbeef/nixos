@@ -33,6 +33,10 @@
     ../01-general/packages/terminals/terminal-optimisers/packages.nix
     ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
 
+
+
+
+    ../02-window-manager-i3/environment.nix
   ];
 
   nixpkgs = {
