@@ -13,6 +13,7 @@
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
+    ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
 
     ../01-general/desktop/applet-nm.nix
