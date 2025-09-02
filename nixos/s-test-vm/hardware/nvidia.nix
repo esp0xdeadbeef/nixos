@@ -9,7 +9,7 @@
   hardware.graphics.enable = true;
 
   # Use bochs or QEMU display (not NVIDIA)
-  # services.xserver.videoDrivers = [ "bochs" ];
+  services.xserver.videoDrivers = [ "bochs" "nvidia" ];
 
   hardware.nvidia = {
     modesetting.enable = true;
