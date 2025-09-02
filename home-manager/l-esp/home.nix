@@ -39,6 +39,7 @@ in
     ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/steam/packages.nix
     ./configs/sway/packages.nix
+    ./configs/tmuxp/packages.nix
 
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
