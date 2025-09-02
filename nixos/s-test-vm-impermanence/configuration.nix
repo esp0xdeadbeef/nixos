@@ -160,7 +160,7 @@
   services.xserver.enable = true;
   # services.displayManager.sddm.enable = true;
   services.desktopManager.plasma6.enable = true;
-  boot.loader.grub.configurationLimit = 10;
+  boot.loader.grub.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=example

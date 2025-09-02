@@ -161,7 +161,7 @@
 
   
   # Set systemd-boot configuration limit
-  boot.loader.systemd-boot.configurationLimit = 5;
+  boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster
