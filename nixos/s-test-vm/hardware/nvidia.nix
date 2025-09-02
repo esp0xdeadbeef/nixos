@@ -16,8 +16,7 @@
     powerManagement.enable = false;
     powerManagement.finegrained = false;
     open = false;
-    nvidiaSettings = false;
-    # containerToolkit.enable = true;  # For Docker CUDA support
+    nvidiaSettings = true;
   };
 
   # virtualisation.docker.enableNvidia = true;
