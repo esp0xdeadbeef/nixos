@@ -21,6 +21,7 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
+    ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
     ./network/vibecoding-shit.nix
     ./ssh-vim-and-basics.nix

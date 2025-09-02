@@ -25,6 +25,7 @@
 
     ./hardware/bootloader.nix
     ./hardware/boot-package.nix
+    ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
