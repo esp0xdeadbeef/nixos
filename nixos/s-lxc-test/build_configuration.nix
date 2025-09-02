@@ -91,7 +91,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     };
 
   # FIXME: Add the rest of your current configuration
-  networking.hostName = "l-x13s";
+  networking.hostName = "s-lxc-test";
   networking.networkmanager.enable = true;
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.

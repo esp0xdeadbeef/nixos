@@ -67,10 +67,11 @@
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix 
 */
+
+
+
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
-
-
     ../01-general/system/autoupdate.nix
     {
       environment.interactiveShellInit = ''
@@ -141,7 +142,7 @@
     };
 
   # FIXME: Add the rest of your current configuration
-  networking.hostName = "l-x13s";
+  networking.hostName = "s-lxc-test";
   networking.networkmanager.enable = true;
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
