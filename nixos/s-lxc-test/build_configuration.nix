@@ -13,7 +13,15 @@
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+/* 
+STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH 
+*/
+
+
+
+    ./hardware/force-update.nix
+    ./hardware/hardware-configuration.nix
+    ../01-general/system/autoupdate.nix
     {
       environment.interactiveShellInit = ''
         ZSH_THEME=random
@@ -86,6 +94,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   networking.hostName = "l-x13s";
   networking.networkmanager.enable = true;
 
+  # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
     deadbeef = {
@@ -97,11 +106,13 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg"
       ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];
     };
   };
+
 
   # This setups a SSH server. Very important if you're setting up a headless system.
   # Feel free to remove if you don't need it.
@@ -115,6 +126,18 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       PasswordAuthentication = true;
     };
   };
+  security.sudo.enable = true;
+  security.sudo.extraRules = [
+    {
+      groups = [ "wheel" ];
+      commands = [
+        {
+          command = "ALL";
+          options = [ "NOPASSWD" ];
+        }
+      ];
+    }
+  ];
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   system.stateVersion = "24.11";
