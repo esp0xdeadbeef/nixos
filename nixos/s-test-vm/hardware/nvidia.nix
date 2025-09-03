@@ -10,6 +10,13 @@
 
   # Use bochs or QEMU display (not NVIDIA)
   services.xserver.videoDrivers = [ "bochs" "nvidia"  ];
+  # use bosch driver instead of nvidia:
+  environment.etc."X11/xorg.conf.d/10-force-bochs.conf".text = ''
+    Section "Device"
+      Identifier "VideoCard0"
+      Driver "bochs"
+    EndSection
+  '';
 
   hardware.nvidia = {
     modesetting.enable = false;
