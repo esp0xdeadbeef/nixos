@@ -9,16 +9,18 @@
   hardware.graphics.enable = true;
 
   # Use bochs or QEMU display (not NVIDIA)
-  services.xserver.videoDrivers = [ "bochs" "nvidia" ];
+  services.xserver.videoDrivers = [ "bochs" ];
 
   hardware.nvidia = {
-    modesetting.enable = true;
+    modesetting.enable = false;
     powerManagement.enable = false;
     powerManagement.finegrained = false;
     open = false;
     nvidiaSettings = true;
   };
 
+  # boot.kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_drm" ];
+  # services.xserver.videoDrivers = [ "modesetting" ];  # or "bochs" if X is in VM
   # virtualisation.docker.enableNvidia = true;
 
 
