@@ -1,42 +1,39 @@
-{
-  pkgs,
-  config,
-  libs,
-  ...
-}:
+{ config, pkgs, ... }:
 
 {
-  hardware.graphics.enable = true;
+  nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.cudaSupport = true;          # build hashcat with CUDA support
 
-  # Use bochs or QEMU display (not NVIDIA)
-  services.xserver.videoDrivers = [ "bochs" "nvidia"  ];
-  # use bosch driver instead of nvidia:
-  environment.etc."X11/xorg.conf.d/10-force-bochs.conf".text = ''
-    Section "Device"
-      Identifier "VideoCard0"
-      Driver "bochs"
-    EndSection
-  '';
+  # Use bochs for display; do not load nvidia DRM
+  services.xserver.videoDrivers = [ "bochs" ];
+  boot.blacklistedKernelModules = [ "nvidia_drm" "nvidia_modeset" ];
 
-  hardware.nvidia = {
-    modesetting.enable = false;
-    powerManagement.enable = false;
-    powerManagement.finegrained = false;
-    open = false;
-    nvidiaSettings = true;
+  # Enable OpenGL so /run/opengl-driver and OpenCL vendor files are created
+  hardware.opengl = {
+    enable = true;
+    driSupport = true;
+    driSupport32Bit = true;
+    # Ensure our OpenCL vendor (nvidia) is available to the loader
+    extraPackages = with pkgs; [ config.boot.kernelPackages.nvidia_x11 ];
   };
 
-  # boot.kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_drm" ];
-  # services.xserver.videoDrivers = [ "modesetting" ];  # or "bochs" if X is in VM
-  # virtualisation.docker.enableNvidia = true;
+  # Install the NVIDIA user‑space driver and CUDA toolkit (for nvidia-smi and CUDA)
+  boot.extraModulePackages = [ config.boot.kernelPackages.nvidia_x11 ];
+  environment.systemPackages = with pkgs; [
+    config.boot.kernelPackages.nvidia_x11
+    cudaPackages.cudatoolkit
+    hashcat
+    glxinfo
+    clinfo
+  ];
 
-
-  nixpkgs.config.cudaSupport = true;
-
-  # For headless CUDA Docker containers
-  virtualisation.docker.daemon.settings.features.cdi = true;
-  virtualisation.docker.rootless.daemon.settings.features.cdi = true;
-
-  # Optional: ensure nvidia driver is loaded (compute-only)
+  # Load only the compute modules (no DRM)
   boot.kernelModules = [ "nvidia" "nvidia_uvm" ];
+
+  # Keep the desktop running on Mesa/bochs but provide the NVIDIA libs via OpenGL
+  environment.sessionVariables = {
+    # Point the ICD loader to the correct vendor directory
+    OCL_ICD_VENDORS = "/run/opengl-driver/etc/OpenCL/vendors";
+    __GLX_VENDOR_LIBRARY_NAME = "mesa";   # force mesa for GUI
+  };
 }

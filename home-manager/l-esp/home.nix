@@ -43,7 +43,6 @@ in
 
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
-    ../01-general/windows-vms/quickemu-build-windows-10-and-11.nix
 
 
     ../02-window-manager-i3/i3/packages.nix
