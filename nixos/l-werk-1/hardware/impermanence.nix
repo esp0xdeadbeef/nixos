@@ -141,12 +141,20 @@
     users.deadbeef = {
       directories = [
         "github" # custom dir for my github projects
+        "pentest"
+        "vms"
 
         "Downloads"
         "Music"
         "Pictures"
         "Documents"
         "Videos"
+
+        ".BurpSuite"
+        ".java/.userPrefs/burp"
+
+        ".config/teams-for-linux"
+
         ".local/share/lxc"
         ".local/share/containers"
 
@@ -195,7 +203,7 @@
       ];
       files = [
         ".local/state/wireplumber/default-nodes"
-        ".screenrc"
+        # ".screenrc"
         ".config/nix/nix.conf"
         ".zsh_history"
         ".zshrc"
