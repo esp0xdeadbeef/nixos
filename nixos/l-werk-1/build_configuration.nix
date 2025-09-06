@@ -41,8 +41,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
 
   
-  programs.zsh.ohMyZsh.theme = "dieter";
-
+  programs.zsh.ohMyZsh.theme = "clean";
 
 
   home-manager = {
