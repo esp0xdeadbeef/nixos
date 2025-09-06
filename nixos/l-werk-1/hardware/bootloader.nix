@@ -22,7 +22,7 @@
   # Lanzaboote configuration
   boot.lanzaboote = {
     enable = true;
-    pkiBundle = "/etc/secureboot";
+    pkiBundle = "/persist/var/lib/sbctl";
   };
   # allow nesting in vms:
   boot.extraModprobeConfig = "options kvm_intel nested=1";

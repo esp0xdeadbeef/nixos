@@ -183,6 +183,15 @@
             ./nixos/l-werk/configuration.nix
           ];
         };
+        # work laptop:
+        l-werk-1 = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            lanzaboote.nixosModules.lanzaboote
+            # > Our main nixos configuration file <
+            ./nixos/l-werk-1/configuration.nix
+          ];
+        };
         # private (amd) laptop:
         l-esp = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
