@@ -25,6 +25,9 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     ../04-window-manager-other/environment.nix
 
+    ../99-testing/autologin-ssh-and-tty.nix
+    # ../99-testing/autologin.nix
+
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
@@ -37,6 +40,11 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
 
 
+  
+  programs.zsh.ohMyZsh.theme = "dieter";
+
+
+
   home-manager = {
     sharedModules = [
       inputs.sops-nix.homeManagerModules.sops
@@ -46,7 +54,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     };
     users = {
       # Import your home-manager configuration
-      deadbeef = import ../../home-manager/l-werk/home.nix;
+      deadbeef = import ../../home-manager/l-werk-1/home.nix;
     };
   };
 

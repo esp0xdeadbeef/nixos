@@ -33,7 +33,13 @@
     intelBusId = "PCI:00:02:0"; # Intel GPU Bus ID
     nvidiaBusId = "PCI:01:00:0"; # NVIDIA GPU Bus ID
   };
-  nixpkgs.config.cudaSupport = true;
+
+
+  
+  # nixpkgs.config.cudaSupport = true;
+
+
+
   services.xserver.videoDrivers = [ "nvidia" ]; # if too much screen tearing, use this!
   #hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.beta; # this somehow works??!
   hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable; # testing if this works still...

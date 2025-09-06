@@ -27,12 +27,12 @@
     ./hardware/audio-and-bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
-    # ./hardware/nvidia-l-werk.nix
     ./hardware/impermanence.nix
+    ./hardware/nvidia-l-werk.nix
     ./hardware/sound-fix-l-werk.nix
     ./hardware/swap-and-tmpfs.nix
     ./llms/lmstudio.nix
-    # ./llms/ollama.nix
+    ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
     ./work-packages/work/packages.nix
 
@@ -84,9 +84,11 @@
     ../01-general/virtualization-as-host/libvirt.nix
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix
+
+    ../04-window-manager-other/environment.nix
+
     ../99-testing/autologin-ssh-and-tty.nix
     # ../99-testing/autologin.nix
-    ../04-window-manager-other/environment.nix
 
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
@@ -100,7 +102,10 @@
 
 
 
+  
   programs.zsh.ohMyZsh.theme = "dieter";
+
+
 
   home-manager = {
     sharedModules = [
@@ -111,7 +116,7 @@
     };
     users = {
       # Import your home-manager configuration
-      deadbeef = import ../../home-manager/l-werk/home.nix;
+      deadbeef = import ../../home-manager/l-werk-1/home.nix;
     };
   };
 
