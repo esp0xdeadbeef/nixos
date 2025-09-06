@@ -103,7 +103,7 @@
 
 
   
-  programs.zsh.ohMyZsh.theme = "dieter";
+  programs.zsh.ohMyZsh.theme = "clean";
 
 
 
