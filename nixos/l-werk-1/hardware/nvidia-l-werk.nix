@@ -19,7 +19,7 @@
   hardware.nvidia.modesetting.enable = true;
   hardware.nvidia.powerManagement.enable = false;
   hardware.nvidia.powerManagement.finegrained = false;
-  hardware.nvidia.open = false;
+  hardware.nvidia.open = true;
   hardware.nvidia.nvidiaSettings = true;
   hardware.nvidia-container-toolkit.enable = true;
   #hardware.nvidia.prime = {
@@ -35,7 +35,7 @@
   };
 
 
-  
+
   # nixpkgs.config.cudaSupport = true;
 
 
