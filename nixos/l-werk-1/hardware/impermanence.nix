@@ -149,7 +149,9 @@
         "pentest"
         "vms"
 
-        "Downloads"
+
+        # removing downloads!! Yeah.
+        # "Downloads"
         "Music"
         "Pictures"
         "Documents"
@@ -157,6 +159,8 @@
 
         ".BurpSuite"
         ".java/.userPrefs/burp"
+
+        
 
         ".config/teams-for-linux"
 
@@ -174,7 +178,14 @@
         ".config/gh"
         ".config/qBittorrent" # qBittorrent settings
         ".config/obsidian" # Obsidian vault
-        ".local/share/remmina" # remmina remote desktop connections
+        
+        # ffs nothing works to keep the remmina settings:
+        ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
+        "./.cache/remmina" # ffs, just remember shit remmina!
+        # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk-1/remmina/config.nix)
+        
+
+
         ".config/Code" # vscode settings and data
         ".vscode" # workspace-specific settings and plugins
         ".config/VSCodium" # VSCodium settings and data

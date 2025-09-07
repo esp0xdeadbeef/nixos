@@ -33,6 +33,7 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
+    ./darkmode/config.nix
     ./i3/packages.nix
     ./rclone-wrapper/rclone.nix
     ./remmina/config.nix
@@ -87,11 +88,7 @@ in
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
-  gtk.enable = true;
-  gtk.theme = {
-    name = "Adwaita-dark";
-    package = pkgs.gnome-themes-extra;
-  };
+  
 
   home.packages =
     let
