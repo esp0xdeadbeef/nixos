@@ -60,9 +60,6 @@ EOF
   backupScript = pkgs.writeShellScript "pentest-backup" ''
     set -euo pipefail
 
-    echo "[*] Backing up ~/pentest to OneDrive..."
-    ${rcloneWrapper}/bin/rclone-crypt sync --links --ignore-errors /home/deadbeef/pentest crypt:pentest-backup
-
     echo "[*] Preparing directory and removing old folders..."
     mkdir -p /home/deadbeef/pentest
     cd /home/deadbeef/pentest
@@ -74,6 +71,8 @@ EOF
         rm -rf -- "$dir"
       fi
     done
+    echo "[*] Backing up ~/pentest to OneDrive..."
+    ${rcloneWrapper}/bin/rclone-crypt sync --links --ignore-errors /home/deadbeef/pentest crypt:pentest-backup
 
     echo "[*] Backup + cleanup finished."
   '';
