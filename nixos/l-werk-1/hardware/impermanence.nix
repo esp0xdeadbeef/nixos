@@ -160,8 +160,6 @@
         ".BurpSuite"
         ".java/.userPrefs/burp"
 
-        
-
         ".config/teams-for-linux"
 
         ".local/share/lxc"
@@ -181,7 +179,7 @@
         
         # ffs nothing works to keep the remmina settings:
         ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
-        "./.cache/remmina" # ffs, just remember shit remmina!
+        ".cache/remmina" # ffs, just remember shit remmina!
         # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk-1/remmina/config.nix)
         
 
