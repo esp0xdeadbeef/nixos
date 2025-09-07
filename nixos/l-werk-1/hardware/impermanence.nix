@@ -10,6 +10,11 @@
   # boot.initrd.systemd.enable = true;
   boot.initrd.systemd.tpm2.enable = true; # keep your TPM2 settings
 
+  # make a /mnt directory
+  systemd.tmpfiles.rules = [
+    "d /mnt/current_pentest 0755 root root -"
+  ];
+
   fileSystems."/persist".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
 

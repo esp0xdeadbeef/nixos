@@ -106,7 +106,6 @@
   programs.zsh.ohMyZsh.theme = "clean";
 
 
-
   home-manager = {
     sharedModules = [
       inputs.sops-nix.homeManagerModules.sops
