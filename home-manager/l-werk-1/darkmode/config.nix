@@ -24,7 +24,10 @@
   # Export environment variable for your own Electron apps
   home.sessionVariables = {
     DARKMODE = "1";
+    # didn't work, still white mode default config:
+    _JAVA_OPTIONS = "-Dswing.defaultlaf=com.formdev.flatlaf.FlatDarculaLaf";
   };
+
 
   # Set GSettings to prefer dark mode (important for some apps like Electron using portals)
   dconf.settings = {
