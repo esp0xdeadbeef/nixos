@@ -25,7 +25,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     ../04-window-manager-other/environment.nix
 
-    ../99-testing/autologin-ssh-and-tty.nix
+    # ../99-testing/autologin-ssh-and-tty.nix
     # ../99-testing/autologin.nix
 
     inputs.impermanence.nixosModules.impermanence

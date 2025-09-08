@@ -34,6 +34,7 @@
     ./llms/lmstudio.nix
     ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
+    ./unmount-pentest-directory/unmount-hook.nix
     ./work-packages/work/packages.nix
 
     ../01-general/desktop/applet-nm.nix
@@ -87,7 +88,7 @@
 
     ../04-window-manager-other/environment.nix
 
-    ../99-testing/autologin-ssh-and-tty.nix
+    # ../99-testing/autologin-ssh-and-tty.nix
     # ../99-testing/autologin.nix
 
     inputs.impermanence.nixosModules.impermanence

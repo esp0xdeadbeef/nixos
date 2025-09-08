@@ -88,7 +88,6 @@ in
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
-  
 
   home.packages =
     let
