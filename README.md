@@ -48,6 +48,11 @@ nixos-rebuild switch --no-write-lock-file --impure --flake "github:esp0xdeadbeef
 
 
 
+## debug what files are read with strace and grep magic:
+
+```bash
+strace -f -e openat,read,write timeout 1 remmina 2>&1 | grep remmina | cut -d '"' -f 2 | grep -v store | sort -u | grep -v '.svg$'
+```
 
 # some testing with nixos on x13s
 
