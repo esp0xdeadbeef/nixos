@@ -35,7 +35,7 @@
     ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
     ./unmount-pentest-directory/unmount-hook.nix
-    ./work-packages/wordlists/seclists/packages.nix
+    ./work-packages/wordlists/packages.nix
     ./work-packages/work/packages.nix
 
     ../01-general/desktop/applet-nm.nix
