@@ -56,7 +56,7 @@ strace -f -e openat,read,write timeout 1 remmina 2>&1 | grep remmina | cut -d '"
 
 # some testing with nixos on x13s
 
-```
+```bash
 mount /dev/nvme0n1p2 /mnt
 mount /dev/nvme0n1p1 /mnt/boot
 

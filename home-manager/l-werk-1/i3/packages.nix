@@ -327,9 +327,9 @@ bindsym $mod+period move workspace to output right
 #bindsym $mod+i exec x2goclient --session=arch --close-disconnect
 #bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c '/home/deadbeef/.local/share/remmina/group_rdp_win11-office_192-168-100-142.remmina'
 #bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "$(ls /home/deadbeef/.local/share/remmina/group_rdp_win11-office-ad*.remmina)"
-bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-pentest-libvirt.remmina"
-bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-office-libvirt.remmina"
-#bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c /home/deadbeef/.local/share/remmina/group_rdp_i5-laptop_192-168-1-165.remmina 
+bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-office-libvirt.remmina"
+bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-pentest-libvirt.remmina"
+
 bindsym $mod+bracketright exec ${pkgs.pamixer}/bin/pamixer --increase 10
 bindsym $mod+bracketleft exec ${pkgs.pamixer}/bin/pamixer --decrease 10
 # disable numlock

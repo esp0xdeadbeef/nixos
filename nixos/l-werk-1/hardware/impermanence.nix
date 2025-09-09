@@ -34,8 +34,6 @@
     before = [ "sysroot.mount" ];
     unitConfig.DefaultDependencies = false;
     serviceConfig.Type = "oneshot";
-
-    # a real script; systemd will write it to a temp file + run it
     script = ''
       #!${pkgs.bash}/bin/bash -euo pipefail
       mkdir /btrfs_tmp
@@ -77,28 +75,13 @@
     ];
   };
 
-  # fileSystems."/var/lib/private" = {
-  #   device = "/persist/var/lib/private";
-  #   fsType = "none";
-  #   options = [ "bind" ];
-  # };
-
-  # # 2) Make sure the source dir has the right perms
-  # systemd.tmpfiles.rules = [
-  #   "d /persist/var/lib/private 0700 root root -"
-  # ];
 
   environment.persistence."/persist" = {
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
     directories = [
       "/root"
-      # "/var/lib/ollama/models" # AI models
-      # "/var/lib/ollama/.ollama" # AI ssh keys
-      # "/var/lib/ollama"
       {
-        # ls -la /var/lib/ollama # will output:
-        # lrwxrwxrwx 1 root root 14  3 aug 05:06 /var/lib/ollama -> private/ollama
         directory = "/var/lib/private";
         mode = "0700";
       }
@@ -122,19 +105,6 @@
     ];
     files = [
       "/etc/machine-id"
-      # "/var/cache/locatedb" # added it to persistent output in updatedb.nix (/persist/var/cache/locatedb); updatedb (locate <something>) history
-      # {
-      #   file = "/var/keys/secret_file";
-      #   parentDirectory = {
-      #     mode = "u=rwx,g=,o=";
-      #   };
-      # }
-      # {
-      #   file = "/var/cache/locatedb";
-      #   parentDirectory = {
-      #     mode = "u=rwx,g=rx,o=";
-      #   };
-      # }
       {
         file = "/var/cache/locatedb";
         parentDirectory = {
@@ -145,17 +115,18 @@
     ];
     users.deadbeef = {
       directories = [
-        "github" # custom dir for my github projects
-        "pentest"
-        "vms"
+        
 
-
-        # removing downloads!! Yeah.
         # "Downloads"
         "Music"
         "Pictures"
         "Documents"
         "Videos"
+
+        "github" # custom dir for my github projects
+        "pentest"
+        "vms"
+
 
         ".BurpSuite"
         ".java/.userPrefs/burp"
@@ -177,7 +148,6 @@
         ".config/qBittorrent" # qBittorrent settings
         ".config/obsidian" # Obsidian vault
         
-        # ffs nothing works to keep the remmina settings:
         ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
         ".cache/remmina" # ffs, just remember shit remmina!
         # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk-1/remmina/config.nix)
@@ -189,7 +159,7 @@
         ".config/VSCodium" # VSCodium settings and data
         ".vscode-oss" # VSCodium workspace-specific settings and plugins
         ".quickget" # quickget downloads
-        ".continue" # quickget downloads
+        ".continue" # continue plugins for vscode
 
         # ".dropbox"
         # ".dropbox-dist"
@@ -213,7 +183,6 @@
           directory = ".local/share/keyrings";
           mode = "0700";
         }
-        # ".local/share/direnv"
       ];
       files = [
         ".local/state/wireplumber/default-nodes"
