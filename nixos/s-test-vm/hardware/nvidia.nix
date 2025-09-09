@@ -2,7 +2,9 @@
 
 {
   nixpkgs.config.allowUnfree = true;
-  nixpkgs.config.cudaSupport = true;          # build hashcat with CUDA support
+
+  # it does not seem to be required to be able to use hashcat with cuda on the work laptop. Disabling it now.
+  # nixpkgs.config.cudaSupport = true;          # build hashcat with CUDA support
 
   # Use bochs for display; do not load nvidia DRM
   services.xserver.videoDrivers = [ "bochs" ];
