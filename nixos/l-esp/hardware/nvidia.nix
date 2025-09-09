@@ -46,21 +46,20 @@
 
   # # NVIDIA driver package and PRIME configuration
   hardware.nvidia = {
-  #   open = true;
-  #   package = config.boot.kernelPackages.nvidiaPackages.stable;
-  #   nvidiaSettings = true;
+    open = true;
+    #   package = config.boot.kernelPackages.nvidiaPackages.stable;
+    #   nvidiaSettings = true;
     prime = {
       intelBusId = "PCI:00:02:0";
       nvidiaBusId = "PCI:01:00:0";
     };
   };
   environment.systemPackages = [
-   (pkgs.ollama.override { 
+    (pkgs.ollama.override {
       acceleration = "cuda";
     })
   ];
   services.ollama.acceleration = "cuda";
-
 
   # # Install CUDA toolkit and user-land tools (nvidia-smi, settings)
   # environment.systemPackages = with pkgs; [
