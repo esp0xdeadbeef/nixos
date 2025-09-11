@@ -63,7 +63,7 @@ let
         rm -f "$TMP_CONF"
   '';
 
-  backupScript = pkgs.writeShellScript "pentest-backup" ''
+  backupScript = pkgs.writeShellScriptBin "pentest-backup" ''
     set -euo pipefail
 
     base=/home/deadbeef/pentest
@@ -89,7 +89,9 @@ in
   sops.secrets."rclone-drive_id" = { };
 
   # Expose wrapper so you can run it manually too
-  home.packages = [ rcloneWrapper ];
+  home.packages = [ rcloneWrapper backupScript ];
+
+
 
   # Systemd service
   systemd.user.services.pentest-backup = {
@@ -98,9 +100,9 @@ in
     };
 
     Service = {
-      Type = "oneshot";
-      ExecStart = "${backupScript}";
-    };
+    Type = "oneshot";
+    ExecStart = "${lib.getExe backupScript}";
+  };
   };
 
   systemd.user.timers.pentest-backup = {
