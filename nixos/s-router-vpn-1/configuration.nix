@@ -32,6 +32,7 @@
     ../01-general/desktop/screen-recording.nix
     ../01-general/desktop/shell-env.nix
     ../01-general/desktop/users-and-groups.nix
+    ../01-general/desktop/xdg-portal.nix
     ../01-general/enable-etc-hosts-editing/default.nix
     ../01-general/firmware-update/default.nix
     ../01-general/packages/1-general/archive-tools.nix

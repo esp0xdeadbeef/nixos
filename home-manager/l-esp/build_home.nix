@@ -90,11 +90,6 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
-  gtk.enable = true;
-  gtk.theme = {
-    name = "Adwaita-dark";
-    package = pkgs.gnome-themes-extra;
-  };
 
   home.packages =
     let
