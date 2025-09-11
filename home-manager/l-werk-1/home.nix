@@ -33,11 +33,11 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-    ./darkmode/config.nix
     ./i3/packages.nix
     ./rclone-wrapper/rclone.nix
     ./remmina/config.nix
 
+    ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
 

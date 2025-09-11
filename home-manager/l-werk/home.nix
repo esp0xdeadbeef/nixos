@@ -36,6 +36,7 @@ in
     ./i3/packages.nix
     ./rclone-wrapper/rclone-wrapper.nix
 
+    ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
 

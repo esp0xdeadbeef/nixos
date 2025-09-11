@@ -41,6 +41,7 @@ in
     ./configs/sway/packages.nix
     ./configs/tmuxp/packages.nix
 
+    ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
 
