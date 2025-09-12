@@ -23,7 +23,8 @@
     # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
-    ./network/vibecoding-shit.nix
+    ./network/configs_from_container.nix
+    ./network/packages-required-by-scripts.nix
     ./ssh-vim-and-basics.nix
 
     ../01-general/desktop/applet-nm.nix
@@ -141,7 +142,7 @@
     enable = true;
     settings = {
       # Opinionated: forbid root login through SSH.
-      PermitRootLogin = "no";
+      PermitRootLogin = "yes";
       # Opinionated: use keys only.
       # Remove if you want to SSH using passwords
       PasswordAuthentication = true;

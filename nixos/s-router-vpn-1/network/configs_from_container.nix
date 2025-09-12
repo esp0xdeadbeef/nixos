@@ -1,11 +1,22 @@
 { config, pkgs, ... }:
 
 {
+
+
+  ### to make the dev environment the same:
+  # nmcli con mod "Wired connection 2" connection.id eth0
+  # nmcli con mod "Wired connection 3" connection.id eth1
+
   # 1) Ensure cp/install/chmod are in $PATH
   environment.systemPackages = with pkgs; [
     coreutils
     python3
   ];
+
+
+  networking.networkmanager.enable = true;
+  networking.networkmanager.unmanaged = [  ];
+
   # 3) Copy everything from /etc/root into /root at activation time
   system.activationScripts.copyToRoot = {
     text = ''
@@ -19,7 +30,7 @@
   # services.cron.enable = true;
 
   services.cron.systemCronJobs = [
-    "0 * * * * root /path/to/your/script.sh"
+    # "0 * * * * root /path/to/your/script.sh"
     "*/5 * * * * root /root/update_iptables.sh"
     "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf eth1\""
     "@reboot root systemctl start isc-dhcp-server"
@@ -135,8 +146,8 @@
     "root/subnets.sh" = {
       source = pkgs.writeShellScript "subnets" ''
         #!/usr/bin/env bash
-        export IPv4_static="10.20.0.1/24"
-        export IPv6_static="fd20:dead:beef::100/64"
+        export IPv4_static="10.90.0.1/24"
+        export IPv6_static="fd90:dead:beef::100/64"
       '';
       mode = "0755";
     };
@@ -145,6 +156,7 @@
     "root/generate-dhcpd.conf.sh" = {
       source = pkgs.writeShellScript "generate-dhcpd.conf.sh" ''
         #!/usr/bin/env bash
+        mkdir /etc/dhcp/ 2>/dev/null || true
         IPV4_ADDR=$(ip -4 a s eth1 | grep 'scope global' | awk '{print $2}')
         source /root/subnets.sh
         IPV4_ADDR=$IPv4_static
@@ -178,6 +190,7 @@
       '';
       mode = "0755";
     };
+
 
     # setup-generic.sh
     "root/setup-generic.sh" = {
