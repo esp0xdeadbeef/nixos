@@ -9,7 +9,7 @@ fi
 HOST="$1"
 
 echo "[*] Checking uptime on $HOST..."
-ssh "deadbeef@$HOST" uptime || { echo "❌ SSH to $HOST failed"; exit 1; }
+ssh "deadbeef@$HOST" uptime || { echo "❌ SSH to $HOST failed"; sleep 2; exit 1; }
 
 echo "[*] Running rsync to $HOST..."
 if rsync -va --exclude='.git' /home/deadbeef/github/nixos "deadbeef@$HOST:~/github/" | grep -q 'nixos/'; then
