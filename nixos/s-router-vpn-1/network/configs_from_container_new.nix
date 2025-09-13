@@ -20,8 +20,10 @@
     "net.ipv4.ip_forward" = 1;
     "net.ipv6.conf.all.forwarding" = 1;
   };
-  boot.kernelModules = [ "nf_nat_ipv6" "ip6table_nat" ];
-
+  boot.kernelModules = [
+    "nf_nat_ipv6"
+    "ip6table_nat"
+  ];
 
   networking.networkmanager.enable = true;
   networking.networkmanager.unmanaged = [ ];
@@ -37,6 +39,80 @@
   };
 
   # services.cron.enable = true;
+
+  environment.etc = {
+    "NetworkManager/system-connections/ens18.nmconnection" = {
+      text = ''
+        [connection]
+        id=ens18
+        type=ethernet
+        interface-name=ens18
+        autoconnect=true
+        permissions=
+
+        [ipv4]
+        method=auto
+        route-metric=300
+        ignore-auto-dns=true
+        never-default=true
+
+        [ipv6]
+        method=auto
+        route-metric=300
+        ignore-auto-dns=true
+        never-default=true
+      '';
+      mode = "0600";
+    };
+
+    "NetworkManager/system-connections/ens20.nmconnection" = {
+      text = ''
+        [connection]
+        id=ens20
+        type=ethernet
+        interface-name=ens20
+        autoconnect=true
+        permissions=
+
+        [ipv4]
+        method=auto
+        route-metric=100
+        ignore-auto-dns=false
+
+        [ipv6]
+        method=auto
+        route-metric=100
+        ignore-auto-dns=false
+      '';
+      mode = "0600";
+    };
+
+    "NetworkManager/system-connections/ens21.nmconnection" = {
+      text = ''
+        [connection]
+        id=ens21
+        type=ethernet
+        interface-name=ens21
+        autoconnect=true
+        permissions=
+
+        [ipv4]
+        method=manual
+        address1=10.90.0.1/24
+        route-metric=250
+        ignore-auto-dns=true
+
+        [ipv6]
+        method=manual
+        address1=fd90:dead:beef::100/64
+        route-metric=250
+        ignore-auto-dns=true
+      '';
+      mode = "0600";
+    };
+
+  };
+  
 
   services.cron.systemCronJobs = [
     # "0 * * * * root /path/to/your/script.sh"
@@ -214,11 +290,24 @@
       mode = "0755";
     };
 
+    "root/import-vpn-profile.sh" = {
+      source = pkgs.writeShellScript "import-vpn-profile.sh" ''
+        # these settings make nmcli tun0 a low priority interface (we don't need to tunnel traffic through it, except for the ens21 lan side):
+        nmcli conn | grep 'tun0' | rev | awk '{print $3}' | rev | xargs -I {} nmcli con del {}
+        nmcli connection import type wireguard file /root/tun0.conf
+        sleep 1
+        nmcli connection modify tun0 ipv4.route-metric 1000
+        nmcli connection modify tun0 ipv6.route-metric 1000
+      '';
+      mode = "0755";
+    };
+
     # update_iptables.sh
     "root/update_iptables.sh" = {
       source = pkgs.writeShellScript "update_iptables.sh" ''
         #!/bin/bash
 
+        /root/import-vpn-profile.sh
         # Get the current IP address of tun0
         #TUN_IP_v4=$(ip addr show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
         TUN_IP_v4=$(nmcli connection show tun0 | grep 'ipv4.dns' | awk '{print $2}' | head -n1)
