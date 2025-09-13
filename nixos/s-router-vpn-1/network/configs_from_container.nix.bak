@@ -1,11 +1,24 @@
-{ config, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
 
-
   ### to make the dev environment the same:
-  # nmcli con mod "Wired connection 2" connection.id eth0
-  # nmcli con mod "Wired connection 3" connection.id eth1
+  # nmcli con mod "Wired connection 2" connection.id ens18
+  # nmcli con mod "Wired connection 3" connection.id ens20
+  # nmcli con show
+  # NAME                UUID                                  TYPE      DEVICE
+  # Wired connection 1  4e02955a-a5a3-38cd-9c38-11a19b417960  ethernet  ens18
+  # ens18                1d2fcfb6-bbb2-31d7-b686-796f57de6808  ethernet  ens20
+  # ens20                eb870d10-7191-34bc-999d-a9ede1634161  ethernet  ens21
+  # lo                  8c87ad73-57b1-4738-9cf5-fa70d23bbbbb  loopback  lo
+  # lxcbr0              3cceacce-b097-4ffc-8768-e50724e60366  bridge    lxcbr0
+  # docker0             4839215c-0087-4207-ad18-068ce1753ad6  bridge    docker0
+  # Wired connection 3  1a40684c-9b1e-39b0-b7b5-d81b9f3c4f7f  ethernet  --
 
   # 1) Ensure cp/install/chmod are in $PATH
   environment.systemPackages = with pkgs; [
@@ -13,9 +26,8 @@
     python3
   ];
 
-
   networking.networkmanager.enable = true;
-  networking.networkmanager.unmanaged = [  ];
+  networking.networkmanager.unmanaged = [ ];
 
   # 3) Copy everything from /etc/root into /root at activation time
   system.activationScripts.copyToRoot = {
@@ -32,7 +44,7 @@
   services.cron.systemCronJobs = [
     # "0 * * * * root /path/to/your/script.sh"
     "*/5 * * * * root /root/update_iptables.sh"
-    "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf eth1\""
+    "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf ens20\""
     "@reboot root systemctl start isc-dhcp-server"
     "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
     "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
@@ -137,7 +149,7 @@
       source = pkgs.writeShellScript "pre-setup-script" ''
         #!/usr/bin/env bash
         nmcli conn | rev | awk '{print $3}' | rev | xargs -I {} nmcli con del {}
-        nmcli con add con-name eth0 type ethernet ifname eth0 ipv4.method auto
+        nmcli con add con-name ens18 type ethernet ifname ens18 ipv4.method auto
       '';
       mode = "0755";
     };
@@ -157,7 +169,7 @@
       source = pkgs.writeShellScript "generate-dhcpd.conf.sh" ''
         #!/usr/bin/env bash
         mkdir /etc/dhcp/ 2>/dev/null || true
-        IPV4_ADDR=$(ip -4 a s eth1 | grep 'scope global' | awk '{print $2}')
+        IPV4_ADDR=$(ip -4 a s ens20 | grep 'scope global' | awk '{print $2}')
         source /root/subnets.sh
         IPV4_ADDR=$IPv4_static
         sipcalc "$IPV4_ADDR"
@@ -191,20 +203,19 @@
       mode = "0755";
     };
 
-
     # setup-generic.sh
     "root/setup-generic.sh" = {
       source = pkgs.writeShellScript "setup-generic" ''
         #!/usr/bin/env bash
         source /root/subnets.sh
         nmcli connection up tun0
-        nmcli connection down eth1
-        nmcli connection up eth1
+        nmcli connection down ens20
+        nmcli connection up ens20
         nmcli connection modify "tun0" connection.autoconnect yes
-        nmcli connection add type ethernet ifname eth1 con-name eth1 ipv4.addresses "$IPv4_static" ipv4.method manual
-        nmcli connection modify eth1 ipv6.addresses "$IPv6_static"
-        nmcli connection modify eth1 ipv6.method manual
-        nmcli connection modify eth1 ipv6.dns "$IPv6_static"
+        nmcli connection add type ethernet ifname ens20 con-name ens20 ipv4.addresses "$IPv4_static" ipv4.method manual
+        nmcli connection modify ens20 ipv6.addresses "$IPv6_static"
+        nmcli connection modify ens20 ipv6.method manual
+        nmcli connection modify ens20 ipv6.dns "$IPv6_static"
         /root/generate-dhcpd.conf.sh
         /root/generate-radvd.conf.sh
         nmcli connection up tun0
@@ -222,8 +233,8 @@
       source = pkgs.writeShellScript "generate-radvd.conf.sh" ''
         #!/usr/bin/env bash
 
-        # Extract IPv6 address and subnet prefix for eth1
-        IPV6_ADDR=$(ip -6 a s eth1 | grep 'scope global' | awk '{print $2}')
+        # Extract IPv6 address and subnet prefix for ens20
+        IPV6_ADDR=$(ip -6 a s ens20 | grep 'scope global' | awk '{print $2}')
 
         source /root/subnets.sh
         IPV6_ADDR=$IPv6_static
@@ -231,7 +242,7 @@
         PREFIX=$(sipcalc "$IPV6_ADDR") # | grep 'Subnet prefix' | awk '{print $3}')
         PREFIX=$(sipcalc "$IPV6_ADDR" | grep 'Subnet prefix' | awk '{print $5}')
         IPV6_ADDR_WITHOUT_MASK=$(echo $IPV6_ADDR | sed 's/\/.*//g')
-        echo -n 'interface eth1 {
+        echo -n 'interface ens20 {
           AdvSendAdvert on;
           MinRtrAdvInterval 3;
           MaxRtrAdvInterval 10;
@@ -289,25 +300,25 @@
         echo $TUN_IP_v4 > "/tmp/dns-ipv4-from-$(basename "$0").txt"
         echo $TUN_IP_v6 > "/tmp/dns-ipv6-from-$(basename "$0").txt"
         # Flush old rules for port 53 forwarding
-        /usr/sbin/iptables -t nat -D PREROUTING -i eth1 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4 2>/dev/null
-        /usr/sbin/iptables -t nat -D PREROUTING -i eth1 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4 2>/dev/null
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens20 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4 2>/dev/null
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens20 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4 2>/dev/null
 
         # Allow callbacks in the local network (added 2024)
-        /usr/sbin/iptables -I FORWARD -i eth1 -o eth1 -j ACCEPT
-        /usr/sbin/ip6tables -I FORWARD -i eth1 -o eth1 -j ACCEPT
+        ${pkgs.iptables}/bin/iptables -I FORWARD -i ens20 -o ens20 -j ACCEPT
+        ${pkgs.iptables}/bin/ip6tables -I FORWARD -i ens20 -o ens20 -j ACCEPT
 
         # Add new rules with the current IP address
-        /usr/sbin/iptables -t nat -A PREROUTING -i eth1 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4
-        /usr/sbin/iptables -t nat -A PREROUTING -i eth1 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens20 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens20 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4
 
         #/root/portforwards.sh
         # Flush old rules for port 53 forwarding
-        /usr/sbin/ip6tables -t nat -D PREROUTING -i eth1 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
-        /usr/sbin/ip6tables -t nat -D PREROUTING -i eth1 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens20 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens20 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
 
         # Add new rules with the current IP address
-        /usr/sbin/ip6tables -t nat -A PREROUTING -i eth1 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6
-        /usr/sbin/ip6tables -t nat -A PREROUTING -i eth1 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens20 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens20 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6
       '';
       mode = "0755";
     };
@@ -316,16 +327,16 @@
     "root/portforwards.sh" = {
       source = pkgs.writeShellScript "portforwards.sh" ''
         #!/bin/bash
-        IPV6_ADDR=$(ip -6 a s eth1 | grep 'scope global' | awk '{print $2}')
+        IPV6_ADDR=$(ip -6 a s ens20 | grep 'scope global' | awk '{print $2}')
         IPV6_PREFIX=$(/root/calculate-prefix.py $(echo $IPV6_ADDR) | sed 's/0000://g')
         # ipv6:
-        /usr/sbin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination [$IPV6_PREFIX:a28f:aa25:f510:bdcb]:22
-        /usr/sbin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination [$IPV6_PREFIX:be24:11ff:fe3d:474d]:443
-        /usr/sbin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination [$IPV6_PREFIX:a133:c085:eeab:f2c1]:21614
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination [$IPV6_PREFIX:a28f:aa25:f510:bdcb]:22
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination [$IPV6_PREFIX:be24:11ff:fe3d:474d]:443
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination [$IPV6_PREFIX:a133:c085:eeab:f2c1]:21614
         # ipv4:
-        /usr/sbin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination 10.30.0.109:22
-        /usr/sbin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination 10.30.0.167:443
-        /usr/sbin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination 10.30.0.163:21614
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination 10.30.0.109:22
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination 10.30.0.167:443
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination 10.30.0.163:21614
       '';
       mode = "0755";
     };
@@ -363,7 +374,7 @@
 
           if echo "$ping_output" | grep -q "Network is unreachable" || [ -z "$packet_loss" ] || [ "$packet_loss" -gt "$drop_threshold" ]; then
             echo "Network is unreachable or packet loss exceeds $drop_threshold%. Restarting Network Manager."
-            ip a flush eth0
+            ip a flush ens18
             sudo systemctl restart NetworkManager
             sleep 3
             # /root/portforwards.sh
@@ -380,74 +391,110 @@
       mode = "0755";
     };
   };
-  networking.useNetworkd = true;
+
+  systemd.services.dhcpd = {
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    # path = [ pkgs.isc-dhcp-server ];
+
+    serviceConfig = {
+      ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /etc/dhcp/dhcpd.conf";
+      Restart = "on-failure";
+    };
+    preStart = ''
+      mkdir -p /var/db
+      touch /var/db/dhcpd.leases
+      # /root/generate-dhcpd.conf.sh
+      chmod 644 /etc/dhcp/dhcpd.conf
+    '';
+
+  };
+
+  systemd.services.radvd = {
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    path = [ pkgs.radvd ];
+
+    serviceConfig = {
+      ExecStart = "${pkgs.radvd}/bin/radvd -n -C /etc/radvd.conf";
+      Restart = "on-failure";
+    };
+
+    # preStart = ''
+    #   echo "Generating radvd.conf..."
+    #   /etc/gen-radvd.sh > /etc/radvd.conf
+    #   chmod 644 /etc/radvd.conf
+    # '';
+  };
+
+  # networking.useNetworkd = true;
 
   # Disable networkd-wait-online
   systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
 
-  systemd.network = {
-    enable = true;
+  # systemd.network = {
+  #   enable = true;
 
-    # Rename ens19 to phys0
-    links."10-phys0" = {
-      matchConfig.PermanentMACAddress = "bc:24:11:28:1f:b6";
-      linkConfig.Name = "phys0";
-    };
-    # Attach only the DHCP VLANs to phys0
-    networks."10-phys0" = {
-      matchConfig.Name = "phys0";
-      networkConfig.VLAN = [
-        "vlan-lan"
-        "vlan-test"
-        "vlan-natted-internal"
-      ];
-    };
+  #   # Rename ens19 to phys0
+  #   links."10-phys0" = {
+  #     matchConfig.PermanentMACAddress = "bc:24:11:28:1f:b6";
+  #     linkConfig.Name = "phys0";
+  #   };
+  #   # Attach only the DHCP VLANs to phys0
+  #   networks."10-phys0" = {
+  #     matchConfig.Name = "phys0";
+  #     networkConfig.VLAN = [
+  #       "vlan-lan"
+  #       "vlan-test"
+  #       "vlan-natted-internal"
+  #     ];
+  #   };
 
-    # VLAN for LAN (ID: 4) with DHCP
-    netdevs."10-vlan-lan" = {
-      netdevConfig = {
-        Kind = "vlan";
-        Name = "vlan-lan";
-      };
-      vlanConfig.Id = 4;
-    };
-    networks."10-vlan-lan" = {
-      matchConfig.Name = "vlan-lan";
-      networkConfig = {
-        DHCP = "yes";
-        IPv6AcceptRA = true;
-      };
-      dhcpConfig.RouteMetric = 150;
-    };
+  #   # VLAN for LAN (ID: 4) with DHCP
+  #   netdevs."10-vlan-lan" = {
+  #     netdevConfig = {
+  #       Kind = "vlan";
+  #       Name = "vlan-lan";
+  #     };
+  #     vlanConfig.Id = 4;
+  #   };
+  #   networks."10-vlan-lan" = {
+  #     matchConfig.Name = "vlan-lan";
+  #     networkConfig = {
+  #       DHCP = "yes";
+  #       IPv6AcceptRA = true;
+  #     };
+  #     dhcpConfig.RouteMetric = 150;
+  #   };
 
-    # VLAN for vlan-natted-internal (ID: 10) with static IP and a high default route metric
-    netdevs."30-vlan-natted-internal" = {
-      netdevConfig = {
-        Kind = "vlan";
-        Name = "vlan-natted-internal";
-      };
-      vlanConfig.Id = 20;
-    };
-    networks."30-vlan-natted-internal" = {
-      matchConfig.Name = "vlan-natted-internal";
-      addresses = [
-        { Address = "192.168.80.20/24"; }
-        { Address = "fd80:dead:beef::1/64"; }
-      ];
-      networkConfig = {
-        DHCP = "no";
-        IPv6AcceptRA = false;
-        DNS = "192.168.80.1";
-        # Remove Gateway here to avoid automatic default route creation.
-      };
-      routes = [
-        {
-          Destination = "0.0.0.0/0";
-          Gateway = "192.168.80.1";
-          Metric = 1024; # This sets the default route with a high metric.
-        }
-      ];
-    };
+  #   # VLAN for vlan-natted-internal (ID: 10) with static IP and a high default route metric
+  #   netdevs."30-vlan-natted-internal" = {
+  #     netdevConfig = {
+  #       Kind = "vlan";
+  #       Name = "vlan-natted-internal";
+  #     };
+  #     vlanConfig.Id = 20;
+  #   };
+  #   networks."30-vlan-natted-internal" = {
+  #     matchConfig.Name = "vlan-natted-internal";
+  #     addresses = [
+  #       { Address = "192.168.80.20/24"; }
+  #       { Address = "fd80:dead:beef::1/64"; }
+  #     ];
+  #     networkConfig = {
+  #       DHCP = "no";
+  #       IPv6AcceptRA = false;
+  #       DNS = "192.168.80.1";
+  #       # Remove Gateway here to avoid automatic default route creation.
+  #     };
+  #     routes = [
+  #       {
+  #         Destination = "0.0.0.0/0";
+  #         Gateway = "192.168.80.1";
+  #         Metric = 1024; # This sets the default route with a high metric.
+  #       }
+  #     ];
+  #   };
 
-  };
+  # };
 }

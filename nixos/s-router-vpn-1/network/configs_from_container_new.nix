@@ -1,0 +1,465 @@
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+{
+  ### to make the dev environment the same:
+  # nmcli con mod "Wired connection 2" connection.id ens18
+  # nmcli con mod "Wired connection 3" connection.id ens20
+  # nmcli con show
+
+
+  # 1) Ensure cp/install/chmod are in $PATH
+  environment.systemPackages = with pkgs; [
+    coreutils
+    python3
+  ];
+
+
+  boot.kernel.sysctl = {
+    "net.ipv4.ip_forward" = 1;
+    "net.ipv6.conf.all.forwarding" = 1;
+  };
+  
+
+  networking.networkmanager.enable = true;
+  networking.networkmanager.unmanaged = [  ];
+
+  # 3) Copy everything from /etc/root into /root at activation time
+  system.activationScripts.copyToRoot = {
+    text = ''
+      for f in /etc/root/*; do
+        install -D -m0755 "$f" "/root/$(basename $f)"
+      done
+    '';
+    deps = [ "etc" ];
+  };
+
+  # services.cron.enable = true;
+
+  services.cron.systemCronJobs = [
+    # "0 * * * * root /path/to/your/script.sh"
+    "*/5 * * * * root /root/update_iptables.sh"
+    "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf ens22\""
+    "@reboot root systemctl start isc-dhcp-server"
+    "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
+    "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
+  ];
+
+  environment.etc = {
+    # calculate-prefix.py → /etc/root/calculate-prefix.py
+    "root/calculate-prefix.py" = {
+      source = pkgs.writeTextFile {
+        name = "calculate-prefix.py";
+        text = ''
+          #!/usr/bin/env python3
+          import argparse
+          import ipaddress
+
+          def expand_ipv6_address(address):
+              """Expand an IPv6 address to its full notation."""
+              return ipaddress.ip_address(address.split('/')[0]).exploded
+
+          def extract_network_prefix(address, length):
+              """Extract the network prefix based on the prefix length."""
+              blocks = address.split(':')
+              num_full_blocks = length // 16
+              relevant_blocks = blocks[:num_full_blocks]
+              # Ensure the output is formatted to show the complete segment with trailing zeros
+              return ':'.join(relevant_blocks) + (':0' * (4 - num_full_blocks)) + ':'
+
+          def main():
+              # Create argument parser
+              parser = argparse.ArgumentParser(description='Process an IPv6 address in the format address/prefix_length.')
+              parser.add_argument('ipv6_cidr', type=str, help='The IPv6 CIDR notation to be processed')
+
+              # Parse arguments
+              args = parser.parse_args()
+
+              # Split the address and prefix length
+              address, length = args.ipv6_cidr.split('/')
+              length = int(length)
+
+              # Process the IPv6 address
+              expanded_ipv6 = expand_ipv6_address(args.ipv6_cidr)
+              network_prefix = extract_network_prefix(expanded_ipv6, length)
+
+              # Output results
+              #print("Expanded IPv6 Address:", expanded_ipv6)
+              print(network_prefix)
+
+          if __name__ == "__main__":
+              main()
+        '';
+      };
+      mode = "0755";
+    };
+
+    # pre-setup-script.sh → /etc/root/pre-setup-script.sh
+    "root/pre-setup-script.sh" = {
+      source = pkgs.writeShellScript "pre-setup-script" ''
+        #!/usr/bin/env bash
+        nmcli conn | rev | awk '{print $3}' | rev | xargs -I {} nmcli con del {}
+        nmcli con add con-name ens20 type ethernet ifname ens20 ipv4.method auto
+      '';
+      mode = "0755";
+    };
+
+    # subnets.sh → /etc/root/subnets.sh
+    "root/subnets.sh" = {
+      source = pkgs.writeShellScript "subnets" ''
+        #!/usr/bin/env bash
+        export IPv4_static="10.90.0.1/24"
+        export IPv6_static="fd90:dead:beef::100/64"
+      '';
+      mode = "0755";
+    };
+
+    # generate-dhcpd.conf.sh → /etc/root/generate-dhcpd.conf.sh
+    "root/generate-dhcpd.conf.sh" = {
+      source = pkgs.writeShellScript "generate-dhcpd.conf.sh" ''
+        #!/usr/bin/env bash
+        mkdir /etc/dhcp/ 2>/dev/null || true
+        IPV4_ADDR=$(ip -4 a s ens22 | grep 'scope global' | awk '{print $2}')
+        source /root/subnets.sh
+        IPV4_ADDR=$IPv4_static
+        sipcalc "$IPV4_ADDR"
+        IPV4_PREFIX=$(sipcalc "$IPV4_ADDR" | grep -i 'network range' | rev | awk '{print $3}' | rev )
+        IPV4_MASK=$(sipcalc "$IPV4_ADDR" | grep -i 'network mask' | grep 255 | awk -F'-' '{print $2}')
+        IPV4_ADDR_WITHOUT_MASK=$(echo $IPV4_ADDR | sed 's/\/.*//g')
+        IPV4_USABLE_RANGE=$(sipcalc "$IPV4_ADDR" | grep -i 'usable range' | rev | awk -F'-' '{print $1, $2}' | rev | sed 's/.1 /.10/g') # Usable range
+        echo $IPV4_ADDR
+        echo $IPV4_PREFIX
+        echo $IPV4_MASK
+        echo $IPV4_ADDR_WITHOUT_MASK
+        echo $IPV4_USABLE_RANGE
+        #echo 'default-lease-time 600;
+        #max-lease-time 600;
+        #subnet 10.30.0.0 netmask 255.255.255.0 {
+        #  range 10.30.0.1 10.30.0.200;
+        #  option routers 10.30.0.1;       # Default gateway
+        #  option subnet-mask 255.255.255.0;
+        #  option domain-name-servers 10.30.0.1;
+        #}'
+
+        echo "default-lease-time 600;
+        max-lease-time 600;
+        subnet $IPV4_PREFIX netmask $IPV4_MASK {
+          range $IPV4_USABLE_RANGE;
+          option routers $IPV4_ADDR_WITHOUT_MASK; # Default gateway
+          option subnet-mask $IPV4_MASK;          # Net mask 
+          option domain-name-servers $IPV4_ADDR_WITHOUT_MASK; # dns host, gateway our case
+        }" | tee /etc/dhcp/dhcpd.conf
+      '';
+      mode = "0755";
+    };
+
+
+    # setup-generic.sh
+    "root/setup-generic.sh" = {
+      source = pkgs.writeShellScript "setup-generic" ''
+        #!/usr/bin/env bash
+        source /root/subnets.sh
+        nmcli connection up tun0
+        nmcli connection down ens22
+        nmcli connection up ens22
+        nmcli connection modify "tun0" connection.autoconnect yes
+        nmcli connection add type ethernet ifname ens22 con-name ens22 ipv4.addresses "$IPv4_static" ipv4.method manual
+        nmcli connection modify ens22 ipv6.addresses "$IPv6_static"
+        nmcli connection modify ens22 ipv6.method manual
+        nmcli connection modify ens22 ipv6.dns "$IPv6_static"
+        /root/generate-dhcpd.conf.sh
+        /root/generate-radvd.conf.sh
+        nmcli connection up tun0
+        nmcli connection up tun0
+        nmcli connection up tun0
+        nmcli connection up tun0
+
+        #reboot
+      '';
+      mode = "0755";
+    };
+
+    # generate-radvd.conf.sh
+    "root/generate-radvd.conf.sh" = {
+      source = pkgs.writeShellScript "generate-radvd.conf.sh" ''
+        #!/usr/bin/env bash
+
+        # Extract IPv6 address and subnet prefix for ens22
+        IPV6_ADDR=$(ip -6 a s ens22 | grep 'scope global' | awk '{print $2}')
+
+        source /root/subnets.sh
+        IPV6_ADDR=$IPv6_static
+
+        PREFIX=$(sipcalc "$IPV6_ADDR") # | grep 'Subnet prefix' | awk '{print $3}')
+        PREFIX=$(sipcalc "$IPV6_ADDR" | grep 'Subnet prefix' | awk '{print $5}')
+        IPV6_ADDR_WITHOUT_MASK=$(echo $IPV6_ADDR | sed 's/\/.*//g')
+        echo -n 'interface ens22 {
+          AdvSendAdvert on;
+          MinRtrAdvInterval 3;
+          MaxRtrAdvInterval 10;
+          RDNSS '$IPV6_ADDR_WITHOUT_MASK' {
+                  AdvRDNSSLifetime 800;
+          };
+          prefix '$PREFIX' {
+            AdvOnLink on;
+            AdvAutonomous on;
+            AdvRouterAddr on;
+          };
+        };' | tee /etc/radvd.conf
+      '';
+      mode = "0755";
+    };
+
+    # setup-openvpn.sh
+    "root/setup-openvpn.sh" = {
+      source = pkgs.writeShellScript "setup-openvpn.sh" ''
+        #!/usr/bin/env bash
+        source /root/subnets.sh
+        /root/pre-setup-script.sh
+        nmcli connection import type openvpn file /root/tun0.ovpn
+        /usr/bin/env bash /root/setup-generic.sh
+      '';
+      mode = "0755";
+    };
+
+    # update_iptables.sh
+    "root/update_iptables.sh" = {
+      source = pkgs.writeShellScript "update_iptables.sh" ''
+        #!/bin/bash
+
+        # Get the current IP address of tun0
+        #TUN_IP_v4=$(ip addr show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+        TUN_IP_v4=$(nmcli connection show tun0 | grep 'ipv4.dns' | awk '{print $2}' | head -n1)
+        TUN_IP_v6=$(nmcli connection show tun0 | grep 'ipv6.dns' | awk '{print $2}' | head -n1)
+
+
+        traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | awk '{print $2}'
+        if [[ -z "$TUN_IP_v4" || "$TUN_IP_v4" == "--" ]]; then
+            # If it's empty or has '--', get the first hop's IPv4 address from traceroute and assign it to TUN_IP_v4
+            TUN_IP_v4=$(traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | awk '{print $2}')
+            echo $TUN_IP_v4
+        fi
+
+        # Check if the DNS setting is empty or if it contains '--'
+        if [[ -z "$TUN_IP_v6" || "$TUN_IP_v6" == "--" ]]; then
+            # If it's empty or has '--', get the first hop's IPv6 address from traceroute and assign it to TUN_IP_v6
+            TUN_IP_v6=$(traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | awk '{print $2}')
+            echo $TUN_IP_v6
+        fi
+        #TUN_IP_v6=$(traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | awk '{print $2}')
+
+        echo $TUN_IP_v4 > "/tmp/dns-ipv4-from-$(basename "$0").txt"
+        echo $TUN_IP_v6 > "/tmp/dns-ipv6-from-$(basename "$0").txt"
+        # Flush old rules for port 53 forwarding
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens22 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4 2>/dev/null
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens22 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4 2>/dev/null
+
+        # Allow callbacks in the local network (added 2024)
+        ${pkgs.iptables}/bin/iptables -I FORWARD -i ens22 -o ens22 -j ACCEPT
+        ${pkgs.iptables}/bin/ip6tables -I FORWARD -i ens22 -o ens22 -j ACCEPT
+
+        # Add new rules with the current IP address
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens22 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens22 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4
+
+
+        # DNS will not resolved with these rules (testing 2025-09-13)
+        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -d $TUN_IP_v4 -p udp --dport 53 -j MASQUERADE
+        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -d $TUN_IP_v4 -p tcp --dport 53 -j MASQUERADE
+
+
+        # # portforward everything (doesn't work, at reboot, the vpn is not resolved......):
+        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+        # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+
+
+        #/root/portforwards.sh
+        # Flush old rules for port 53 forwarding
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens22 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens22 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
+
+        # Add new rules with the current IP address
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens22 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens22 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6
+      '';
+      mode = "0755";
+    };
+
+    # portforwards.sh
+    "root/portforwards.sh" = {
+      source = pkgs.writeShellScript "portforwards.sh" ''
+        #!/bin/bash
+        IPV6_ADDR=$(ip -6 a s ens22 | grep 'scope global' | awk '{print $2}')
+        IPV6_PREFIX=$(/root/calculate-prefix.py $(echo $IPV6_ADDR) | sed 's/0000://g')
+        # ipv6:
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination [$IPV6_PREFIX:a28f:aa25:f510:bdcb]:22
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination [$IPV6_PREFIX:be24:11ff:fe3d:474d]:443
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination [$IPV6_PREFIX:a133:c085:eeab:f2c1]:21614
+        # ipv4:
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination 10.30.0.109:22
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination 10.30.0.167:443
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination 10.30.0.163:21614
+      '';
+      mode = "0755";
+    };
+
+    # setup-wireguard.sh
+    "root/setup-wireguard.sh" = {
+      source = pkgs.writeShellScript "setup-wireguard.sh" ''
+        #!/usr/bin/env bash
+        source /root/subnets.sh
+        /root/pre-setup-script.sh
+        nmcli connection import type wireguard file /root/tun0.conf 
+        /usr/bin/env bash /root/setup-generic.sh
+      '';
+      mode = "0755";
+    };
+
+    # watchdog-networkmanager.sh
+    "root/watchdog-networkmanager.sh" = {
+      source = pkgs.writeShellScript "watchdog-networkmanager.sh" ''
+        #!/bin/bash
+
+        # Variables
+        destination="1.1.1.1"  # IP to ping
+        interface="tun0"        # Network interface
+        ping_count=10           # Number of pings to send each time
+        drop_threshold=50       # Packet drop percentage threshold
+
+        # Continuous check
+        while true; do
+          # Run the ping with a 1-second timeout and capture output
+          ping_output=$(ping -I $interface -c $ping_count -W 1 $destination 2>&1)
+
+          # Check for "Network is unreachable" or packet loss
+          packet_loss=$(echo "$ping_output" | grep -oP '\d+(?=% packet loss)')
+
+          if echo "$ping_output" | grep -q "Network is unreachable" || [ -z "$packet_loss" ] || [ "$packet_loss" -gt "$drop_threshold" ]; then
+            echo "Network is unreachable or packet loss exceeds $drop_threshold%. Restarting Network Manager."
+            ip a flush ens20
+            sudo systemctl restart NetworkManager
+            sleep 3
+            # /root/portforwards.sh
+          elif [ "$packet_loss" -eq 0 ]; then
+            echo "Packet loss is 0%, network is functioning correctly. No restart needed."
+          else
+            echo "Packet loss is $packet_loss%, below threshold of $drop_threshold%. No action needed."
+          fi
+
+          # Wait for the next check
+          sleep 30
+        done
+      '';
+      mode = "0755";
+    };
+  };
+  networking.useNetworkd = true;
+
+
+  systemd.services.dhcpd = {
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    # path = [ pkgs.isc-dhcp-server ];
+
+    serviceConfig = {
+      ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /etc/dhcp/dhcpd.conf";
+      Restart = "on-failure";
+    };
+    preStart = ''
+      mkdir -p /var/db
+      touch /var/db/dhcpd.leases
+      # /root/generate-dhcpd.conf.sh
+      chmod 644 /etc/dhcp/dhcpd.conf
+    '';
+
+  };
+
+  systemd.services.radvd = {
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    path = [ pkgs.radvd ];
+
+    serviceConfig = {
+      ExecStart = "${pkgs.radvd}/bin/radvd -n -C /etc/radvd.conf";
+      Restart = "on-failure";
+    };
+
+    # preStart = ''
+    #   echo "Generating radvd.conf..."
+    #   /etc/gen-radvd.sh > /etc/radvd.conf
+    #   chmod 644 /etc/radvd.conf
+    # '';
+  };
+
+  # Disable networkd-wait-online
+  systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
+
+  systemd.network = {
+    enable = true;
+
+    # Rename ens19 to phys0
+    links."10-phys0" = {
+      matchConfig.PermanentMACAddress = "bc:24:11:28:1f:b6";
+      linkConfig.Name = "phys0";
+    };
+    # Attach only the DHCP VLANs to phys0
+    networks."10-phys0" = {
+      matchConfig.Name = "phys0";
+      networkConfig.VLAN = [
+        "vlan-lan"
+        "vlan-test"
+        "vlan-natted-internal"
+      ];
+    };
+
+    # VLAN for LAN (ID: 4) with DHCP
+    netdevs."10-vlan-lan" = {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "vlan-lan";
+      };
+      vlanConfig.Id = 4;
+    };
+    networks."10-vlan-lan" = {
+      matchConfig.Name = "vlan-lan";
+      networkConfig = {
+        DHCP = "yes";
+        IPv6AcceptRA = true;
+      };
+      dhcpConfig.RouteMetric = 150;
+    };
+
+    # VLAN for vlan-natted-internal (ID: 10) with static IP and a high default route metric
+    netdevs."30-vlan-natted-internal" = {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "vlan-natted-internal";
+      };
+      vlanConfig.Id = 20;
+    };
+    networks."30-vlan-natted-internal" = {
+      matchConfig.Name = "vlan-natted-internal";
+      addresses = [
+        { Address = "192.168.80.20/24"; }
+        { Address = "fd80:dead:beef::1/64"; }
+      ];
+      networkConfig = {
+        DHCP = "no";
+        IPv6AcceptRA = false;
+        DNS = "192.168.80.1";
+        # Remove Gateway here to avoid automatic default route creation.
+      };
+      routes = [
+        {
+          Destination = "0.0.0.0/0";
+          Gateway = "192.168.80.1";
+          Metric = 1024; # This sets the default route with a high metric.
+        }
+      ];
+    };
+
+  };
+}

@@ -23,7 +23,7 @@
     # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
-    ./network/configs_from_container.nix
+    ./network/configs_from_container_new.nix
     ./network/packages-required-by-scripts.nix
     ./ssh-vim-and-basics.nix
 

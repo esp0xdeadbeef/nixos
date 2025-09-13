@@ -27,6 +27,7 @@
     ./hardware/hardware-configuration.nix
     ./hardware/nvidia.nix
     ./hardware/swap-and-tmpfs.nix
+    ./wayland-tests/config.nix
 
     ../01-general/desktop/applet-nm.nix
     ../01-general/desktop/fonts.nix
