@@ -266,11 +266,13 @@
         ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens22 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4
 
 
+
+        # !!!! THIS IS WHERE IT GOES WRONG !!!!
         # DNS will not resolved with these rules (testing 2025-09-13)
         # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -d $TUN_IP_v4 -p udp --dport 53 -j MASQUERADE
         # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -d $TUN_IP_v4 -p tcp --dport 53 -j MASQUERADE
 
-
+        # !!!! THIS IS WHERE IT GOES WRONG !!!!
         # # portforward everything (doesn't work, at reboot, the vpn is not resolved......):
         # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
         # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
