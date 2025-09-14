@@ -16,7 +16,7 @@
     "net.ipv6.conf.all.forwarding" = 1;
   };
   boot.kernelModules = [
-    "nf_nat_ipv6"
+    # "nf_nat_ipv6" # no fucking clue what this is... :D
     "ip6table_nat"
   ];
 
@@ -121,8 +121,8 @@
 
   systemd.services.import-vpn-profile = {
     wantedBy = [ "multi-user.target" ];
-    # requires = [ "NetworkManager.service" ];
-    # after = [ "NetworkManager.service" ];
+    after = [ "network-online.target" ];
+    requires = [ "network-online.target" ];
     path = [
       pkgs.networkmanager
       pkgs.util-linux
@@ -130,22 +130,23 @@
     ];
     serviceConfig = {
       ExecStart = "/root/import-vpn-profile.sh";
+      Type = "oneshot";
+      RemainAfterExit = true;
       Restart = "on-failure";
       RestartSec = 10;
-      StartLimitIntervalSec = 0;
-      StartLimitBurst = 0;
     };
   };
+
   systemd.services.portforwards = {
     wantedBy = [ "multi-user.target" ];
     requires = [ "import-vpn-profile.service" ];
     after = [ "import-vpn-profile.service" ];
     serviceConfig = {
       ExecStart = "/root/portforwards.sh";
+      Type = "oneshot";
+      RemainAfterExit = true;
       Restart = "on-failure";
       RestartSec = 10;
-      StartLimitIntervalSec = 0;
-      StartLimitBurst = 0;
     };
   };
 
@@ -156,10 +157,10 @@
     path = [ pkgs.networkmanager ];
     serviceConfig = {
       ExecStart = "/root/update_iptables.sh";
+      Type = "oneshot";
+      RemainAfterExit = true;
       Restart = "on-failure";
       RestartSec = 10;
-      StartLimitIntervalSec = 0;
-      StartLimitBurst = 0;
     };
   };
   systemd.services.watchdog-networkmanager = {
@@ -178,10 +179,10 @@
 
     serviceConfig = {
       ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /etc/dhcp/dhcpd.conf ens21";
+      Type = "oneshot";
+      RemainAfterExit = true;
       Restart = "on-failure";
       RestartSec = 10;
-      StartLimitIntervalSec = 0;
-      StartLimitBurst = 0;
     };
     preStart = ''
       mkdir -p /var/db
@@ -202,7 +203,7 @@
       ExecStart = "${pkgs.radvd}/bin/radvd -n -C /etc/radvd.conf ens21";
       Restart = "on-failure";
       RestartSec = 10;
-      StartLimitIntervalSec = 0;
+      # StartLimitIntervalSec = 0;
       StartLimitBurst = 0;
     };
 
@@ -275,7 +276,6 @@
     # subnets.sh → /etc/root/subnets.sh
     "root/subnets.sh" = {
       source = pkgs.writeShellScript "subnets" ''
-        set -euo pipefail
         export IPV4_VPN_SUBNET_STATIC_WITH_MASK="10.90.0.1/24"
         export IPV6_VPN_SUBNET_STATIC_WITH_MASK="fd90:dead:beef::100/64"
       '';
@@ -383,6 +383,7 @@
     "root/import-vpn-profile.sh" = {
       source = pkgs.writeShellScript "import-vpn-profile.sh" ''
         set -euo pipefail
+        set -x
         # these settings make nmcli tun0 a low priority interface (we don't need to tunnel traffic through it, except for the ens21 lan side):
         until ${pkgs.networkmanager}/bin/nmcli networking connectivity check &>/dev/null; do
           sleep 1
@@ -408,7 +409,7 @@
 
         IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
         IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}')
-        
+
         if [[ -z "$IPv4_DNS_VPN" || "$IPv4_DNS_VPN" == "--" ]]; then
             # If it's empty or has '--', get the first hop's IPv4 address from traceroute and assign it to IPv4_DNS_VPN
             IPv4_DNS_VPN=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
@@ -473,17 +474,33 @@
     "root/portforwards.sh" = {
       source = pkgs.writeShellScript "portforwards.sh" ''
         set -euo pipefail
-        #update this shit!
-        IPV6_ADDR=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
-        IPV6_PREFIX=$(/root/calculate-prefix.py $(echo $IPV6_ADDR) | sed 's/0000://g')
-        # ipv6:
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination [$IPV6_PREFIX:a28f:aa25:f510:bdcb]:22
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination [$IPV6_PREFIX:be24:11ff:fe3d:474d]:443
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination [$IPV6_PREFIX:a133:c085:eeab:f2c1]:21614
-        # ipv4:
-        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination 10.30.0.109:22
-        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21613 -j DNAT --to-destination 10.30.0.167:443
-        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport 21614 -j DNAT --to-destination 10.30.0.163:21614
+        set -x
+
+        . /root/subnets.sh
+
+        IPV6_PREFIX=$(echo "$IPV6_VPN_SUBNET_STATIC_WITH_MASK" | cut -d/ -f1 | cut -d: -f1-3):
+        IPV4_PREFIX=$(echo "$IPV4_VPN_SUBNET_STATIC_WITH_MASK" | cut -d/ -f1 | cut -d. -f1-3)
+
+        declare -A HOSTS_IPV4=(
+          [21612]=109
+          [21613]=167
+          [21614]=163
+        )
+
+        declare -A HOSTS_IPV6=(
+          [21612]=":a28f:aa25:f510:bdcb"
+          [21613]=":be24:11ff:fe3d:474d"
+          [21614]=":a133:c085:eeab:f2c1"
+        )
+
+        for port in "''${!HOSTS_IPV4[@]}"; do
+          ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i tun0 -p tcp --dport "$port" \
+            -j DNAT --to-destination "$IPV4_PREFIX.''${HOSTS_IPV4[$port]}:$port"
+
+          ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport "$port" \
+            -j DNAT --to-destination "[$IPV6_PREFIX''${HOSTS_IPV6[$port]}]:$port"
+        done
+
       '';
       mode = "0755";
     };
