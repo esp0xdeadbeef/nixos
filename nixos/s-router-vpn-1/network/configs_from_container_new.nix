@@ -399,103 +399,59 @@
     "root/update_iptables.sh" = {
       source = pkgs.writeShellScript "update_iptables.sh" ''
         set -euo pipefail
+        # set -x
         # Get the current IP address of tun0
-        TUN_IP_v4=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv4.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
-        TUN_IP_v6=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
+        source /root/subnets.sh
+
+        IPv4_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv4.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
+        IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
 
         IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
         IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}')
-        IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
-
-        # traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | awk '{print $2}'
-        if [[ -z "$TUN_IP_v4" || "$TUN_IP_v4" == "--" ]]; then
-            # If it's empty or has '--', get the first hop's IPv4 address from traceroute and assign it to TUN_IP_v4
-            TUN_IP_v4=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
-            echo "IPV4 Tunnel IP: $TUN_IP_v4"
+        
+        if [[ -z "$IPv4_DNS_VPN" || "$IPv4_DNS_VPN" == "--" ]]; then
+            # If it's empty or has '--', get the first hop's IPv4 address from traceroute and assign it to IPv4_DNS_VPN
+            IPv4_DNS_VPN=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
+            echo "IPV4 Tunnel IP: $IPv4_DNS_VPN"
         fi
 
         # Check if the DNS setting is empty or if it contains '--'
-        if [[ -z "$TUN_IP_v6" || "$TUN_IP_v6" == "--" ]]; then
-            # If it's empty or has '--', get the first hop's IPv6 address from traceroute and assign it to TUN_IP_v6
-            TUN_IP_v6=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
-            echo "IPV6 Tunnel IP: $TUN_IP_v6"
+        if [[ -z "$IPv6_DNS_VPN" || "$IPv6_DNS_VPN" == "--" ]]; then
+            # If it's empty or has '--', get the first hop's IPv6 address from traceroute and assign it to IPv6_DNS_VPN
+            IPv6_DNS_VPN=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
+            echo "IPV6 Tunnel IP: $IPv6_DNS_VPN"
         fi
-        #TUN_IP_v6=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
 
-        echo $TUN_IP_v4 | tee "/tmp/dns-ipv4-from-$(basename "$0").txt"
-        echo $TUN_IP_v6 | tee "/tmp/dns-ipv6-from-$(basename "$0").txt"
+        # logging for DNS:
+        echo "IPv4_DNS_VPN: $IPv4_DNS_VPN"
+        echo "IPv6_DNS_VPN: $IPv6_DNS_VPN"
 
 
         # Flush old rules for port 53 forwarding
-        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4 || true
-        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4 || true
-
-        # Allow callbacks in the local network (added 2024)
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN || true
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN || true
+        # Allow forwarding to self
         ${pkgs.iptables}/bin/iptables -I FORWARD -i ens21 -o ens21 -j ACCEPT
-        ${pkgs.iptables}/bin/ip6tables -I FORWARD -i ens21 -o ens21 -j ACCEPT
-
-        # Add new rules with the current IP address
-        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4
-        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4
-
-
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s 10.90.0.0/24 -o tun0 -p udp --dport 53 -j MASQUERADE
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s 10.90.0.0/24 -o tun0 -p tcp --dport 53 -j MASQUERADE
-
-        # Masquerade *all* IPv4 traffic from ens21 out tun0
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s 10.90.0.0/24 -o tun0 -j MASQUERADE
-
-        # Masquerade *all* IPv6 traffic from ens21 out tun0
-        # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -s fd90:dead:beef::/64 -o tun0 -j MASQUERADE
-
-        # !!!! THIS IS WHERE IT GOES WRONG !!!!
-        # DNS will not resolved with these rules (testing 2025-09-13)
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -d $TUN_IP_v4 -p udp --dport 53 -j MASQUERADE
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -d $TUN_IP_v4 -p tcp --dport 53 -j MASQUERADE
-
-        # !!!! THIS IS WHERE IT GOES WRONG !!!!
-        # # portforward everything (doesn't work, at reboot, the vpn is not resolved......):
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
-        # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
-
-        ## Only MASQUERADE DNS traffic coming from ens21
-        # iptables v1.8.11 (nf_tables): Can't use --in-interface with POSTROUTING
-        # Try `iptables -h' or 'iptables --help' for more information.
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -i ens21 -o tun0 -d $TUN_IP_v4 -p udp --dport 53 -j MASQUERADE
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -i ens21 -o tun0 -d $TUN_IP_v4 -p tcp --dport 53 -j MASQUERADE
-
-        ## do the same for ipv6
-        # ip6tables v1.8.11 (nf_tables): Can't use --in-interface with POSTROUTING
-        # Try `ip6tables -h' or 'ip6tables --help' for more information.
-        # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -i ens21 -o tun0 -d $TUN_IP_v6 -p udp --dport 53 -j MASQUERADE
-        # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -i ens21 -o tun0 -d $TUN_IP_v6 -p tcp --dport 53 -j MASQUERADE
-
-        ##  Optional full masquerading for traffic coming *from* ens21 and going *out* tun0
-        # iptables v1.8.11 (nf_tables): Can't use --in-interface with POSTROUTING
-        # Try `iptables -h' or 'iptables --help' for more information.
-        # so doesn't work:
-        # ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -i ens21 -o tun0 -j MASQUERADE
-        # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -i ens21 -o tun0 -j MASQUERADE
-
-        source /root/subnets.sh
+        # Portforwards DNS
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
+        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
+        # MASQUERADE the traffic from IPV4_VPN_SUBNET_STATIC_WITH_MASK to tun0
         ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s $IPV4_VPN_SUBNET_STATIC_WITH_MASK -o tun0 -j MASQUERADE
 
+
         # Flush old rules for port 53 forwarding
-        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6 || true
-        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6 || true
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN || true
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN || true
 
+        # allow callbacks on the adapter itself
+        ${pkgs.iptables}/bin/ip6tables -I FORWARD -i ens21 -o ens21 -j ACCEPT
         # Add new rules with the current IP address
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6
-        # old shit that didn't work:
-        # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -s $IPV6_VPN_SUBNET_STATIC_WITH_MASK -o tun0 -j MASQUERADE
-
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN
+        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN
 
         # DNAT any incoming UDP or TCP DNS on ens21 to the real VPN DNS server
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p tcp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
-
-        # Allow the traffic to be forwarded from LAN → VPN
         ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ens21 -o tun0 -p udp --dport 53 -d $IPv6_DNS_VPN -j ACCEPT
         ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ens21 -o tun0 -p tcp --dport 53 -d $IPv6_DNS_VPN -j ACCEPT
 
@@ -507,7 +463,6 @@
 
         # Accept return traffic
         ${pkgs.iptables}/bin/ip6tables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
-
         ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -s $IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET -o tun0 -j MASQUERADE
 
       '';
