@@ -16,7 +16,6 @@
     "net.ipv6.conf.all.forwarding" = 1;
   };
   boot.kernelModules = [
-    # "nf_nat_ipv6" # no fucking clue what this is... :D
     "ip6table_nat"
   ];
 
@@ -109,13 +108,6 @@
   };
 
   services.cron.systemCronJobs = [
-    #   # "0 * * * * root /path/to/your/script.sh"
-    #   # "*/5 * * * * root /root/update_iptables.sh"
-    #   # "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf ens21\""
-    #   # "@reboot root systemctl start isc-dhcp-server"
-    #   # "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
-    #   # "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
-    # "@reboot root bash -c \"sleep 10; /root/import-vpn-profile.sh\""
     # "@reboot root bash -c \"sleep 60; mv /root/test.conf /root/tun0.conf\""
   ];
 
