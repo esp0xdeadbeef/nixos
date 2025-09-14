@@ -5,11 +5,6 @@
   ...
 }:
 {
-  ### to make the dev environment the same:
-  # nmcli con mod "Wired connection 2" connection.id ens18
-  # nmcli con mod "Wired connection 3" connection.id ens20
-  # nmcli con show
-
   # 1) Ensure cp/install/chmod are in $PATH
   environment.systemPackages = with pkgs; [
     coreutils
@@ -112,16 +107,64 @@
     };
 
   };
-  
 
   services.cron.systemCronJobs = [
-    # "0 * * * * root /path/to/your/script.sh"
-    "*/5 * * * * root /root/update_iptables.sh"
-    "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf ens21\""
-    "@reboot root systemctl start isc-dhcp-server"
-    "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
-    "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
+    #   # "0 * * * * root /path/to/your/script.sh"
+    #   # "*/5 * * * * root /root/update_iptables.sh"
+    #   # "@reboot root bash -c \"sleep 1; touch /var/run/dhcpd.pid; /usr/sbin/dhcpd -4 -q -cf /etc/dhcp/dhcpd.conf ens21\""
+    #   # "@reboot root systemctl start isc-dhcp-server"
+    #   # "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
+    #   # "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
+    "@reboot root bash -c \"sleep 10; /root/import-vpn-profile.sh\""
   ];
+
+  systemd.services.portforwards = {
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    serviceConfig = {
+      ExecStart = "/root/portforwards.sh";
+      Restart = "on-failure";
+    };
+  };
+
+  systemd.services.import-vpn-profile = {
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    path = [ pkgs.networkmanager ];
+    serviceConfig = {
+      ExecStart = "/root/import-vpn-profile.sh";
+      Restart = "on-failure";
+    };
+  };
+
+  # systemd.timers.update_iptables = {
+  #   wantedBy = [ "timers.target" ];
+  #   timerConfig = {
+  #     OnBootSec = "2min";
+  #     OnUnitActiveSec = "5min";
+  #     Persistent = true;
+  #   };
+  # };
+
+  systemd.services.update_iptables = {
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    path = [ pkgs.networkmanager ];
+    serviceConfig = {
+      ExecStart = "/root/update_iptables.sh";
+      Restart = "on-failure";
+    };
+  };
+  systemd.services.watchdog-networkmanager = {
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      ExecStart = "/root/watchdog-networkmanager.sh";
+      Restart = "always";
+    };
+  };
 
   environment.etc = {
     # calculate-prefix.py → /etc/root/calculate-prefix.py
@@ -129,7 +172,7 @@
       source = pkgs.writeTextFile {
         name = "calculate-prefix.py";
         text = ''
-          #!/usr/bin/env python3
+          #!${pkgs.python3}/bin/python3
           import argparse
           import ipaddress
 
@@ -176,8 +219,8 @@
     "root/pre-setup-script.sh" = {
       source = pkgs.writeShellScript "pre-setup-script" ''
         #!/usr/bin/env bash
-        nmcli conn | grep -v 'ens18\|lo \|NAME ' | rev | awk '{print $3}' | rev | xargs -I {} nmcli con del {}
-        nmcli con add con-name ens20 type ethernet ifname ens20 ipv4.method auto
+        ${pkgs.networkmanager}/bin/nmcli conn | grep -v 'ens18\|lo \|NAME ' | rev | awk '{print $3}' | rev | xargs -I {} ${pkgs.networkmanager}/bin/nmcli con del {}
+        ${pkgs.networkmanager}/bin/nmcli con add con-name ens20 type ethernet ifname ens20 ipv4.method auto
       '';
       mode = "0755";
     };
@@ -197,7 +240,7 @@
       source = pkgs.writeShellScript "generate-dhcpd.conf.sh" ''
         #!/usr/bin/env bash
         mkdir /etc/dhcp/ 2>/dev/null || true
-        IPV4_ADDR=$(ip -4 a s ens21 | grep 'scope global' | awk '{print $2}')
+        IPV4_ADDR=$(${pkgs.iproute2}/bin/ip -4 a s ens21 | grep 'scope global' | awk '{print $2}')
         source /root/subnets.sh
         IPV4_ADDR=$IPV4_VPN_SUBNET_STATIC_WITH_MASK
         sipcalc "$IPV4_ADDR"
@@ -225,22 +268,21 @@
     # setup-generic.sh
     "root/setup-generic.sh" = {
       source = pkgs.writeShellScript "setup-generic" ''
-        #!/usr/bin/env bash
         source /root/subnets.sh
-        nmcli connection up tun0
-        nmcli connection down ens21
-        nmcli connection up ens21
-        nmcli connection modify "tun0" connection.autoconnect yes
-        nmcli connection add type ethernet ifname ens21 con-name ens21 ipv4.addresses "$IPV4_VPN_SUBNET_STATIC_WITH_MASK" ipv4.method manual
-        nmcli connection modify ens21 ipv6.addresses "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
-        nmcli connection modify ens21 ipv6.method manual
-        nmcli connection modify ens21 ipv6.dns "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
+        ${pkgs.networkmanager}/bin/nmcli connection up tun0
+        ${pkgs.networkmanager}/bin/nmcli connection down ens21
+        ${pkgs.networkmanager}/bin/nmcli connection up ens21
+        ${pkgs.networkmanager}/bin/nmcli connection modify "tun0" connection.autoconnect yes
+        ${pkgs.networkmanager}/bin/nmcli connection add type ethernet ifname ens21 con-name ens21 ipv4.addresses "$IPV4_VPN_SUBNET_STATIC_WITH_MASK" ipv4.method manual
+        ${pkgs.networkmanager}/bin/nmcli connection modify ens21 ipv6.addresses "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
+        ${pkgs.networkmanager}/bin/nmcli connection modify ens21 ipv6.method manual
+        ${pkgs.networkmanager}/bin/nmcli connection modify ens21 ipv6.dns "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
         /root/generate-dhcpd.conf.sh
         /root/generate-radvd.conf.sh
-        nmcli connection up tun0
-        nmcli connection up tun0
-        nmcli connection up tun0
-        nmcli connection up tun0
+        ${pkgs.networkmanager}/bin/nmcli connection up tun0
+        ${pkgs.networkmanager}/bin/nmcli connection up tun0
+        ${pkgs.networkmanager}/bin/nmcli connection up tun0
+        ${pkgs.networkmanager}/bin/nmcli connection up tun0
 
         #reboot
       '';
@@ -253,7 +295,7 @@
         #!/usr/bin/env bash
 
         # Extract IPv6 address and subnet prefix for ens21
-        IPV6_ADDR=$(ip -6 a s ens21 | grep 'scope global' | awk '{print $2}')
+        IPV6_ADDR=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global' | awk '{print $2}')
 
         source /root/subnets.sh
         IPV6_ADDR=$IPV6_VPN_SUBNET_STATIC_WITH_MASK
@@ -284,7 +326,7 @@
         #!/usr/bin/env bash
         source /root/subnets.sh
         /root/pre-setup-script.sh
-        nmcli connection import type openvpn file /root/tun0.ovpn
+        ${pkgs.networkmanager}/bin/nmcli connection import type openvpn file /root/tun0.ovpn
         /usr/bin/env bash /root/setup-generic.sh
       '';
       mode = "0755";
@@ -293,11 +335,10 @@
     "root/import-vpn-profile.sh" = {
       source = pkgs.writeShellScript "import-vpn-profile.sh" ''
         # these settings make nmcli tun0 a low priority interface (we don't need to tunnel traffic through it, except for the ens21 lan side):
-        nmcli conn | grep 'tun0' | rev | awk '{print $3}' | rev | xargs -I {} nmcli con del {}
-        nmcli connection import type wireguard file /root/tun0.conf
-        sleep 1
-        nmcli connection modify tun0 ipv4.route-metric 1000
-        nmcli connection modify tun0 ipv6.route-metric 1000
+        ${pkgs.networkmanager}/bin/nmcli conn | grep 'tun0' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $3}' | ${pkgs.util-linux}/bin/rev | xargs -I {} ${pkgs.networkmanager}/bin/nmcli con del {}
+        ${pkgs.networkmanager}/bin/nmcli connection import type wireguard file /root/tun0.conf
+        ${pkgs.networkmanager}/bin/nmcli connection modify tun0 ipv4.route-metric 1000
+        ${pkgs.networkmanager}/bin/nmcli connection modify tun0 ipv6.route-metric 1000
       '';
       mode = "0755";
     };
@@ -307,27 +348,27 @@
       source = pkgs.writeShellScript "update_iptables.sh" ''
         #!/bin/bash
 
-        /root/import-vpn-profile.sh
+
         # Get the current IP address of tun0
-        #TUN_IP_v4=$(ip addr show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
-        TUN_IP_v4=$(nmcli connection show tun0 | grep 'ipv4.dns' | awk '{print $2}' | head -n1)
-        TUN_IP_v6=$(nmcli connection show tun0 | grep 'ipv6.dns' | awk '{print $2}' | head -n1)
+        #TUN_IP_v4=$(${pkgs.iproute2}/bin/ip addr show tun0 | grep 'inet ' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d/ -f1)
+        TUN_IP_v4=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv4.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
+        TUN_IP_v6=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
 
 
         # traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | awk '{print $2}'
         if [[ -z "$TUN_IP_v4" || "$TUN_IP_v4" == "--" ]]; then
             # If it's empty or has '--', get the first hop's IPv4 address from traceroute and assign it to TUN_IP_v4
-            TUN_IP_v4=$(traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | awk '{print $2}')
+            TUN_IP_v4=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
             echo "IPV4 Tunnel IP: $TUN_IP_v4"
         fi
 
         # Check if the DNS setting is empty or if it contains '--'
         if [[ -z "$TUN_IP_v6" || "$TUN_IP_v6" == "--" ]]; then
             # If it's empty or has '--', get the first hop's IPv6 address from traceroute and assign it to TUN_IP_v6
-            TUN_IP_v6=$(traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | awk '{print $2}')
+            TUN_IP_v6=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
             echo "IPV6 Tunnel IP: $TUN_IP_v6"
         fi
-        #TUN_IP_v6=$(traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | awk '{print $2}')
+        #TUN_IP_v6=$(${pkgs.traceroute}/bin/traceroute --interface=tun0 -n6 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
 
         echo $TUN_IP_v4 | tee "/tmp/dns-ipv4-from-$(basename "$0").txt"
         echo $TUN_IP_v6 | tee "/tmp/dns-ipv6-from-$(basename "$0").txt"
@@ -385,10 +426,6 @@
         source /root/subnets.sh
         ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s $IPV4_VPN_SUBNET_STATIC_WITH_MASK -o tun0 -j MASQUERADE
 
-
-
-
-        #/root/portforwards.sh
         # Flush old rules for port 53 forwarding
         ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
         ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
@@ -400,9 +437,9 @@
         # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -s $IPV6_VPN_SUBNET_STATIC_WITH_MASK -o tun0 -j MASQUERADE
 
 
-        IPv6_INTERFACE_NATTED_LAN=$(ip -6 a s ens21 | grep 'scope global noprefixroute' | awk '{print $2}' | cut -d '/' -f 1)
-        IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(ip -6 a s ens21 | grep 'scope global noprefixroute' | awk '{print $2}')
-        IPv6_DNS_VPN=$(nmcli connection show tun0 | grep 'ipv6.dns' | awk '{print $2}' | head -n1)
+        IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
+        IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}')
+        IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
         # DNAT any incoming UDP or TCP DNS on ens21 to the real VPN DNS server
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p tcp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
@@ -431,7 +468,7 @@
       source = pkgs.writeShellScript "portforwards.sh" ''
         #!/bin/bash
         #update this shit!
-        IPV6_ADDR=$(ip -6 a s ens21 | grep 'scope global' | awk '{print $2}')
+        IPV6_ADDR=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
         IPV6_PREFIX=$(/root/calculate-prefix.py $(echo $IPV6_ADDR) | sed 's/0000://g')
         # ipv6:
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport 21612 -j DNAT --to-destination [$IPV6_PREFIX:a28f:aa25:f510:bdcb]:22
@@ -451,7 +488,7 @@
         #!/usr/bin/env bash
         source /root/subnets.sh
         /root/pre-setup-script.sh
-        nmcli connection import type wireguard file /root/tun0.conf 
+        ${pkgs.networkmanager}/bin/nmcli connection import type wireguard file /root/tun0.conf 
         /usr/bin/env bash /root/setup-generic.sh
       '';
       mode = "0755";
@@ -471,15 +508,15 @@
         # Continuous check
         while true; do
           # Run the ping with a 1-second timeout and capture output
-          ping_output=$(ping -I $interface -c $ping_count -W 1 $destination 2>&1)
+          ping_output=$(${pkgs.iputils}/bin/ping -I $interface -c $ping_count -W 1 $destination 2>&1)
 
           # Check for "Network is unreachable" or packet loss
           packet_loss=$(echo "$ping_output" | grep -oP '\d+(?=% packet loss)')
 
           if echo "$ping_output" | grep -q "Network is unreachable" || [ -z "$packet_loss" ] || [ "$packet_loss" -gt "$drop_threshold" ]; then
             echo "Network is unreachable or packet loss exceeds $drop_threshold%. Restarting Network Manager."
-            ip a flush ens20
-            sudo systemctl restart NetworkManager
+            ${pkgs.iproute2}/bin/ip a flush ens20
+            ${pkgs.systemd}/bin/systemctl restart NetworkManager
             sleep 3
             # /root/portforwards.sh
           elif [ "$packet_loss" -eq 0 ]; then
