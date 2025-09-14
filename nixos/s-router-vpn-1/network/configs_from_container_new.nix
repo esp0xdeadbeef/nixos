@@ -115,55 +115,102 @@
     #   # "@reboot root systemctl start isc-dhcp-server"
     #   # "@reboot root /root/watchdog-networkmanager.sh > /tmp/watchdog-networkmanager.sh.out"
     #   # "@reboot root bash -c \"sleep 10; /root/portforwards.sh ; /root/update_iptables.sh\""
-    "@reboot root bash -c \"sleep 10; /root/import-vpn-profile.sh\""
+    # "@reboot root bash -c \"sleep 10; /root/import-vpn-profile.sh\""
+    # "@reboot root bash -c \"sleep 60; mv /root/test.conf /root/tun0.conf\""
   ];
-
-  systemd.services.portforwards = {
-    wantedBy = [ "multi-user.target" ];
-    wants = [ "network-online.target" ];
-    after = [ "network-online.target" ];
-    serviceConfig = {
-      ExecStart = "/root/portforwards.sh";
-      Restart = "on-failure";
-    };
-  };
 
   systemd.services.import-vpn-profile = {
     wantedBy = [ "multi-user.target" ];
-    requires = [ "network-online.target" ];
-    after = [ "network-online.target" ];
-    path = [ pkgs.networkmanager ];
+    # requires = [ "NetworkManager.service" ];
+    # after = [ "NetworkManager.service" ];
+    path = [
+      pkgs.networkmanager
+      pkgs.util-linux
+      pkgs.gawk
+    ];
     serviceConfig = {
       ExecStart = "/root/import-vpn-profile.sh";
       Restart = "on-failure";
+      RestartSec = 10;
+      StartLimitIntervalSec = 0;
+      StartLimitBurst = 0;
+    };
+  };
+  systemd.services.portforwards = {
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
+    serviceConfig = {
+      ExecStart = "/root/portforwards.sh";
+      Restart = "on-failure";
+      RestartSec = 10;
+      StartLimitIntervalSec = 0;
+      StartLimitBurst = 0;
     };
   };
 
-  # systemd.timers.update_iptables = {
-  #   wantedBy = [ "timers.target" ];
-  #   timerConfig = {
-  #     OnBootSec = "2min";
-  #     OnUnitActiveSec = "5min";
-  #     Persistent = true;
-  #   };
-  # };
-
   systemd.services.update_iptables = {
     wantedBy = [ "multi-user.target" ];
-    requires = [ "network-online.target" ];
-    after = [ "network-online.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
     path = [ pkgs.networkmanager ];
     serviceConfig = {
       ExecStart = "/root/update_iptables.sh";
       Restart = "on-failure";
+      RestartSec = 10;
+      StartLimitIntervalSec = 0;
+      StartLimitBurst = 0;
     };
   };
   systemd.services.watchdog-networkmanager = {
     wantedBy = [ "multi-user.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
     serviceConfig = {
       ExecStart = "/root/watchdog-networkmanager.sh";
       Restart = "always";
     };
+  };
+  systemd.services.dhcpd = {
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
+
+    serviceConfig = {
+      ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /etc/dhcp/dhcpd.conf ens21";
+      Restart = "on-failure";
+      RestartSec = 10;
+      StartLimitIntervalSec = 0;
+      StartLimitBurst = 0;
+    };
+    preStart = ''
+      mkdir -p /var/db
+      touch /var/db/dhcpd.leases
+      /root/generate-dhcpd.conf.sh
+      chmod 644 /etc/dhcp/dhcpd.conf
+    '';
+
+  };
+
+  systemd.services.radvd = {
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
+    path = [ pkgs.radvd ];
+
+    serviceConfig = {
+      ExecStart = "${pkgs.radvd}/bin/radvd -n -C /etc/radvd.conf ens21";
+      Restart = "on-failure";
+      RestartSec = 10;
+      StartLimitIntervalSec = 0;
+      StartLimitBurst = 0;
+    };
+
+    # preStart = ''
+    #   echo "Generating radvd.conf..."
+    #   /etc/gen-radvd.sh > /etc/radvd.conf
+    #   chmod 644 /etc/radvd.conf
+    # '';
   };
 
   environment.etc = {
@@ -218,8 +265,8 @@
     # pre-setup-script.sh → /etc/root/pre-setup-script.sh
     "root/pre-setup-script.sh" = {
       source = pkgs.writeShellScript "pre-setup-script" ''
-        #!/usr/bin/env bash
-        ${pkgs.networkmanager}/bin/nmcli conn | grep -v 'ens18\|lo \|NAME ' | rev | awk '{print $3}' | rev | xargs -I {} ${pkgs.networkmanager}/bin/nmcli con del {}
+        set -euo pipefail
+        ${pkgs.networkmanager}/bin/nmcli conn | grep -v 'ens18\|lo \|NAME ' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $3}' | ${pkgs.util-linux}/bin/rev | xargs -I {} ${pkgs.networkmanager}/bin/nmcli con del {}
         ${pkgs.networkmanager}/bin/nmcli con add con-name ens20 type ethernet ifname ens20 ipv4.method auto
       '';
       mode = "0755";
@@ -228,7 +275,7 @@
     # subnets.sh → /etc/root/subnets.sh
     "root/subnets.sh" = {
       source = pkgs.writeShellScript "subnets" ''
-        #!/usr/bin/env bash
+        set -euo pipefail
         export IPV4_VPN_SUBNET_STATIC_WITH_MASK="10.90.0.1/24"
         export IPV6_VPN_SUBNET_STATIC_WITH_MASK="fd90:dead:beef::100/64"
       '';
@@ -238,16 +285,16 @@
     # generate-dhcpd.conf.sh → /etc/root/generate-dhcpd.conf.sh
     "root/generate-dhcpd.conf.sh" = {
       source = pkgs.writeShellScript "generate-dhcpd.conf.sh" ''
-        #!/usr/bin/env bash
+        set -euo pipefail
         mkdir /etc/dhcp/ 2>/dev/null || true
-        IPV4_ADDR=$(${pkgs.iproute2}/bin/ip -4 a s ens21 | grep 'scope global' | awk '{print $2}')
+        IPV4_ADDR=$(${pkgs.iproute2}/bin/ip -4 a s ens21 | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
         source /root/subnets.sh
         IPV4_ADDR=$IPV4_VPN_SUBNET_STATIC_WITH_MASK
-        sipcalc "$IPV4_ADDR"
-        IPV4_PREFIX=$(sipcalc "$IPV4_ADDR" | grep -i 'network range' | rev | awk '{print $3}' | rev )
-        IPV4_MASK=$(sipcalc "$IPV4_ADDR" | grep -i 'network mask' | grep 255 | awk -F'-' '{print $2}')
+        ${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR"
+        IPV4_PREFIX=$(${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR" | grep -i 'network range' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $3}' | ${pkgs.util-linux}/bin/rev )
+        IPV4_MASK=$(${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR" | grep -i 'network mask' | grep 255 | ${pkgs.gawk}/bin/awk -F'-' '{print $2}')
         IPV4_ADDR_GATEWAY=$(echo $IPV4_ADDR | sed 's/\/.*//g')
-        IPV4_USABLE_RANGE=$(sipcalc "$IPV4_ADDR" | grep -i 'usable range' | rev | awk -F'-' '{print $1, $2}' | rev | sed 's/.1 /.10/g') # Usable range
+        IPV4_USABLE_RANGE=$(${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR" | grep -i 'usable range' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk -F'-' '{print $1, $2}' | ${pkgs.util-linux}/bin/rev | sed 's/.1 /.10/g') # Usable range
         # echo $IPV4_ADDR
         # echo $IPV4_PREFIX
         # echo $IPV4_MASK
@@ -268,6 +315,7 @@
     # setup-generic.sh
     "root/setup-generic.sh" = {
       source = pkgs.writeShellScript "setup-generic" ''
+        set -euo pipefail
         source /root/subnets.sh
         ${pkgs.networkmanager}/bin/nmcli connection up tun0
         ${pkgs.networkmanager}/bin/nmcli connection down ens21
@@ -292,7 +340,7 @@
     # generate-radvd.conf.sh
     "root/generate-radvd.conf.sh" = {
       source = pkgs.writeShellScript "generate-radvd.conf.sh" ''
-        #!/usr/bin/env bash
+        set -euo pipefail
 
         # Extract IPv6 address and subnet prefix for ens21
         IPV6_ADDR=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global' | awk '{print $2}')
@@ -323,7 +371,7 @@
     # setup-openvpn.sh
     "root/setup-openvpn.sh" = {
       source = pkgs.writeShellScript "setup-openvpn.sh" ''
-        #!/usr/bin/env bash
+        set -euo pipefail
         source /root/subnets.sh
         /root/pre-setup-script.sh
         ${pkgs.networkmanager}/bin/nmcli connection import type openvpn file /root/tun0.ovpn
@@ -334,8 +382,13 @@
 
     "root/import-vpn-profile.sh" = {
       source = pkgs.writeShellScript "import-vpn-profile.sh" ''
+        set -euo pipefail
         # these settings make nmcli tun0 a low priority interface (we don't need to tunnel traffic through it, except for the ens21 lan side):
-        ${pkgs.networkmanager}/bin/nmcli conn | grep 'tun0' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $3}' | ${pkgs.util-linux}/bin/rev | xargs -I {} ${pkgs.networkmanager}/bin/nmcli con del {}
+        until ${pkgs.networkmanager}/bin/nmcli networking connectivity check &>/dev/null; do
+          sleep 1
+        done
+
+        ${pkgs.networkmanager}/bin/nmcli conn | grep 'tun0' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $3}' | ${pkgs.util-linux}/bin/rev | xargs -I {} ${pkgs.networkmanager}/bin/nmcli con del {} || true
         ${pkgs.networkmanager}/bin/nmcli connection import type wireguard file /root/tun0.conf
         ${pkgs.networkmanager}/bin/nmcli connection modify tun0 ipv4.route-metric 1000
         ${pkgs.networkmanager}/bin/nmcli connection modify tun0 ipv6.route-metric 1000
@@ -343,17 +396,16 @@
       mode = "0755";
     };
 
-    # update_iptables.sh
     "root/update_iptables.sh" = {
       source = pkgs.writeShellScript "update_iptables.sh" ''
-        #!/bin/bash
-
-
+        set -euo pipefail
         # Get the current IP address of tun0
-        #TUN_IP_v4=$(${pkgs.iproute2}/bin/ip addr show tun0 | grep 'inet ' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d/ -f1)
         TUN_IP_v4=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv4.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
         TUN_IP_v6=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
 
+        IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
+        IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}')
+        IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
 
         # traceroute --interface=tun0 -n4 -m 1 google.com | tail -n1 | awk '{print $2}'
         if [[ -z "$TUN_IP_v4" || "$TUN_IP_v4" == "--" ]]; then
@@ -372,9 +424,11 @@
 
         echo $TUN_IP_v4 | tee "/tmp/dns-ipv4-from-$(basename "$0").txt"
         echo $TUN_IP_v6 | tee "/tmp/dns-ipv6-from-$(basename "$0").txt"
+
+
         # Flush old rules for port 53 forwarding
-        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4
-        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v4 || true
+        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v4 || true
 
         # Allow callbacks in the local network (added 2024)
         ${pkgs.iptables}/bin/iptables -I FORWARD -i ens21 -o ens21 -j ACCEPT
@@ -427,8 +481,8 @@
         ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s $IPV4_VPN_SUBNET_STATIC_WITH_MASK -o tun0 -j MASQUERADE
 
         # Flush old rules for port 53 forwarding
-        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
-        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6 2>/dev/null
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6 || true
+        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ens21 -p tcp --dport 53 -j DNAT --to-destination $TUN_IP_v6 || true
 
         # Add new rules with the current IP address
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -j DNAT --to-destination $TUN_IP_v6
@@ -437,9 +491,6 @@
         # ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -s $IPV6_VPN_SUBNET_STATIC_WITH_MASK -o tun0 -j MASQUERADE
 
 
-        IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
-        IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}')
-        IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show tun0 | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
         # DNAT any incoming UDP or TCP DNS on ens21 to the real VPN DNS server
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p udp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
         ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ens21 -p tcp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
@@ -466,7 +517,7 @@
     # portforwards.sh
     "root/portforwards.sh" = {
       source = pkgs.writeShellScript "portforwards.sh" ''
-        #!/bin/bash
+        set -euo pipefail
         #update this shit!
         IPV6_ADDR=$(${pkgs.iproute2}/bin/ip -6 a s ens21 | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
         IPV6_PREFIX=$(/root/calculate-prefix.py $(echo $IPV6_ADDR) | sed 's/0000://g')
@@ -485,7 +536,7 @@
     # setup-wireguard.sh
     "root/setup-wireguard.sh" = {
       source = pkgs.writeShellScript "setup-wireguard.sh" ''
-        #!/usr/bin/env bash
+        set -euo pipefail
         source /root/subnets.sh
         /root/pre-setup-script.sh
         ${pkgs.networkmanager}/bin/nmcli connection import type wireguard file /root/tun0.conf 
@@ -497,8 +548,7 @@
     # watchdog-networkmanager.sh
     "root/watchdog-networkmanager.sh" = {
       source = pkgs.writeShellScript "watchdog-networkmanager.sh" ''
-        #!/bin/bash
-
+        set -euo pipefail
         # Variables
         destination="1.1.1.1"  # IP to ping
         interface="tun0"        # Network interface
@@ -533,41 +583,6 @@
     };
   };
   networking.useNetworkd = true;
-
-  systemd.services.dhcpd = {
-    wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
-    # path = [ pkgs.isc-dhcp-server ];
-
-    serviceConfig = {
-      ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /etc/dhcp/dhcpd.conf ens21";
-      Restart = "on-failure";
-    };
-    preStart = ''
-      mkdir -p /var/db
-      touch /var/db/dhcpd.leases
-      # /root/generate-dhcpd.conf.sh
-      chmod 644 /etc/dhcp/dhcpd.conf
-    '';
-
-  };
-
-  systemd.services.radvd = {
-    wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
-    path = [ pkgs.radvd ];
-
-    serviceConfig = {
-      ExecStart = "${pkgs.radvd}/bin/radvd -n -C /etc/radvd.conf ens21";
-      Restart = "on-failure";
-    };
-
-    # preStart = ''
-    #   echo "Generating radvd.conf..."
-    #   /etc/gen-radvd.sh > /etc/radvd.conf
-    #   chmod 644 /etc/radvd.conf
-    # '';
-  };
 
   # Disable networkd-wait-online
   systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
