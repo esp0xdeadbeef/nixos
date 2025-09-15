@@ -6,6 +6,7 @@ keys:
   - &l-werk-1-deadbeef age1z6k6e4ywawn44u83tmwv9304ufaq4ahteszuadechj34jcp9tusqevrm6d
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
   - &l-esp-deadbeef age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
+  - &s-test-vm-impermanence-root age1wxt5gu3uq0l345az0dfurff9ng7c9672ge5yrslkt48l9wan8fgsjapjlp
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -19,6 +20,7 @@ creation_rules:
           - *l-werk-1-deadbeef
           - *l-esp-root
           - *l-esp-deadbeef
+          - *s-test-vm-impermanence-root
 
   - path_regex: '^(secrets/)*l-esp-default-deadbeef\.(env|ya?ml)$'
     input_type: env
@@ -62,6 +64,18 @@ creation_rules:
       - age:
           - *l-werk-root
           - *l-werk-1-root
+
+          
+  - path_regex: '^(secrets/)*s-test-vm-impermanence-.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-x13s-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-test-vm-impermanence-root
+
 
 
   - path_regex: '^(secrets/)*l-x13s-.*\.(env|ya?ml)$'
