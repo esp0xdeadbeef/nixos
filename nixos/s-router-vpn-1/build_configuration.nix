@@ -21,35 +21,30 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
-    
+
+    /*
+      # no autobuild:
+      STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    */
+
+    ./hardware/force-update.nix
+    ./hardware/hardware-configuration.nix
+    ./network/configs_from_container_new.nix
+    ./network/packages-required-by-scripts.nix
+    ./ssh-vim-and-basics.nix
+    ../01-general/desktop/shell-env.nix
 
   ];
 
   nixpkgs = {
-    # You can add overlays here
     overlays = [
-      # Add overlays your own flake exports (from overlays and pkgs dir):
       outputs.overlays.additions
       outputs.overlays.modifications
       outputs.overlays.unstable-packages
-
-      # You can also add overlays exported from other flakes:
-      # neovim-nightly-overlay.overlays.default
-
-      # Or define it inline, for example:
-      # (final: prev: {
-      #   hi = final.hello.overrideAttrs (oldAttrs: {
-      #     patches = [ ./change-hello-to-hi.patch ];
-      #   });
-      # })
     ];
-    # Configure your nixpkgs instance
     config = {
-      # Disable if you don't want unfree packages
       allowUnfree = true;
     };
-    # specify that it is aarch64-linux:
     hostPlatform = "x86_64-linux";
   };
 
@@ -110,11 +105,6 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     };
   };
 
-  # networking.hostName = "s-router-vpn-1";
-  # services.openssh.enable = true;
-  services.xserver.enable = true;
-  # services.displayManager.sddm.enable = true;
-  # services.desktopManager.plasma6.enable = true;
   boot.loader.grub.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
