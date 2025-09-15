@@ -8,24 +8,27 @@
 
   '';
   users.defaultUserShell = pkgs.zsh;
+  environment.systemPackages = with pkgs; [
+    fzf
+    navi
+  ];
 
   programs.zsh = {
     enable = true;
     interactiveShellInit = ''
       export HISTSIZE=1000000000
       export SAVEHIST=1000000000
+      export HISTFILE="/persist/root/.zsh_history"
       source <(fzf --zsh)
+      # eval "$(navi widget zsh)"
       source <(op completion zsh 2>/dev/null || true)
     '';
     ohMyZsh = {
       enable = true;
-      #theme = "random";
-      #theme = "clean";
       plugins = [
         "sudo"
         "terraform"
         "systemadmin"
-        # "vi-mode"
         "fzf"
       ];
     };
