@@ -21,15 +21,48 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
+
+    /*
+      # testing router config, disable:
+      STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    */
+
+    ./hardware/bootloader.nix
+    ./hardware/boot-package.nix
+    ./hardware/force-update.nix
+    ./hardware/hardware-configuration.nix
+    ./hardware/impermanence.nix
+    ./hardware/lanzaboote.nix
+    ./hardware/swap-and-tmpfs.nix
+    ./routing-test-voor-s-router-vpn-1/default.nix
+
+
+    ../01-general/desktop/shell-env.nix
+
+    # ../02-window-manager-i3/environment.nix
     inputs.impermanence.nixosModules.impermanence
-
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
-
-
-
-    ../02-window-manager-i3/environment.nix
-
+    inputs.home-manager.nixosModules.home-manager
+    inputs.sops-nix.nixosModules.sops
   ];
+
+
+  sops.defaultSopsFile = ../../secrets/s-test-vm-impermanence-root.yaml;
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
+
+  sops.secrets."deadbeef-passwd" = {
+    neededForUsers = true; # make it available before the user is created
+  };
+
+  time.timeZone = "Europe/Amsterdam";
+  
+  programs.neovim.enable = true;
+  programs.neovim.defaultEditor = true;
+
+  environment.systemPackages = with pkgs; [
+    sops
+    age
+  ];
+
 
   nixpkgs = {
     # You can add overlays here
@@ -90,7 +123,9 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       # TODO: You can set an initial password for your user.
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
-      initialPassword = " ";
+      # initialPassword = " ";
+      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+
       isNormalUser = true;
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
@@ -113,18 +148,14 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       PasswordAuthentication = true;
     };
   };
-
-  # networking.hostName = "s-router-vpn-1";
-  # services.openssh.enable = true;
-  services.xserver.enable = true;
-  # services.displayManager.sddm.enable = true;
-  services.desktopManager.plasma6.enable = true;
-  boot.loader.grub.configurationLimit = 2;
+  
+  
+  boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=example
+    alias vim=nvim
   '';
-
 
   security.sudo.enable = true;
   security.sudo.extraRules = [

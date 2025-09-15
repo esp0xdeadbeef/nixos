@@ -19,8 +19,6 @@
   #     fsType = "btrfs";
   #     options = [ "subvol=root" ];
   # };
-  # Set systemd-boot configuration limit
-  boot.loader.systemd-boot.configurationLimit = 2;
 
   # # Force disable systemd-boot as Lanzaboote replaces it
   # boot.loader.systemd-boot.enable = lib.mkForce false;

@@ -73,12 +73,12 @@
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
     directories = [
-      "/root"
+      # "/root"
       "/var/log"
-      "/var/lib/bluetooth"
+      # "/var/lib/bluetooth"
       "/var/lib/nixos"
       "/var/lib/systemd/coredump"
-      "/etc/NetworkManager/system-connections"
+      # "/etc/NetworkManager/system-connections"
       {
         directory = "/var/lib/colord";
         user = "colord";
@@ -94,6 +94,8 @@
           mode = "u=rwx,g=,o=";
         };
       }
+      "/root/.zsh_history"
+      "/root/.config/sops/age/keys.txt"
     ];
     users.deadbeef = {
       directories = [
