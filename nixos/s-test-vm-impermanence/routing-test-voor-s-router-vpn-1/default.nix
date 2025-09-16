@@ -579,9 +579,15 @@
           RX_AFTER=$(cat "$rx_path")
 
           if [[ "$RX_BEFORE" -eq "$RX_AFTER" ]]; then
-            echo "[$(date)] No RX activity on $interface. Restarting NetworkManager..."
-            ${pkgs.systemd}/bin/systemctl restart NetworkManager
-            sleep 3
+            echo "[$(date)] No RX activity on $interface. Probing with ping to confirm..."
+
+            if ! ${pkgs.iputils}/bin/ping -c1 -I "$interface" -W 2 8.8.8.8 >/dev/null 2>&1; then
+              echo "[$(date)] Ping failed on $interface. Restarting NetworkManager..."
+              ${pkgs.systemd}/bin/systemctl restart NetworkManager
+              sleep 3
+            else
+              echo "[$(date)] Ping succeeded. Likely idle traffic on $interface."
+            fi
           else
             echo "[$(date)] RX bytes changed: $RX_BEFORE → $RX_AFTER. Interface OK."
           fi
