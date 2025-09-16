@@ -18,7 +18,7 @@
     interactiveShellInit = ''
       export HISTSIZE=1000000000
       export SAVEHIST=1000000000
-      export HISTFILE="/persist/root/.zsh_history"
+      export HISTFILE="/persist/$HOME/.zsh_history"
       source <(fzf --zsh)
       # eval "$(navi widget zsh)"
       source <(op completion zsh 2>/dev/null || true)
