@@ -5,122 +5,60 @@
   ...
 }:
 {
-  # 1. Secret VPN config loaded via SOPS
-  sops.secrets."vpn-configuration" = {
+  sops.secrets."tun0-wireguard" = {
     owner = "root";
     group = "root";
     mode = "0400";
   };
 
-  boot.kernelModules = [
-    "vrf"
-    "ip6table_nat"
-  ];
-  boot.kernel.sysctl = {
-    "net.ipv4.tcp_l3mdev_accept" = 1;
-    "net.ipv6.tcp_l3mdev_accept" = 1;
-  };
-
-  # 2. Systemd target that signals when VPN is ready
-  systemd.targets.vpn-ready = {
-    description = "VPN interface is up and ready";
-    wantedBy = [ "multi-user.target" ];
-  };
-
-  # 3. Decode VPN config at boot
-  systemd.services.write-vpn-config = {
-    description = "Decode VPN config from sops and write to /etc/vpn/tun0.conf";
+  systemd.services.write-tun0-conf = {
+    description = "Decode tun0 WireGuard config from sops";
     wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
+    before = [ "network-online.target" ]; # important: get in before any networking
     after = [ "local-fs.target" ];
 
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = pkgs.writeShellScript "write-vpn-config" ''
+      ExecStart = pkgs.writeShellScript "write-tun0-conf" ''
         set -euxo pipefail
-        mkdir -p /etc/vpn
-        secret_path="${config.sops.secrets."vpn-configuration".path}"
+
+        secret_path="${config.sops.secrets."tun0-wireguard".path}"
+
+        echo "[DEBUG] Checking if secret path exists: $secret_path"
         if [ -f "$secret_path" ] && [ -s "$secret_path" ]; then
-        cat "$secret_path" | ${pkgs.coreutils}/bin/base64 -d > /etc/vpn/tun0.conf
-        chmod 600 /etc/vpn/tun0.conf
+          cat "$secret_path" | ${pkgs.coreutils}/bin/base64 -d > /root/tun0.conf
+          echo "[DEBUG] Written to /root/tun0.conf"
         else
-        echo "[ERROR] VPN config secret missing or empty: $secret_path" >&2
-        exit 1
+          echo "[ERROR] tun0-wireguard secret is missing or empty: $secret_path" >&2
+          exit 1
         fi
       '';
     };
   };
 
-  # 4. Dispatch VPN connection logic based on file content
-  systemd.services.vpn-dispatcher = {
-    description = "Continuously detect and start VPN tunnel (tun0), then start vpn-ready.target";
-    after = [ "write-vpn-config.service" ];
-    requires = [ "write-vpn-config.service" ];
+  systemd.services.import-vpn-profile = {
     wantedBy = [ "multi-user.target" ];
+    requires = [ "write-tun0-conf.service" ];
+    after = [ "write-tun0-conf.service" ];
 
+    path = [
+      pkgs.networkmanager
+      pkgs.util-linux
+      pkgs.gawk
+    ];
     serviceConfig = {
-      Type = "simple"; # Run continuously
-      Restart = "always";
+      ExecStart = "/etc/root/import-vpn-profile.sh";
+      Type = "oneshot";
+      RemainAfterExit = true;
+      Restart = "on-failure";
       RestartSec = 10;
-      ExecStart = pkgs.writeShellScript "vpn-dispatcher-loop" ''
-        set -euxo pipefail
-        CONF=/etc/vpn/tun0.conf
-
-        while true; do
-          if grep -qE '^\[Interface\]' "$CONF"; then
-            echo "[+] Detected WireGuard config"
-
-            if ${pkgs.wireguard-tools}/bin/wg-quick up "$CONF"; then
-              echo "[+] WireGuard tunnel up"
-            else
-              echo "[!] WireGuard failed, retrying in 10s"
-              sleep 10
-              continue
-            fi
-
-          elif grep -qE '^(client|dev|proto|remote)' "$CONF"; then
-            echo "[+] Detected OpenVPN config"
-            ${pkgs.openvpn}/bin/openvpn --config "$CONF" --daemon
-            sleep 5  # give OpenVPN time to bring up the tunnel
-          else
-            echo "[!] Unknown VPN config format"
-            sleep 10
-            continue
-          fi
-
-          # Wait for interface to appear
-          for i in $(seq 1 10); do
-            if ip link show tun0 > /dev/null 2>&1; then
-              echo "[+] Interface tun0 is up"
-              break
-            fi
-            sleep 1
-          done
-
-          if ! ip link show tun0 > /dev/null 2>&1; then
-            echo "[!] Interface tun0 never appeared, retrying"
-            sleep 10
-            continue
-          fi
-
-          # Signal readiness only once
-          if [ ! -e /run/vpn-ready.once ]; then
-            ${pkgs.systemd}/bin/systemctl start vpn-ready.target
-            touch /run/vpn-ready.once
-          fi
-
-          # Wait indefinitely — or monitor VPN health
-          sleep infinity
-        done
-      '';
     };
   };
 
-  # 5. Example dependent service
   systemd.services.portforwards = {
     wantedBy = [ "multi-user.target" ];
-    requires = [ "vpn-ready.target" ];
-    after = [ "vpn-ready.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
     serviceConfig = {
       ExecStart = "/etc/root/portforwards.sh";
       Type = "oneshot";
@@ -130,65 +68,10 @@
     };
   };
 
-  systemd.services.watchdog-networkmanager = {
-    description = "Watchdog for VPN interface and NetworkManager recovery";
-    wantedBy = [ "multi-user.target" ];
-    requires = [ "vpn-ready.target" ];
-    after = [ "vpn-ready.target" ];
-
-    serviceConfig = {
-      Type = "simple";
-      Restart = "always";
-      RestartSec = 5;
-
-      ExecStart = pkgs.writeShellScript "watchdog-networkmanager" ''
-        #!/usr/bin/env bash
-        set -euo pipefail
-
-        interface="tun0"       # could also use: interface=${"INTERFACE:-tun0"}
-        check_interval=100
-
-        while true; do
-          if [[ ! -d "/sys/class/net/$interface" ]]; then
-            echo "[$(date)] Interface $interface not found. Restarting NetworkManager..."
-            ${pkgs.systemd}/bin/systemctl restart NetworkManager
-            sleep 3
-            continue
-          fi
-
-          rx_path="/sys/class/net/$interface/statistics/rx_bytes"
-          if [[ ! -r "$rx_path" ]]; then
-            echo "[$(date)] Cannot read RX stats from $rx_path. Restarting NetworkManager..."
-            ${pkgs.systemd}/bin/systemctl restart NetworkManager
-            sleep 3
-            continue
-          fi
-
-          RX_BEFORE=$(cat "$rx_path")
-          sleep "$check_interval"
-          RX_AFTER=$(cat "$rx_path")
-
-          if [[ "$RX_BEFORE" -eq "$RX_AFTER" ]]; then
-            echo "[$(date)] No RX activity on $interface. Probing with ping..."
-            if ! ${pkgs.iputils}/bin/ping -c1 -I "$interface" -W 2 8.8.8.8 >/dev/null 2>&1; then
-              echo "[$(date)] Ping failed. Restarting NetworkManager..."
-              ${pkgs.systemd}/bin/systemctl restart NetworkManager
-              sleep 3
-            else
-              echo "[$(date)] Ping succeeded, probably idle."
-            fi
-          else
-            echo "[$(date)] RX changed: $RX_BEFORE → $RX_AFTER. OK."
-          fi
-        done
-      '';
-    };
-  };
-
   systemd.services.update_iptables = {
     wantedBy = [ "multi-user.target" ];
-    requires = [ "vpn-ready.target" ];
-    after = [ "vpn-ready.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
     path = [ pkgs.networkmanager ];
     serviceConfig = {
       ExecStart = "/etc/root/update_iptables.sh";
@@ -198,59 +81,31 @@
       RestartSec = 10;
     };
   };
-  # systemd.services.dhcpd = {
-  #   wantedBy = [ "multi-user.target" ];
-  #   requires = [ "vpn-ready.target" ];
-  #   after = [ "vpn-ready.target" ];
-
-  #   serviceConfig = {
-  #     ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /root/dhcpd.conf ens20";
-  #     Type = "oneshot";
-  #     RemainAfterExit = true;
-  #     Restart = "on-failure";
-  #     RestartSec = 10;
-  #   };
-  #   preStart = ''
-  #     mkdir -p /var/db
-  #     touch /var/db/dhcpd.leases
-  #     /etc/root/generate-dhcpd.conf.sh
-  #     chmod 644 /root/dhcpd.conf
-  #   '';
-
-  # };
-  systemd.services.kea-dhcp4 = {
-    description = "Kea DHCPv4 Server";
+  systemd.services.dhcpd = {
     wantedBy = [ "multi-user.target" ];
-    requires = [ "vpn-ready.target" ];
-    after = [ "vpn-ready.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
 
     serviceConfig = {
-      ExecStart = "${pkgs.kea}/bin/kea-dhcp4 -c /etc/kea/kea-dhcp4.conf";
-      Type = "simple";
+      ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /root/dhcpd.conf ens20";
+      Type = "oneshot";
+      RemainAfterExit = true;
       Restart = "on-failure";
       RestartSec = 10;
-      ExecStartPost = ''
-        ${pkgs.procps}/bin/pgrep -x kea-dhcp4 >/dev/null || exit 1
-        ${pkgs.gnugrep}/bin/grep -q "listening on interface" /var/log/kea-dhcp4.log || exit 1
-      '';
-
-      # This ensures /run/kea/ exists with proper perms
-      RuntimeDirectory = "kea";
-      RuntimeDirectoryMode = "0755";
     };
-
     preStart = ''
-      mkdir -p /etc/kea
-      mkdir -p /var/lib/kea
-      chmod 700 /var/lib/kea
-      /etc/root/generate-kea-config.sh
+      mkdir -p /var/db
+      touch /var/db/dhcpd.leases
+      /etc/root/generate-dhcpd.conf.sh
+      chmod 644 /root/dhcpd.conf
     '';
+
   };
 
   systemd.services.radvd = {
     wantedBy = [ "multi-user.target" ];
-    requires = [ "vpn-ready.target" ];
-    after = [ "vpn-ready.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
     path = [ pkgs.radvd ];
 
     serviceConfig = {
@@ -268,38 +123,127 @@
     '';
   };
 
+  systemd.services.watchdog-networkmanager = {
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "import-vpn-profile.service" ];
+    after = [ "import-vpn-profile.service" ];
+    serviceConfig = {
+      ExecStart = "/etc/root/watchdog-networkmanager.sh";
+      Restart = "always";
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     coreutils
     python3
-    coreutils
-    openvpn
-    wireguard-tools
   ];
 
   boot.kernel.sysctl = {
     "net.ipv4.ip_forward" = 1;
     "net.ipv6.conf.all.forwarding" = 1;
   };
+  boot.kernelModules = [
+    "ip6table_nat"
+  ];
 
   networking.networkmanager.enable = true;
   networking.networkmanager.unmanaged = [ ];
 
-  # # 3) Copy everything from /etc/root into /root at activation time
-  # system.activationScripts.copyToRoot = {
-  #   text = ''
-  #     for f in /etc/root/*; do
-  #       install -D -m0755 "$f" "/root/$(basename $f)"
-  #     done
-  #   '';
-  #   deps = [ "etc" ];
-  # };
+  # 3) Copy everything from /etc/root into /root at activation time
+  system.activationScripts.copyToRoot = {
+    text = ''
+      for f in /etc/root/*; do
+        install -D -m0755 "$f" "/root/$(basename $f)"
+      done
+    '';
+    deps = [ "etc" ];
+  };
 
   # services.cron.enable = true;
 
-  environment.etc = {
-    "NetworkManager/system-connections/ens18.nmconnection" = {
-      text = ''
-        [connection]
+  # environment.etc = {
+  #   "NetworkManager/system-connections/ens18.nmconnection" = {
+  #     text = ''
+  #       [connection]
+  #       id=ens18
+  #       type=ethernet
+  #       interface-name=ens18
+  #       autoconnect=true
+  #       permissions=
+
+  #       [ipv4]
+  #       method=auto
+  #       route-metric=300
+  #       ignore-auto-dns=true
+  #       never-default=true
+
+  #       [ipv6]
+  #       method=auto
+  #       route-metric=300
+  #       ignore-auto-dns=true
+  #       never-default=true
+  #     '';
+  #     mode = "0600";
+  #   };
+
+  #   "NetworkManager/system-connections/ens19.nmconnection" = {
+  #     text = ''
+  #       [connection]
+  #       id=ens19
+  #       type=ethernet
+  #       interface-name=ens19
+  #       autoconnect=true
+  #       permissions=
+
+  #       [ipv4]
+  #       method=auto
+  #       route-metric=100
+  #       ignore-auto-dns=false
+
+  #       [ipv6]
+  #       method=auto
+  #       route-metric=100
+  #       ignore-auto-dns=false
+  #     '';
+  #     mode = "0600";
+  #   };
+
+  #   "NetworkManager/system-connections/ens20.nmconnection" = {
+  #     text = ''
+  #       [connection]
+  #       id=ens20
+  #       type=ethernet
+  #       interface-name=ens20
+  #       autoconnect=true
+  #       permissions=
+
+  #       [ipv4]
+  #       method=manual
+  #       address1=10.90.0.1/24
+  #       route-metric=250
+  #       ignore-auto-dns=true
+
+  #       [ipv6]
+  #       method=manual
+  #       address1=fd90:dead:beef::100/64
+  #       route-metric=250
+  #       ignore-auto-dns=true
+  #     '';
+  #     mode = "0600";
+  #   };
+  # };
+  systemd.services."generate-nmconnections" = {
+    description = "Generate NetworkManager .nmconnection profiles at boot";
+    wantedBy = [ "network-pre.target" ];
+    before = [ "NetworkManager.service" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = pkgs.writeShellScript "generate-nmconnections" ''
+                mkdir -p /etc/NetworkManager/system-connections
+                chmod 700 /etc/NetworkManager/system-connections
+
+                echo "[connection]
         id=ens18
         type=ethernet
         interface-name=ens18
@@ -316,14 +260,9 @@
         method=auto
         route-metric=300
         ignore-auto-dns=true
-        never-default=true
-      '';
-      mode = "0600";
-    };
+        never-default=true" > /etc/NetworkManager/system-connections/ens18.nmconnection
 
-    "NetworkManager/system-connections/ens19.nmconnection" = {
-      text = ''
-        [connection]
+                echo "[connection]
         id=ens19
         type=ethernet
         interface-name=ens19
@@ -338,14 +277,9 @@
         [ipv6]
         method=auto
         route-metric=100
-        ignore-auto-dns=false
-      '';
-      mode = "0600";
-    };
+        ignore-auto-dns=false" > /etc/NetworkManager/system-connections/ens19.nmconnection
 
-    "NetworkManager/system-connections/ens20.nmconnection" = {
-      text = ''
-        [connection]
+                echo "[connection]
         id=ens20
         type=ethernet
         interface-name=ens20
@@ -362,9 +296,10 @@
         method=manual
         address1=fd90:dead:beef::100/64
         route-metric=250
-        ignore-auto-dns=true
+        ignore-auto-dns=true" > /etc/NetworkManager/system-connections/ens20.nmconnection
+
+                chmod 600 /etc/NetworkManager/system-connections/*.nmconnection
       '';
-      mode = "0600";
     };
   };
 
@@ -386,59 +321,32 @@
       mode = "0755";
     };
 
-    "root/generate-kea-config.sh" = {
-      source = pkgs.writeShellScript "generate-kea-config.sh" ''
-        #!/usr/bin/env bash
+    "root/generate-dhcpd.conf.sh" = {
+      source = pkgs.writeShellScript "generate-dhcpd.conf.sh" ''
         set -euo pipefail
-
+        set -x
+        mkdir /etc/dhcp/ 2>/dev/null || true
+        IPV4_ADDR=$(${pkgs.iproute2}/bin/ip -4 a s ens20 | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
         source /etc/root/subnets.sh
-        IPV4_ADDR="''${IPV4_VPN_SUBNET_STATIC_WITH_MASK}"
-
-        # Get network details from sipcalc
-        NETWORK_INFO=$(${pkgs.sipcalc}/bin/sipcalc "''${IPV4_ADDR}")
-
-        PREFIX=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network address/ {gsub(/ /,"",$2); print $2}')
-        CIDR=$(echo "''${IPV4_ADDR}" | cut -d/ -f2)
-        NETMASK=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network mask[[:space:]]*-/ {gsub(/ /,"",$2); print $2}')
-        GATEWAY=$(echo "''${IPV4_ADDR}" | ${pkgs.gnused}/bin/sed 's#/.*##')
-
-        FIRST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $4}')
-        LAST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $6}')
-        POOL="''${FIRST_HOST}-''${LAST_HOST}"
-
-        mkdir -p /etc/kea
-        cat > /etc/kea/kea-dhcp4.conf <<EOF
-        {
-          "Dhcp4": {
-            "valid-lifetime": 600,
-            "renew-timer": 300,
-            "rebind-timer": 540,
-            "interfaces-config": {
-              "interfaces": [ "ens20" ]
-            },
-            "lease-database": {
-              "type": "memfile",
-              "persist": true,
-              "name": "/var/lib/kea/dhcp4.leases"
-            },
-            "subnet4": [
-              {
-                "id": 1,
-                "subnet": "''${PREFIX}/''${CIDR}",
-                "pools": [
-                  { "pool": "''${POOL}" }
-                ],
-                "option-data": [
-                  { "name": "routers", "data": "''${GATEWAY}" },
-                  { "name": "subnet-mask", "data": "''${NETMASK}" },
-                  { "name": "domain-name-servers", "data": "''${GATEWAY}" }
-                ]
-              }
-            ]
-          }
-        }
-        EOF
-
+        IPV4_ADDR=$IPV4_VPN_SUBNET_STATIC_WITH_MASK
+        ${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR"
+        IPV4_PREFIX=$(${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR" | grep -i 'network range' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $3}' | ${pkgs.util-linux}/bin/rev )
+        IPV4_MASK=$(${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR" | grep -i 'network mask' | grep 255 | ${pkgs.gawk}/bin/awk -F'-' '{print $2}')
+        IPV4_ADDR_GATEWAY=$(echo $IPV4_ADDR | sed 's/\/.*//g')
+        IPV4_USABLE_RANGE=$(${pkgs.sipcalc}/bin/sipcalc "$IPV4_ADDR" | grep -i 'usable range' | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk -F'-' '{print $1, $2}' | ${pkgs.util-linux}/bin/rev | sed 's/.1 /.10/g') # Usable range
+        # echo $IPV4_ADDR
+        # echo $IPV4_PREFIX
+        # echo $IPV4_MASK
+        # echo $IPV4_ADDR_GATEWAY
+        # echo $IPV4_USABLE_RANGE
+        echo "default-lease-time 600;
+        max-lease-time 600;
+        subnet $IPV4_PREFIX netmask $IPV4_MASK {
+          range $IPV4_USABLE_RANGE;
+          option routers $IPV4_ADDR_GATEWAY; # Default gateway
+          option subnet-mask $IPV4_MASK;          # Net mask 
+          option domain-name-servers $IPV4_ADDR_GATEWAY; # dns host, gateway our case
+        }" | tee /root/dhcpd.conf
       '';
       mode = "0755";
     };
@@ -456,8 +364,7 @@
         ${pkgs.networkmanager}/bin/nmcli connection modify ens20 ipv6.addresses "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
         ${pkgs.networkmanager}/bin/nmcli connection modify ens20 ipv6.method manual
         ${pkgs.networkmanager}/bin/nmcli connection modify ens20 ipv6.dns "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
-        # /etc/root/generate-dhcpd.conf.sh
-        /etc/root/generate-kea-config.sh
+        /etc/root/generate-dhcpd.conf.sh
         /etc/root/generate-radvd.conf.sh
         ${pkgs.networkmanager}/bin/nmcli connection up tun0
         ${pkgs.networkmanager}/bin/nmcli connection up tun0
@@ -643,6 +550,53 @@
           # IPv6 rule
           ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i tun0 -p tcp --dport "$port" \
             -j DNAT --to-destination "[$IPV6_PREFIX:$ipv6_host_suffix]:$dst_port_v6"
+        done
+      '';
+      mode = "0755";
+    };
+
+    # watchdog-networkmanager.sh
+    "root/watchdog-networkmanager.sh" = {
+      source = pkgs.writeShellScript "watchdog-networkmanager.sh" ''
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        interface="tun0"
+        check_interval=100
+
+        while true; do
+          if [[ ! -d "/sys/class/net/$interface" ]]; then
+            echo "[$(date)] Interface $interface not found. Restarting NetworkManager..."
+            ${pkgs.systemd}/bin/systemctl restart NetworkManager
+            sleep 3
+            continue
+          fi
+
+          rx_path="/sys/class/net/$interface/statistics/rx_bytes"
+          if [[ ! -r "$rx_path" ]]; then
+            echo "[$(date)] Cannot read RX stats from $rx_path. Restarting NetworkManager..."
+            ${pkgs.systemd}/bin/systemctl restart NetworkManager
+            sleep 3
+            continue
+          fi
+
+          RX_BEFORE=$(cat "$rx_path")
+          sleep "$check_interval"
+          RX_AFTER=$(cat "$rx_path")
+
+          if [[ "$RX_BEFORE" -eq "$RX_AFTER" ]]; then
+            echo "[$(date)] No RX activity on $interface. Probing with ping to confirm..."
+
+            if ! ${pkgs.iputils}/bin/ping -c1 -I "$interface" -W 2 8.8.8.8 >/dev/null 2>&1; then
+              echo "[$(date)] Ping failed on $interface. Restarting NetworkManager..."
+              ${pkgs.systemd}/bin/systemctl restart NetworkManager
+              sleep 3
+            else
+              echo "[$(date)] Ping succeeded. Likely idle traffic on $interface."
+            fi
+          else
+            echo "[$(date)] RX bytes changed: $RX_BEFORE → $RX_AFTER. Interface OK."
+          fi
         done
       '';
       mode = "0755";
