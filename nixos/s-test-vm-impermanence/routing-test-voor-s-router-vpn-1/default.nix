@@ -198,26 +198,7 @@
       RestartSec = 10;
     };
   };
-  # systemd.services.dhcpd = {
-  #   wantedBy = [ "multi-user.target" ];
-  #   requires = [ "vpn-ready.target" ];
-  #   after = [ "vpn-ready.target" ];
 
-  #   serviceConfig = {
-  #     ExecStart = "${pkgs.nix}/bin/nix shell github:NixOS/nixpkgs/32dcb45f66c0487e92db8303a798ebc548cadedc#dhcp -c dhcpd -f -cf /root/dhcpd.conf ens20";
-  #     Type = "oneshot";
-  #     RemainAfterExit = true;
-  #     Restart = "on-failure";
-  #     RestartSec = 10;
-  #   };
-  #   preStart = ''
-  #     mkdir -p /var/db
-  #     touch /var/db/dhcpd.leases
-  #     /etc/root/generate-dhcpd.conf.sh
-  #     chmod 644 /root/dhcpd.conf
-  #   '';
-
-  # };
   systemd.services.kea-dhcp4 = {
     description = "Kea DHCPv4 Server";
     wantedBy = [ "multi-user.target" ];
@@ -228,11 +209,23 @@
       ExecStart = "${pkgs.kea}/bin/kea-dhcp4 -c /etc/kea/kea-dhcp4.conf";
       Type = "simple";
       Restart = "on-failure";
-      RestartSec = 10;
-      ExecStartPost = ''
-        ${pkgs.procps}/bin/pgrep -x kea-dhcp4 >/dev/null || exit 1
-        ${pkgs.gnugrep}/bin/grep -q "listening on interface" /var/log/kea-dhcp4.log || exit 1
-      '';
+      RestartSec = 1;
+      ExecStartPost = pkgs.writeShellScript "kea-dhcp4-postcheck" ''
+      set -euo pipefail
+
+      LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 -n 50)"
+
+      if echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "DHCPSRV_OPEN_SOCKET_FAIL"; then
+        echo "kea-dhcp4 failed to open sockets"
+        exit 1
+      fi
+
+      if ! echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "listening on interface"; then
+        echo "kea-dhcp4 not listening on any interface"
+        exit 1
+      fi
+    '';
+
 
       # This ensures /run/kea/ exists with proper perms
       RuntimeDirectory = "kea";
@@ -240,10 +233,57 @@
     };
 
     preStart = ''
-      mkdir -p /etc/kea
-      mkdir -p /var/lib/kea
+      set -euo pipefail
+      mkdir -p /etc/kea || true
+      mkdir -p /var/lib/kea || true
       chmod 700 /var/lib/kea
-      /etc/root/generate-kea-config.sh
+      source /etc/root/subnets.sh
+      IPV4_ADDR="''${IPV4_VPN_SUBNET_STATIC_WITH_MASK}"
+
+      # Get network details from sipcalc
+      NETWORK_INFO=$(${pkgs.sipcalc}/bin/sipcalc "''${IPV4_ADDR}")
+
+      PREFIX=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network address/ {gsub(/ /,"",$2); print $2}')
+      CIDR=$(echo "''${IPV4_ADDR}" | cut -d/ -f2)
+      NETMASK=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network mask[[:space:]]*-/ {gsub(/ /,"",$2); print $2}')
+      GATEWAY=$(echo "''${IPV4_ADDR}" | ${pkgs.gnused}/bin/sed 's#/.*##')
+
+      FIRST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $4}')
+      LAST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $6}')
+      POOL="''${FIRST_HOST}-''${LAST_HOST}"
+
+      mkdir -p /etc/kea
+      cat > /etc/kea/kea-dhcp4.conf <<EOF
+      {
+        "Dhcp4": {
+          "valid-lifetime": 600,
+          "renew-timer": 300,
+          "rebind-timer": 540,
+          "interfaces-config": {
+            "interfaces": [ "ens20" ]
+          },
+          "lease-database": {
+            "type": "memfile",
+            "persist": true,
+            "name": "/var/lib/kea/dhcp4.leases"
+          },
+          "subnet4": [
+            {
+              "id": 1,
+              "subnet": "''${PREFIX}/''${CIDR}",
+              "pools": [
+                { "pool": "''${POOL}" }
+              ],
+              "option-data": [
+                { "name": "routers", "data": "''${GATEWAY}" },
+                { "name": "subnet-mask", "data": "''${NETMASK}" },
+                { "name": "domain-name-servers", "data": "''${GATEWAY}" }
+              ]
+            }
+          ]
+        }
+      }
+      EOF
     '';
   };
 
@@ -283,18 +323,6 @@
 
   networking.networkmanager.enable = true;
   networking.networkmanager.unmanaged = [ ];
-
-  # # 3) Copy everything from /etc/root into /root at activation time
-  # system.activationScripts.copyToRoot = {
-  #   text = ''
-  #     for f in /etc/root/*; do
-  #       install -D -m0755 "$f" "/root/$(basename $f)"
-  #     done
-  #   '';
-  #   deps = [ "etc" ];
-  # };
-
-  # services.cron.enable = true;
 
   environment.etc = {
     "NetworkManager/system-connections/ens18.nmconnection" = {
@@ -386,88 +414,62 @@
       mode = "0755";
     };
 
-    "root/generate-kea-config.sh" = {
-      source = pkgs.writeShellScript "generate-kea-config.sh" ''
-        #!/usr/bin/env bash
-        set -euo pipefail
+    # "root/generate-kea-config.sh" = {
+    #   source = pkgs.writeShellScript "generate-kea-config.sh" ''
+    #     #!/usr/bin/env bash
+    #     set -euo pipefail
 
-        source /etc/root/subnets.sh
-        IPV4_ADDR="''${IPV4_VPN_SUBNET_STATIC_WITH_MASK}"
+    #     source /etc/root/subnets.sh
+    #     IPV4_ADDR="''${IPV4_VPN_SUBNET_STATIC_WITH_MASK}"
 
-        # Get network details from sipcalc
-        NETWORK_INFO=$(${pkgs.sipcalc}/bin/sipcalc "''${IPV4_ADDR}")
+    #     # Get network details from sipcalc
+    #     NETWORK_INFO=$(${pkgs.sipcalc}/bin/sipcalc "''${IPV4_ADDR}")
 
-        PREFIX=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network address/ {gsub(/ /,"",$2); print $2}')
-        CIDR=$(echo "''${IPV4_ADDR}" | cut -d/ -f2)
-        NETMASK=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network mask[[:space:]]*-/ {gsub(/ /,"",$2); print $2}')
-        GATEWAY=$(echo "''${IPV4_ADDR}" | ${pkgs.gnused}/bin/sed 's#/.*##')
+    #     PREFIX=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network address/ {gsub(/ /,"",$2); print $2}')
+    #     CIDR=$(echo "''${IPV4_ADDR}" | cut -d/ -f2)
+    #     NETMASK=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk -F- '/Network mask[[:space:]]*-/ {gsub(/ /,"",$2); print $2}')
+    #     GATEWAY=$(echo "''${IPV4_ADDR}" | ${pkgs.gnused}/bin/sed 's#/.*##')
 
-        FIRST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $4}')
-        LAST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $6}')
-        POOL="''${FIRST_HOST}-''${LAST_HOST}"
+    #     FIRST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $4}')
+    #     LAST_HOST=$(echo "''${NETWORK_INFO}" | ${pkgs.gawk}/bin/awk '/Usable range/ {print $6}')
+    #     POOL="''${FIRST_HOST}-''${LAST_HOST}"
 
-        mkdir -p /etc/kea
-        cat > /etc/kea/kea-dhcp4.conf <<EOF
-        {
-          "Dhcp4": {
-            "valid-lifetime": 600,
-            "renew-timer": 300,
-            "rebind-timer": 540,
-            "interfaces-config": {
-              "interfaces": [ "ens20" ]
-            },
-            "lease-database": {
-              "type": "memfile",
-              "persist": true,
-              "name": "/var/lib/kea/dhcp4.leases"
-            },
-            "subnet4": [
-              {
-                "id": 1,
-                "subnet": "''${PREFIX}/''${CIDR}",
-                "pools": [
-                  { "pool": "''${POOL}" }
-                ],
-                "option-data": [
-                  { "name": "routers", "data": "''${GATEWAY}" },
-                  { "name": "subnet-mask", "data": "''${NETMASK}" },
-                  { "name": "domain-name-servers", "data": "''${GATEWAY}" }
-                ]
-              }
-            ]
-          }
-        }
-        EOF
+    #     mkdir -p /etc/kea
+    #     cat > /etc/kea/kea-dhcp4.conf <<EOF
+    #     {
+    #       "Dhcp4": {
+    #         "valid-lifetime": 600,
+    #         "renew-timer": 300,
+    #         "rebind-timer": 540,
+    #         "interfaces-config": {
+    #           "interfaces": [ "ens20" ]
+    #         },
+    #         "lease-database": {
+    #           "type": "memfile",
+    #           "persist": true,
+    #           "name": "/var/lib/kea/dhcp4.leases"
+    #         },
+    #         "subnet4": [
+    #           {
+    #             "id": 1,
+    #             "subnet": "''${PREFIX}/''${CIDR}",
+    #             "pools": [
+    #               { "pool": "''${POOL}" }
+    #             ],
+    #             "option-data": [
+    #               { "name": "routers", "data": "''${GATEWAY}" },
+    #               { "name": "subnet-mask", "data": "''${NETMASK}" },
+    #               { "name": "domain-name-servers", "data": "''${GATEWAY}" }
+    #             ]
+    #           }
+    #         ]
+    #       }
+    #     }
+    #     EOF
 
-      '';
-      mode = "0755";
-    };
-
-    # setup-generic.sh
-    "root/setup-generic.sh" = {
-      source = pkgs.writeShellScript "setup-generic" ''
-        set -euo pipefail
-        source /etc/root/subnets.sh
-        ${pkgs.networkmanager}/bin/nmcli connection up tun0
-        ${pkgs.networkmanager}/bin/nmcli connection down ens20
-        ${pkgs.networkmanager}/bin/nmcli connection up ens20
-        ${pkgs.networkmanager}/bin/nmcli connection modify "tun0" connection.autoconnect yes
-        ${pkgs.networkmanager}/bin/nmcli connection add type ethernet ifname ens20 con-name ens20 ipv4.addresses "$IPV4_VPN_SUBNET_STATIC_WITH_MASK" ipv4.method manual
-        ${pkgs.networkmanager}/bin/nmcli connection modify ens20 ipv6.addresses "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
-        ${pkgs.networkmanager}/bin/nmcli connection modify ens20 ipv6.method manual
-        ${pkgs.networkmanager}/bin/nmcli connection modify ens20 ipv6.dns "$IPV6_VPN_SUBNET_STATIC_WITH_MASK"
-        # /etc/root/generate-dhcpd.conf.sh
-        /etc/root/generate-kea-config.sh
-        /etc/root/generate-radvd.conf.sh
-        ${pkgs.networkmanager}/bin/nmcli connection up tun0
-        ${pkgs.networkmanager}/bin/nmcli connection up tun0
-        ${pkgs.networkmanager}/bin/nmcli connection up tun0
-        ${pkgs.networkmanager}/bin/nmcli connection up tun0
-
-        #reboot
-      '';
-      mode = "0755";
-    };
+    #   '';
+    #   mode = "0755";
+    # };
 
     # generate-radvd.conf.sh
     "root/generate-radvd.conf.sh" = {
