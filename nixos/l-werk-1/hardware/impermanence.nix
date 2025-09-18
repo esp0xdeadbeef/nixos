@@ -118,10 +118,11 @@
         
 
         # "Downloads"
-        "Music"
-        "Pictures"
+        # "Music"
+        # "Pictures"
+        # "Videos"
+        # I will try to migrate old shit from here, but it will be commented one day (lol):
         "Documents"
-        "Videos"
 
         "github" # custom dir for my github projects
         "pentest"
@@ -135,6 +136,8 @@
 
         ".local/share/lxc"
         ".local/share/containers"
+
+        ".cache/nix-index" # added this to persist the nix-locate output.
 
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/libvirt/qemu" # libvirt qemu settings
