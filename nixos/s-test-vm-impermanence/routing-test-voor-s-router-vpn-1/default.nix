@@ -15,44 +15,43 @@ let
   vpnConfPath = "${vpnConfBasePath}/${vpnInterface}.conf";
   vpnIPv4WithMask = "10.90.0.1/24";
   vpnIPv6WithMask = "fd90:dead:beef::100/64";
+
+  vrf_name_vpn = "vrf-vpn";
+  # vrf_patch = "${pkgs.iproute2}/bin/ip vrf exec ${vrf_name_vpn} ";
+  vrf_patch = "";
+  enableVRF = vrf_patch != ""; # true when you switch to ip vrf exec
+
 in
 {
 
-  # systemd.network.netdevs."10-vrf-vpn" = {
-  #   netdevConfig = {
-  #     Kind = "vrf";
-  #     Name = "vrf-vpn";
-  #   };
-  #   vrfConfig = {
-  #     Table = 10;
-  #   };
-  # };
+  systemd.network.netdevs."10-vrf-vpn" = lib.mkIf enableVRF {
+    netdevConfig = {
+      Kind = "vrf";
+      Name = vrf_name_vpn;
+    };
+    vrfConfig.Table = 10;
+  };
 
-  # systemd.network.networks."10-vrf-vpn" = {
-  #   matchConfig = {
-  #     Name = "vrf-vpn";
-  #   };
-  #   networkConfig = {
-  #     DHCP = "no";
-  #   };
-  # };
+  systemd.network.networks."10-vrf-vpn" = lib.mkIf enableVRF {
+    matchConfig.Name = vrf_name_vpn;
+    networkConfig.DHCP = "no";
+  };
 
-  # systemd.network.networks."20-upstream-vpn" = {
-  #   matchConfig = {
-  #     Name = "${upstream_VPN_interface}";
-  #   };
-  #   networkConfig = {
-  #     VRF = "vrf-vpn";
-  #     DHCP = "yes"; # or manual config if needed
-  #   };
-  # };
-  # systemd.network.networks."30-vpn" = {
-  #   matchConfig.Name = "tun0";
-  #   networkConfig = {
-  #     # VRF = "vrf-vpn"; # enslave tun0 into vrf-vpn
-  #     DHCP = "no";
-  #   };
-  # };
+  systemd.network.networks."20-upstream-vpn" = lib.mkIf enableVRF {
+    matchConfig.Name = upstream_VPN_interface;
+    networkConfig = {
+      VRF = vrf_name_vpn;
+      DHCP = "yes";
+    };
+  };
+
+  systemd.network.networks."30-vpn" = lib.mkIf enableVRF {
+    matchConfig.Name = vpnInterface;
+    networkConfig = {
+      VRF = vrf_name_vpn;
+      DHCP = "no";
+    };
+  };
 
   # 1. Secret VPN config loaded via SOPS
   sops.secrets."vpn-configuration" = {
@@ -136,16 +135,10 @@ in
         while true; do
           if grep -qE '^\[Interface\]' "$CONF"; then
             echo "[+] Detected WireGuard config"
-            if ${pkgs.wireguard-tools}/bin/wg-quick up "$CONF"; then
-              echo "[+] WireGuard tunnel up"
-            else
-              echo "[!] WireGuard failed, retrying in 10s"
-              sleep 10
-              continue
-            fi
+            ${vrf_patch} ${pkgs.wireguard-tools}/bin/wg-quick up "$CONF"
           elif grep -qE '^(client|dev|proto|remote)' "$CONF"; then
             echo "[+] Detected OpenVPN config"
-            ${pkgs.openvpn}/bin/openvpn --config "$CONF" --daemon
+            ${vrf_patch} ${pkgs.openvpn}/bin/openvpn --config "$CONF" --daemon
             sleep 5  # give OpenVPN time to bring up the tunnel
           else
             echo "[!] Unknown VPN config format"
@@ -226,11 +219,11 @@ in
           # ----- Rules -----
 
           # IPv4 rule
-          ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnInterface} -p tcp --dport "$port" \
+          ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnInterface} -p tcp --dport "$port" \
             -j DNAT --to-destination "$IPV4_PREFIX.$ipv4_host:$dst_port_v4"
 
           # IPv6 rule
-          ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnInterface} -p tcp --dport "$port" \
+          ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnInterface} -p tcp --dport "$port" \
             -j DNAT --to-destination "[$IPV6_PREFIX:$ipv6_host_suffix]:$dst_port_v6"
         done
       '';
@@ -320,20 +313,20 @@ in
         echo "IPv4_DNS_VPN: $IPv4_DNS_VPN"
 
         # Flush old rules for port 53 forwarding
-        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN || true
-        ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN || true
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN || true
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -D PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN || true
         # Allow forwarding to self
-        ${pkgs.iptables}/bin/iptables -I FORWARD -i ${vpnNATInterface} -o ${vpnNATInterface} -j ACCEPT
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -I FORWARD -i ${vpnNATInterface} -o ${vpnNATInterface} -j ACCEPT
         # Portforwards DNS
-        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
-        ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
         # MASQUERADE the traffic from IPV4_VPN_SUBNET_STATIC_WITH_MASK to ${vpnInterface}
-        ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s $IPV4_VPN_SUBNET_STATIC_WITH_MASK -o ${vpnInterface} -j MASQUERADE
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s $IPV4_VPN_SUBNET_STATIC_WITH_MASK -o ${vpnInterface} -j MASQUERADE
         # MSS clamping (mtu size forcing) 
-        ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -o ${vpnInterface} -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -o ${vpnInterface} -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
 
-        '';
+      '';
       Type = "oneshot";
       RemainAfterExit = true;
       Restart = "on-failure";
@@ -371,33 +364,33 @@ in
 
 
         # Flush old rules for port 53 forwarding
-        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN || true
-        ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN || true
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN || true
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -D PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN || true
 
         # allow callbacks on the adapter itself
-        ${pkgs.iptables}/bin/ip6tables -I FORWARD -i ${vpnNATInterface} -o ${vpnNATInterface} -j ACCEPT
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -I FORWARD -i ${vpnNATInterface} -o ${vpnNATInterface} -j ACCEPT
         # Add new rules with the current IP address
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv6_DNS_VPN
 
         # DNAT any incoming UDP or TCP DNS on ${vpnNATInterface} to the real VPN DNS server
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
-        ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
-        ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnNATInterface} -o ${vpnInterface} -p udp --dport 53 -d $IPv6_DNS_VPN -j ACCEPT
-        ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnNATInterface} -o ${vpnInterface} -p tcp --dport 53 -d $IPv6_DNS_VPN -j ACCEPT
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -A PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -d $IPv6_INTERFACE_NATTED_LAN -j DNAT --to-destination "[$IPv6_DNS_VPN]:53"
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnNATInterface} -o ${vpnInterface} -p udp --dport 53 -d $IPv6_DNS_VPN -j ACCEPT
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnNATInterface} -o ${vpnInterface} -p tcp --dport 53 -d $IPv6_DNS_VPN -j ACCEPT
 
         # All traffic from LAN to VPN
-        ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnNATInterface} -o ${vpnInterface} -s $IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET -j ACCEPT
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnNATInterface} -o ${vpnInterface} -s $IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET -j ACCEPT
 
         # Return traffic
-        ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnInterface} -o ${vpnNATInterface} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${vpnInterface} -o ${vpnNATInterface} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
         # Accept return traffic
-        ${pkgs.iptables}/bin/ip6tables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
-        ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -s $IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET -o ${vpnInterface} -j MASQUERADE
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -s $IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET -o ${vpnInterface} -j MASQUERADE
 
 
-        ${pkgs.iptables}/bin/ip6tables -t mangle -A FORWARD -o ${vpnInterface} -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+        ${vrf_patch} ${pkgs.iptables}/bin/ip6tables -t mangle -A FORWARD -o ${vpnInterface} -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
       '';
       Type = "oneshot";
       RemainAfterExit = true;
@@ -413,7 +406,7 @@ in
     after = [ "vpn-ready.target" ];
 
     serviceConfig = {
-      ExecStart = "${pkgs.kea}/bin/kea-dhcp4 -c /etc/kea/kea-dhcp4.conf";
+      ExecStart = "${vrf_patch} ${pkgs.kea}/bin/kea-dhcp4 -c /etc/kea/kea-dhcp4.conf";
       Type = "simple";
       Restart = "on-failure";
       RestartSec = 1;
@@ -500,7 +493,7 @@ in
     path = [ pkgs.radvd ];
 
     serviceConfig = {
-      ExecStart = "${pkgs.radvd}/bin/radvd -n -C /root/radvd.conf ${vpnNATInterface}";
+      ExecStart = "${vrf_patch} ${pkgs.radvd}/bin/radvd -n -C /root/radvd.conf ${vpnNATInterface}";
       Restart = "on-failure";
       RestartSec = 10;
       # StartLimitIntervalSec = 0;
