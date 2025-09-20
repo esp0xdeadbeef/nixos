@@ -7,8 +7,8 @@
 
 let
   management_interface = "ens18";
-  vpnNATInterface = "ens20";
   upstream_VPN_interface = "ens19";
+  vpnNATInterface = "ens20";
 
   vpnInterface = "tun0";
   vpnConfBasePath = "/etc/vpn";
@@ -16,25 +16,36 @@ let
   vpnIPv4WithMask = "10.90.0.1/24";
   vpnIPv6WithMask = "fd90:dead:beef::100/64";
 
-  vrf_name_vpn = "vrf-vpn";
-  # vrf_patch = "${pkgs.iproute2}/bin/ip vrf exec ${vrf_name_vpn} ";
-  vrf_patch = "";
-  enableVRF = vrf_patch != ""; # true when you switch to ip vrf exec
+  # Flip this when you want VRF mode
+  enableVRF = false;
 
+  # ignore this
+  vrf_table_vpn = 10;
+  vrf_name_vpn = "vrf-vpn";
+
+  vrf_patch = if enableVRF then "${pkgs.iproute2}/bin/ip vrf exec ${vrf_name_vpn}" else "";
 in
 {
+  networking.networkmanager.enable = true;
 
-  systemd.network.netdevs."10-vrf-vpn" = lib.mkIf enableVRF {
+  networking.networkmanager.unmanaged = lib.mkIf enableVRF [
+    "${upstream_VPN_interface}"
+    "${vpnNATInterface}"
+  ];
+
+  systemd.network.netdevs."10-${vrf_name_vpn}" = lib.mkIf enableVRF {
     netdevConfig = {
-      Kind = "vrf";
       Name = vrf_name_vpn;
+      Kind = "vrf";
     };
-    vrfConfig.Table = 10;
+    vrfConfig.Table = vrf_table_vpn;
   };
-
-  systemd.network.networks."10-vrf-vpn" = lib.mkIf enableVRF {
+  systemd.network.networks."10-${vrf_name_vpn}" = lib.mkIf enableVRF {
     matchConfig.Name = vrf_name_vpn;
-    networkConfig.DHCP = "no";
+    linkConfig.RequiredForOnline = "no";
+    networkConfig = {
+      DHCP = "no";
+    };
   };
 
   systemd.network.networks."20-upstream-vpn" = lib.mkIf enableVRF {
@@ -51,6 +62,28 @@ in
       VRF = vrf_name_vpn;
       DHCP = "no";
     };
+
+    # Force routes into VRF table
+    routingPolicyRules = [
+      {
+        routingPolicyRuleConfig = {
+          Table = 10;
+          Priority = 1000;
+        };
+      }
+    ];
+  };
+
+  systemd.network.networks."40-nat-iface" = lib.mkIf enableVRF {
+    matchConfig.Name = vpnNATInterface;
+    networkConfig = {
+      VRF = vrf_name_vpn;
+      DHCP = "no";
+      Address = [
+        vpnIPv4WithMask
+        vpnIPv6WithMask
+      ];
+    };
   };
 
   # 1. Secret VPN config loaded via SOPS
@@ -66,10 +99,10 @@ in
     "ip6table_nat"
   ];
   boot.kernel.sysctl = {
-    "net.ipv4.tcp_l3mdev_accept" = 1;
-    "net.ipv6.tcp_l3mdev_accept" = 1;
     "net.ipv4.ip_forward" = 1;
+    "net.ipv4.tcp_l3mdev_accept" = 1;
     "net.ipv6.conf.all.forwarding" = 1;
+    "net.ipv6.tcp_l3mdev_accept" = 1;
   };
 
   # 2. Systemd target that signals when VPN is ready
@@ -101,8 +134,6 @@ in
       '';
     };
   };
-
-  # 4. Dispatch VPN connection logic based on file content
   systemd.services.vpn-dispatcher = {
     description = "Continuously detect and start VPN tunnel (${vpnInterface}), then start vpn-ready.target";
     after = [
@@ -122,55 +153,65 @@ in
       ExecStart = pkgs.writeShellScript "vpn-dispatcher-loop" ''
         set -euxo pipefail
         CONF=${vpnConfPath}
-
-        # # wait until vrf-vpn exists
-        # for i in $(seq 1 20); do
-        #   if ip link show vrf-vpn >/dev/null 2>&1; then
-        #     break
-        #   fi
-        #   echo "[vpn-dispatcher] waiting for vrf-vpn to be created..."
-        #   sleep 1
-        # done
+        VRF_TABLE=${toString vrf_table_vpn}
 
         while true; do
-          if grep -qE '^\[Interface\]' "$CONF"; then
-            echo "[+] Detected WireGuard config"
-            ${vrf_patch} ${pkgs.wireguard-tools}/bin/wg-quick up "$CONF"
-          elif grep -qE '^(client|dev|proto|remote)' "$CONF"; then
-            echo "[+] Detected OpenVPN config"
-            ${vrf_patch} ${pkgs.openvpn}/bin/openvpn --config "$CONF" --daemon
-            sleep 5  # give OpenVPN time to bring up the tunnel
+          if grep -q "^ *${vpnInterface}:" /proc/net/dev; then
+            echo "[*] ${vpnInterface} already exists, skipping setup"
           else
-            echo "[!] Unknown VPN config format"
-            sleep 10
-            continue
-          fi
-
-          # Wait for interface to appear
-          for i in $(seq 1 10); do
-            if ip link show ${vpnInterface} > /dev/null 2>&1; then
-              echo "[+] Interface ${vpnInterface} is up"
-              break
+            if grep -qE '^\[Interface\]' "$CONF"; then
+              echo "[+] Detected WireGuard config"
+              ${vrf_patch} ${pkgs.wireguard-tools}/bin/wg-quick up "$CONF"
+            elif grep -qE '^(client|dev|proto|remote)' "$CONF"; then
+              echo "[+] Detected OpenVPN config"
+              ${vrf_patch} ${pkgs.openvpn}/bin/openvpn --config "$CONF" --daemon
+              sleep 1
+            else
+              echo "[!] Unknown VPN config format"
+              sleep 10
+              continue
             fi
-            sleep 1
-          done
-
-          if ! ip link show ${vpnInterface} > /dev/null 2>&1; then
-            echo "[!] Interface ${vpnInterface} never appeared, retrying"
-            sleep 10
-            continue
           fi
 
-          # Signal readiness only once
+          ${lib.optionalString enableVRF ''
+            echo "[*] Proceeding with VRF migration for ${vpnInterface}"
+            current_master=$(readlink "/sys/class/net/${vpnInterface}/master" || echo "")
+            if [[ "$current_master" != *"${vrf_name_vpn}"* ]]; then
+              ${pkgs.iproute2}/bin/ip route flush dev ${vpnInterface} || true
+              ${pkgs.iproute2}/bin/ip -6 route flush dev ${vpnInterface} || true
+
+              ${pkgs.iproute2}/bin/ip link set ${vpnInterface} master ${vrf_name_vpn}
+              ${pkgs.iproute2}/bin/ip link set ${vpnInterface} up
+            fi
+
+            # Copy routes into VRF table
+            ${pkgs.iproute2}/bin/ip route show dev ${vpnInterface} table main | while read -r line; do
+              echo "  - reinstalling route: $line (table $VRF_TABLE)"
+              ${pkgs.iproute2}/bin/ip route add $line table $VRF_TABLE || true
+            done
+
+            ${pkgs.iproute2}/bin/ip -6 route show dev ${vpnInterface} table main | while read -r line; do
+              echo "  - reinstalling IPv6 route: $line (table $VRF_TABLE)"
+              ${pkgs.iproute2}/bin/ip -6 route add $line table $VRF_TABLE || true
+            done
+
+            echo "[*] Routes in VRF table $VRF_TABLE:"
+            ${pkgs.iproute2}/bin/ip route show table $VRF_TABLE || true
+            ${pkgs.iproute2}/bin/ip -6 route show table $VRF_TABLE || true
+
+            echo "[+] Interfaces in VRF:"
+            ${pkgs.iproute2}/bin/ip link show master ${vrf_name_vpn}
+          ''}
+
           if [ ! -e /run/vpn-ready.once ]; then
             ${pkgs.systemd}/bin/systemctl start vpn-ready.target
             touch /run/vpn-ready.once
           fi
 
-          # Wait indefinitely — or monitor VPN health
           sleep infinity
         done
       '';
+
     };
   };
 
@@ -184,12 +225,12 @@ in
         set -euo pipefail
         set -x
 
-        # Load subnet info (should set IPV4_VPN_SUBNET_STATIC_WITH_MASK and IPV6_VPN_SUBNET_STATIC_WITH_MASK)
+        # Load subnet info (should set ${vpnIPv4WithMask} and ${vpnIPv6WithMask})
         . /etc/root/subnets.sh
 
         # Extract prefixes from /CIDR notation
-        IPV6_PREFIX=$(echo "$IPV6_VPN_SUBNET_STATIC_WITH_MASK" | cut -d/ -f1 | cut -d: -f1-3):
-        IPV4_PREFIX=$(echo "$IPV4_VPN_SUBNET_STATIC_WITH_MASK" | cut -d/ -f1 | cut -d. -f1-3)
+        IPV6_PREFIX=$(echo "${vpnIPv6WithMask}" | cut -d/ -f1 | cut -d: -f1-3):
+        IPV4_PREFIX=$(echo "${vpnIPv4WithMask}" | cut -d/ -f1 | cut -d. -f1-3)
 
         # Format: [source_port]="last_octet:destination_port"
         declare -A HOSTS_IPV4=(
@@ -297,12 +338,13 @@ in
     serviceConfig = {
       ExecStart = pkgs.writeShellScript "update_iptables_v4" ''
         set -euo pipefail
-        # set -x
+        set -x
         # Get the current IP address of ${vpnInterface}
         source /etc/root/subnets.sh
 
-        IPv4_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show ${vpnInterface} | grep 'ipv4.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
-
+        # IPv4_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show ${vpnInterface} | grep 'ipv4.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
+        # IPv4_DNS_VPN=$(${pkgs.systemd}/bin/resolvectl dns "${vpnInterface}"  | cut -d ':' -f 2 | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $2; exit}' | ${pkgs.util-linux}/bin/rev)
+        IPv4_DNS_VPN=$(${pkgs.systemd}/bin/resolvectl dns "${vpnInterface}" | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $2; exit}' | ${pkgs.util-linux}/bin/rev)
         if [[ -z "$IPv4_DNS_VPN" || "$IPv4_DNS_VPN" == "--" ]]; then
             # If it's empty or has '--', get the first hop's IPv4 address from traceroute and assign it to IPv4_DNS_VPN
             IPv4_DNS_VPN=$(${pkgs.traceroute}/bin/traceroute --interface=${vpnInterface} -n4 -m 1 google.com | tail -n1 | ${pkgs.gawk}/bin/awk '{print $2}')
@@ -320,8 +362,8 @@ in
         # Portforwards DNS
         ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnNATInterface} -p udp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
         ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A PREROUTING -i ${vpnNATInterface} -p tcp --dport 53 -j DNAT --to-destination $IPv4_DNS_VPN
-        # MASQUERADE the traffic from IPV4_VPN_SUBNET_STATIC_WITH_MASK to ${vpnInterface}
-        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s $IPV4_VPN_SUBNET_STATIC_WITH_MASK -o ${vpnInterface} -j MASQUERADE
+        # MASQUERADE the traffic from ${vpnIPv4WithMask} to ${vpnInterface}
+        ${vrf_patch} ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s ${vpnIPv4WithMask} -o ${vpnInterface} -j MASQUERADE
         # MSS clamping (mtu size forcing) 
         ${vrf_patch} ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -o ${vpnInterface} -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
@@ -341,11 +383,12 @@ in
     serviceConfig = {
       ExecStart = pkgs.writeShellScript "update_iptables_v6" ''
         set -euo pipefail
-        # set -x
+        set -x
         # Get the current IP address of ${vpnInterface}
         source /etc/root/subnets.sh
 
-        IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show ${vpnInterface} | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
+        # IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show ${vpnInterface} | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
+        IPv6_DNS_VPN=$(${pkgs.systemd}/bin/resolvectl dns "${vpnInterface}" | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $1; exit}' | ${pkgs.util-linux}/bin/rev)
 
         IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
         IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}')
@@ -437,7 +480,7 @@ in
       mkdir -p /var/lib/kea || true
       chmod 700 /var/lib/kea
       source /etc/root/subnets.sh
-      IPV4_ADDR="''${IPV4_VPN_SUBNET_STATIC_WITH_MASK}"
+      IPV4_ADDR="${vpnIPv4WithMask}"
 
       # Get network details from sipcalc
       NETWORK_INFO=$(${pkgs.sipcalc}/bin/sipcalc "''${IPV4_ADDR}")
@@ -508,7 +551,7 @@ in
       IPV6_ADDR=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
 
       source /etc/root/subnets.sh
-      IPV6_ADDR=$IPV6_VPN_SUBNET_STATIC_WITH_MASK
+      IPV6_ADDR=${vpnIPv6WithMask}
 
       PREFIX=$(${pkgs.sipcalc}/bin/sipcalc "$IPV6_ADDR")
       PREFIX=$(${pkgs.sipcalc}/bin/sipcalc "$IPV6_ADDR" | grep 'Subnet prefix' | ${pkgs.gawk}/bin/awk '{print $5}')
@@ -534,14 +577,12 @@ in
     # coreutils
     # python3
     # coreutils
-    # openvpn
-    # wireguard-tools
+    dnsutils # dig
+    openvpn
+    wireguard-tools
     tcpdump
     traceroute
   ];
-
-  networking.networkmanager.enable = true;
-  networking.networkmanager.unmanaged = [ ];
 
   environment.etc = {
     "root/subnets.sh" = {
@@ -576,7 +617,7 @@ in
       mode = "0600";
     };
 
-    "NetworkManager/system-connections/${upstream_VPN_interface}.nmconnection" = {
+    "NetworkManager/system-connections/${upstream_VPN_interface}.nmconnection" = lib.mkIf (!enableVRF) {
       text = ''
         [connection]
         id=${upstream_VPN_interface}
@@ -598,7 +639,7 @@ in
       mode = "0600";
     };
 
-    "NetworkManager/system-connections/${vpnNATInterface}.nmconnection" = {
+    "NetworkManager/system-connections/${vpnNATInterface}.nmconnection" = lib.mkIf (!enableVRF) {
       text = ''
         [connection]
         id=${vpnNATInterface}
