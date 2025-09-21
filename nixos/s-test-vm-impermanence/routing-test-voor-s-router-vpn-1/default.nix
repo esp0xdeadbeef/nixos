@@ -18,6 +18,7 @@ let
 
   # Flip this when you want VRF mode
   enableVRF = false;
+  
 
   # ignore this
   vrf_table_vpn = 10;
@@ -63,12 +64,18 @@ in
       DHCP = "no";
     };
 
-    # Force routes into VRF table
     routingPolicyRules = [
       {
         routingPolicyRuleConfig = {
-          Table = 10;
           Priority = 1000;
+          Table = vrf_table_vpn;
+        };
+      }
+      {
+        routingPolicyRuleConfig = {
+          Priority = 2000;
+          SuppressPrefixLength = 0;
+          Table = "main";
         };
       }
     ];
@@ -208,7 +215,7 @@ in
             touch /run/vpn-ready.once
           fi
 
-          sleep infinity
+          # sleep infinity
         done
       '';
 
@@ -628,7 +635,7 @@ in
 
         [ipv4]
         method=auto
-        route-metric=100
+        route-metric=500
         ignore-auto-dns=false
 
         [ipv6]
@@ -651,13 +658,13 @@ in
         [ipv4]
         method=manual
         address1=${vpnIPv4WithMask}
-        route-metric=250
+        route-metric=1000
         ignore-auto-dns=true
 
         [ipv6]
         method=manual
         address1=${vpnIPv6WithMask}
-        route-metric=250
+        route-metric=1000
         ignore-auto-dns=true
       '';
       mode = "0600";
