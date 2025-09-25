@@ -12,7 +12,7 @@ echo "[*] Checking uptime on $HOST..."
 ssh "deadbeef@$HOST" uptime || { echo "❌ SSH to $HOST failed"; sleep 2; exit 1; }
 
 echo "[*] Running rsync to $HOST..."
-if timeout 3 rsync -va --exclude='.git' /home/deadbeef/github/nixos "deadbeef@$HOST:~/github/" | grep -q "nixos/$HOST"; then
+if timeout 3 rsync -va --exclude='.git' /home/deadbeef/github/nixos "deadbeef@$HOST:~/github/" | grep -q "nixos/$HOST/"; then
   echo "[*] Changes detected, rebuilding and rebooting $HOST..."
   if [[ "$HOST" == "s-router-vpn-1" ]]; then
     ( ssh "deadbeef@$HOST" 'sudo nmcli connection down tun0' ) || true

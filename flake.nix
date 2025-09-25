@@ -200,6 +200,15 @@
             ./nixos/s-lxc-test/configuration.nix
           ];
         };
+        # lxc server
+        s-lxc-router = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            # lanzaboote.nixosModules.lanzaboote
+            # > Our main nixos configuration file <
+            ./nixos/s-lxc-router/configuration.nix
+          ];
+        };
       };
     };
 }

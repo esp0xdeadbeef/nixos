@@ -223,3 +223,22 @@ export CURRENT_CONFIG="s-lxc-test"
 
 awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' .//nixos/$CURRENT_CONFIG/build_configuration.nix >  .//nixos/$CURRENT_CONFIG/configuration.nix
 
+export CURRENT_CONFIG="s-lxc-router"
+(
+    (
+        cd .//nixos/$CURRENT_CONFIG
+        find . | grep -v 'old\|./configuration.nix$' | grep 'nix$' | while read line; do
+            echo "    $line"
+        done
+    ) | sort
+    echo # empty row
+    (
+        cd .//nixos/01-general
+        find ../01-general | grep '\.nix$' | grep -v '/build_'  | while read line; do
+            echo "    $line"
+        done
+    ) | sort
+) | grep -v '/build_' | tee /tmp/results.txt
+
+awk -v r="$(</tmp/results.txt)" '{gsub(/STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH/, r)}1' .//nixos/$CURRENT_CONFIG/build_configuration.nix >  .//nixos/$CURRENT_CONFIG/configuration.nix
+

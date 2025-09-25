@@ -6,7 +6,9 @@ windows:
       - shell_command: |
           while :; do ./rsync-update-reboot.sh s-lxc-test ; done
       - shell_command: |
-          while :; do ./rsync-update-reboot.sh s-router-vpn-1 ; done
+          while :; do ./rsync-update-reboot.sh s-lxc-router ; done
+    #   - shell_command: |
+    #       while :; do ./rsync-update-reboot.sh s-router-vpn-1 ; done
       - shell_command: |
           while :; do ./rsync-update-reboot.sh s-test-vm-impermanence ; done
       - shell_command: |

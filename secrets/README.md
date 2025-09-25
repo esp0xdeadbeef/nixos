@@ -3,6 +3,7 @@
 # generate a key with:
 
 ```bash
+[ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -q
 mkdir -p ~/.config/sops/age
 nix-shell -p ssh-to-age --run "ssh-to-age -private-key -i ~/.ssh/id_ed25519 > ~/.config/sops/age/keys.txt"
 ```
