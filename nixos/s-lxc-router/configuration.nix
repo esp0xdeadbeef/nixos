@@ -73,7 +73,7 @@
 
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
-    ./network/default.nix
+    # ./network/default.nix
     ../01-general/system/autoupdate.nix
     {
       environment.interactiveShellInit = ''

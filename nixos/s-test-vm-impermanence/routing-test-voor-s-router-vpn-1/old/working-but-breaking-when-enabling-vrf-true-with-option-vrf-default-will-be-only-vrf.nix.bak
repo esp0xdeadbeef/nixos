@@ -26,12 +26,25 @@ let
   vrf_patch = if enableVRF then "${pkgs.iproute2}/bin/ip vrf exec ${vrf_name_vpn}" else "";
 in
 {
-  networking.networkmanager.enable = true;
+  networking.networkmanager.enable = if enableVRF then false else true;
 
-  networking.networkmanager.unmanaged = lib.mkIf enableVRF [
-    "${upstream_VPN_interface}"
-    "${vpnNATInterface}"
-  ];
+  # networking.networkmanager.unmanaged = lib.mkIf enableVRF [
+  #   "${upstream_VPN_interface}"
+  #   "${vpnNATInterface}"
+  #   "${management_interface}"
+  # ];
+
+  systemd.network.networks."10-mgmt" = {
+    matchConfig.Name = management_interface;
+    networkConfig.DHCP = "yes";
+    routingPolicyRules = [
+      {
+        Priority = 100;
+        From = "192.168.1.0/24"; # or just your mgmt IP /32
+        Table = "main";
+      }
+    ];
+  };
 
   systemd.network.netdevs."10-${vrf_name_vpn}" = lib.mkIf enableVRF {
     netdevConfig = {
@@ -63,21 +76,29 @@ in
       DHCP = "no";
     };
 
+    # routingPolicyRules = [
+    #   {
+    #     Priority = 1000;
+    #     Table = vrf_table_vpn;
+    #   }
+    #   {
+    #     Priority = 2000;
+    #     SuppressPrefixLength = 0;
+    #     Table = "main";
+    #   }
+    # ];
     routingPolicyRules = [
       {
-        routingPolicyRuleConfig = {
-          Priority = 1000;
-          Table = vrf_table_vpn;
-        };
-      }
-      {
-        routingPolicyRuleConfig = {
-          Priority = 2000;
-          SuppressPrefixLength = 0;
-          Table = "main";
-        };
+        Priority = 1000;
+        Table = vrf_table_vpn;
+        From = vpnIPv4WithMask;
       }
     ];
+
+  };
+
+  systemd.slices.vrf = lib.mkIf enableVRF {
+    description = "Slice for VRF-routed services";
   };
 
   systemd.network.networks."40-nat-iface" = lib.mkIf enableVRF {
@@ -108,7 +129,6 @@ in
     "net.ipv4.ip_forward" = 1;
     "net.ipv4.tcp_l3mdev_accept" = 1;
     "net.ipv6.conf.all.forwarding" = 1;
-    "net.ipv6.tcp_l3mdev_accept" = 1;
   };
 
   # 2. Systemd target that signals when VPN is ready
@@ -140,122 +160,186 @@ in
       '';
     };
   };
-  systemd.services.vpn-dispatcher = {
-    description = "Continuously detect and patch VPN routing/NAT state";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    wantedBy = [ "multi-user.target" ];
 
+  systemd.services."nftables-vrf-mark" = lib.mkIf enableVRF {
+    wantedBy = [ "multi-user.target" ];
+    path = [
+      pkgs.nftables
+      pkgs.coreutils
+      pkgs.gawk
+    ];
     serviceConfig = {
       Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = pkgs.writeShellScript "vpn-dispatcher" ''
-        set -euxo pipefail
+      ExecStart = pkgs.writeShellScript "nftables-vrf-mark" ''
+        set -eux
 
-        STATE_DIR="/run/vpn-dispatcher"
-        VPN_INTERFACE_REGEX='^(tun|wg)[0-9]+$'
+        # Ensure table/chain exist
+        nft list table inet vrf >/dev/null 2>&1 || nft add table inet vrf
+        nft list chain inet vrf output >/dev/null 2>&1 || \
+          nft add chain inet vrf output '{ type filter hook output priority 0; }'
 
-        NAT_IFACE="${vpnNATInterface}"
-        VRF_NAME="${vrf_name_vpn}"
-        VRF_TABLE="${toString vrf_table_vpn}"
-        ENABLE_VRF="${if enableVRF then "true" else "false"}"
+        # Grab inode ID for vrf.slice
+        CGROUP_ID=$(stat -c %i /sys/fs/cgroup/vrf.slice)
+        echo "[*] vrf.slice cgroup id = $CGROUP_ID"
 
-        mkdir -p "$STATE_DIR"
-
-        save_routes() {
-          ${pkgs.iproute2}/bin/ip route show > "$STATE_DIR/ip-route-main.txt"
-          ${pkgs.iproute2}/bin/ip -6 route show > "$STATE_DIR/ip6-route-main.txt"
-          ${pkgs.iproute2}/bin/ip rule show > "$STATE_DIR/ip-rule-main.txt"
-          ${pkgs.iproute2}/bin/ip -6 rule show > "$STATE_DIR/ip6-rule-main.txt"
-        }
-
-        save_vpn_routes() {
-          ${pkgs.iproute2}/bin/ip route show table "$VRF_TABLE" > "$STATE_DIR/ip-route-vrf.txt"
-          ${pkgs.iproute2}/bin/ip -6 route show table "$VRF_TABLE" > "$STATE_DIR/ip6-route-vrf.txt"
-          ${pkgs.iproute2}/bin/ip rule show | grep "$VRF_TABLE" > "$STATE_DIR/ip-rule-vrf.txt" || true
-          ${pkgs.iproute2}/bin/ip -6 rule show | grep "$VRF_TABLE" > "$STATE_DIR/ip6-rule-vrf.txt" || true
-        }
-
-        flush_post_vpn() {
-          ${pkgs.iproute2}/bin/ip route flush table main
-          ${pkgs.iproute2}/bin/ip -6 route flush table main
-          ${pkgs.iproute2}/bin/ip rule flush
-          ${pkgs.iproute2}/bin/ip -6 rule flush
-        }
-
-        restore_main_routes() {
-          ${pkgs.iproute2}/bin/ip route restore < "$STATE_DIR/ip-route-main.txt"
-          ${pkgs.iproute2}/bin/ip -6 route restore < "$STATE_DIR/ip6-route-main.txt"
-          while read -r rule; do ${pkgs.iproute2}/bin/ip rule add $rule; done < "$STATE_DIR/ip-rule-main.txt"
-          while read -r rule; do ${pkgs.iproute2}/bin/ip -6 rule add $rule; done < "$STATE_DIR/ip6-rule-main.txt"
-        }
-
-        add_vrf_nat_rules() {
-          local vpn_if=$1
-
-          ${pkgs.iproute2}/bin/ip link set dev "$vpn_if" up
-          ${pkgs.iproute2}/bin/ip link set dev "$vpn_if" master "$VRF_NAME" || true
-
-          ${pkgs.iproute2}/bin/ip route add default dev "$vpn_if" table "$VRF_TABLE" || true
-          ${pkgs.iproute2}/bin/ip rule add iif "$NAT_IFACE" lookup "$VRF_TABLE" || true
-
-          ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -i "$NAT_IFACE" -o "$vpn_if" -j MASQUERADE || true
-          ${pkgs.iptables}/bin/ip6tables -t nat -A POSTROUTING -i "$NAT_IFACE" -o "$vpn_if" -j MASQUERADE || true
-        }
-
-        echo "[*] Waiting for VPN interface or configuration to appear"
-        while true; do
-          CONF="${vpnConfPath}"
-
-          if grep -q "^ *${vpnInterface}:" /proc/net/dev; then
-            echo "[*] ${vpnInterface} already exists, skipping setup"
-            break
-          fi
-
-          if grep -qE '^\[Interface\]' "$CONF"; then
-            echo "[+] Detected WireGuard config"
-            ${vrf_patch} ${pkgs.wireguard-tools}/bin/wg-quick up "$CONF"
-            break
-          elif grep -qE '^(client|dev|proto|remote)' "$CONF"; then
-            echo "[+] Detected OpenVPN config"
-            ${vrf_patch} ${pkgs.openvpn}/bin/openvpn --config "$CONF" --daemon
-            sleep 1
-            break
-          else
-            echo "[!] Unknown VPN config format"
-            sleep 10
-          fi
-        done
-
-        echo "[*] Saving pre-VPN route state"
-        save_routes
-
-        echo "[*] Waiting for VPN interface to appear"
-        while true; do
-          VPN_IF=$(${pkgs.iproute2}/bin/ip -j link | ${pkgs.jq}/bin/jq -r ".[] | select(.ifname | test(\"$VPN_INTERFACE_REGEX\")) | .ifname" | head -n1)
-          [ -n "$VPN_IF" ] && break
-          sleep 1
-        done
-
-        echo "[+] Detected VPN interface: $VPN_IF"
-
-        echo "[*] Saving post-VPN table patches"
-        save_vpn_routes
-
-        echo "[*] Flushing main routing tables"
-        flush_post_vpn
-
-        echo "[*] Restoring original routing state"
-        restore_main_routes
-
-        if [[ "$ENABLE_VRF" == "true" ]]; then
-          echo "[*] Applying VRF rules to NAT interface"
-          add_vrf_nat_rules "$VPN_IF"
-        else
-          echo "[*] Skipping VRF-specific routing patch"
+        # Remove old rule if present
+        RULE_HANDLE=$(nft -a list chain inet vrf output | awk '/meta cgroup '"$CGROUP_ID"'/ {print $NF}')
+        if [ -n "$RULE_HANDLE" ]; then
+          nft delete rule inet vrf output handle "$RULE_HANDLE" || true
         fi
 
-        echo "[+] Done"
+        # Add rule: mark all traffic from vrf.slice
+        nft add rule inet vrf output meta cgroup "$CGROUP_ID" meta mark set 0x1
+      '';
+    };
+  };
+  systemd.services.vpn-dispatcher = {
+    description = "Continuously detect and start VPN tunnel (${vpnInterface}), then start vpn-ready.target";
+    after = [
+      "write-vpn-config.service"
+      "systemd-networkd.service"
+    ];
+    requires = [
+      "write-vpn-config.service"
+      "systemd-networkd.service"
+    ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = with pkgs; [
+      iproute2
+      coreutils
+      gawk
+      wireguard-tools
+      openvpn
+      systemd
+      nftables
+    ];
+
+    serviceConfig = {
+      Type = "simple";
+      Restart = "always";
+      RestartSec = 10;
+      Slice = lib.mkIf enableVRF "vrf.slice";
+
+      ExecStart = pkgs.writeShellScript "vpn-dispatcher-loop" ''
+        set -euxo pipefail
+        CONF=${vpnConfPath}
+        VRF_TABLE=${toString vrf_table_vpn}
+        VRF_NAME=${vrf_name_vpn}
+        MGMT_IF=${management_interface}
+
+        while true; do
+          if grep -q "^ *${vpnInterface}:" /proc/net/dev; then
+            echo "[*] ${vpnInterface} already exists, skipping setup"
+          else
+            ${lib.optionalString enableVRF ''
+              echo "[*] Waiting for ${upstream_VPN_interface} to settle..."
+              for i in $(seq 1 20); do
+                ip addr show dev ${upstream_VPN_interface} | grep -q "inet" && break || true
+                sleep 1
+              done
+
+              # Snapshot BEFORE
+              ip route show table main | sort -u > /run/routes.before
+              ip -6 route show table main | sort -u > /run/routes6.before
+              ip rule show | awk '{prio=$1; $1=""; sub(/^ /,""); print prio":"$0}' | sort -n > /run/rules.before
+
+              # === Add killswitch ===
+              echo "[*] Enabling temporary egress block (except mgmt + loopback)"
+              nft add table inet vpnblock
+              nft add chain inet vpnblock output { type filter hook output priority -100\; policy drop; }
+              # Always allow established/related so existing SSH doesn’t die instantly
+              nft add rule inet vpnblock output ct state established,related accept
+              # Allow anything on loopback
+              nft add rule inet vpnblock output oif lo accept
+              # Allow anything going out management interface
+              nft add rule inet vpnblock output oifname ''${MGMT_IF} accept
+            ''}
+
+            if grep -qE '^\[Interface\]' "''${CONF}"; then
+              echo "[+] Detected WireGuard config"
+              ${vrf_patch} wg-quick up "''${CONF}"
+            elif grep -qE '^(client|dev|proto|remote)' "''${CONF}"; then
+              echo "[+] Detected OpenVPN config"
+              ${vrf_patch} openvpn --config "''${CONF}" --daemon
+              sleep 2
+            else
+              echo "[!] Unknown VPN config format"
+              ${lib.optionalString enableVRF "nft delete table inet vpnblock || true"}
+              sleep 10
+              continue
+            fi
+
+            ${lib.optionalString enableVRF ''
+              # Snapshot AFTER
+              ip route show table main | sort -u > /run/routes.after
+              ip -6 route show table main | sort -u > /run/routes6.after
+              ip rule show | awk '{prio=$1; $1=""; sub(/^ /,""); print prio":"$0}' | sort -n > /run/rules.after
+
+              # Diff IPv4 routes
+              comm -13 /run/routes.before /run/routes.after | while read -r line; do
+                [ -n "$line" ] || continue
+                echo "[+] Migrating IPv4 route: $line"
+                ip route add $line table "''${VRF_TABLE}" || true
+                ip route del $line || true
+              done
+
+              # Diff IPv6 routes
+              comm -13 /run/routes6.before /run/routes6.after | while read -r line; do
+                [ -n "$line" ] || continue
+                echo "[+] Migrating IPv6 route: $line"
+                ip -6 route add $line table "''${VRF_TABLE}" || true
+                ip -6 route del $line || true
+              done
+
+              # Diff rules
+              comm -13 /run/rules.before /run/rules.after | while IFS= read -r rule; do
+                [ -n "$rule" ] || continue
+                echo "[+] Processing new rule: $rule"
+                if [[ "$rule" =~ ^([0-9]+):(.*) ]]; then
+                  PRIO="''${BASH_REMATCH[1]}"
+                  REST="''${BASH_REMATCH[2]}"
+                else
+                  continue
+                fi
+
+                REST=$(echo "$REST" | xargs)
+                [ -z "$REST" ] && continue
+
+                if echo "$REST" | grep -q "table main"; then
+                  NEWREST="''${REST/main/''${VRF_TABLE}}"
+                elif echo "$REST" | grep -q "table 51820"; then
+                  NEWREST="''${REST/51820/''${VRF_TABLE}}"
+                else
+                  NEWREST="$REST"
+                fi
+
+                ip rule add priority "$PRIO" $NEWREST || true
+                ip rule del priority "$PRIO" || true
+              done
+
+              # === Remove killswitch ===
+              echo "[*] Removing temporary egress block"
+              nft delete table inet vpnblock || true
+            ''}
+          fi
+
+          ${lib.optionalString enableVRF ''
+            echo "[*] Ensuring ${vpnInterface} is enslaved to VRF ''${VRF_NAME}"
+            current_master=$(readlink "/sys/class/net/${vpnInterface}/master" || echo "")
+            if [[ "$current_master" != *"''${VRF_NAME}"* ]]; then
+              ip link set ${vpnInterface} master ''${VRF_NAME}
+              ip link set ${vpnInterface} up
+            fi
+          ''}
+
+          if [ ! -e /run/vpn-ready.once ]; then
+            systemctl start vpn-ready.target
+            touch /run/vpn-ready.once
+          fi
+
+          sleep infinity
+        done
       '';
     };
   };
@@ -627,6 +711,7 @@ in
     wireguard-tools
     tcpdump
     traceroute
+    nftables
   ];
 
   environment.etc = {
@@ -634,6 +719,78 @@ in
       source = pkgs.writeShellScript "subnets" ''
         export IPV4_VPN_SUBNET_STATIC_WITH_MASK="${vpnIPv4WithMask}"
         export IPV6_VPN_SUBNET_STATIC_WITH_MASK="${vpnIPv6WithMask}"
+      '';
+      mode = "0755";
+    };
+
+    "root/restore_internet.sh" = {
+      source = pkgs.writeShellScript "restore_internet" ''
+        #!/usr/bin/env bash
+        sudo systemctl stop vpn-dispatcher.service
+        set -euxo pipefail
+
+        NUKE_IFACES=("tun0" "ens19" "ens20")
+
+        echo "[+] Killing routes and rules for: ''${NUKE_IFACES[*]}"
+
+        for IFACE in "''${NUKE_IFACES[@]}"; do
+          echo "[-] Nuking interface: $IFACE"
+
+          # Flush routes from other tables that use the interface
+          for TABLE in $(ip route show table all | grep -F "$IFACE" | awk '{print $NF}' | sort -u); do
+            echo "  -> Flushing routes from table $TABLE"
+            ip route flush table "$TABLE" dev "$IFACE" || true
+            ip -6 route flush table "$TABLE" dev "$IFACE" || true
+          done
+
+          # Delete rules that reference the interface
+          ip rule | grep "$IFACE" || true
+          for RULE in $(ip rule | grep "$IFACE" | awk '{print $1}'); do
+            echo "  -> Deleting ip rule $RULE"
+            ip rule del priority "$RULE" || true
+          done
+
+          # Detach from VRF if necessary
+          if [ -e "/sys/class/net/$IFACE/master" ]; then
+            echo "  -> Detaching $IFACE from VRF"
+            ip link set dev "$IFACE" nomaster || true
+          fi
+
+          # Bring interface down
+          ip link set dev "$IFACE" down || true
+        done
+
+        echo "[+] Flushing iptables and ip6tables for cleanup"
+        iptables -F
+        iptables -t nat -F
+        iptables -t mangle -F
+        ip6tables -F
+        ip6tables -t nat -F
+        ip6tables -t mangle -F
+
+
+        sudo ip link set dev ens18 up
+        nft delete table inet vpnblock || true
+        echo "[+] Done. VRF interfaces nuked. Main interface untouched."
+        ip a show dev ens18
+        ip r
+
+        echo "[+] Setting fallback DNS to 1.1.1.1 and 9.9.9.9"
+        echo -e "nameserver 1.1.1.1\nnameserver 9.9.9.9" > /etc/resolv.conf
+
+        echo "[+] Final IP state on management interface:"
+        ip a show dev ens18
+
+        echo "[+] Route table:"
+        ip r
+
+        echo "[+] Testing external connectivity:"
+        ping -c 2 1.1.1.1
+        curl -s https://ifconfig.me || echo "curl failed"
+
+        echo "[✓] VRF interfaces nuked. DNS + routing restored via ens18."
+
+
       '';
       mode = "0755";
     };
@@ -647,17 +804,15 @@ in
         autoconnect=true
         permissions=
 
-        [ipv4]
-        method=auto
+        [ipv4] 
+        method=auto 
         route-metric=300
-        ignore-auto-dns=${if enableVRF then "false" else "true"}
-        never-default=${if enableVRF then "false" else "true"}
+        ${if enableVRF then "" else "ignore-auto-dns=true\nnever-default=true"}
 
-        [ipv6]
-        method=auto
-        route-metric=300
-        ignore-auto-dns=${if enableVRF then "false" else "true"}
-        never-default=${if enableVRF then "false" else "true"}
+        [ipv6] 
+        method=auto 
+        route-metric=300 
+        ${if enableVRF then "" else "ignore-auto-dns=true\nnever-default=true"}
       '';
       mode = "0600";
     };
@@ -698,12 +853,14 @@ in
         address1=${vpnIPv4WithMask}
         route-metric=1000
         ignore-auto-dns=true
+        never-default=true
 
         [ipv6]
         method=manual
         address1=${vpnIPv6WithMask}
         route-metric=1000
         ignore-auto-dns=true
+        never-default=true
       '';
       mode = "0600";
     };

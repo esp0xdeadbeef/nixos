@@ -31,7 +31,7 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
-    ./routing-test-voor-s-router-vpn-1/default.nix
+    ./routing-test-voor-s-router-vpn-1/vrf_vpn_upstream_gateway_with_mgmt.nix
 
     ../01-general/desktop/applet-nm.nix
     ../01-general/desktop/fonts.nix
@@ -80,11 +80,11 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
-    ./routing-test-voor-s-router-vpn-1/default.nix
+    ./routing-test-voor-s-router-vpn-1/vrf_vpn_upstream_gateway_with_mgmt.nix
 
 
     ../01-general/desktop/shell-env.nix
-
+    ../99-testing/autologin.nix
     # ../02-window-manager-i3/environment.nix
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager

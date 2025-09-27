@@ -38,7 +38,7 @@
 
 
     ../01-general/desktop/shell-env.nix
-
+    ../99-testing/autologin.nix
     # ../02-window-manager-i3/environment.nix
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
