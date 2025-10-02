@@ -34,8 +34,10 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
-    ./routing-test-voor-s-router-vpn-1/default.nix
-
+    
+    # ./routing-test-voor-s-router-vpn-1/vrf_vpn_upstream_gateway_with_mgmt.nix
+    ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
+    ./containers/start_container.nix
 
     ../01-general/desktop/shell-env.nix
     ../99-testing/autologin.nix

@@ -16,7 +16,6 @@
 /* 
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
-    ./network/default.nix
 
     ../01-general/desktop/applet-nm.nix
     ../01-general/desktop/fonts.nix
@@ -73,7 +72,7 @@
 
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
-    # ./network/default.nix
+    ./network/default.nix
     ../01-general/system/autoupdate.nix
     {
       environment.interactiveShellInit = ''
