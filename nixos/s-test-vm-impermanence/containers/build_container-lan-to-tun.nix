@@ -527,7 +527,7 @@ in
         set -euo pipefail
 
 
-        # we should have a different way of checking if dhcp4 is working:
+        # we should have a different way of checking if dhcp4 is working, this still sucks:
 
         # LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 -n 40)"
 
