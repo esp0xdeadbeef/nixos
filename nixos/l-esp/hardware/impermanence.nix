@@ -179,6 +179,10 @@
         ".config/zoom" # Zoom settings
         ".config/1Password" # 1Password
 
+        # signal:
+        ".config/Signal"
+        ".config/maestral"
+
         {
           directory = ".gnupg";
           mode = "0700";

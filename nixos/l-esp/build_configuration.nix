@@ -125,23 +125,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   environment.interactiveShellInit = ''
     ZSH_THEME=robbyrussell
   '';
-
-  ## moved this to home-manager/l-esp/dropbox/packages.nix
-  # systemd.user.services.dropbox = {
-  #   description = "Dropbox service";
-  #   wantedBy = [ "default.target" ];
-  #   after = [ "network-online.target" ];
-  #   serviceConfig = {
-  #     ExecStart = "${pkgs.dropbox}/bin/dropbox";
-  #     Restart = "on-failure";
-  #   };
-  # };
-  # secrets.deadbeef-passwd.neededForUsers = true;
-  # sops = {
-  #   secrets.deadbeef-passwd = {
-  #     neededForUsers = true;
-  #   };
-  # };
+  
   sops.secrets."deadbeef-passwd" = {
     neededForUsers = true; # make it available before the user is created
   };
