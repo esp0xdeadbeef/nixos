@@ -13,8 +13,16 @@ let
   vpnInterface = "tun0";
   vpnConfBasePath = "/etc/vpn";
   vpnConfPath = "${vpnConfBasePath}/${vpnInterface}.conf";
-  vpnIPv4WithMask = "10.90.0.1/24";
-  vpnIPv6WithMask = "fd90:dead:beef::100/64";
+
+
+  # subnets in lan:
+  vpnIPv4Address  = "10.90.0.1";
+  vpnIPv6Address  = "fd90:dead:beef::100";
+  vpnIPv4Mask  = "24";
+  vpnIPv6Mask  = "64";
+
+  vpnIPv4WithMask = "${vpnIPv4Address}/${vpnIPv4Mask}";
+  vpnIPv6WithMask = "${vpnIPv6Address}/${vpnIPv6Mask}";
 
   # Flip this when you want VRF mode
   enableVRF = false;
@@ -33,13 +41,25 @@ in
   networking.useDHCP = lib.mkDefault false;
   networking.interfaces.wan.useDHCP = true;
 
-  networking.interfaces.lan.ipv4.addresses = [
-    {
-      address = "10.90.0.1";
-      prefixLength = 24;
-    }
-  ];
-  networking.networkmanager.enable = true;
+  networking.interfaces.lan = {
+    ipv4.addresses = [
+      {
+        address = vpnIPv4Address;
+        prefixLength = 24;
+      }
+    ];
+
+    ipv6 = {
+      addresses = [
+        {
+          address = vpnIPv6Address;
+          prefixLength = 64;
+        }
+      ];
+    };
+  };
+
+  networking.networkmanager.enable = false;
 
   systemd.slices.vrf = lib.mkIf enableVRF {
     description = "Slice for VRF-routed services";
@@ -454,8 +474,8 @@ in
         # IPv6_DNS_VPN=$(${pkgs.networkmanager}/bin/nmcli connection show ${vpnInterface} | grep 'ipv6.dns' | ${pkgs.gawk}/bin/awk '{print $2}' | head -n1)
         IPv6_DNS_VPN=$(${pkgs.systemd}/bin/resolvectl dns "${vpnInterface}" | ${pkgs.util-linux}/bin/rev | ${pkgs.gawk}/bin/awk '{print $1; exit}' | ${pkgs.util-linux}/bin/rev)
 
-        IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
-        IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global noprefixroute' | ${pkgs.gawk}/bin/awk '{print $2}')
+        IPv6_INTERFACE_NATTED_LAN=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}' | cut -d '/' -f 1)
+        IPv6_INTERFACE_NATTED_LAN_WITH_SUBNET=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
 
 
         # Check if the DNS setting is empty or if it contains '--'
@@ -511,6 +531,13 @@ in
     wantedBy = [ "multi-user.target" ];
     requires = [ "vpn-ready.target" ];
     after = [ "vpn-ready.target" ];
+    path = [
+      pkgs.kea
+      pkgs.systemd
+    ];
+    unitConfig = {
+      StartLimitIntervalSec = 0; # disables rate limiting
+    };
 
     serviceConfig = {
       ExecStart = pkgs.writeShellScript "kea-dhcp4-execstart" ''
@@ -521,27 +548,28 @@ in
       '';
 
       Type = "simple";
-      Restart = "on-failure";
-      RestartSec = 1;
+      Restart = "always"; # keep restarting no matter what
+      RestartSec = 1; # 1s between attempts
+      # your ExecStart, ExecStartPost, etc...
       ExecStartPost = pkgs.writeShellScript "kea-dhcp4-postcheck" ''
         set -euo pipefail
 
 
         # we should have a different way of checking if dhcp4 is working, this still sucks:
 
-        # LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 -n 40)"
+        LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 | tail -n 40)"
 
-        # if ! echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "listening on interface"; then
-        #   echo "kea-dhcp4 not listening on any interface"
-        #   exit 1
-        # fi
+        if ! echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "listening on interface"; then
+          echo "kea-dhcp4 not listening on any interface"
+          exit 1
+        fi
 
-        # sleep 3
-        # LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 -n 40)"
-        # if echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "DHCPSRV_OPEN_SOCKET_FAIL"; then
-        #   echo "kea-dhcp4 failed to open sockets"
-        #   exit 1
-        # fi
+        sleep 3
+        LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 -n 40)"
+        if echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "DHCPSRV_OPEN_SOCKET_FAIL"; then
+          echo "kea-dhcp4 failed to open sockets"
+          exit 1
+        fi
 
       '';
 
@@ -623,6 +651,7 @@ in
     preStart = ''
       echo "Generating radvd.conf..."
       set -euo pipefail
+      set -x
 
       # Extract IPv6 address and subnet prefix for ${vpnNATInterface}
       IPV6_ADDR=$(${pkgs.iproute2}/bin/ip -6 a s ${vpnNATInterface} | grep 'scope global' | ${pkgs.gawk}/bin/awk '{print $2}')
