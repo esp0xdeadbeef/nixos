@@ -1,6 +1,9 @@
 
 
 
+
+# old notes, went to the container route.
+
 ```bash
 
 ip netns add testvpn
