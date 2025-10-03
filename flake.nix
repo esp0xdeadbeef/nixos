@@ -17,6 +17,9 @@
     systems = {
       url = "github:nix-systems/default-linux";
     };
+    nixos-router-vpn-gateway = {
+      url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
+    };
 
     # zen-browser = {
     #   url = "github:0xc000022070/zen-browser-flake";
