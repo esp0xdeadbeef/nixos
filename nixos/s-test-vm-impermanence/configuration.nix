@@ -23,55 +23,55 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     /*
-      # testing router config, disable:
-          ./containers/start_container.nix
-    ./hardware/bootloader.nix
-    ./hardware/boot-package.nix
-    ./hardware/force-update.nix
-    ./hardware/hardware-configuration.nix
-    ./hardware/impermanence.nix
-    ./hardware/lanzaboote.nix
-    ./hardware/swap-and-tmpfs.nix
-    ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
+        # testing router config, disable:
+            ./containers/start_container.nix
+      ./hardware/bootloader.nix
+      ./hardware/boot-package.nix
+      ./hardware/force-update.nix
+      ./hardware/hardware-configuration.nix
+      ./hardware/impermanence.nix
+      ./hardware/lanzaboote.nix
+      ./hardware/swap-and-tmpfs.nix
+      ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
 
-    ../01-general/desktop/applet-nm.nix
-    ../01-general/desktop/fonts.nix
-    ../01-general/desktop/packages.nix
-    ../01-general/desktop/screen-recording.nix
-    ../01-general/desktop/shell-env.nix
-    ../01-general/desktop/users-and-groups.nix
-    ../01-general/desktop/xdg-portal.nix
-    ../01-general/enable-etc-hosts-editing/default.nix
-    ../01-general/firmware-update/default.nix
-    ../01-general/network/firewall.nix
-    ../01-general/network/nat-lxc.nix
-    ../01-general/network/nmcli.nix
-    ../01-general/packages/1-general/archive-tools.nix
-    ../01-general/packages/1-general/tooling.nix
-    ../01-general/packages/data-tranformation/packages.nix
-    ../01-general/packages/editors/packages.nix
-    ../01-general/packages/encryption-and-password-management/packages.nix
-    ../01-general/packages/git/packages.nix
-    ../01-general/packages/network-troubleshooting/packages.nix
-    ../01-general/packages/nix-specific/packages.nix
-    ../01-general/packages/packages.nix
-    ../01-general/packages/password-managers/1password.nix
-    ../01-general/packages/terminals/packages.nix
-    ../01-general/packages/terminals/terminal-optimisers/packages.nix
-    ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
-    ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
-    ../01-general/packages/window-managers/X-org/packages.nix
-    ../01-general/secrets/import-secrets.nix
-    ../01-general/security/default.nix
-    ../01-general/system/autoupdate.nix
-    ../01-general/system/garbage-collection.nix
-    ../01-general/system/locale.nix
-    ../01-general/terminals/tmux/settings.nix
-    ../01-general/time/timezone.nix
-    ../01-general/virtualization-as-host/general.nix
-    ../01-general/virtualization-as-host/libvirt.nix
-    ../01-general/virtualization-as-host/lxc.nix
-    ../01-general/virtualization-as-host/podman.nix
+      ../01-general/desktop/applet-nm.nix
+      ../01-general/desktop/fonts.nix
+      ../01-general/desktop/packages.nix
+      ../01-general/desktop/screen-recording.nix
+      ../01-general/desktop/shell-env.nix
+      ../01-general/desktop/users-and-groups.nix
+      ../01-general/desktop/xdg-portal.nix
+      ../01-general/enable-etc-hosts-editing/default.nix
+      ../01-general/firmware-update/default.nix
+      ../01-general/network/firewall.nix
+      ../01-general/network/nat-lxc.nix
+      ../01-general/network/nmcli.nix
+      ../01-general/packages/1-general/archive-tools.nix
+      ../01-general/packages/1-general/tooling.nix
+      ../01-general/packages/data-tranformation/packages.nix
+      ../01-general/packages/editors/packages.nix
+      ../01-general/packages/encryption-and-password-management/packages.nix
+      ../01-general/packages/git/packages.nix
+      ../01-general/packages/network-troubleshooting/packages.nix
+      ../01-general/packages/nix-specific/packages.nix
+      ../01-general/packages/packages.nix
+      ../01-general/packages/password-managers/1password.nix
+      ../01-general/packages/terminals/packages.nix
+      ../01-general/packages/terminals/terminal-optimisers/packages.nix
+      ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
+      ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
+      ../01-general/packages/window-managers/X-org/packages.nix
+      ../01-general/secrets/import-secrets.nix
+      ../01-general/security/default.nix
+      ../01-general/system/autoupdate.nix
+      ../01-general/system/garbage-collection.nix
+      ../01-general/system/locale.nix
+      ../01-general/terminals/tmux/settings.nix
+      ../01-general/time/timezone.nix
+      ../01-general/virtualization-as-host/general.nix
+      ../01-general/virtualization-as-host/libvirt.nix
+      ../01-general/virtualization-as-host/lxc.nix
+      ../01-general/virtualization-as-host/podman.nix
     */
 
     ./hardware/bootloader.nix
@@ -81,12 +81,11 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
-    
+
     # ./routing-test-voor-s-router-vpn-1/vrf_vpn_upstream_gateway_with_mgmt.nix
     ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
     # ./containers/start_container.nix
-    ./router-vpn-1-from-public-git/start_container.nix
-
+    # ./router-vpn-1-from-public-git/start_container.nix
 
     ../01-general/desktop/shell-env.nix
     ../99-testing/autologin.nix
@@ -94,8 +93,64 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
+
+    ./modules/vpn-container-single.nix
   ];
 
+  # # this works with vpn-container-single.nix:
+  vpn.container = {
+    enable = true;
+    name = "lan-to-vpn-airvpn";
+    wanInterface = "ens19";
+    lanInterface = "ens20";
+    vpnInterface = "tun0";
+    vpnIPv4 = "10.90.0.1/24";
+    vpnIPv6 = "fd90:dead:beef::1/64";
+    vpnProfileName = "tun0";
+  };
+
+  # # this works with vpn-container-single.nix:
+  # networking.vlans."ens21.10" = {
+  #   id = 10;
+  #   interface = "ens21";
+  # };
+  # networking.vlans."ens21.4" = {
+  #   id = 4;
+  #   interface = "ens21";
+  # };
+  # vpn.container = {
+  #   enable = true;
+  #   name = "lan-to-vpn-mullvad";
+  #   wanInterface = "ens21.10";
+  #   lanInterface = "ens21.4";
+  #   vpnInterface = "tun0";
+  #   vpnIPv4 = "10.90.0.1/24";
+  #   vpnIPv6 = "fd90:dead:beef::1/64";
+  #   vpnProfileName = "tun0";
+  # };
+
+
+
+  # # the goal
+  # vpn.containers = {
+  #   airvpn = {
+  #     wanInterface = "ens19";
+  #     lanInterface = "ens20";
+  #     vpnInterface = "tun0";
+  #     vpnIPv4 = "10.90.0.1/24";
+  #     vpnIPv6 = "fd90:dead:beef::1/64";
+  #     vpnProfileName = "tun0";
+  #   };
+
+  #   mullvad = {
+  #     wanInterface = "ens21.10";
+  #     lanInterface = "ens21.4";
+  #     vpnInterface = "tun1";
+  #     vpnIPv4 = "10.4.0.1/24";
+  #     vpnIPv6 = "fd04:dead:beef::1/64";
+  #     vpnProfileName = "tun1";
+  #   };
+  # };
 
   sops.defaultSopsFile = ../../secrets/s-test-vm-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
@@ -105,7 +160,7 @@
   };
 
   time.timeZone = "Europe/Amsterdam";
-  
+
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
 
@@ -113,7 +168,6 @@
     sops
     age
   ];
-
 
   nixpkgs = {
     # You can add overlays here
@@ -199,8 +253,7 @@
       PasswordAuthentication = true;
     };
   };
-  
-  
+
   boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
