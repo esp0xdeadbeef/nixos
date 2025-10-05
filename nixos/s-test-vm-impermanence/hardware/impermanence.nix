@@ -20,7 +20,7 @@
   ];
 
   boot.initrd.systemd.services.rotateBtrfsRoot = {
-    description = "Rotate /root Btrfs subvolume and prune >30 day snapshots";
+    description = "Rotate /root Btrfs subvolume and prune >1 day snapshots";
     wantedBy    = [ "initrd.target" ];
     after       = [ "systemd-cryptsetup@crypted.service" ];
     before      = [ "sysroot.mount" ];

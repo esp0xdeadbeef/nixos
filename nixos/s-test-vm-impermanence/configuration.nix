@@ -94,63 +94,10 @@
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
-    ./modules/vpn-container-single.nix
+
+    ./router-vpn-1-from-public-git/start_containers.nix
+
   ];
-
-  # # this works with vpn-container-single.nix:
-  vpn.container = {
-    enable = true;
-    name = "lan-to-vpn-airvpn";
-    wanInterface = "ens19";
-    lanInterface = "ens20";
-    vpnInterface = "tun0";
-    vpnIPv4 = "10.90.0.1/24";
-    vpnIPv6 = "fd90:dead:beef::1/64";
-    vpnProfileName = "tun0";
-  };
-
-  # # this works with vpn-container-single.nix:
-  # networking.vlans."ens21.10" = {
-  #   id = 10;
-  #   interface = "ens21";
-  # };
-  # networking.vlans."ens21.4" = {
-  #   id = 4;
-  #   interface = "ens21";
-  # };
-  # vpn.container = {
-  #   enable = true;
-  #   name = "lan-to-vpn-mullvad";
-  #   wanInterface = "ens21.10";
-  #   lanInterface = "ens21.4";
-  #   vpnInterface = "tun0";
-  #   vpnIPv4 = "10.90.0.1/24";
-  #   vpnIPv6 = "fd90:dead:beef::1/64";
-  #   vpnProfileName = "tun0";
-  # };
-
-
-
-  # # the goal
-  # vpn.containers = {
-  #   airvpn = {
-  #     wanInterface = "ens19";
-  #     lanInterface = "ens20";
-  #     vpnInterface = "tun0";
-  #     vpnIPv4 = "10.90.0.1/24";
-  #     vpnIPv6 = "fd90:dead:beef::1/64";
-  #     vpnProfileName = "tun0";
-  #   };
-
-  #   mullvad = {
-  #     wanInterface = "ens21.10";
-  #     lanInterface = "ens21.4";
-  #     vpnInterface = "tun1";
-  #     vpnIPv4 = "10.4.0.1/24";
-  #     vpnIPv6 = "fd04:dead:beef::1/64";
-  #     vpnProfileName = "tun1";
-  #   };
-  # };
 
   sops.defaultSopsFile = ../../secrets/s-test-vm-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];

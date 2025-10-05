@@ -1,12 +1,7 @@
-# vpn-containers.nix — recursion-free version
-
-{ lib, pkgs, inputs, config, ... }:
+{ config, lib, pkgs, inputs, ... }:
 
 let
   inherit (lib) mkMerge mapAttrsToList;
-
-  # extract option value only when options are already available
-  instances = config.vpn.containers.instances or {};
 
   perInstance = name: cfg:
     let
@@ -43,16 +38,20 @@ let
         containers.${name} = {
           autoStart = true;
           privateNetwork = true;
+
           extraVeths = {
             wan.hostBridge = wanBridge;
             lan.hostBridge = lanBridge;
           };
+
           bindMounts."/etc/vpn" = {
             hostPath = "/etc/vpn";
             isReadOnly = true;
           };
+
           config = { pkgs, config, ... }: {
             imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
+
             services.router-vpn-gateway = {
               enable = true;
               wanInterface = "wan";
@@ -103,25 +102,9 @@ let
     ];
 
 in {
-  options.vpn.containers.instances = lib.mkOption {
-    type = lib.types.attrsOf (lib.types.submodule {
-      options = {
-        enable = lib.mkEnableOption "Enable VPN container";
-        wanInterface = lib.mkOption { type = lib.types.str; };
-        lanInterface = lib.mkOption { type = lib.types.str; };
-        vpnInterface = lib.mkOption { type = lib.types.str; };
-        vpnIPv4 = lib.mkOption { type = lib.types.str; };
-        vpnIPv6 = lib.mkOption { type = lib.types.str; };
-        vpnProfileName = lib.mkOption { type = lib.types.str; };
-      };
-    });
-    default = {};
-    description = "Map of VPN containers by instance name";
-  };
-
   config = mkMerge (
     mapAttrsToList (name: cfg:
       if cfg.enable then perInstance name cfg else {}
-    ) instances
+    ) config.vpn.containers.instances
   );
 }
