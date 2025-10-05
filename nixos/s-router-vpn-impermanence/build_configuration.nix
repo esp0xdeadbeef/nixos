@@ -20,31 +20,77 @@
 
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
-    # (cd /home/deadbeef/github/nixos/nixos/1-general ; find ../1-general | grep '\.nix$' | grep -v 'llms\|is-vm\|/packages.nix\|virtualization\|network\|darkmode\|applets\|autologin')
+    # Import your generated (nixos-generate-config) hardware configuration
 
     /*
-      # no autobuild:
+      # testing router config, disable:
       STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
     */
-
+    ./hardware/bootloader.nix
+    ./hardware/boot-package.nix
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
-    ./network/configs_from_container_new.nix
-    ./network/packages-required-by-scripts.nix
-    ./ssh-vim-and-basics.nix
+    ./hardware/impermanence.nix
+    ./hardware/lanzaboote.nix
+    ./hardware/swap-and-tmpfs.nix
+    ./hardware/network-onlymgmt.nix
+
+    ./containers/start_containers.nix
+
     ../01-general/desktop/shell-env.nix
 
+    # it's a vm.. if you pwn the host you'll be able to login anyway.
+    ../99-testing/autologin.nix
+    ../99-testing/autologin-ssh-and-tty.nix
+    # ../02-window-manager-i3/environment.nix
+    inputs.impermanence.nixosModules.impermanence
+    inputs.home-manager.nixosModules.home-manager
+    inputs.sops-nix.nixosModules.sops
   ];
 
+
+  sops.defaultSopsFile = ../../secrets/s-test-vm-impermanence-root.yaml;
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
+
+  sops.secrets."deadbeef-passwd" = {
+    neededForUsers = true; # make it available before the user is created
+  };
+
+  time.timeZone = "Europe/Amsterdam";
+  
+  programs.neovim.enable = true;
+  programs.neovim.defaultEditor = true;
+
+  environment.systemPackages = with pkgs; [
+    sops
+    age
+  ];
+
+
   nixpkgs = {
+    # You can add overlays here
     overlays = [
+      # Add overlays your own flake exports (from overlays and pkgs dir):
       outputs.overlays.additions
       outputs.overlays.modifications
       outputs.overlays.unstable-packages
+
+      # You can also add overlays exported from other flakes:
+      # neovim-nightly-overlay.overlays.default
+
+      # Or define it inline, for example:
+      # (final: prev: {
+      #   hi = final.hello.overrideAttrs (oldAttrs: {
+      #     patches = [ ./change-hello-to-hi.patch ];
+      #   });
+      # })
     ];
+    # Configure your nixpkgs instance
     config = {
+      # Disable if you don't want unfree packages
       allowUnfree = true;
     };
+    # specify that it is aarch64-linux:
     hostPlatform = "x86_64-linux";
   };
 
@@ -71,7 +117,8 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-router-vpn-1";
+  
+  networking.hostName = "s-router-vpn-impermanence";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
@@ -80,12 +127,13 @@
       # TODO: You can set an initial password for your user.
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
-      initialPassword = " ";
+      # initialPassword = " ";
+      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+
       isNormalUser = true;
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg"
       ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];
@@ -98,17 +146,19 @@
     enable = true;
     settings = {
       # Opinionated: forbid root login through SSH.
-      PermitRootLogin = "yes";
+      PermitRootLogin = "no";
       # Opinionated: use keys only.
       # Remove if you want to SSH using passwords
       PasswordAuthentication = true;
     };
   };
-
-  boot.loader.grub.configurationLimit = 2;
+  
+  
+  boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
-    ZSH_THEME=agnoster
+    ZSH_THEME=example
+    alias vim=nvim
   '';
 
   security.sudo.enable = true;

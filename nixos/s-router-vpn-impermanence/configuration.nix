@@ -23,8 +23,55 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     /*
-      # testing router config, disable:
-      STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+        # testing router config, disable:
+            ./containers/start_container.nix
+      ./hardware/bootloader.nix
+      ./hardware/boot-package.nix
+      ./hardware/force-update.nix
+      ./hardware/hardware-configuration.nix
+      ./hardware/impermanence.nix
+      ./hardware/lanzaboote.nix
+      ./hardware/swap-and-tmpfs.nix
+      ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
+
+      ../01-general/desktop/applet-nm.nix
+      ../01-general/desktop/fonts.nix
+      ../01-general/desktop/packages.nix
+      ../01-general/desktop/screen-recording.nix
+      ../01-general/desktop/shell-env.nix
+      ../01-general/desktop/users-and-groups.nix
+      ../01-general/desktop/xdg-portal.nix
+      ../01-general/enable-etc-hosts-editing/default.nix
+      ../01-general/firmware-update/default.nix
+      ../01-general/network/firewall.nix
+      ../01-general/network/nat-lxc.nix
+      ../01-general/network/nmcli.nix
+      ../01-general/packages/1-general/archive-tools.nix
+      ../01-general/packages/1-general/tooling.nix
+      ../01-general/packages/data-tranformation/packages.nix
+      ../01-general/packages/editors/packages.nix
+      ../01-general/packages/encryption-and-password-management/packages.nix
+      ../01-general/packages/git/packages.nix
+      ../01-general/packages/network-troubleshooting/packages.nix
+      ../01-general/packages/nix-specific/packages.nix
+      ../01-general/packages/packages.nix
+      ../01-general/packages/password-managers/1password.nix
+      ../01-general/packages/terminals/packages.nix
+      ../01-general/packages/terminals/terminal-optimisers/packages.nix
+      ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
+      ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
+      ../01-general/packages/window-managers/X-org/packages.nix
+      ../01-general/secrets/import-secrets.nix
+      ../01-general/security/default.nix
+      ../01-general/system/autoupdate.nix
+      ../01-general/system/garbage-collection.nix
+      ../01-general/system/locale.nix
+      ../01-general/terminals/tmux/settings.nix
+      ../01-general/time/timezone.nix
+      ../01-general/virtualization-as-host/general.nix
+      ../01-general/virtualization-as-host/libvirt.nix
+      ../01-general/virtualization-as-host/lxc.nix
+      ../01-general/virtualization-as-host/podman.nix
     */
 
     ./hardware/bootloader.nix
@@ -34,8 +81,13 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
+    ./hardware/network-onlymgmt.nix
+
+    ./containers/start_containers.nix
 
     ../01-general/desktop/shell-env.nix
+
+    # it's a vm.. if you pwn the host you'll be able to login anyway.
     ../99-testing/autologin.nix
     # ../02-window-manager-i3/environment.nix
     inputs.impermanence.nixosModules.impermanence
@@ -52,7 +104,7 @@
   };
 
   time.timeZone = "Europe/Amsterdam";
-  
+
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
 
@@ -60,7 +112,6 @@
     sops
     age
   ];
-
 
   nixpkgs = {
     # You can add overlays here
@@ -112,7 +163,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-test-vm-impermanence";
+  networking.hostName = "s-router-vpn-impermanence";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
@@ -146,8 +197,7 @@
       PasswordAuthentication = true;
     };
   };
-  
-  
+
   boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
