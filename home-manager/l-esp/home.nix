@@ -10,6 +10,7 @@ args@{
 let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
+    system = pkgs.system;
     config.allowUnfree = true;
   };
   stablePkgs = import inputs.nixpkgs-stable {
