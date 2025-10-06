@@ -7,6 +7,7 @@ keys:
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
   - &l-esp-deadbeef age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
   - &s-test-vm-impermanence-root age1v0jkptx0aulxrapktgptzvn82tt25gyq3qf8hn8e0dyheqwz446qa798t2
+  - &s-router-vpn-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
   - &s-lxc-router-root age1nnm22xdfv4ptx0vy3exh24djhmdc4cgc0hjghmk5y4l0hggfcswq8j88j9
 
 creation_rules:
@@ -22,6 +23,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-test-vm-impermanence-root
+          - *s-router-vpn-impermanence-root
 
   - path_regex: '^(secrets/)*l-esp-default-deadbeef\.(env|ya?ml)$'
     input_type: env
@@ -78,6 +80,15 @@ creation_rules:
           - *s-test-vm-impermanence-root
 
 
+  - path_regex: '^(secrets/)*s-router-vpn-impermanence-.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-x13s-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-vpn-impermanence-root
 
   - path_regex: '^(secrets/)*l-x13s-.*\.(env|ya?ml)$'
     input_type: env

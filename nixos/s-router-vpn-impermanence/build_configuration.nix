@@ -49,7 +49,7 @@
   ];
 
 
-  sops.defaultSopsFile = ../../secrets/s-test-vm-impermanence-root.yaml;
+  sops.defaultSopsFile = ../../secrets/s-router-vpn-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
   sops.secrets."deadbeef-passwd" = {
