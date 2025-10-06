@@ -5,19 +5,7 @@
   ...
 }:
 
-let
-
-  automount_opts = lib.concatStringsSep "," [
-    "x-systemd.automount"
-    "noauto"
-    "x-systemd.idle-timeout=60"
-    "x-systemd.device-timeout=5s"
-    "x-systemd.mount-timeout=5s"
-    "x-systemd.requires=network-online.target"
-  ];
-in
 {
-
   environment.systemPackages = [ pkgs.cifs-utils ];
 
   sops.secrets = {
@@ -28,33 +16,78 @@ in
     "nas-share-private" = { };
   };
 
-  environment.etc = {
-    "smb-secrets-private".text = lib.concatStringsSep "\n" [
-      "username=${builtins.readFile config.sops.secrets.nas-username.path}"
-      "password=${builtins.readFile config.sops.secrets.nas-password.path}"
+  systemd.tmpfiles.rules = [
+    "d /mnt/nas 0755 root root -"
+    "d /mnt/nas/public 0755 root root -"
+    "d /mnt/nas/private 0755 root root -"
+  ];
+
+  systemd.services.generate-nas-units = {
+    description = "Generate NAS automount units from SOPS secrets";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    path = [
+      pkgs.coreutils
+      pkgs.systemd
+      pkgs.cifs-utils
     ];
-    "smb-secrets-public".text = lib.concatStringsSep "\n" [
-      "username=${builtins.readFile config.sops.secrets.nas-username.path}"
-      "password=${builtins.readFile config.sops.secrets.nas-password.path}"
-    ];
-  };
 
-  fileSystems = {
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "generate-nas-automounts" ''
+        set -euo pipefail
+        echo "[generate-nas-units] Reading secrets and generating units..."
 
-    "/mnt/nas/private" = {
-      device = "//${builtins.readFile config.sops.secrets.nas-ip.path}/${builtins.readFile config.sops.secrets.nas-share-private.path}";
-      fsType = "cifs";
-      options = [
-        "${automount_opts},credentials=/etc/smb-secrets-private,uid=1000,gid=100,iocharset=utf8,vers=3.0"
-      ];
-    };
+        read_secret() { tr -d '\r\n' < "$1"; }
 
-    "/mnt/nas/public" = {
-      device = "//${builtins.readFile config.sops.secrets.nas-ip.path}/${builtins.readFile config.sops.secrets.nas-share-public.path}";
-      fsType = "cifs";
-      options = [
-        "${automount_opts},credentials=/etc/smb-secrets-public,uid=1000,gid=100,iocharset=utf8,vers=3.0"
-      ];
+        host="$(read_secret '${config.sops.secrets."nas-ip".path}')"
+        user="$(read_secret '${config.sops.secrets."nas-username".path}')"
+        pass="$(read_secret '${config.sops.secrets."nas-password".path}')"
+        sharePublic="$(read_secret '${config.sops.secrets."nas-share-public".path}')"
+        sharePrivate="$(read_secret '${config.sops.secrets."nas-share-private".path}')"
+
+        credfile="/run/nas.creds"
+        umask 077
+        printf 'username=%s\npassword=%s\n' "$user" "$pass" > "$credfile"
+        chmod 600 "$credfile"
+
+        mkdir -p /mnt/nas/public /mnt/nas/private
+
+        for name in public private; do
+          share=$([ "$name" = public ] && echo "$sharePublic" || echo "$sharePrivate")
+          cat > /run/systemd/system/mnt-nas-$name.mount <<EOF
+        [Unit]
+        Description=SMB mount ($name)
+        After=network-online.target
+        ConditionPathExists=$credfile
+
+        [Mount]
+        What=//$host/$share
+        Where=/mnt/nas/$name
+        Type=cifs
+        Options=credentials=$credfile,vers=3.0,sec=ntlmssp,noserverino,iocharset=utf8,uid=1000,gid=100,file_mode=0755,dir_mode=0755
+        EOF
+
+                  cat > /run/systemd/system/mnt-nas-$name.automount <<EOF
+        [Unit]
+        Description=Automount SMB ($name)
+        After=network-online.target
+
+        [Automount]
+        Where=/mnt/nas/$name
+        TimeoutIdleSec=60
+
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        done
+
+        systemctl daemon-reload
+        systemctl start mnt-nas-public.automount mnt-nas-private.automount
+        echo "[generate-nas-units] Automounts active."
+      '';
     };
   };
 }
