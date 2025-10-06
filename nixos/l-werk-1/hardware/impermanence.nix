@@ -138,7 +138,7 @@
         ".local/share/containers"
 
         ".cache/nix-index" # added this to persist the nix-locate output.
-
+        ".config/rclone" # state file of rclone
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/libvirt/qemu" # libvirt qemu settings
         ".config/discord"
