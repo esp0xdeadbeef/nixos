@@ -359,12 +359,11 @@ for_window [class="teams-for-linux"] move window to workspace 5
 #for_window [class="Microsoft Teams - Preview"] move window to workspace 5
 for_window [class="Office 365 on Electron" title="${config.sops.placeholder.workRelatedXlsx}"] move container to workspace 5
 #for_window [class="Chromium" title=".*"] move container to workspace 10
-bindsym $mod+b exec --no-startup-id xdotool click 8
-bindsym $mod+shift+b exec --no-startup-id xdotool click 9
-bindsym Mod1+b exec --no-startup-id xdotool click 8
-bindsym Mod1+shift+b exec --no-startup-id xdotool click 9
-
-
+# bindsym $mod+b exec --no-startup-id xdotool click 8
+# bindsym $mod+shift+b exec --no-startup-id xdotool click 9
+# bindsym Mod1+b exec --no-startup-id xdotool click 8
+# bindsym Mod1+shift+b exec --no-startup-id xdotool click 9
+# bindsym $mod+b exec systemctl restart --user waydroid-cage.service
 
 exec --no-startup-id export XDG_SESSION_TYPE=x11
 exec --no-startup-id xsetroot -solid "#333333" #gray

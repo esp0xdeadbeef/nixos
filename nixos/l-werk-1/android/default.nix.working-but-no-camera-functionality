@@ -1,0 +1,68 @@
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+
+let
+  waydroidBridge = "lxcbr0"; # change if you use lxcbr1 or something else
+in
+{
+  environment.systemPackages = with pkgs; [
+    waydroid
+    cage
+    lxc
+    dbus
+  ];
+  boot.extraModulePackages = with config.boot.kernelPackages; [ v4l2loopback ];
+  boot.kernelModules = [ "v4l2loopback" ];
+  boot.extraModprobeConfig = ''
+    options v4l2loopback devices=1 video_nr=10 card_label="QRcam"
+  '';
+
+  systemd.services.waydroid-container = {
+    description = "Waydroid Android container";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    serviceConfig = {
+      Type = "simple";
+
+      ExecStartPre = "${pkgs.writeShellScript "waydroid-setup" ''
+        #!/bin/sh
+        set -e
+
+        if [ ! -f /var/lib/waydroid/lxc/waydroid/config ]; then
+          echo 'Waydroid not initialized, running waydroid init...'
+          ${pkgs.waydroid}/bin/waydroid init -s VANILLA || ${pkgs.waydroid}/bin/waydroid init
+        fi
+
+        # patch bridge link every time
+        if grep -q 'lxc.net.0.link' /var/lib/waydroid/lxc/waydroid/config; then
+          sed -i 's|^lxc.net.0.link = .*|lxc.net.0.link = ${waydroidBridge}|' /var/lib/waydroid/lxc/waydroid/config
+        else
+          echo 'lxc.net.0.link = ${waydroidBridge}' >> /var/lib/waydroid/lxc/waydroid/config
+        fi
+      ''}";
+
+      ExecStart = "${pkgs.waydroid}/bin/waydroid container start";
+      ExecStop = "${pkgs.waydroid}/bin/waydroid container stop";
+      Restart = "on-failure";
+    };
+  };
+
+  systemd.user.services."waydroid-cage" = {
+    description = "Launch Waydroid Android UI in Cage";
+    after = [ "graphical-session.target" ];
+    wantedBy = [ "graphical-session.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.cage}/bin/cage ${pkgs.waydroid}/bin/waydroid show-full-ui";
+      Restart = "on-failure";
+    };
+  };
+
+  environment.persistence."/persist".directories = [
+    "/var/lib/waydroid"
+  ];
+}
