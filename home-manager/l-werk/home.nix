@@ -40,6 +40,7 @@ in
     ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
+    ../01-general/virt-manager-config/default.nix
 
 
     # ../02-window-manager-i3/i3/packages.nix

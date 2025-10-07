@@ -1,10 +1,11 @@
 { config, pkgs, ... }:
-
 {
+  # Get these flags by using:
+  # dconf watch /
   dconf.settings = {
     "org/virt-manager/virt-manager" = {
       "xmleditor-enabled" = true;
-      "show-status-icon" = true; # optional
+      "system-tray" = true;
     };
   };
 }
