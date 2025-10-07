@@ -75,7 +75,6 @@
     ];
   };
 
-
   environment.persistence."/persist" = {
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
@@ -96,6 +95,7 @@
       "/var/lib/systemd/coredump"
       "/etc/NetworkManager/system-connections"
       "/var/lib/libvirt" # libvirt configurations
+      "/var/lib/waydroid/"
       {
         directory = "/var/lib/colord";
         user = "colord";
@@ -115,7 +115,6 @@
     ];
     users.deadbeef = {
       directories = [
-        
 
         # "Downloads"
         # "Music"
@@ -127,7 +126,6 @@
         "github" # custom dir for my github projects
         "pentest"
         "vms"
-
 
         ".BurpSuite"
         ".java/.userPrefs/burp"
@@ -150,12 +148,10 @@
         ".config/gh"
         ".config/qBittorrent" # qBittorrent settings
         ".config/obsidian" # Obsidian vault
-        
+
         ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
         ".cache/remmina" # ffs, just remember shit remmina!
         # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk-1/remmina/config.nix)
-        
-
 
         ".config/Code" # vscode settings and data
         ".vscode" # workspace-specific settings and plugins

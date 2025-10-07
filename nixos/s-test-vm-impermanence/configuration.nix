@@ -24,8 +24,7 @@
 
     /*
       # testing router config, disable:
-          ./containers/start_container.nix
-    ./hardware/bootloader.nix
+          ./hardware/bootloader.nix
     ./hardware/boot-package.nix
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
@@ -37,8 +36,6 @@
     ./modules/vpn-containers.nix
     ./modules/vpn/containers-options.nix
     ./modules/vpn-test.nix
-    ./router-vpn-1-from-public-git/start_containers.nix
-    ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
 
     ../01-general/desktop/applet-nm.nix
     ../01-general/desktop/fonts.nix
@@ -87,10 +84,6 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
-    
-    # ./routing-test-voor-s-router-vpn-1/vrf_vpn_upstream_gateway_with_mgmt.nix
-    ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
-    ./containers/start_container.nix
 
     ../01-general/desktop/shell-env.nix
     ../99-testing/autologin.nix
