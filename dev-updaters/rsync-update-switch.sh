@@ -22,3 +22,9 @@ else
   echo "[*] No changes, sleeping"
   sleep 2
 fi
+
+# I might need to reimplement this hack script this with (tip from ):
+# entr # from discord `adk` user (213309904255975424), looks great, and no watchdog required anymore.
+# and:
+# --build-host $HOST # instead of sshing into the box.
+# maybe --fast
