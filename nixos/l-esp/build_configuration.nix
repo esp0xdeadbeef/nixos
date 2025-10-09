@@ -31,12 +31,24 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
-    # inputs.nvf.nixosModules.default
+    inputs.nvf.nixosModules.default
   ];
 
   hardware.nvidia.prime = {
     intelBusId = "PCI:00:02:0";
     nvidiaBusId = "PCI:01:00:0";
+  };
+  
+
+  programs.nvf = {
+    enable = true;
+    # settings = {
+    #   vim = {
+    #     viAlias = true;
+    #     vimAlias = true;
+    #   };
+    # };
+    settings = import ./test.nix-test true;
   };
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
@@ -155,7 +167,6 @@
           -bios ${pkgs.OVMF.fd}/FV/OVMF.fd \
           "$@"
       '')
-      inputs.nvf.packages.${pkgs.stdenv.system}.maximal
     ];
   };
 

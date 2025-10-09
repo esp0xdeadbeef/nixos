@@ -104,16 +104,16 @@
   };
   
 
-  # programs.nvf = {
-  #   enable = true;
-  #   # settings = {
-  #   #   vim = {
-  #   #     viAlias = true;
-  #   #     vimAlias = true;
-  #   #   };
-  #   # };
-  #   settings = import ./test.nix-test true;
-  # };
+  programs.nvf = {
+    enable = true;
+    # settings = {
+    #   vim = {
+    #     viAlias = true;
+    #     vimAlias = true;
+    #   };
+    # };
+    settings = import ./test-nvf true;
+  };
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys
@@ -231,7 +231,6 @@
           -bios ${pkgs.OVMF.fd}/FV/OVMF.fd \
           "$@"
       '')
-      inputs.nvf.packages.${pkgs.stdenv.system}.maximal
     ];
   };
 
