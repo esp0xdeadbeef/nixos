@@ -11,6 +11,8 @@ let
 
   nameAirvpn = "airvpn";
   nameMullvad = "mullvad";
+  vlan5 = "vlan5";
+  vlan6 = "vlan6";
 
   mkVpnConfigService =
     name: tun: secretName:
@@ -35,6 +37,14 @@ in
 
   # VLANs for downstream networks
   networking.vlans = {
+    lan5 = {
+      interface = "ens21";
+      id = 5;
+    };
+    lan6 = {
+      interface = "ens21";
+      id = 6;
+    };
     lan100 = {
       interface = "ens21";
       id = 100;
@@ -47,6 +57,8 @@ in
 
   # Bridges (used by containers)
   networking.bridges = {
+    br-lan5.interfaces = [ "lan5" ];
+    br-lan6.interfaces = [ "lan6" ];
     br-ens19.interfaces = [ "ens19" ];
     br-ens20.interfaces = [ "ens20" ];
     br-lan100.interfaces = [ "lan100" ];
@@ -95,6 +107,24 @@ in
           ConfigureWithoutCarrier = true;
         };
       };
+      "br-lan5" = {
+        matchConfig.Name = "br-lan100";
+        linkConfig.RequiredForOnline = "no";
+        networkConfig = {
+          DHCP = "no";
+          LinkLocalAddressing = "no";
+          ConfigureWithoutCarrier = true;
+        };
+      };
+      "br-lan6" = {
+        matchConfig.Name = "br-lan3001";
+        linkConfig.RequiredForOnline = "no";
+        networkConfig = {
+          DHCP = "no";
+          LinkLocalAddressing = "no";
+          ConfigureWithoutCarrier = true;
+        };
+      };
       "br-lan100" = {
         matchConfig.Name = "br-lan100";
         linkConfig.RequiredForOnline = "no";
@@ -122,6 +152,8 @@ in
     "net.ipv6.conf.default.accept_ra" = 0;
     "net.ipv6.conf.br-ens19.accept_ra" = 0;
     "net.ipv6.conf.br-ens20.accept_ra" = 0;
+    "net.ipv6.conf.br-lan5.accept_ra" = 0;
+    "net.ipv6.conf.br-lan6.accept_ra" = 0;
     "net.ipv6.conf.br-lan100.accept_ra" = 0;
     "net.ipv6.conf.br-lan3001.accept_ra" = 0;
   };
@@ -216,6 +248,11 @@ in
   systemd.services."container@lan-to-vpn-${nameMullvad}".serviceConfig.ConditionPathExists =
     "/etc/vpn/tun1.conf";
 
+  systemd.services."container@lan-to-vpn-${vlan5}".serviceConfig.ConditionPathExists =
+    "/etc/vpn/tun2.conf";
+  systemd.services."container@lan-to-vpn-${vlan6}".serviceConfig.ConditionPathExists =
+    "/etc/vpn/tun3.conf";
+
   # Decode VPN profiles from sops secrets
   sops.secrets."vpn-lan-to-vpn-${nameAirvpn}" = {
     owner = "root";
@@ -226,6 +263,41 @@ in
     owner = "root";
     group = "root";
     mode = "0400";
+  };
+
+  # Decode VPN profiles from sops secrets
+  sops.secrets."vpn-lan-to-vpn-${vlan5}" = {
+    owner = "root";
+    group = "root";
+    mode = "0400";
+  };
+
+  sops.secrets."vpn-lan-to-vpn-${vlan6}" = {
+    owner = "root";
+    group = "root";
+    mode = "0400";
+  };
+
+  systemd.services."write-vpn-config-${vlan5}" = {
+    description = "Decode AirVPN config";
+    wantedBy = [ "network-pre.target" ];
+    before = [ "network-online.target" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = mkVpnConfigService vlan5 "tun0" "vpn-lan-to-vpn-${vlan5}";
+    };
+  };
+
+  systemd.services."write-vpn-config-${vlan6}" = {
+    description = "Decode Mullvad config";
+    wantedBy = [ "network-pre.target" ];
+    before = [ "network-online.target" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = mkVpnConfigService vlan6 "tun1" "vpn-lan-to-vpn-${vlan6}";
+    };
   };
 
   systemd.services."write-vpn-config-${nameAirvpn}" = {
