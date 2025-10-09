@@ -21,7 +21,7 @@
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
 
-    ./connect-nas/default.nix
+        ./connect-nas/default.nix
     ./disable-sleep-suspend-hibernate/default.nix
     ./hardware/audio.nix
     ./hardware/bluetooth.nix
@@ -88,22 +88,32 @@
     ../01-general/virtualization-as-host/podman.nix
 
     ../02-window-manager-i3/environment.nix
-    ../30-physical-hardware-connections/why2025-badge/default.nix
+    # ../30-physical-hardware-connections/why2025-badge/default.nix
     # ../99-testing/autologin-ssh-and-tty.nix
-  
 
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
-
-
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
+    inputs.nvf.nixosModules.default
   ];
 
   hardware.nvidia.prime = {
     intelBusId = "PCI:00:02:0";
     nvidiaBusId = "PCI:01:00:0";
   };
+  
+
+  # programs.nvf = {
+  #   enable = true;
+  #   # settings = {
+  #   #   vim = {
+  #   #     viAlias = true;
+  #   #     vimAlias = true;
+  #   #   };
+  #   # };
+  #   settings = import ./test.nix-test true;
+  # };
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys
@@ -189,7 +199,7 @@
   environment.interactiveShellInit = ''
     ZSH_THEME=robbyrussell
   '';
-  
+
   sops.secrets."deadbeef-passwd" = {
     neededForUsers = true; # make it available before the user is created
   };
@@ -201,11 +211,9 @@
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
 
-
       # initialPassword = " ";
       hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
 
-      
       isNormalUser = true;
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
@@ -223,6 +231,7 @@
           -bios ${pkgs.OVMF.fd}/FV/OVMF.fd \
           "$@"
       '')
+      inputs.nvf.packages.${pkgs.stdenv.system}.maximal
     ];
   };
 

@@ -21,6 +21,24 @@
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
 
+    # This doesn't work:
+    # obsidian-nvim = {
+    #   url = "github:epwalsh/obsidian.nvim";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
+
+    # Required, nvf works best and only directly supports flakes
+    nvf = {
+      url = "github:NotAShelf/nvf";
+      # You can override the input nixpkgs to follow your system's
+      # instance of nixpkgs. This is safe to do as nvf does not depend
+      # on a binary cache.
+      inputs.nixpkgs.follows = "nixpkgs";
+      # Optionally, you can also override individual plugins
+      # for example:
+      # inputs.obsidian-nvim.follows = "obsidian-nvim"; # <- this will use the obsidian-nvim from your inputs
+    };
+
     # zen-browser = {
     #   url = "github:0xc000022070/zen-browser-flake";
     #   # IMPORTANT: we're using "libgbm" and is only available in unstable so ensure
@@ -46,7 +64,6 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
 
     # hardware:
     hardware = {
@@ -83,7 +100,7 @@
       url = "github:BrainWart/x13s-nixos";
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
-    
+
   };
 
   outputs =
@@ -168,7 +185,6 @@
             ./nixos/s-router-vpn-impermanence/configuration.nix
           ];
         };
-
 
         # x13s laptop:
         l-x13s = nixpkgs.lib.nixosSystem {
