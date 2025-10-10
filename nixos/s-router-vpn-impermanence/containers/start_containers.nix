@@ -192,7 +192,7 @@ in
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-${nameMullvad}".hostBridge = "br-ens20";
+      "wan-${nameMullvad}".hostBridge = "br-ens19";
       "lan-${nameMullvad}".hostBridge = "br-lan3001";
     };
     bindMounts."/etc/vpn" = {
@@ -214,34 +214,38 @@ in
           dhcp4.enable = true;
           ra.enable = true;
         };
-        
-
-      #   # Disable systemd-resolved integration and use NM to manage resolv.conf
-      #   networking.networkmanager = {
-      #     enable = true;
-      #     dns = "default";
-      #   };
-
-      #   # Remove any existing resolv.conf symlinks or stub files at boot
-      #   systemd.tmpfiles.rules = [
-      #     "L+ /etc/resolv.conf - - - - /run/NetworkManager/resolv.conf"
-      #   ];
-
-      #   # Optional: mask resolvconf service if it exists in base container image
-      #   systemd.services.resolvconf.enable = false;
-      #   environment.systemPackages = with pkgs; [
-      #     dnsutils
-      #     openvpn
-      #     wireguard-tools
-      #     tcpdump
-      #     traceroute
-      #     nftables
-      #     dhcpcd
-      #     tmux
-      #     tshark
-      #   ];
       };
   };
+
+  containers."lan-to-vpn-${vlan5}" = {
+    autoStart = true;
+    privateNetwork = true;
+    extraVeths = {
+      "wan-${vlan5}".hostBridge = "br-ens19";
+      "lan-${vlan5}".hostBridge = "br-lan5";
+    };
+    bindMounts."/etc/vpn" = {
+      hostPath = "/etc/vpn";
+      isReadOnly = true;
+    };
+    config =
+      { pkgs, config, ... }:
+      {
+        imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
+        services.router-vpn-gateway = {
+          enable = true;
+          wanInterface = "wan-${vlan5}";
+          lanInterface = "lan-${vlan5}";
+          vpnInterface = "tun1";
+          vpnProfile = "/etc/vpn/tun2.conf";
+          subnets.ipv4 = "10.10.0.1/24";
+          subnets.ipv6 = "fd10:dead:beef::1/64";
+          dhcp4.enable = true;
+          ra.enable = true;
+        };
+      };
+  };
+
 
   systemd.services."container@lan-to-vpn-${nameAirvpn}".serviceConfig.ConditionPathExists =
     "/etc/vpn/tun0.conf";
@@ -278,28 +282,6 @@ in
     mode = "0400";
   };
 
-  systemd.services."write-vpn-config-${vlan5}" = {
-    description = "Decode AirVPN config";
-    wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
-    after = [ "local-fs.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = mkVpnConfigService vlan5 "tun0" "vpn-lan-to-vpn-${vlan5}";
-    };
-  };
-
-  systemd.services."write-vpn-config-${vlan6}" = {
-    description = "Decode Mullvad config";
-    wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
-    after = [ "local-fs.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = mkVpnConfigService vlan6 "tun1" "vpn-lan-to-vpn-${vlan6}";
-    };
-  };
-
   systemd.services."write-vpn-config-${nameAirvpn}" = {
     description = "Decode AirVPN config";
     wantedBy = [ "network-pre.target" ];
@@ -319,6 +301,28 @@ in
     serviceConfig = {
       Type = "oneshot";
       ExecStart = mkVpnConfigService nameMullvad "tun1" "vpn-lan-to-vpn-${nameMullvad}";
+    };
+  };
+
+  # systemd.services."write-vpn-config-${vlan5}" = {
+  #   description = "Decode AirVPN config";
+  #   wantedBy = [ "network-pre.target" ];
+  #   before = [ "network-online.target" ];
+  #   after = [ "local-fs.target" ];
+  #   serviceConfig = {
+  #     Type = "oneshot";
+  #     ExecStart = mkVpnConfigService vlan5 "tun2" "vpn-lan-to-vpn-${vlan5}";
+  #   };
+  # };
+
+  systemd.services."write-vpn-config-${vlan6}" = {
+    description = "Decode Mullvad config";
+    wantedBy = [ "network-pre.target" ];
+    before = [ "network-online.target" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = mkVpnConfigService vlan6 "tun3" "vpn-lan-to-vpn-${vlan6}";
     };
   };
 }
