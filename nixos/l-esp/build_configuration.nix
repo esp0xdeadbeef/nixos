@@ -42,13 +42,12 @@
 
   programs.nvf = {
     enable = true;
-    # settings = {
-    #   vim = {
-    #     viAlias = true;
-    #     vimAlias = true;
-    #   };
-    # };
-    settings = import ./test.nix-test true;
+    settings = {
+      vim = {
+        viAlias = true;
+        vimAlias = true;
+      };
+    };
   };
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;

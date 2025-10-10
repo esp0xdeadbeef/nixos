@@ -106,13 +106,12 @@
 
   programs.nvf = {
     enable = true;
-    # settings = {
-    #   vim = {
-    #     viAlias = true;
-    #     vimAlias = true;
-    #   };
-    # };
-    settings = import ./test-nvf true;
+    settings = {
+      vim = {
+        viAlias = true;
+        vimAlias = true;
+      };
+    };
   };
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
