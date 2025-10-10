@@ -315,14 +315,14 @@ in
   #   };
   # };
 
-  systemd.services."write-vpn-config-${vlan6}" = {
-    description = "Decode Mullvad config";
-    wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
-    after = [ "local-fs.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = mkVpnConfigService vlan6 "tun3" "vpn-lan-to-vpn-${vlan6}";
-    };
-  };
+  # systemd.services."write-vpn-config-${vlan6}" = {
+  #   description = "Decode Mullvad config";
+  #   wantedBy = [ "network-pre.target" ];
+  #   before = [ "network-online.target" ];
+  #   after = [ "local-fs.target" ];
+  #   serviceConfig = {
+  #     Type = "oneshot";
+  #     ExecStart = mkVpnConfigService vlan6 "tun3" "vpn-lan-to-vpn-${vlan6}";
+  #   };
+  # };
 }
