@@ -369,11 +369,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1760210266,
-        "narHash": "sha256-ZWxR5QzKOgXyLCvkm43I9vol9CGT1XKrd6GUc9fI/bg=",
+        "lastModified": 1760210931,
+        "narHash": "sha256-bgrh3lYEoE/1meOAHUn4fQko1gto2njbgYBmHomUPGI=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-router-vpn-gateway",
-        "rev": "cdbb00312d6356230369ef78b76b46d587199fee",
+        "rev": "c9a2b35dc0e50e6497352001a2d7aa82b6cc71ba",
         "type": "github"
       },
       "original": {
