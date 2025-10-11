@@ -196,7 +196,7 @@
           directory = ".local/share/keyrings";
           mode = "0700";
         }
-        # ".local/share/direnv"
+        ".local/share/direnv"
       ];
       files = [
         ".local/state/wireplumber/default-nodes"

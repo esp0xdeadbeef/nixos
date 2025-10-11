@@ -180,8 +180,8 @@ in
           lanInterface = "lan-${nameAirvpn}";
           vpnInterface = "tun0";
           vpnProfile = "/etc/vpn/tun0.conf";
-          subnets.ipv4 = "10.90.0.1/24";
-          subnets.ipv6 = "fd90:dead:beef::1/64";
+          subnets.ipv4 = "10.10.0.1/24";
+          subnets.ipv6 = "fd10:dead:beef::1/64";
           dhcp4.enable = true;
           ra.enable = true;
         };
@@ -209,8 +209,8 @@ in
           lanInterface = "lan-${nameMullvad}";
           vpnInterface = "tun1";
           vpnProfile = "/etc/vpn/tun1.conf";
-          subnets.ipv4 = "10.10.0.1/24";
-          subnets.ipv6 = "fd10:dead:beef::1/64";
+          subnets.ipv4 = "10.11.0.1/24";
+          subnets.ipv6 = "fd11:dead:beef::1/64";
           dhcp4.enable = true;
           ra.enable = true;
         };
@@ -236,10 +236,10 @@ in
           enable = true;
           wanInterface = "wan-${vlan5}";
           lanInterface = "lan-${vlan5}";
-          vpnInterface = "tun1";
+          vpnInterface = "tun2";
           vpnProfile = "/etc/vpn/tun2.conf";
-          subnets.ipv4 = "10.10.0.1/24";
-          subnets.ipv6 = "fd10:dead:beef::1/64";
+          subnets.ipv4 = "10.12.0.1/24";
+          subnets.ipv6 = "fd12:dead:beef::1/64";
           dhcp4.enable = true;
           ra.enable = true;
         };
@@ -263,12 +263,12 @@ in
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;
-          wanInterface = "wan-${vlan5}";
-          lanInterface = "lan-${vlan5}";
-          vpnInterface = "tun1";
-          vpnProfile = "/etc/vpn/tun2.conf";
-          subnets.ipv4 = "10.10.0.1/24";
-          subnets.ipv6 = "fd10:dead:beef::1/64";
+          wanInterface = "wan-${vlan6}";
+          lanInterface = "lan-${vlan6}";
+          vpnInterface = "tun3";
+          vpnProfile = "/etc/vpn/tun3.conf";
+          subnets.ipv4 = "10.13.0.1/24";
+          subnets.ipv6 = "fd13:dead:beef::1/64";
           dhcp4.enable = true;
           ra.enable = true;
         };
