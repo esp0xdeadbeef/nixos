@@ -7,6 +7,14 @@ vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
   {
+    "nmac427/guess-indent.nvim",
+    config = function()
+      require("guess-indent").setup({})
+    end,
+  },
+
+
+  {
   "trixnz/sops.nvim",
   lazy = false,  -- or `true` and specify filetypes/patterns
   config = function()
