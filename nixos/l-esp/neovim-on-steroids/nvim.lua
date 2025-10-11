@@ -12,6 +12,31 @@ require("lazy").setup({
       require("guess-indent").setup({})
     end,
   },
+  {
+  "nvim-telescope/telescope.nvim",
+  tag = "0.1.5",
+  dependencies = { "nvim-lua/plenary.nvim" },
+  config = function()
+    local telescope = require("telescope")
+    local builtin = require("telescope.builtin")
+
+    telescope.setup({
+      defaults = {
+        layout_strategy = "horizontal",
+        layout_config = { width = 0.9, preview_cutoff = 120 },
+        sorting_strategy = "ascending",
+        prompt_prefix = " ",
+        selection_caret = " ",
+      },
+    })
+
+    -- keymaps
+    vim.keymap.set("n", "<leader>f", builtin.find_files, { desc = "Fuzzy find files" })
+    vim.keymap.set("n", "<leader>g", builtin.live_grep, { desc = "Live grep" })
+    vim.keymap.set("n", "<leader>b", builtin.buffers, { desc = "Fuzzy find buffers" })
+    vim.keymap.set("n", "<leader>h", builtin.help_tags, { desc = "Help tags" })
+  end,
+},
 
 
   {

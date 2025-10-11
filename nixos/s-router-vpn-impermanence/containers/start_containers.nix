@@ -108,7 +108,7 @@ in
         };
       };
       "br-lan5" = {
-        matchConfig.Name = "br-lan100";
+        matchConfig.Name = "br-lan5";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -117,7 +117,7 @@ in
         };
       };
       "br-lan6" = {
-        matchConfig.Name = "br-lan3001";
+        matchConfig.Name = "br-lan6";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -159,12 +159,12 @@ in
   };
 
   # VPN containers configuration
-  containers."lan-to-vpn-${nameAirvpn}" = {
+  containers."lan-to-vpn-vlan4" = {
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-${nameAirvpn}".hostBridge = "br-ens19";
-      "lan-${nameAirvpn}".hostBridge = "br-ens20";
+      "wan-vlan4".hostBridge = "br-ens19";
+      "lan-vlan4".hostBridge = "br-ens20";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -176,8 +176,8 @@ in
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;
-          wanInterface = "wan-${nameAirvpn}";
-          lanInterface = "lan-${nameAirvpn}";
+          wanInterface = "wan-vlan4";
+          lanInterface = "lan-vlan4";
           vpnInterface = "tun0";
           vpnProfile = "/etc/vpn/tun0.conf";
           subnets.ipv4 = "10.10.0.1/24";
@@ -188,12 +188,12 @@ in
       };
   };
 
-  containers."lan-to-vpn-${nameMullvad}" = {
+  containers."lan-to-vpn-vlan3000" = {
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-${nameMullvad}".hostBridge = "br-ens19";
-      "lan-${nameMullvad}".hostBridge = "br-lan3001";
+      "wan-vlan3000".hostBridge = "br-ens19";
+      "lan-vlan3000".hostBridge = "br-lan3001";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -205,8 +205,8 @@ in
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;
-          wanInterface = "wan-${nameMullvad}";
-          lanInterface = "lan-${nameMullvad}";
+          wanInterface = "wan-vlan3000";
+          lanInterface = "lan-vlan3000";
           vpnInterface = "tun1";
           vpnProfile = "/etc/vpn/tun1.conf";
           subnets.ipv4 = "10.11.0.1/24";
@@ -217,12 +217,12 @@ in
       };
   };
 
-  containers."lan-to-vpn-${vlan5}" = {
+  containers."lan-to-vpn-vlan5" = {
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-${vlan5}".hostBridge = "br-ens19";
-      "lan-${vlan5}".hostBridge = "br-lan5";
+      "wan-vlan5".hostBridge = "br-ens19";
+      "lan-vlan5".hostBridge = "br-lan5";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -234,8 +234,8 @@ in
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;
-          wanInterface = "wan-${vlan5}";
-          lanInterface = "lan-${vlan5}";
+          wanInterface = "wan-vlan5";
+          lanInterface = "lan-vlan5";
           vpnInterface = "tun2";
           vpnProfile = "/etc/vpn/tun2.conf";
           subnets.ipv4 = "10.12.0.1/24";
@@ -246,12 +246,12 @@ in
       };
   };
 
-  containers."lan-to-vpn-${vlan6}" = {
+  containers."lan-to-vpn-vlan6" = {
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-${vlan6}".hostBridge = "br-ens19";
-      "lan-${vlan6}".hostBridge = "br-lan6";
+      "wan-vlan6".hostBridge = "br-ens19";
+      "lan-vlan6".hostBridge = "br-lan6";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -263,8 +263,8 @@ in
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;
-          wanInterface = "wan-${vlan6}";
-          lanInterface = "lan-${vlan6}";
+          wanInterface = "wan-vlan6";
+          lanInterface = "lan-vlan6";
           vpnInterface = "tun3";
           vpnProfile = "/etc/vpn/tun3.conf";
           subnets.ipv4 = "10.13.0.1/24";
@@ -276,82 +276,77 @@ in
   };
 
 
-  systemd.services."container@lan-to-vpn-${nameAirvpn}".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun0.conf";
-  systemd.services."container@lan-to-vpn-${nameMullvad}".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun1.conf";
-
-  systemd.services."container@lan-to-vpn-${vlan5}".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun2.conf";
-  systemd.services."container@lan-to-vpn-${vlan6}".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun3.conf";
+  systemd.services."container@lan-to-vpn-vlan4".serviceConfig.ConditionPathExists = "/etc/vpn/tun0.conf";
+  systemd.services."container@lan-to-vpn-vlan3000".serviceConfig.ConditionPathExists = "/etc/vpn/tun1.conf";
+  systemd.services."container@lan-to-vpn-vlan5".serviceConfig.ConditionPathExists = "/etc/vpn/tun2.conf";
+  systemd.services."container@lan-to-vpn-vlan6".serviceConfig.ConditionPathExists = "/etc/vpn/tun3.conf";
 
   # Decode VPN profiles from sops secrets
-  sops.secrets."vpn-lan-to-vpn-${nameAirvpn}" = {
+  sops.secrets."vpn-lan-to-vpn-vlan4" = {
     owner = "root";
     group = "root";
     mode = "0400";
   };
-  sops.secrets."vpn-lan-to-vpn-${nameMullvad}" = {
+  sops.secrets."vpn-lan-to-vpn-vlan3000" = {
     owner = "root";
     group = "root";
     mode = "0400";
   };
 
   # Decode VPN profiles from sops secrets
-  sops.secrets."vpn-lan-to-vpn-${vlan5}" = {
+  sops.secrets."vpn-lan-to-vpn-vlan5" = {
     owner = "root";
     group = "root";
     mode = "0400";
   };
 
-  sops.secrets."vpn-lan-to-vpn-${vlan6}" = {
+  sops.secrets."vpn-lan-to-vpn-vlan6" = {
     owner = "root";
     group = "root";
     mode = "0400";
   };
 
-  systemd.services."write-vpn-config-${nameAirvpn}" = {
+  systemd.services."write-vpn-config-vlan4" = {
     description = "Decode AirVPN config";
     wantedBy = [ "network-pre.target" ];
     before = [ "network-online.target" ];
     after = [ "local-fs.target" ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = mkVpnConfigService nameAirvpn "tun0" "vpn-lan-to-vpn-${nameAirvpn}";
+      ExecStart = mkVpnConfigService "vlan4" "tun0" "vpn-lan-to-vpn-vlan4";
     };
   };
 
-  systemd.services."write-vpn-config-${nameMullvad}" = {
+  systemd.services."write-vpn-config-vlan3000" = {
     description = "Decode Mullvad config";
     wantedBy = [ "network-pre.target" ];
     before = [ "network-online.target" ];
     after = [ "local-fs.target" ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = mkVpnConfigService nameMullvad "tun1" "vpn-lan-to-vpn-${nameMullvad}";
+      ExecStart = mkVpnConfigService "vlan3000" "tun1" "vpn-lan-to-vpn-vlan3000";
     };
   };
 
-  systemd.services."write-vpn-config-${vlan5}" = {
+  systemd.services."write-vpn-config-vlan5" = {
     description = "Decode AirVPN config";
     wantedBy = [ "network-pre.target" ];
     before = [ "network-online.target" ];
     after = [ "local-fs.target" ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = mkVpnConfigService vlan5 "tun2" "vpn-lan-to-vpn-${vlan5}";
+      ExecStart = mkVpnConfigService "vlan5" "tun2" "vpn-lan-to-vpn-vlan5";
     };
   };
 
-  systemd.services."write-vpn-config-${vlan6}" = {
+  systemd.services."write-vpn-config-vlan6" = {
     description = "Decode Mullvad config";
     wantedBy = [ "network-pre.target" ];
     before = [ "network-online.target" ];
     after = [ "local-fs.target" ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = mkVpnConfigService vlan6 "tun3" "vpn-lan-to-vpn-${vlan6}";
+      ExecStart = mkVpnConfigService "vlan6" "tun3" "vpn-lan-to-vpn-vlan6";
     };
   };
 }
