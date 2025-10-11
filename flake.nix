@@ -20,6 +20,9 @@
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
+    nixvim = {
+      url = "github:nix-community/nixvim";
+    };
 
     # This doesn't work:
     # obsidian-nvim = {

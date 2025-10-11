@@ -2,8 +2,8 @@
 {
   environment.etc.hosts.enable = false;
   programs.firefox.enable = true;
-  programs.neovim.enable = true;
-  programs.neovim.defaultEditor = true;
+  # programs.neovim.enable = true;
+  # programs.neovim.defaultEditor = true;
   services.supergfxd.enable = true;
   security.polkit.enable = true;
   #services.openssh.enable = true;

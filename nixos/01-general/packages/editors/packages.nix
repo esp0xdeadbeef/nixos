@@ -13,7 +13,7 @@
   environment.systemPackages = with pkgs; [
     obsidian
     # vscode
-    neovim
+    # neovim
     vim
     obsidian
   ];

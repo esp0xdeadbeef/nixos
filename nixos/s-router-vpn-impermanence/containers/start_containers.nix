@@ -246,6 +246,35 @@ in
       };
   };
 
+  containers."lan-to-vpn-${vlan6}" = {
+    autoStart = true;
+    privateNetwork = true;
+    extraVeths = {
+      "wan-${vlan6}".hostBridge = "br-ens19";
+      "lan-${vlan6}".hostBridge = "br-lan6";
+    };
+    bindMounts."/etc/vpn" = {
+      hostPath = "/etc/vpn";
+      isReadOnly = true;
+    };
+    config =
+      { pkgs, config, ... }:
+      {
+        imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
+        services.router-vpn-gateway = {
+          enable = true;
+          wanInterface = "wan-${vlan5}";
+          lanInterface = "lan-${vlan5}";
+          vpnInterface = "tun1";
+          vpnProfile = "/etc/vpn/tun2.conf";
+          subnets.ipv4 = "10.10.0.1/24";
+          subnets.ipv6 = "fd10:dead:beef::1/64";
+          dhcp4.enable = true;
+          ra.enable = true;
+        };
+      };
+  };
+
 
   systemd.services."container@lan-to-vpn-${nameAirvpn}".serviceConfig.ConditionPathExists =
     "/etc/vpn/tun0.conf";
@@ -304,25 +333,25 @@ in
     };
   };
 
-  # systemd.services."write-vpn-config-${vlan5}" = {
-  #   description = "Decode AirVPN config";
-  #   wantedBy = [ "network-pre.target" ];
-  #   before = [ "network-online.target" ];
-  #   after = [ "local-fs.target" ];
-  #   serviceConfig = {
-  #     Type = "oneshot";
-  #     ExecStart = mkVpnConfigService vlan5 "tun2" "vpn-lan-to-vpn-${vlan5}";
-  #   };
-  # };
+  systemd.services."write-vpn-config-${vlan5}" = {
+    description = "Decode AirVPN config";
+    wantedBy = [ "network-pre.target" ];
+    before = [ "network-online.target" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = mkVpnConfigService vlan5 "tun2" "vpn-lan-to-vpn-${vlan5}";
+    };
+  };
 
-  # systemd.services."write-vpn-config-${vlan6}" = {
-  #   description = "Decode Mullvad config";
-  #   wantedBy = [ "network-pre.target" ];
-  #   before = [ "network-online.target" ];
-  #   after = [ "local-fs.target" ];
-  #   serviceConfig = {
-  #     Type = "oneshot";
-  #     ExecStart = mkVpnConfigService vlan6 "tun3" "vpn-lan-to-vpn-${vlan6}";
-  #   };
-  # };
+  systemd.services."write-vpn-config-${vlan6}" = {
+    description = "Decode Mullvad config";
+    wantedBy = [ "network-pre.target" ];
+    before = [ "network-online.target" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = mkVpnConfigService vlan6 "tun3" "vpn-lan-to-vpn-${vlan6}";
+    };
+  };
 }

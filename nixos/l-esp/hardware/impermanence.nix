@@ -149,6 +149,7 @@
         "Videos"
         ".local/share/lxc"
         ".local/share/containers"
+	".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
 
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/libvirt/qemu" # libvirt qemu settings

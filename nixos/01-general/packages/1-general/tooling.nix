@@ -84,7 +84,7 @@
       # traceroute self
       traceroute
       # file editing
-      neovim
+      # neovim
 
       # ipv6 - Looks up an on-link IPv6 node link-layer address (Neighbor Discovery)
       ndisc6

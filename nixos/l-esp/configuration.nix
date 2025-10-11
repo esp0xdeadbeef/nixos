@@ -34,6 +34,7 @@
     ./hardware/swap-and-tmpfs.nix
     ./llms/lmstudio.nix
     ./llms/ollama.nix
+    ./neovim-on-steroids/neovim.nix
     ./signal/default.nix
     ./torrents/qbittorrent.nix
 
@@ -95,24 +96,41 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
-    inputs.nvf.nixosModules.default
+    # inputs.nvf.nixosModules.default
+    # inputs.nixvim.nixosModules.nixvim
+    ./neovim-on-steroids/neovim.nix
+
   ];
 
   hardware.nvidia.prime = {
     intelBusId = "PCI:00:02:0";
     nvidiaBusId = "PCI:01:00:0";
   };
-  
 
-  programs.nvf = {
-    enable = true;
-    settings = {
-      vim = {
-        viAlias = true;
-        vimAlias = true;
-      };
-    };
-  };
+  
+  # programs.nixvim = {
+  #   enable = true;
+  #   extraConfigLua = ''
+  #     local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+  #     if not vim.loop.fs_stat(lazypath) then
+  #       vim.fn.system({ "git", "clone", "--filter=blob:none",
+  #         "https://github.com/folke/lazy.nvim.git", lazypath })
+  #     end
+  #     vim.opt.rtp:prepend(lazypath)
+  #     require("lazy").setup({
+  #       { "nvim-lua/plenary.nvim" },
+  #       { "folke/snacks.nvim" },
+  #       { "MunifTanjim/nui.nvim" },
+  #       { "r-pletnev/pdfreader.nvim", dependencies = { "folke/snacks.nvim" } },
+  #       { "yetone/avante.nvim", dependencies = { "MunifTanjim/nui.nvim", "nvim-lua/plenary.nvim" } },
+  #       { "HakonHarnes/img-clip.nvim" },
+  #     })
+  #   '';
+  #   extraPackages = with pkgs; [ git curl ];
+  # };
+
+
+
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys
