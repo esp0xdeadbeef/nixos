@@ -166,3 +166,55 @@ https://github.com/NixOS/nix/issues/6536
   };
 }
 ```
+
+# usb boot
+
+From discord, this is for an HP laptop, from user ∀x∈ℝ(x≠0⇒∃y∈ℝ, xy=1):
+
+```nix
+ hardware.enableAllFirmware = true;
+ boot.initrd.availableKernelModules = [
+  "xhci_pci"
+  "xhci_hcd"
+  "ehci_pci"
+  "ehci_hcd"
+  "ohci_hcd"
+  "uhci_hcd"
+  "usbcore"
+  "usb_common"
+  "usb_storage"
+  "uas"
+  "scsi_mod"
+  "sd_mod"
+  "sr_mod"
+  "ahci"
+  "libahci"
+  "libata"
+  "usbhid"
+  "hid_generic"
+  "nvme"
+];
+```
+User `הלוואה בנקאית בריבית ג` is saying this is enough:
+
+```nix
+  "usbcore"
+  "usb_common"
+  "usb_storage"
+  "uas"
+  "usbhid"
+  "hid_generic"
+  "uhci_hcd"
+```
+User `Wo2wz_` is saying this is enough:
+
+```nix
+  "usbcore"
+  "usb_common"
+  "usb_storage"
+  "uas"
+  "usbhid"
+  "hid_generic"
+  "uhci_hcd"
+```
+
