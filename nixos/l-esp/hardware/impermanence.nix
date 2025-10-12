@@ -142,6 +142,10 @@
       directories = [
         "github" # custom dir for my github projects
 
+        "vms/isos"
+        "vms/disks"
+        "vms/nvrams"
+
         "Downloads"
         "Music"
         "Pictures"
