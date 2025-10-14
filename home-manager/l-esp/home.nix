@@ -38,6 +38,7 @@ in
     ./configs/flameshot/packages.nix
     ./configs/git/config.nix
     ./configs/nixpkgs-allowunfree/packages.nix
+    ./configs/osee-libvirt/default.nix
     ./configs/sway/packages.nix
     ./configs/tmuxp/packages.nix
 
