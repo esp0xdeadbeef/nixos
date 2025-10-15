@@ -34,6 +34,7 @@
     ./llms/lmstudio.nix
     ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
+    ./neovim-on-steroids/neovim.nix
     ./unmount-pentest-directory/unmount-hook.nix
     ./work-packages/wordlists/packages.nix
     ./work-packages/work/packages.nix
