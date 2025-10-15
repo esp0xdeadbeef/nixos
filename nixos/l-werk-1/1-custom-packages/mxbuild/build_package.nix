@@ -33,11 +33,12 @@ stdenv.mkDerivation rec {
   buildPhase = "true";
 
   installPhase = ''
-    mkdir -p $out/bin
     mkdir -p $out/mendix-src
 
     # Copy the entire source tree.
     cp -r ./* $out/mendix-src/
+
+    mkdir -p $out/bin
 
     # Change directory to the copied sources.
     cd $out/mendix-src
