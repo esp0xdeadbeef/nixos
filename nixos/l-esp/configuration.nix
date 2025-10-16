@@ -33,6 +33,8 @@
     ./hardware/swap-and-tmpfs.nix
     ./llms/lmstudio.nix
     ./llms/ollama.nix
+    ./lxc-osee/bind-to-lxc.nix
+    ./lxc-osee/x2go-client.nix
     ./neovim-on-steroids/neovim.nix
     ./signal/default.nix
     ./torrents/qbittorrent.nix

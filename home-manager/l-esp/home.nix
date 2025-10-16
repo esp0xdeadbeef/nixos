@@ -41,6 +41,8 @@ in
     ./configs/osee/default.nix
     ./configs/sway/packages.nix
     ./configs/tmuxp/packages.nix
+    ./projects/lxc-osee/create-x2go-profile.nix
+    ./projects/lxc-osee/start-lxc.nix
 
     ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
