@@ -146,7 +146,7 @@
         "vms/disks"
         "vms/nvrams"
 
-        "Downloads"
+        #"Downloads"
         "Music"
         "Pictures"
         "Documents"
