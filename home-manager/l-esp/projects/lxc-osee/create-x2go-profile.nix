@@ -123,36 +123,28 @@ in
 {
   # install the little updater script into your user PATH
   home.packages = [ updateX2GoSession ];
-
-  systemd.user.services."updateX2GOSession" = {
-    Unit = {
-      Description = "update the x2go session file";
-      # After = [ "network-online.target" ];
-      # Wants = [ "network-online.target" ];
-      After = [ "graphical-session.target" ];
-      Wants = [
-        "graphical-session.target"
-        "network-online.target"
-      ];
-    };
-    Service = {
-      Type = "simple";
-      ExecStartPre = [
-
-      ];
-#       ExecStart = "${pkgs.writeShellScript "updateX2GOSession-callee" ''
-# #!${pkgs.bash}/bin/bash --noprofile --norc
-# ${updateX2GoSession}/bin/update-x2go-session
-#       ''}";
-      ExecStart = "${updateX2GoSession}/bin/update-x2go-session";
-      Restart = "on-failure";
-      RestartSec = "10s"; # back off between retries
-      TimeoutStartSec = "75s";
-      StandardOutput = "journal+console";
-      StandardError = "journal+console";
-    };
-    Install = {
-      WantedBy = [ "default.target" ];
-    };
+systemd.user.services."updateX2GOSession" = {
+  Unit = {
+    Description = "update the x2go session file";
+    After = [ "graphical-session.target" ];
+    PartOf = [ "graphical-session.target" ];
+    BindsTo = [ "graphical-session.target" ];
   };
+
+  Service = {
+    Type = "simple";
+    ExecStart = "${updateX2GoSession}/bin/update-x2go-session";
+    Restart = "on-failure";
+    RestartSec = "10s";
+    TimeoutStartSec = "75s";
+    KillMode = "control-group";
+    StandardOutput = "journal+console";
+    StandardError = "journal+console";
+  };
+
+  Install = {
+    WantedBy = [ "graphical-session.target" ];
+  };
+};
+
 }
