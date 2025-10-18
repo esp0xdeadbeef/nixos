@@ -34,7 +34,6 @@
     ./llms/ollama.nix
     ./lxc-osee/bind-to-lxc.nix
     ./lxc-osee/x2go-client.nix
-    ./neovim-on-steroids/neovim.nix
     ./signal/default.nix
     ./torrents/qbittorrent.nix
 
@@ -99,6 +98,7 @@
     inputs.nvf.nixosModules.default
     # inputs.nixvim.nixosModules.nixvim
     #./neovim-on-steroids/neovim.nix
+    #./neovim-with-preload/nvim.nix
   ];
 
   hardware.nvidia.prime = {
@@ -111,29 +111,15 @@
     #    settings = import "./nvf-configuration.nix" true;
     # use the defaults of nvf:
     # settings = import "${inputs.nvf}/configuration.nix" true;
-    settings = import "${inputs.self}/nixos/l-esp/nvf-configuration.nix" true;
+    # settings = import "${inputs.self}/nixos/l-esp/nvf-configuration.nix" true;
+    settings =
+      (import "${inputs.self}/nixos/l-esp/nvf-configuration.nix" true)
+      // {
+        # this doesn't crash, but doesn't use the the nvf config...........:
+        # config.vim.luaConfigPre = '''';
+        config.vim.luaConfigPre = builtins.readFile "${inputs.self}/nixos/l-esp/neovim-with-preload/nvim.lua";
+      };
   };
-
-  # programs.nixvim = {
-  #   enable = true;
-  #   extraConfigLua = ''
-  #     local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-  #     if not vim.loop.fs_stat(lazypath) then
-  #       vim.fn.system({ "git", "clone", "--filter=blob:none",
-  #         "https://github.com/folke/lazy.nvim.git", lazypath })
-  #     end
-  #     vim.opt.rtp:prepend(lazypath)
-  #     require("lazy").setup({
-  #       { "nvim-lua/plenary.nvim" },
-  #       { "folke/snacks.nvim" },
-  #       { "MunifTanjim/nui.nvim" },
-  #       { "r-pletnev/pdfreader.nvim", dependencies = { "folke/snacks.nvim" } },
-  #       { "yetone/avante.nvim", dependencies = { "MunifTanjim/nui.nvim", "nvim-lua/plenary.nvim" } },
-  #       { "HakonHarnes/img-clip.nvim" },
-  #     })
-  #   '';
-  #   extraPackages = with pkgs; [ git curl ];
-  # };
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys
