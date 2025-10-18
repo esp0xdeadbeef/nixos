@@ -35,18 +35,22 @@ in
 
     # You can also split up your configuration and import pieces of it here:
     ./i3/packages.nix
-    ./rclone-wrapper/rclone-wrapper.nix
+    ./rclone-wrapper/rclone.nix
+    ./remmina/config.nix
 
     ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
     ../01-general/virt-manager-config/default.nix
 
-
     # ../02-window-manager-i3/i3/packages.nix
     ../02-window-manager-i3/i3status-rust/packages.nix
+
+
     inputs.sops-nix.homeManagerModules.sops
   ];
+
+  
   sops = {
     defaultSopsFile = ../../secrets/l-werk-default-deadbeef.yaml;
 
@@ -85,11 +89,6 @@ in
   home = {
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
-  };
-  gtk.enable = true;
-  gtk.theme = {
-    name = "Adwaita-dark";
-    package = pkgs.gnome-themes-extra;
   };
 
   home.packages =

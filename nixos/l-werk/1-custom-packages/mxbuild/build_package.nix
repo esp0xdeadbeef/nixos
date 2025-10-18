@@ -10,11 +10,17 @@
 
 stdenv.mkDerivation rec {
   pname = "mxbuild";
-  version = "10.21.0.64362";
+  # go to https://marketplace.mendix.com/link/studiopro
+  # start a download (for windows for example, and cancel the download)
+  # copy the version in the download url.
+  version = "10.24.9.81004";
 
   src = fetchurl {
     url = "https://cdn.mendix.com/runtime/mxbuild-${version}.tar.gz";
-    sha256 = "sha256-rH7goj4cDgEfzua2nY32kje8JJ50L39pLxXbdo976kA=";
+    #sha256 = "sha256-rH7goj4cDgEfzua2nY32kje8JJ50L39pLxXbdo976kA=";
+    # get the hash by:
+    # nix store prefetch-file https://cdn.mendix.com/runtime/mxbuild-10.24.9.81004.tar.gz
+    sha256 = "sha256-mJEmlZmVeo6n5tXs4ta0lKTr5HAKRNeq4ehm1vP7SuY=";
   };
 
   nativeBuildInputs = [
@@ -27,11 +33,12 @@ stdenv.mkDerivation rec {
   buildPhase = "true";
 
   installPhase = ''
-    mkdir -p $out/bin
     mkdir -p $out/mendix-src
 
     # Copy the entire source tree.
     cp -r ./* $out/mendix-src/
+
+    mkdir -p $out/bin
 
     # Change directory to the copied sources.
     cd $out/mendix-src

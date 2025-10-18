@@ -6,8 +6,8 @@
 3. sed this file with the ip and path to this file like so (so the documentation will be easier to read):
 
 ```bash
-sed -i 's|/home/deadbeef/github/nixos|<your-new-path>|g' /home/deadbeef/github/nixos/nixos/l-werk-1/README.md
-sed -i 's/192.168.1.165/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/l-werk-1/README.md
+sed -i 's|/home/deadbeef/github/nixos|<your-new-path>|g' /home/deadbeef/github/nixos/nixos/l-werk/README.md
+sed -i 's/192.168.1.165/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/l-werk/README.md
 ```
 
 
@@ -23,7 +23,7 @@ rsync -va /home/deadbeef/github/nixos nixos@192.168.1.165:~/github/
 # inside the ssh session:
 ssh nixos@192.168.1.165
 sudo -i
-PATH_TO_DISKO="/home/nixos/github/nixos/nixos/l-werk-1/disko/build_disko.nix"
+PATH_TO_DISKO="/home/nixos/github/nixos/nixos/l-werk/disko/build_disko.nix"
 head -c 512 /dev/urandom > /tmp/disk.key
 sed -i 's|/dev/sda|/dev/nvme0n1|g' $PATH_TO_DISKO
 sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- --mode destroy,format,mount $PATH_TO_DISKO
@@ -54,7 +54,7 @@ nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/s
 
 ```bash
 # host that contain the nixos configuration:
-rsync -va nixos@192.168.1.165:/mnt/etc/nixos/hardware-configuration.nix /home/deadbeef/github/nixos/nixos/l-werk-1/hardware/hardware-configuration.nix
+rsync -va nixos@192.168.1.165:/mnt/etc/nixos/hardware-configuration.nix /home/deadbeef/github/nixos/nixos/l-werk/hardware/hardware-configuration.nix
 ```
 
 ```bash
@@ -65,7 +65,7 @@ rsync -va /home/deadbeef/github/nixos nixos@192.168.1.165:~/github/
 # Installing the vm:
 
 ```bash
-nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/nixos-24.11#nixos-install -- --impure --flake path:/home/nixos/github/nixos#l-werk-1
+nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/nixos-24.11#nixos-install -- --impure --flake path:/home/nixos/github/nixos#l-werk
 # .....
 # setting root password...
 # New password: 
@@ -162,7 +162,7 @@ generating machine-specific age key...
 AGE-SECRET-KEY-redacted
 sops-install-secrets: Imported /persist/etc/ssh/ssh_host_rsa_key as GPG key with fingerprint 0adf57b94141ea0eff10ed80a00a382bac2569db
 sops-install-secrets: Imported /home/deadbeef/.ssh/id_ed25519 as age key with fingerprint age12ghkem2kyy89htjqd7fv7az34gg5g87zcdtzm0gq23tdll60avtsqsz7vk
-/nix/store/ff49sadsyjzk6xqhn575rawv8qyc84y3-sops-install-secrets-0.0.1/bin/sops-install-secrets: failed to decrypt '/nix/store/3viv7d3zhjx9770xqfv3qzlqm956ihfd-l-werk-1-default.yaml': Error getting data key: 0 successful groups required, got 0
+/nix/store/ff49sadsyjzk6xqhn575rawv8qyc84y3-sops-install-secrets-0.0.1/bin/sops-install-secrets: failed to decrypt '/nix/store/3viv7d3zhjx9770xqfv3qzlqm956ihfd-l-werk-default.yaml': Error getting data key: 0 successful groups required, got 0
 Activation script snippet 'setupSecretsForUsers' failed (1)
 warning: password file ‘/run/secrets-for-users/deadbeef-passwd’ does not exist
 setting up /etc...
@@ -188,15 +188,15 @@ warning: the following units failed: home-manager-deadbeef.service
    Mem peak: 6.2M
         CPU: 245ms
 
-sep 06 03:57:37 l-werk-1 hm-activate-deadbeef[28839]: Activating reloadSystemd
-sep 06 03:57:37 l-werk-1 hm-activate-deadbeef[29174]: Starting units: sops-nix.service
-sep 06 03:57:37 l-werk-1 hm-activate-deadbeef[29174]: sops-nix.service failed
-sep 06 03:57:37 l-werk-1 hm-activate-deadbeef[28839]: Activating sops-nix
-sep 06 03:57:37 l-werk-1 systemctl[29211]: Job for sops-nix.service failed because the control process exited with error code.
-sep 06 03:57:37 l-werk-1 systemctl[29211]: See "systemctl --user status sops-nix.service" and "journalctl --user -xeu sops-nix.service" for details.
-sep 06 03:57:37 l-werk-1 systemd[1]: home-manager-deadbeef.service: Main process exited, code=exited, status=1/FAILURE
-sep 06 03:57:37 l-werk-1 systemd[1]: home-manager-deadbeef.service: Failed with result 'exit-code'.
-sep 06 03:57:37 l-werk-1 systemd[1]: Failed to start Home Manager environment for deadbeef.
-sep 06 03:57:37 l-werk-1 systemd[1]: home-manager-deadbeef.service: Consumed 245ms CPU time, 6.2M memory peak, 4.7M read from disk.
+sep 06 03:57:37 l-werk hm-activate-deadbeef[28839]: Activating reloadSystemd
+sep 06 03:57:37 l-werk hm-activate-deadbeef[29174]: Starting units: sops-nix.service
+sep 06 03:57:37 l-werk hm-activate-deadbeef[29174]: sops-nix.service failed
+sep 06 03:57:37 l-werk hm-activate-deadbeef[28839]: Activating sops-nix
+sep 06 03:57:37 l-werk systemctl[29211]: Job for sops-nix.service failed because the control process exited with error code.
+sep 06 03:57:37 l-werk systemctl[29211]: See "systemctl --user status sops-nix.service" and "journalctl --user -xeu sops-nix.service" for details.
+sep 06 03:57:37 l-werk systemd[1]: home-manager-deadbeef.service: Main process exited, code=exited, status=1/FAILURE
+sep 06 03:57:37 l-werk systemd[1]: home-manager-deadbeef.service: Failed with result 'exit-code'.
+sep 06 03:57:37 l-werk systemd[1]: Failed to start Home Manager environment for deadbeef.
+sep 06 03:57:37 l-werk systemd[1]: home-manager-deadbeef.service: Consumed 245ms CPU time, 6.2M memory peak, 4.7M read from disk.
 warning: error(s) occurred while switching to the new configuration
 ```

@@ -327,9 +327,9 @@ bindsym $mod+period move workspace to output right
 #bindsym $mod+i exec x2goclient --session=arch --close-disconnect
 #bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c '/home/deadbeef/.local/share/remmina/group_rdp_win11-office_192-168-100-142.remmina'
 #bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "$(ls /home/deadbeef/.local/share/remmina/group_rdp_win11-office-ad*.remmina)"
-bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "$(ls /home/deadbeef/.local/share/remmina/*$(echo -n ${config.sops.placeholder.remminaOfficeIP} | sed 's|\.|-|g')*)"
-bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c "$(ls /home/deadbeef/.local/share/remmina/*$(echo -n ${config.sops.placeholder.remminaPentestIP} | sed 's|\.|-|g')*)"
-#bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c /home/deadbeef/.local/share/remmina/group_rdp_i5-laptop_192-168-1-165.remmina 
+bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-office-libvirt.remmina"
+bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-pentest-libvirt.remmina"
+
 bindsym $mod+bracketright exec ${pkgs.pamixer}/bin/pamixer --increase 10
 bindsym $mod+bracketleft exec ${pkgs.pamixer}/bin/pamixer --decrease 10
 # disable numlock
@@ -359,12 +359,11 @@ for_window [class="teams-for-linux"] move window to workspace 5
 #for_window [class="Microsoft Teams - Preview"] move window to workspace 5
 for_window [class="Office 365 on Electron" title="${config.sops.placeholder.workRelatedXlsx}"] move container to workspace 5
 #for_window [class="Chromium" title=".*"] move container to workspace 10
-bindsym $mod+b exec --no-startup-id xdotool click 8
-bindsym $mod+shift+b exec --no-startup-id xdotool click 9
-bindsym Mod1+b exec --no-startup-id xdotool click 8
-bindsym Mod1+shift+b exec --no-startup-id xdotool click 9
-
-
+# bindsym $mod+b exec --no-startup-id xdotool click 8
+# bindsym $mod+shift+b exec --no-startup-id xdotool click 9
+# bindsym Mod1+b exec --no-startup-id xdotool click 8
+# bindsym Mod1+shift+b exec --no-startup-id xdotool click 9
+# bindsym $mod+b exec systemctl restart --user waydroid-cage.service
 
 exec --no-startup-id export XDG_SESSION_TYPE=x11
 exec --no-startup-id xsetroot -solid "#333333" #gray

@@ -25,19 +25,24 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     ../04-window-manager-other/environment.nix
 
+    # ../99-testing/autologin-ssh-and-tty.nix
+    # ../99-testing/autologin.nix
+
+    inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
   ];
-  sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
-  # This will automatically import SSH keys as age keys
-  sops.age.sshKeyPaths = [ "/home/deadbeef/.ssh/id_ed25519" ];
-  # This is using an age key that is expected to already be in the filesystem
-  # sops.age.keyFile = "/var/lib/sops-nix/key.txt";
-  # This will generate a new key if the key specified above does not exist
-  sops.age.generateKey = true;
-  # This is the actual specification of the secrets.
-  # sops.secrets.example-key = { };
-  # sops.secrets."myservice/my_subdir/my_secret" = { };
+
+
+  sops.defaultSopsFile = ../../secrets/l-werk-default.yaml;
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
+  sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
+
+
+
+  
+  programs.zsh.ohMyZsh.theme = "clean";
+
 
   home-manager = {
     sharedModules = [
@@ -104,14 +109,15 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   networking.networkmanager.enable = true;
   time.timeZone = "Europe/Amsterdam";
 
+  sops.secrets."deadbeef-passwd" = {
+    neededForUsers = true; # make it available before the user is created
+  };
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
     deadbeef = {
-      # TODO: You can ss-test-vmet an initial password for your user.
-      # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
-      # Be sure to change it (using passwd) after rebooting!
-      initialPassword = " ";
+      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+      # initialPassword = " ";
       isNormalUser = true;
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
