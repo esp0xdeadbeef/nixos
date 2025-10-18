@@ -355,7 +355,7 @@
       exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
 
       # dropbox is whining about shit:
-      exec --no-startup-id ${pkgs.maestral-gui}/bin/maestral_qt
+      #exec --no-startup-id ${pkgs.maestral-gui}/bin/maestral_qt
       
       # exec_always --no-startup-id ${pkgs.dropbox}/bin/dropbox
       exec_always --no-startup-id ${pkgs.spotify}/bin/spotify
