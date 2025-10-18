@@ -121,6 +121,8 @@
         # "Pictures"
         # "Videos"
         # I will try to migrate old shit from here, but it will be commented one day (lol):
+      	".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
+
         "Documents"
 
         "github" # custom dir for my github projects
