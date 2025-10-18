@@ -337,6 +337,7 @@
       bindsym $mod+shift+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 9
       bindsym Mod1+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 8
       bindsym Mod1+shift+b exec --no-startup-id ${pkgs.xdotool}/bin/xdotool click 9
+      bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_osee_10-1-1-205.remmina"
 
 
 
