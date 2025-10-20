@@ -117,7 +117,7 @@
       // {
         # this doesn't crash, but doesn't use the the nvf config...........:
         # config.vim.luaConfigPre = '''';
-        config.vim.luaConfigPre = builtins.readFile "${inputs.self}/nixos/l-esp/neovim-with-preload/nvim.lua";
+        #config.vim.luaConfigPre = builtins.readFile "${inputs.self}/nixos/l-esp/neovim-with-preload/nvim.lua";
       };
   };
 
