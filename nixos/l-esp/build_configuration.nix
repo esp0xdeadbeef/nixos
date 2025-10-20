@@ -42,7 +42,6 @@
     nvidiaBusId = "PCI:01:00:0";
   };
 
-  
   # programs.nixvim = {
   #   enable = true;
   #   extraConfigLua = ''
@@ -63,9 +62,6 @@
   #   '';
   #   extraPackages = with pkgs; [ git curl ];
   # };
-
-
-
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys

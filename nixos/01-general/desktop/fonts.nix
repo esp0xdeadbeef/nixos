@@ -1,19 +1,25 @@
-{ config, pkgs, ... }:
-
 {
+  confid,
+  pkgs,
+  ...
+}: {
   fonts = {
     enableDefaultPackages = true;
     packages = with pkgs; [
       font-awesome
       font-awesome_6
       powerline-fonts
-      #nerdfonts
+      # nvim
+      nerd-fonts.jetbrains-mono
+      # alacritty:
+      nerd-fonts.hack
       terminus_font
       noto-fonts
       noto-fonts-emoji
       dejavu_fonts
       liberation_ttf
     ];
+    #++ builtins.filter lib.attrsets.isDerivation (builtins.attrValues pkgs.nerd-fonts);
 
     fontconfig.defaultFonts = {
       monospace = [
@@ -31,7 +37,7 @@
         "DejaVu Serif"
         "Liberation Serif"
       ];
-      emoji = [ "Noto Color Emoji" ];
+      emoji = ["Noto Color Emoji"];
     };
   };
 }
