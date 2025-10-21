@@ -1,4 +1,4 @@
-args @ {
+args@{
   inputs,
   outputs,
   lib,
@@ -6,7 +6,8 @@ args @ {
   pkgs,
   sopsSecrets,
   ...
-}: let
+}:
+let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
     system = pkgs.system;
@@ -15,8 +16,9 @@ args @ {
   stablePkgs = import inputs.nixpkgs-stable {
     config.allowUnfree = true;
   };
-in {
-  home.activation.debugArgs = lib.hm.dag.entryAfter ["writeBoundary"] ''
+in
+{
+  home.activation.debugArgs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     # this will log in journalctl -u home-manager-deadbeef.service -e
 
     echo "[+] Home Manager activation: showing specialArgs"
@@ -47,34 +49,18 @@ in {
     ../01-general/pentesting/packages.nix
     ../01-general/virt-manager-config/default.nix
 
+
     ../02-window-manager-i3/i3/packages.nix
     ../02-window-manager-i3/i3status-rust/packages.nix
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
+
 
     # zen browser:
     # inputs.zen-browser.homeModules.beta
     # or inputs.zen-browser.homeModules.twilight
     # or inputs.zen-browser.homeModules.twilight-official
 
-    #(let
-    #  baseConfig = inputs.khanelivim.nixvimConfigurations.x86_64-linux.khanelivim;
-    #  extendedConfig = baseConfig.extendModules {
-    #    modules = [
-    #      {
-    #        # Disable specific plugins
-    #        # plugins.yazi.enable = false;
-    #        # Override plugin settings
-    #        # plugins.lualine.settings.options.theme = "gruvbox";
-    #        # Add custom Lua configuration
-    #        extraConfigLua = ''
-    #          vim.opt.relativenumber = false
-    #        '';
-    #      }
-    #    ];
-    #  };
-    #in
-    #  extendedConfig.config.build.package)
   ];
 
   # programs.zen-browser.enable = true;
@@ -82,10 +68,12 @@ in {
     defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
 
     age = {
-      sshKeyPaths = ["${config.home.homeDirectory}/.ssh/id_ed25519"];
+      sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
       generateKey = true;
     };
+
   };
+
 
   nixpkgs = {
     # You can add overlays here
@@ -117,28 +105,28 @@ in {
     homeDirectory = "/home/deadbeef";
   };
 
-  home.packages = let
-    stable = with pkgs; [
-      xdotool
-      i3status-rust
-      obsidian
-      google-chrome
-      flameshot
-      rofi
-      remmina
-      legcord
-      ffuf
-      distrobox
-    ];
-    unstable = with unstablePkgs; [
-      inputs.khanelivim.packages.x86_64-linux.default
-      vscode
-      # firefox
-      exploitdb
-      netexec
-      gh
-    ];
-  in
+  home.packages =
+    let
+      stable = with pkgs; [
+        xdotool
+        i3status-rust
+        obsidian
+        google-chrome
+        flameshot
+        rofi
+        remmina
+        legcord
+        ffuf
+        distrobox
+      ];
+      unstable = with unstablePkgs; [
+        vscode
+        # firefox
+        exploitdb
+        netexec
+        gh
+      ];
+    in
     stable ++ unstable;
 
   # home-manager
@@ -157,4 +145,5 @@ in {
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "24.11";
+
 }
