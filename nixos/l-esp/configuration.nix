@@ -33,7 +33,6 @@
     ./llms/lmstudio.nix
     ./llms/ollama.nix
     ./neovim-with-preload/neovim.nix
-    ./nvf-configuration.nix
     ./osee/lxc-osee/bind-to-lxc.nix
     ./osee/lxc-osee/x2go-client.nix
     ./osee/rev-tooling/ghidra.nix
