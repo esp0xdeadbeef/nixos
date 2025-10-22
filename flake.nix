@@ -16,6 +16,13 @@
     systems = {
       url = "github:nix-systems/default-linux";
     };
+    kickstart-nix-nvim = {
+      url = "github:nix-community/kickstart-nix.nvim";
+      # do NOT make nixpkgs follow your main nixpkgs; it breaks wrapNeovimUnstable
+      # omit this line entirely:
+      # inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };

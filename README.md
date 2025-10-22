@@ -1,4 +1,4 @@
-tltr; this repo was never ment to be public, but someone wanted it so i published it.
+TLDR this repo was never ment to be public, but someone wanted it so i published it.
 
 # Todo
 

@@ -32,7 +32,7 @@
     ./hardware/swap-and-tmpfs.nix
     ./llms/lmstudio.nix
     ./llms/ollama.nix
-    ./neovim-with-preload/neovim.nix
+    ./neovim-configuration/default.nix
     ./osee/lxc-osee/bind-to-lxc.nix
     ./osee/lxc-osee/x2go-client.nix
     ./osee/rev-tooling/ghidra.nix
