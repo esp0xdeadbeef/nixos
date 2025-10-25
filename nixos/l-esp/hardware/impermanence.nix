@@ -83,6 +83,9 @@
   #   "d /persist/var/lib/private 0700 root root -"
   # ];
 
+  systemd.tmpfiles.rules = [
+    "d /mnt/current_pentest 0755 root root -"
+  ];
   environment.persistence."/persist" = {
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
@@ -153,7 +156,7 @@
         "Videos"
         ".local/share/lxc"
         ".local/share/containers"
-	".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
+        ".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
 
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/libvirt/qemu" # libvirt qemu settings

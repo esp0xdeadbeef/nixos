@@ -10,7 +10,7 @@
   # boot.initrd.systemd.enable = true;
   boot.initrd.systemd.tpm2.enable = true; # keep your TPM2 settings
 
-  # make a /mnt directory
+  # make a /mnt/current_pentest directory
   systemd.tmpfiles.rules = [
     "d /mnt/current_pentest 0755 root root -"
   ];
@@ -121,7 +121,7 @@
         # "Pictures"
         # "Videos"
         # I will try to migrate old shit from here, but it will be commented one day (lol):
-      	".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
+        ".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
 
         "Documents"
 
