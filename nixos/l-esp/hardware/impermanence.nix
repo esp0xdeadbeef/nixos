@@ -148,6 +148,8 @@
         "vms/isos"
         "vms/disks"
         "vms/nvrams"
+        "pentest"
+        "firefox-pentest-profile"
 
         #"Downloads"
         "Music"
