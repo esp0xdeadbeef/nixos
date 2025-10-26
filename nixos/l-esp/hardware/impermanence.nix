@@ -193,6 +193,9 @@
         ".config/Signal"
         ".config/maestral"
 
+        # zap plugins:
+        ".ZAP/plugin"
+
         {
           directory = ".gnupg";
           mode = "0700";
@@ -210,6 +213,10 @@
       files = [
         ".local/state/wireplumber/default-nodes"
         ".screenrc"
+
+        # zap (persist the config, which is containing the certificates):
+        ".ZAP/config.xml"
+
         ".config/nix/nix.conf"
         ".zsh_history"
         ".zshrc"
