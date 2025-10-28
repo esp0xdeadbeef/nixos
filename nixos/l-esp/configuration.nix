@@ -38,6 +38,7 @@
     ./osee/rev-tooling/ghidra.nix
     ./signal/default.nix
     ./torrents/qbittorrent.nix
+    ./unmount-pentest-directory/unmount-hook.nix
 
     ../01-general/desktop/applet-nm.nix
     ../01-general/desktop/fonts.nix
