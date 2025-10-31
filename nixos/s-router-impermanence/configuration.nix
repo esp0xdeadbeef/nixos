@@ -80,11 +80,11 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
-    ./hardware/network-onlymgmt.nix
+    #./hardware/network-onlymgmt.nix
 
     #./containers/start_containers.nix
-    ./containers/pppoe.nix
-    ./containers/lan.nix
+    ./containers/pppoe-v2.nix
+    #./containers/lan.nix
 
     ../01-general/desktop/shell-env.nix
     ../01-general/system/autoupdate.nix
@@ -94,6 +94,11 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
+
+    #inputs.nixos-router.nixosModules
+    #inputs.nixos-router.nixosModules.default
+
+    #./containers/lan-v2.nix
   ];
 
   sops.defaultSopsFile = ../../secrets/s-router-impermanence-root.yaml;
