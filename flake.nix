@@ -184,6 +184,15 @@
       #     ./nixos/s-router-vpn-1/configuration.nix
       #   ];
       # };
+      s-router-impermanence = nixpkgs.lib.nixosSystem {
+        specialArgs = {inherit inputs outputs;};
+        modules = [
+          # required for secure boot:
+          lanzaboote.nixosModules.lanzaboote
+          # > Our main nixos configuration file <
+          ./nixos/s-router-impermanence/configuration.nix
+        ];
+      };
       s-router-vpn-impermanence = nixpkgs.lib.nixosSystem {
         specialArgs = {inherit inputs outputs;};
         modules = [
@@ -193,6 +202,7 @@
           ./nixos/s-router-vpn-impermanence/configuration.nix
         ];
       };
+
 
       # x13s laptop:
       l-x13s = nixpkgs.lib.nixosSystem {
