@@ -32,7 +32,6 @@
       ./hardware/impermanence.nix
       ./hardware/lanzaboote.nix
       ./hardware/swap-and-tmpfs.nix
-      ./routing-test-voor-s-router-vpn-1/onlymgmt.nix
 
       ../01-general/desktop/applet-nm.nix
       ../01-general/desktop/fonts.nix
@@ -84,9 +83,11 @@
     ./hardware/network-onlymgmt.nix
 
     #./containers/start_containers.nix
+    ./containers/pppoe.nix
+    ./containers/lan.nix
 
     ../01-general/desktop/shell-env.nix
-
+    ../01-general/system/autoupdate.nix
     # it's a vm.. if you pwn the host you'll be able to login anyway.
     ../99-testing/autologin.nix
     # ../02-window-manager-i3/environment.nix
@@ -95,7 +96,7 @@
     inputs.sops-nix.nixosModules.sops
   ];
 
-  sops.defaultSopsFile = ../../secrets/s-router-vpn-impermanence-root.yaml;
+  sops.defaultSopsFile = ../../secrets/s-router-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
   sops.secrets."deadbeef-passwd" = {
@@ -162,7 +163,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-router-vpn-impermanence";
+  networking.hostName = "s-router-impermanence";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {

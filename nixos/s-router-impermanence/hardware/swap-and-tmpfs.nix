@@ -6,12 +6,13 @@
   ...
 }:
 {
-  # swapDevices = [
-  #   {
-  #     device = "/.swapvol";
-  #     # size = 5 * 1024;
-  #   }
-  # ];
+  #swapDevices = [
+  #  {
+  #    device = "/.swapvol";
+  #    size = 5 * 1024;
+  #  }
+  #];
+
   #   swapDevices = [
   # {
   #   device = "/.swapvol"
