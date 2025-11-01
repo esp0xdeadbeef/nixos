@@ -83,6 +83,8 @@
     #./hardware/network-onlymgmt.nix
 
     #./containers/start_containers.nix
+    ../01-general/network/nmcli.nix
+    ../01-general/packages/1-general/tooling.nix
     ./containers/pppoe-v2.nix
     #./containers/lan.nix
 

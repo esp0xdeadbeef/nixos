@@ -12,47 +12,53 @@ let
   passSecret = "pppoe-password";
 in
 {
-  # SOPS PPP secrets
+  networking.useNetworkd = false;
+  networking.networkmanager.enable = true;
+  networking.networkmanager.unmanaged = [
+    "ens18"
+    "ens21"
+  ];
+
   sops.secrets.${userSecret} = { };
   sops.secrets.${passSecret} = { };
 
-  networking.useNetworkd = false;
-  networking.networkmanager.enable = true;
-
-  environment.systemPackages = with pkgs; [
-    networkmanager
-  ];
-  # Create VLAN 6 for PPPoE (remove if ISP does not need VLAN)
-  networking.vlans.${wanVlan}.interface = wan;
-  networking.vlans.${wanVlan}.id = 6;
-
-  # Ensure NM profile exists for PPPoE
-  networking.networkmanager.ensureProfiles = {
-    profiles = {
-      "pppoe-wan.nmconnection" = {
-        type = "pppoe";
-
-        connection = {
-          id = "pppoe-wan";
-          interface-name = wanVlan; # use `${wan}` if no VLAN
-          autoconnect = true;
-        };
-
-        pppoe = {
-          username = "\${SECRET:${userSecret}}";
-        };
-
-        ppp = {
-          password-flags = 0;
-        };
-
-        ipv4.method = "pppoe";
-        ipv6.method = "auto"; # or "ignore" depending on ISP
+  networking.networkmanager.ensureProfiles.profiles = {
+    "wan-vlan6" = {
+      connection = {
+        id = "wan-vlan6";
+        type = "vlan";
+        interface-name = wanVlan; # ens19.6
+        autoconnect = true;
       };
+
+      vlan = {
+        id = 6;
+        parent = wan;
+      };
+
+      ipv4.method = "disabled";
+      ipv6.method = "ignore";
     };
 
-    secrets."pppoe-wan.nmconnection" = {
-      ppp.password = "@${config.sops.secrets.${passSecret}.path}";
+    "pppoe-wan" = {
+      connection = {
+        id = "pppoe-wan";
+        type = "pppoe";
+        autoconnect = true;
+      };
+
+      pppoe = {
+        parent = "ens19.6";
+        username = "@/run/secrets/${userSecret}";
+      };
+
+      ppp = {
+        password = "@/run/secrets/${passSecret}";
+        password-flags = 0;
+      };
+
+      ipv4.method = "auto";
+      ipv6.method = "auto";
     };
   };
 }
