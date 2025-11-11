@@ -117,7 +117,6 @@ in
         # firefox
         exploitdb
         netexec
-        certipy
         (burpsuite.override { proEdition = true; })
         gh
       ];

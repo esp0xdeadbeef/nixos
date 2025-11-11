@@ -55,10 +55,6 @@
     # inotify service (otherwise flameshot crashes)
     dunst
     unzip
-    sqlmap
-    certipy
-    enum4linux
-    enum4linux-ng
     metasploit
     samba4Full
     rlwrap
