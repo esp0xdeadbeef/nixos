@@ -99,6 +99,7 @@
     inputs.sops-nix.nixosModules.sops
   ];
 
+security.pam.services.login.enableGnomeKeyring = true;
 
   sops.defaultSopsFile = ../../secrets/l-werk-default.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];

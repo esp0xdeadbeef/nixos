@@ -13,6 +13,15 @@ sops = {
     secrets.remminaPentestIP = { };
     secrets.workRelatedXlsx = {};
 };
+home.file."/.xprofile" = {
+    # we cant use the indirect approach:
+    # ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon
+    # it will not export the SSH_AUTH_SOCK
+    text = ''
+      export $(gnome-keyring-daemon --start --components=secrets,pkcs11,ssh,gpg)
+    '';
+    executable = true;
+  };
 
 sops.templates.i3config = {
   content = ''
