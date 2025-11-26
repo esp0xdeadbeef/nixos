@@ -85,6 +85,8 @@
 
     ./containers/start_containers.nix
 
+    # auto update the vm.
+    ../01-general/system/autoupdate.nix
     ../01-general/desktop/shell-env.nix
 
     # it's a vm.. if you pwn the host you'll be able to login anyway.
