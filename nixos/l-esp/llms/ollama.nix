@@ -37,6 +37,7 @@
       "qwen2.5-coder:1.5b-base"
       "nomic-embed-text"
       "deepseek-r1:1.5b"
+      "satyr-v0.1-4b"
     ];
   };
 }
