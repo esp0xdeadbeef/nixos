@@ -195,6 +195,9 @@
 
         # zap plugins:
         ".ZAP/plugin"
+	
+        # lm studio (backends, models etc.):
+        ".lmstudio"
 
         {
           directory = ".gnupg";
