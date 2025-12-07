@@ -121,6 +121,8 @@
         # "Pictures"
         # "Videos"
         ".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
+        # persist kde connect (phone)
+        ".config/kdeconnect"
 
         "Documents"
 
