@@ -12,12 +12,12 @@
 
   # # Activation script to bindfs mount before system starts services
   # system.activationScripts.bindOllama = ''
-  #   mkdir -p /var/lib/private/ollama 
+  #   mkdir -p /var/lib/private/ollama
   #   mkdir -p /persist/var/lib/ollama /persist/var/lib/ollama/models /var/lib/private/ollama/.ollama/models
   #   "${pkgs.bindfs}/bin/bindfs" /persist/var/lib/ollama /var/lib/private/ollama
   #   "${pkgs.bindfs}/bin/bindfs" /persist/var/lib/ollama/models /var/lib/private/ollama/.ollama/models
 
-  # ''; 
+  # '';
 
   # # Configure the Ollama systemd service
   # systemd.services.ollama = {
@@ -37,7 +37,7 @@
       "qwen2.5-coder:1.5b-base"
       "nomic-embed-text"
       "deepseek-r1:1.5b"
-      "satyr-v0.1-4b"
+      "hf.co/PantheonUnbound/Satyr-V0.1-4B:Q4_K_M"
     ];
   };
 }
