@@ -344,7 +344,6 @@ bindsym $mod+bracketleft exec ${pkgs.pamixer}/bin/pamixer --decrease 10
 # disable numlock
 exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
 #exec --no-startup-id ${pkgs.dropbox}/bin/dropbox
-exec --no-startup-id ${pkgs.parcellite}/bin/parcellite
 exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
 #exec --no-startup-id ${pkgs.legcord}/bin/legcord
 

@@ -351,7 +351,6 @@
 
       # disable numlock
       exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
-      exec --no-startup-id ${pkgs.parcellite}/bin/parcellite
       exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
 
       # dropbox is whining about shit:

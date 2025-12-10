@@ -93,7 +93,7 @@
 
     # --- Language runtime dependencies ---
     nodejs
-    python3Full
+    #python3Full
     ruby
     sqlite
 

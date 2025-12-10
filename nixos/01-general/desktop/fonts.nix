@@ -15,7 +15,7 @@
       nerd-fonts.hack
       terminus_font
       noto-fonts
-      noto-fonts-emoji
+      noto-fonts-color-emoji
       dejavu_fonts
       liberation_ttf
     ];

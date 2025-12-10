@@ -11,6 +11,12 @@
   
   boot.lanzaboote = {
     enable = true;
+    autoGenerateKeys.enable = true;
+
     pkiBundle = "/persist/var/lib/sbctl";
+
+  #pkiBundle = {
+  #  externalPath = "/persist/var/lib/sbctl";
+  #};
   };
 }

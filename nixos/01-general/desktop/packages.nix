@@ -78,7 +78,6 @@
     gron
     mokutil
     man
-    glxinfo
     #dex
     pciutils
     autotiling
@@ -112,7 +111,6 @@
     spice
     spice-gtk
     spice-protocol
-    win-virtio
     win-spice
     python3
     libusb1

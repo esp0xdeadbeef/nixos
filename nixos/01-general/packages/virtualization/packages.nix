@@ -11,7 +11,7 @@
     spice
     spice-gtk
     spice-protocol
-    win-virtio
+    virtio-win
     win-spice
     qemu
     # kind creates and manages local Kubernetes clusters using Docker container 'nodes'
