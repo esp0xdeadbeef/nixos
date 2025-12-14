@@ -78,9 +78,61 @@
   };
 
   #################################
+  # VLAN 2 -> BRIDGE
+  #################################
+  systemd.network.netdevs."10-ens21-vlan2" = {
+    netdevConfig = {
+      Name = "ens21.2";
+      Kind = "vlan";
+    };
+    vlanConfig.Id = 1338;
+  };
+
+  systemd.network.netdevs."20-br-lan2" = {
+    netdevConfig = {
+      Name = "br-lan2";
+      Kind = "bridge";
+    };
+  };
+
+  systemd.network.networks."20-br-lan2" = {
+    matchConfig.Name = "br-lan2";
+    linkConfig.RequiredForOnline = "no";
+    networkConfig = {
+      ConfigureWithoutCarrier = true;
+      DHCP = "no";
+      IPv6AcceptRA = false;
+      LinkLocalAddressing = "no";
+    };
+  };
+
+  systemd.network.networks."30-ens21" = {
+    matchConfig.Name = "ens21";
+    networkConfig = {
+      DHCP = "no";
+      IPv6AcceptRA = false;
+      LinkLocalAddressing = "no";
+      VLAN = [ "ens21.2" ];
+    };
+  };
+
+  systemd.network.networks."40-ens21.2" = {
+    matchConfig.Name = "ens21.2";
+    networkConfig = {
+      Bridge = "br-lan2";
+      DHCP = "no";
+      IPv6AcceptRA = false;
+      LinkLocalAddressing = "no";
+    };
+  };
+
+
+
+  #################################
   # DISABLE RA (HOST)
   #################################
   boot.kernel.sysctl = {
+    "net.ipv4.ip_forward" = 1;
     "net.ipv6.conf.all.accept_ra" = 0;
     "net.ipv6.conf.default.accept_ra" = 0;
   };
@@ -93,6 +145,7 @@
     privateNetwork = true;
 
     extraVeths.wan.hostBridge = "br-wan6";
+    extraVeths.eth1.hostBridge = "br-lan2";
 
     allowedDevices = [
       { node = "/dev/ppp"; modifier = "rw"; }
@@ -130,6 +183,137 @@
         bind.dnsutils
       ];
 
+
+networking = {
+  firewall = {
+    enable = true;
+    
+    # Allows the entire interface through the firewall.
+    trustedInterfaces = [
+      "eth1"
+    ];
+
+    # Allows individual ports through the firewall.
+    interfaces = {
+      eth1 = {
+        allowedUDPPorts = [
+          # DNS
+          53
+          # DHCP
+          67
+          # You may want to allow more ports such as ipv6 and other services here.
+        ];
+      };
+    };
+  };
+};
+      networking.nat = {
+    enable = true;
+
+    # Traffic enters from ppp0
+    internalInterfaces = [ "eth1" ];
+    externalInterface = "ppp0";
+
+
+  };
+boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
+
+environment.etc."NetworkManager/system-connections/lan-eth1.nmconnection" = {
+  mode = "0600";
+  text = ''
+[connection]
+id=lan-eth1
+type=ethernet
+interface-name=eth1
+autoconnect=true
+
+[ipv4]
+method=manual
+addresses=192.168.2.1/24
+dns=192.168.2.1
+
+[ipv6]
+method=disabled
+'';
+};
+
+environment.etc."kea/kea-dhcp4.conf" = {
+  mode = "0644";
+  text = ''
+{
+  "Dhcp4": {
+    "interfaces-config": { "interfaces": [ "eth1" ] },
+    "lease-database": {
+      "type": "memfile",
+      "persist": true,
+      "name": "/var/lib/kea/dhcp4.leases"
+    },
+    "subnet4": [
+      {
+        "id": 1,
+        "subnet": "192.168.2.0/24",
+        "pools": [ { "pool": "192.168.2.100 - 192.168.2.200" } ],
+        "option-data": [
+          { "name": "routers", "data": "192.168.2.1" },
+          { "name": "domain-name-servers", "data": "1.1.1.1, 8.8.8.8" }
+        ]
+      }
+    ]
+  }
+}
+'';
+};
+
+systemd.services.kea-dhcp4 = {
+  description = "Kea DHCPv4 Server";
+  wantedBy = [ "multi-user.target" ];
+
+  after = [
+    "NetworkManager.service"
+    "NetworkManager-wait-online.service"
+  ];
+
+  requires = [
+    "NetworkManager.service"
+    "NetworkManager-wait-online.service"
+  ];
+
+  serviceConfig = {
+          ExecStart = pkgs.writeShellScript "kea-dhcp4-execstart" ''
+            set -euo pipefail
+            set -x
+            mkdir -p /var/run/kea || true
+            ${pkgs.kea}/bin/kea-dhcp4 -c /etc/kea/kea-dhcp4.conf
+          '';
+ExecStartPost = pkgs.writeShellScript "kea-dhcp4-postcheck" ''
+            set -euo pipefail
+            LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 | tail -n 40)"
+
+            if ! echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "listening on interface"; then
+              echo "kea-dhcp4 not listening on any interface"
+              exit 1
+            fi
+
+            sleep 3
+            LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 -n 40)"
+            if echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "DHCPSRV_OPEN_SOCKET_FAIL"; then
+              echo "kea-dhcp4 failed to open sockets"
+              exit 1
+            fi
+
+          '';
+    Restart = "always";
+    RestartSec = 2;
+RuntimeDirectory = "kea";
+          RuntimeDirectoryMode = "0755";
+
+  };
+};
+
+
+
+
+
       #################################
       # DNS (NM-OWNED)
       #################################
@@ -138,6 +322,8 @@
 
       systemd.tmpfiles.rules = [
         "L+ /etc/resolv.conf - - - - /run/NetworkManager/resolv.conf"
+      "d /run/kea 0777 root root -"
+      "d /var/lib/kea 0777 root root -"
       ];
 
       networking.useDHCP = lib.mkForce false;
