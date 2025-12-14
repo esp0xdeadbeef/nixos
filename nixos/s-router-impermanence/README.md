@@ -1,4 +1,22 @@
 
+# Importaint note, if you want to test this config, and have a vm with opnsense:
+
+
+Go to Interfaces -> [WAN] -> uncheck Enable Interface, save and save. 
+
+To undo (go back to the opnsense config):
+
+Go to Interfaces -> [WAN] -> check Enable Interface, save and save. 
+
+# Container restarting:
+
+```bash
+sudo nixos-container stop pppoe-test
+sudo nixos-container start pppoe-test ; nixos-container root-login pppoe-test
+
+```
+
+
 # Before setting up
 
 1. use the gnome iso (vim installed by default)

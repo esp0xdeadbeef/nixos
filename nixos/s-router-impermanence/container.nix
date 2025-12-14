@@ -108,19 +108,22 @@
       "CAP_NET_RAW"
     ];
 
+    #################################
+    # CONTAINER SYSTEM
+    #################################
     config = { pkgs, lib, ... }: {
 
       system.stateVersion = "24.11";
 
-      #################################
-      # BASE
-      #################################
       services.dbus.enable = true;
 
+      #################################
+      # PACKAGES
+      #################################
       environment.systemPackages = with pkgs; [
         networkmanager
         ppp
-        kea
+        odhcp6c
         iproute2
         tcpdump
         curl
@@ -128,7 +131,7 @@
       ];
 
       #################################
-      # DNS
+      # DNS (NM-OWNED)
       #################################
       environment.etc."resolv.conf".enable = false;
       services.resolved.enable = false;
@@ -141,14 +144,6 @@
       networking.useHostResolvConf = lib.mkForce false;
 
       #################################
-      # DISABLE RA (CONTAINER)
-      #################################
-      boot.kernel.sysctl = {
-        "net.ipv6.conf.all.accept_ra" = 0;
-        "net.ipv6.conf.default.accept_ra" = 0;
-      };
-
-      #################################
       # NETWORKMANAGER (IPv4 ONLY)
       #################################
       networking.useNetworkd = false;
@@ -159,7 +154,7 @@
       };
 
       #################################
-      # PPPoE PROFILE (IPv6 OFF)
+      # PPPoE PROFILE (IPv6 DISABLED)
       #################################
       environment.etc."NetworkManager/system-connections/isp-pppoe.nmconnection" = {
         mode = "0600";
@@ -187,50 +182,31 @@ method=disabled
       };
 
       #################################
-      # KEA DHCPv6 CLIENT CONFIG
+      # DHCPv6 CLIENT (IA_NA + IA_PD /48)
       #################################
-      environment.etc."kea/kea-dhcp6.conf".text = ''
-{
-  "Dhcp6": {
-    "interfaces-config": {
-      "interfaces": [ "ppp0" ]
-    },
-
-    "lease-database": {
-      "type": "memfile",
-      "persist": true,
-      "name": "/var/lib/kea/dhcp6.leases"
-    },
-
-    "preferred-lifetime": 7200,
-    "valid-lifetime": 14400,
-
-    "dhcp-ddns": {
-      "enable-updates": false
-    },
-
-    "pd-pools": [
-      {
-        "prefix": "::",
-        "prefix-len": 48,
-        "delegated-len": 48
-      }
-    ]
-  }
-}
-      '';
-
-      #################################
-      # KEA DHCPv6 CLIENT SERVICE
-      #################################
-      systemd.services.kea-dhcp6 = {
-        description = "Kea DHCPv6 client (IA_NA + IA_PD /48) on ppp0";
+      systemd.services.odhcp6c = {
+        description = "DHCPv6 client (IA_NA + IA_PD) on ppp0";
         wantedBy = [ "multi-user.target" ];
-        after = [ "network-online.target" ];
-        wants = [ "network-online.target" ];
+
+        after = [
+          "NetworkManager.service"
+          "NetworkManager-wait-online.service"
+        ];
+
+        requires = [
+          "NetworkManager.service"
+          "NetworkManager-wait-online.service"
+        ];
 
         serviceConfig = {
-          ExecStart = "${pkgs.kea}/bin/kea-dhcp6 -c /etc/kea/kea-dhcp6.conf";
+          ExecStart = ''
+            ${pkgs.odhcp6c}/sbin/odhcp6c \
+              -f \
+              -d \
+              -s /bin/true \
+              -P 48 \
+              ppp0
+          '';
           Restart = "always";
           RestartSec = 5;
           CapabilityBoundingSet = [ "CAP_NET_ADMIN" "CAP_NET_RAW" ];
