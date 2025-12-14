@@ -85,7 +85,7 @@
       Name = "ens21.2";
       Kind = "vlan";
     };
-    vlanConfig.Id = 1338;
+    vlanConfig.Id = 2;
   };
 
   systemd.network.netdevs."20-br-lan2" = {
@@ -229,8 +229,8 @@ autoconnect=true
 
 [ipv4]
 method=manual
-addresses=192.168.2.1/24
-dns=192.168.2.1
+addresses=192.168.1.1/24
+dns=192.168.1.1
 
 [ipv6]
 method=disabled
@@ -251,10 +251,10 @@ environment.etc."kea/kea-dhcp4.conf" = {
     "subnet4": [
       {
         "id": 1,
-        "subnet": "192.168.2.0/24",
-        "pools": [ { "pool": "192.168.2.100 - 192.168.2.200" } ],
+        "subnet": "192.168.1.0/24",
+        "pools": [ { "pool": "192.168.1.100 - 192.168.1.200" } ],
         "option-data": [
-          { "name": "routers", "data": "192.168.2.1" },
+          { "name": "routers", "data": "192.168.1.1" },
           { "name": "domain-name-servers", "data": "1.1.1.1, 8.8.8.8" }
         ]
       }
