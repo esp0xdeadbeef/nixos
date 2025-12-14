@@ -85,7 +85,7 @@
     #./containers/start_containers.nix
     ../01-general/network/nmcli.nix
     ../01-general/packages/1-general/tooling.nix
-    ./containers/pppoe-v2.nix
+    #./containers/pppoe-v2.nix
     #./containers/lan.nix
 
     ../01-general/desktop/shell-env.nix
@@ -103,6 +103,72 @@
     #./containers/lan-v2.nix
   ];
 
+
+
+#programs.pppd.enable = true;
+
+
+  networking.useNetworkd = false;
+
+  networking.networkmanager.enable = true;
+
+  /*
+    IMPORTANT:
+    - ens19 MUST stay managed
+    - ens19 MUST NOT get an IP
+    - ens19 is ONLY a VLAN parent
+  */
+
+  networking.networkmanager.ensureProfiles.profiles = {
+
+    # ---- Parent interface: NO IP, NO AUTOCONNECT ----
+    "ens19-parent-only" = {
+      connection = {
+        id = "ens19-parent-only";
+        type = "ethernet";
+        interface-name = "ens19";
+        autoconnect = false;
+      };
+      ipv4.method = "disabled";
+      ipv6.method = "ignore";
+    };
+
+    # ---- VLAN 6 on WAN ----
+    "wan-vlan6" = {
+      connection = {
+        id = "wan-vlan6";
+        type = "vlan";
+        interface-name = "ens19.6";
+        autoconnect = true;
+      };
+      vlan = {
+        id = 6;
+        parent = "ens19";
+      };
+      ipv4.method = "disabled";
+      ipv6.method = "ignore";
+    };
+
+    # ---- PPPoE over VLAN 6 ----
+    "pppoe-wan" = {
+      connection = {
+        id = "pppoe-wan";
+        type = "pppoe";
+        autoconnect = true;
+      };
+      pppoe = {
+        parent = "ens19.6";
+        username = "anything";
+      };
+      ppp = {
+        password = "anything";
+      };
+      ipv4.method = "auto";
+      ipv6.method = "auto";
+    };
+  };
+
+
   sops.defaultSopsFile = ../../secrets/s-router-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
@@ -116,6 +182,7 @@
   programs.neovim.defaultEditor = true;
 
   environment.systemPackages = with pkgs; [
+    ppp
     sops
     age
   ];
