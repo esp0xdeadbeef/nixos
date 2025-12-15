@@ -72,6 +72,8 @@
       ../01-general/virtualization-as-host/lxc.nix
       ../01-general/virtualization-as-host/podman.nix
     */
+    ../01-general/system/garbage-collection.nix
+    ../01-general/time/timezone.nix
 
     ./hardware/bootloader.nix
     ./hardware/boot-package.nix
