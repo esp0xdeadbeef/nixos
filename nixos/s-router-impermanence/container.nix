@@ -42,9 +42,9 @@ in
   };
 
   boot.kernel.sysctl = {
-    "net.ipv4.ip_forward" = 1;
-    "net.ipv6.conf.all.accept_ra" = 0;
-    "net.ipv6.conf.default.accept_ra" = 0;
+    #"net.ipv4.ip_forward" = 1;
+    #"net.ipv6.conf.all.accept_ra" = 0;
+    #"net.ipv6.conf.default.accept_ra" = 0;
   };
   #boot.kernel.sysctl = {
   #  "net.ipv4.ip_forward" = 1;
@@ -221,6 +221,7 @@ in
         services.dbus.enable = true;
 
         environment.systemPackages = with pkgs; [
+          dnsutils
           radvd
           dhcpcd
           networkmanager
@@ -232,7 +233,7 @@ in
 
         systemd.tmpfiles.rules = [
           #"L+ /etc/resolv.conf - - - - /run/NetworkManager/resolv.conf"
-          "L+ /etc/resolv.conf - - - - /etc/ppp/resolv.conf"
+          #"L+ /etc/resolv.conf - - - - /etc/ppp/resolv.conf"
           "d /run/kea 0777 root root -"
           "d /var/lib/kea 0777 root root -"
           "d /etc/ppp/peers/ 0777 root root -"
@@ -393,11 +394,31 @@ in
         };
 
         environment.etc."radvd.conf".text = ''
-          interface lan2 { AdvSendAdvert on; };
-          interface lan3 { AdvSendAdvert on; };
-          interface lan10 { AdvSendAdvert on; };
-          interface lan1000 { AdvSendAdvert on; };
-          interface lan1010 { AdvSendAdvert on; };
+interface lan2 {
+  AdvSendAdvert on;
+  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+};
+
+interface lan3 {
+  AdvSendAdvert on;
+  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+};
+
+interface lan10 {
+  AdvSendAdvert on;
+  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+};
+
+interface lan1000 {
+  AdvSendAdvert on;
+  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+};
+
+interface lan1010 {
+  AdvSendAdvert on;
+  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+};
+
         '';
 
         systemd.services.kea-dhcp4 = {
@@ -478,29 +499,16 @@ in
           };
         };
         environment.etc."dhcpcd.conf".text = ''
-          duid
-          persistent
-          noipv6rs
-          noipv4
+duid
+persistent
+noipv6rs
+noipv4
+ipv6only
 
-          interface ppp0
-            iaid 1
-            ia_pd 1
+interface ppp0
+  iaid 1
+  ia_pd 1 lan2/0/64 lan3/1/64 lan10/2/64 lan1000/3/64 lan1010/4/64
 
-          interface lan2
-            ia_pd 1/64
-
-          interface lan3
-            ia_pd 1/64
-
-          interface lan10
-            ia_pd 1/64
-
-          interface lan1000
-            ia_pd 1/64
-
-          interface lan1010
-            ia_pd 1/64
         '';
 
         environment.etc."ppp/pap-secrets" = {
