@@ -52,12 +52,6 @@
     # neededForBoot = true;
   };
 
-  fileSystems."/games" = {
-    device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
-    fsType = "btrfs";
-    options = [ "subvol=games" ];
-  };
-
   fileSystems."/home/deadbeef" = {
     device = "/dev/disk/by-uuid/b671ba87-8ef2-41be-af36-eb8904bbd5ee";
     fsType = "btrfs";
