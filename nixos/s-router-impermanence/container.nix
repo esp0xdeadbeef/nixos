@@ -216,6 +216,79 @@ in
       { pkgs, lib, ... }:
       {
 
+        networking.nftables = {
+          enable = true;
+          ruleset = ''
+            table inet filter {
+
+
+            chain input {
+            type filter hook input priority 0;
+            policy drop;
+
+
+            # Loopback
+            iif lo accept
+
+
+            # Established / related
+            ct state established,related accept
+
+
+            # --- ICMP ---
+            ip protocol icmp accept
+            ip6 nexthdr icmpv6 accept
+
+
+            # --- DHCPv6 client (ISP) ---
+            iifname "ppp0" udp sport 547 udp dport 546 accept
+
+
+            # --- EXPLICIT DNS BLOCK ON WAN (LOG + DROP, VALID) ---
+            iifname "ppp0" udp dport 53 log prefix "DROP_DNS_UDP_WAN: "
+            iifname "ppp0" udp dport 53 drop
+
+
+            iifname "ppp0" tcp dport 53 log prefix "DROP_DNS_TCP_WAN: "
+            iifname "ppp0" tcp dport 53 drop
+
+
+            # --- BLOCK ALL OTHER UDP FROM WAN ---
+            iifname "ppp0" meta l4proto udp log prefix "DROP_UDP_WAN: "
+            iifname "ppp0" meta l4proto udp drop
+
+
+            # --- BLOCK ALL OTHER TCP FROM WAN ---
+            iifname "ppp0" meta l4proto tcp log prefix "DROP_TCP_WAN: "
+            iifname "ppp0" meta l4proto tcp drop
+            }
+
+
+            chain forward {
+            type filter hook forward priority 0;
+            policy drop;
+
+
+            ct state established,related accept
+
+
+            # LAN → WAN
+            iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010" } oifname "ppp0" accept
+
+
+            # WAN → LAN denied
+            iifname "ppp0" log prefix "DROP_FWD_PPP0: "
+            iifname "ppp0" drop
+            }
+
+
+            chain output {
+            type filter hook output priority 0;
+            policy accept;
+            }
+            }
+          '';
+        };
         system.stateVersion = "25.11";
 
         services.dbus.enable = true;
@@ -394,30 +467,30 @@ in
         };
 
         environment.etc."radvd.conf".text = ''
-interface lan2 {
-  AdvSendAdvert on;
-  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-};
+          interface lan2 {
+            AdvSendAdvert on;
+            prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+          };
 
-interface lan3 {
-  AdvSendAdvert on;
-  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-};
+          interface lan3 {
+            AdvSendAdvert on;
+            prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+          };
 
-interface lan10 {
-  AdvSendAdvert on;
-  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-};
+          interface lan10 {
+            AdvSendAdvert on;
+            prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+          };
 
-interface lan1000 {
-  AdvSendAdvert on;
-  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-};
+          interface lan1000 {
+            AdvSendAdvert on;
+            prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+          };
 
-interface lan1010 {
-  AdvSendAdvert on;
-  prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-};
+          interface lan1010 {
+            AdvSendAdvert on;
+            prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
+          };
 
         '';
 
@@ -427,6 +500,11 @@ interface lan1010 {
 
           after = [ "network-online.target" ];
           wants = [ "network-online.target" ];
+          path = [
+            pkgs.systemd
+            pkgs.kea
+            pkgs.gnugrep
+          ];
 
           serviceConfig = {
             ExecStart = pkgs.writeShellScript "kea-dhcp4-execstart" ''
@@ -437,23 +515,24 @@ interface lan1010 {
               mkdir -p /var/lib/kea || true
               chmod 0755 /run/kea
 
-              exec ${pkgs.kea}/bin/kea-dhcp4 -c /etc/kea/kea-dhcp4.conf
+              exec kea-dhcp4 -c /etc/kea/kea-dhcp4.conf
             '';
 
             Restart = "always";
             RestartSec = 2;
             ExecStartPost = pkgs.writeShellScript "kea-dhcp4-postcheck" ''
               set -euo pipefail
-              LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 | tail -n 40)"
+              set -x
+              LOG=$(journalctl -u kea-dhcp4 -b --since "$(systemctl show kea-dhcp4 -p InactiveEnterTimestamp --value)")
 
-              if ! echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "listening on interface"; then
+              if ! echo "$LOG" | grep -q "listening on interface"; then
                 echo "kea-dhcp4 not listening on any interface"
                 exit 1
               fi
 
               sleep 3
-              LOG="$(${pkgs.systemd}/bin/journalctl -u kea-dhcp4 -n 40)"
-              if echo "$LOG" | ${pkgs.gnugrep}/bin/grep -q "DHCPSRV_OPEN_SOCKET_FAIL"; then
+              LOG=$(journalctl -u kea-dhcp4 -b --since "$(systemctl show kea-dhcp4 -p InactiveEnterTimestamp --value)")
+              if echo "$LOG" | grep -q "DHCPSRV_OPEN_SOCKET_FAIL"; then
                 echo "kea-dhcp4 failed to open sockets"
                 exit 1
               fi
@@ -499,15 +578,15 @@ interface lan1010 {
           };
         };
         environment.etc."dhcpcd.conf".text = ''
-duid
-persistent
-noipv6rs
-noipv4
-ipv6only
+          duid
+          persistent
+          noipv6rs
+          noipv4
+          ipv6only
 
-interface ppp0
-  iaid 1
-  ia_pd 1 lan2/0/64 lan3/1/64 lan10/2/64 lan1000/3/64 lan1010/4/64
+          interface ppp0
+            iaid 1
+            ia_pd 1 lan2/0/64 lan3/1/64 lan10/2/64 lan1000/3/64 lan1010/4/64
 
         '';
 
