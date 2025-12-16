@@ -292,6 +292,10 @@ in
         system.stateVersion = "25.11";
 
         services.dbus.enable = true;
+        programs.neovim = {
+          enable = true;
+          defaultEditor = true;
+        };
 
         environment.systemPackages = with pkgs; [
           dnsutils
@@ -664,13 +668,13 @@ in
               ];
             };
 
-            key = [
-              {
-                name = "kea-ddns-key";
-                algorithm = "hmac-sha256";
-                secret = "%{env:KEA_TSIG_SECRET}";
-              }
-            ];
+            #key = [
+            #  {
+            #    name = "kea-ddns-key";
+            #    algorithm = "hmac-sha256";
+            #    secret = "%{env:KEA_TSIG_SECRET}";
+            #  }
+            #];
           };
         };
 
