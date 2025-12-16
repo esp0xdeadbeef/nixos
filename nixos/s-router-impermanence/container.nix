@@ -398,53 +398,13 @@ in
           ];
         };
 
+        ############################
+        # Kea DHCP-DDNS (FIXED)
+        ############################
         services.kea.dhcp-ddns = {
           enable = true;
 
           settings = {
-<<<<<<< HEAD
-            ip-address = "127.0.0.1";
-            port = 53001;
-
-            tsig-keys = [
-              {
-                name = "kea-ddns-key";
-                algorithm = "hmac-sha256";
-                #secret = builtins.readFile "/var/lib/kea/tsig.key";
-                digest-bits = 256;
-                secret = "%{env:KEA_TSIG_SECRET}";
-              }
-            ];
-
-            forward-ddns = {
-              ddns-domains = [
-                {
-                  name = "lan.";
-                  key-name = "kea-ddns-key";
-                  dns-servers = [
-                    {
-                      ip-address = "127.0.0.1";
-                      port = 53;
-                    }
-                  ];
-                }
-              ];
-            };
-
-            reverse-ddns = {
-              ddns-domains = [
-                {
-                  name = "168.192.in-addr.arpa.";
-                  key-name = "kea-ddns-key";
-                  dns-servers = [
-                    {
-                      ip-address = "127.0.0.1";
-                      port = 53;
-                    }
-                  ];
-                }
-              ];
-=======
             DhcpDdns = {
               ip-address = "127.0.0.1";
               port = 53001;
@@ -453,7 +413,7 @@ in
                 {
                   name = "kea-ddns-key";
                   algorithm = "hmac-sha256";
-                  #secret = builtins.readFile "/var/lib/kea/tsig.key";
+                  digest-bits = 256;
                   secret = "%{env:KEA_TSIG_SECRET}";
                 }
               ];
@@ -487,7 +447,6 @@ in
                   }
                 ];
               };
->>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
             };
           };
         };
@@ -519,11 +478,7 @@ in
                   "pools": [ { "pool": "192.168.1.100 - 192.168.1.200" } ],
                   "option-data": [
                     { "name": "routers", "data": "192.168.1.1" },
-<<<<<<< HEAD
                     { "name": "domain-name-servers", "data": "192.168.1.1, 1.1.1.1, 8.8.8.8" }
-=======
-                    { "name": "domain-name-servers", "data": "192.168.1.1" }
->>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
                   ]
                 },
                 {
@@ -601,10 +556,6 @@ in
             '';
           };
         };
-<<<<<<< HEAD
-=======
-        systemd.services.kea-dhcp-ddns.serviceConfig.EnvironmentFile = "/var/lib/kea/tsig.env";
->>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
 
         systemd.services.radvd = {
           wantedBy = [ "multi-user.target" ];
@@ -665,7 +616,7 @@ in
             '';
 
             Restart = "always";
-            RestartSec = 2;
+            RestartSec = 20;
             ExecStartPost = pkgs.writeShellScript "kea-dhcp4-postcheck" ''
               set -euo pipefail
               set -x
@@ -687,29 +638,6 @@ in
 
         };
 
-<<<<<<< HEAD
-        services.unbound.settings = {
-          server = {
-            interface = [
-              "127.0.0.1"
-              "0.0.0.0"
-              "::1"
-              "::0"
-            ];
-
-            access-control = [
-              "127.0.0.1 allow"
-              "192.168.0.0/16 allow"
-              "10.0.0.0/8 allow"
-              "172.16.0.0/12 allow"
-              "fd00::/8 allow"
-            ];
-
-            local-zone = [
-              "lan. transparent"
-              "168.192.in-addr.arpa. transparent"
-            ];
-=======
         services.unbound = {
           enable = true;
 
@@ -725,29 +653,31 @@ in
               access-control = [
                 "127.0.0.1 allow"
                 "192.168.0.0/16 allow"
+                "10.0.0.0/8 allow"
+                "172.16.0.0/12 allow"
                 "fd00::/8 allow"
               ];
 
-              # ✅ CORRECT
               local-zone = [
                 "lan. transparent"
                 "168.192.in-addr.arpa. transparent"
               ];
             };
->>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
 
             key = [
               {
                 name = "kea-ddns-key";
                 algorithm = "hmac-sha256";
-<<<<<<< HEAD
-=======
-                #secret = builtins.readFile "/var/lib/kea/tsig.key";
->>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
                 secret = "%{env:KEA_TSIG_SECRET}";
               }
             ];
           };
+        };
+
+        systemd.services.unbound = {
+          after = [ "kea-tsig-init.service" ];
+          wants = [ "kea-tsig-init.service" ];
+          serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
         };
 
         systemd.services.pppoe-pap = {
@@ -835,18 +765,11 @@ in
 
           '';
         };
-<<<<<<< HEAD
-        systemd.services.unbound.serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
 
         systemd.services.kea-dhcp-ddns.serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
-        systemd.services.unbound.after = [ "kea-tsig-init.service" ];
-        systemd.services.unbound.wants = [ "kea-tsig-init.service" ];
 
         systemd.services.kea-dhcp-ddns.after = [ "kea-tsig-init.service" ];
         systemd.services.kea-dhcp-ddns.wants = [ "kea-tsig-init.service" ];
-=======
-        systemd.services.unbound.serviceConfig.EnvironmentFile = "/var/lib/kea/tsig.env";
->>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
 
         environment.etc."NetworkManager/system-connections/isp-pppoe.nmconnection" = {
           mode = "0600";
