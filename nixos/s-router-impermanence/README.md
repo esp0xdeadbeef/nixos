@@ -1,4 +1,14 @@
 
+# Todo:
+
+1. segment the pppoe from the network, so my old opnsense config can live besides this config
+
+2. fix dns (unbound) issues, I want a network that is able to resolve dns by using the `<hostname>.<postfix>` or even `hostname`
+
+3. Firewall rules (snat / nat rules) defined in sops which should not be leaked:
+
+* SSH / VPN persistence in network / simular things
+
 # Importaint note, if you want to test this config, and have a vm with opnsense:
 
 
