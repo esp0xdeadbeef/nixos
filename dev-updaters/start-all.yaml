@@ -5,8 +5,8 @@ windows:
     panes:
       - shell_command: |
           while :; do ./rsync-update-switch.sh s-lxc-test ; done
-      - shell_command: |
-          while :; do ./rsync-update-switch.sh s-lxc-router ; done
+      #- shell_command: |
+      #    while :; do ./rsync-update-switch.sh s-lxc-router ; done
     #   - shell_command: |
     #       while :; do ./rsync-update-switch.sh s-router-vpn-1 ; done
       - shell_command: |
