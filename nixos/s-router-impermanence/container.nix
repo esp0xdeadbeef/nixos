@@ -402,6 +402,7 @@ in
           enable = true;
 
           settings = {
+<<<<<<< HEAD
             ip-address = "127.0.0.1";
             port = 53001;
 
@@ -443,6 +444,50 @@ in
                   ];
                 }
               ];
+=======
+            DhcpDdns = {
+              ip-address = "127.0.0.1";
+              port = 53001;
+
+              tsig-keys = [
+                {
+                  name = "kea-ddns-key";
+                  algorithm = "hmac-sha256";
+                  #secret = builtins.readFile "/var/lib/kea/tsig.key";
+                  secret = "%{env:KEA_TSIG_SECRET}";
+                }
+              ];
+
+              forward-ddns = {
+                ddns-domains = [
+                  {
+                    name = "lan.";
+                    key-name = "kea-ddns-key";
+                    dns-servers = [
+                      {
+                        ip-address = "127.0.0.1";
+                        port = 53;
+                      }
+                    ];
+                  }
+                ];
+              };
+
+              reverse-ddns = {
+                ddns-domains = [
+                  {
+                    name = "168.192.in-addr.arpa.";
+                    key-name = "kea-ddns-key";
+                    dns-servers = [
+                      {
+                        ip-address = "127.0.0.1";
+                        port = 53;
+                      }
+                    ];
+                  }
+                ];
+              };
+>>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
             };
           };
         };
@@ -474,7 +519,11 @@ in
                   "pools": [ { "pool": "192.168.1.100 - 192.168.1.200" } ],
                   "option-data": [
                     { "name": "routers", "data": "192.168.1.1" },
+<<<<<<< HEAD
                     { "name": "domain-name-servers", "data": "192.168.1.1, 1.1.1.1, 8.8.8.8" }
+=======
+                    { "name": "domain-name-servers", "data": "192.168.1.1" }
+>>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
                   ]
                 },
                 {
@@ -552,6 +601,10 @@ in
             '';
           };
         };
+<<<<<<< HEAD
+=======
+        systemd.services.kea-dhcp-ddns.serviceConfig.EnvironmentFile = "/var/lib/kea/tsig.env";
+>>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
 
         systemd.services.radvd = {
           wantedBy = [ "multi-user.target" ];
@@ -634,6 +687,7 @@ in
 
         };
 
+<<<<<<< HEAD
         services.unbound.settings = {
           server = {
             interface = [
@@ -655,11 +709,41 @@ in
               "lan. transparent"
               "168.192.in-addr.arpa. transparent"
             ];
+=======
+        services.unbound = {
+          enable = true;
+
+          settings = {
+            server = {
+              interface = [
+                "127.0.0.1"
+                "0.0.0.0"
+                "::1"
+                "::0"
+              ];
+
+              access-control = [
+                "127.0.0.1 allow"
+                "192.168.0.0/16 allow"
+                "fd00::/8 allow"
+              ];
+
+              # ✅ CORRECT
+              local-zone = [
+                "lan. transparent"
+                "168.192.in-addr.arpa. transparent"
+              ];
+            };
+>>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
 
             key = [
               {
                 name = "kea-ddns-key";
                 algorithm = "hmac-sha256";
+<<<<<<< HEAD
+=======
+                #secret = builtins.readFile "/var/lib/kea/tsig.key";
+>>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
                 secret = "%{env:KEA_TSIG_SECRET}";
               }
             ];
@@ -751,6 +835,7 @@ in
 
           '';
         };
+<<<<<<< HEAD
         systemd.services.unbound.serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
 
         systemd.services.kea-dhcp-ddns.serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
@@ -759,6 +844,9 @@ in
 
         systemd.services.kea-dhcp-ddns.after = [ "kea-tsig-init.service" ];
         systemd.services.kea-dhcp-ddns.wants = [ "kea-tsig-init.service" ];
+=======
+        systemd.services.unbound.serviceConfig.EnvironmentFile = "/var/lib/kea/tsig.env";
+>>>>>>> 3f63b3912d8914c63b9f5d3f34ee6be132e4028e
 
         environment.etc."NetworkManager/system-connections/isp-pppoe.nmconnection" = {
           mode = "0600";
