@@ -162,6 +162,7 @@
 
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/libvirt/qemu" # libvirt qemu settings
+        ".config/freerdp/server" # remmina ssl certs
         ".config/discord"
         ".config/spotify"
         ".config/autorandr" # autorandr profile

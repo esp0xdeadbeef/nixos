@@ -153,6 +153,9 @@
         ".config/obsidian" # Obsidian vault
 
         ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
+        
+        ".config/freerdp/server" # remmina ssl certs
+
         ".cache/remmina" # ffs, just remember shit remmina!
         # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk/remmina/config.nix)
 
