@@ -104,7 +104,8 @@
 
     #./containers/lan-v2.nix
 
-    ./container.nix
+    ./pppoe-container.nix
+    #./isp-to-fake-isp.nix
   ];
 
   sops.defaultSopsFile = ../../secrets/s-router-impermanence-root.yaml;
