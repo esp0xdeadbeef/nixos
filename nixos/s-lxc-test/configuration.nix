@@ -71,9 +71,16 @@
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
     ../01-general/system/autoupdate.nix
+    ../99-testing/autologin-ssh-and-tty.nix
+    ../99-testing/autologin.nix
+    ../01-general/packages/1-general/tooling.nix
+    ../01-general/desktop/shell-env.nix
+
+    ./test-vlan1010.nix
+
     {
       environment.interactiveShellInit = ''
-        ZSH_THEME=random
+        ZSH_THEME=dieter
       '';
     }
     # (import "${inputs.home-manager}")

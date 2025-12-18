@@ -1,0 +1,29 @@
+{
+  lib,
+  pkgs,
+  ...
+}:
+{
+
+  networking.useNetworkd = true;
+  systemd.network.enable = true;
+  services.resolved.enable = false;
+
+  networking.networkmanager.unmanaged = [
+    "interface-name:eth1"
+  ];
+
+  systemd.network.networks."eth1" = {
+    matchConfig.Name = "eth1";
+
+    networkConfig = {
+      Address = "203.0.113.2/30";
+      Gateway = "203.0.113.1";
+      DNS = [
+        "1.1.1.1"
+        "8.8.8.8"
+      ];
+    };
+  };
+
+}
