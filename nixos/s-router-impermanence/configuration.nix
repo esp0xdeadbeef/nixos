@@ -104,7 +104,7 @@
 
     #./containers/lan-v2.nix
 
-    ./pppoe-container.nix
+    ./pppoe-container-network.nix
     #./isp-to-fake-isp.nix
   ];
 
