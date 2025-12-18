@@ -97,7 +97,6 @@
     inputs.sops-nix.nixosModules.sops
   ];
 
-
   sops.defaultSopsFile = ../../secrets/s-router-vpn-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
