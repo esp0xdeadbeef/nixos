@@ -1,0 +1,72 @@
+table inet filter {
+     chain input {
+            type filter hook input priority 0;
+            policy drop;
+
+            # Loopback
+            iif lo accept
+
+
+            # Established / related
+            ct state established,related accept
+
+
+            # --- ICMP ---
+            ip protocol icmp accept
+            ip6 nexthdr icmpv6 accept
+
+
+            # --- DHCPv6 client (ISP) ---
+            iifname "ppp0" udp sport 547 udp dport 546 accept
+
+
+
+
+            # --- EXPLICIT DNS BLOCK ON WAN (LOG + DROP, VALID) ---
+            iifname "ppp0" udp dport 53 log prefix "DROP_DNS_UDP_WAN: "
+            iifname "ppp0" udp dport 53 drop
+
+
+            iifname "ppp0" tcp dport 53 log prefix "DROP_DNS_TCP_WAN: "
+            iifname "ppp0" tcp dport 53 drop
+
+
+            # --- BLOCK ALL OTHER UDP FROM WAN ---
+            iifname "ppp0" meta l4proto udp log prefix "DROP_UDP_WAN: "
+            iifname "ppp0" meta l4proto udp drop
+
+
+            # --- BLOCK ALL OTHER TCP FROM WAN ---
+            iifname "ppp0" meta l4proto tcp log prefix "DROP_TCP_WAN: "
+            iifname "ppp0" meta l4proto tcp drop
+      }
+
+
+chain forward {
+  type filter hook forward priority 0;
+  policy drop;
+
+  ct state established,related accept
+
+  # OPNsense → WAN
+  iifname "lan1010" oifname "ppp0" accept
+
+  # LAN → WAN (all LANs)
+  iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010"} oifname "ppp0" accept
+
+  # >>> THIS IS THE FIX <<<
+  # WAN → LAN ICMP (traceroute, PMTU, errors)
+  iifname "ppp0" oifname "lan1010" ip protocol icmp accept
+
+  # WAN → LAN denied
+  iifname "ppp0" log prefix "DROP_FWD_PPP0: "
+  iifname "ppp0" drop
+}
+
+
+      chain output {
+            type filter hook output priority 0;
+            policy accept;
+      }
+}
+

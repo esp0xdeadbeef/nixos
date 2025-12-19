@@ -15,10 +15,9 @@
 
   systemd.network.networks."eth1" = {
     matchConfig.Name = "eth1";
-
     networkConfig = {
-      Address = "203.0.113.2/30";
-      Gateway = "203.0.113.1";
+      Address = "10.255.255.2/30";
+      Gateway = "10.255.255.1";
       DNS = [
         "1.1.1.1"
         "8.8.8.8"

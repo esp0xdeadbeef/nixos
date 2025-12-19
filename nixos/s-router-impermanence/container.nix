@@ -3,86 +3,7 @@
 
   networking.nftables = {
     enable = true;
-    ruleset = ''
-      table inet filter {
-
-
-      chain input {
-      type filter hook input priority 0;
-      policy drop;
-
-
-      # Loopback
-      iif lo accept
-
-
-      # Established / related
-      ct state established,related accept
-
-
-      # --- ICMP ---
-      ip protocol icmp accept
-      ip6 nexthdr icmpv6 accept
-
-
-      # --- DHCPv6 client (ISP) ---
-      iifname "ppp0" udp sport 547 udp dport 546 accept
-
-
-
-
-      # --- EXPLICIT DNS BLOCK ON WAN (LOG + DROP, VALID) ---
-      iifname "ppp0" udp dport 53 log prefix "DROP_DNS_UDP_WAN: "
-      iifname "ppp0" udp dport 53 drop
-
-
-      iifname "ppp0" tcp dport 53 log prefix "DROP_DNS_TCP_WAN: "
-      iifname "ppp0" tcp dport 53 drop
-
-
-      # --- BLOCK ALL OTHER UDP FROM WAN ---
-      iifname "ppp0" meta l4proto udp log prefix "DROP_UDP_WAN: "
-      iifname "ppp0" meta l4proto udp drop
-
-
-      # --- BLOCK ALL OTHER TCP FROM WAN ---
-      iifname "ppp0" meta l4proto tcp log prefix "DROP_TCP_WAN: "
-      iifname "ppp0" meta l4proto tcp drop
-      }
-
-
-      chain forward {
-      type filter hook forward priority 0;
-      policy drop;
-
-
-      ct state established,related accept
-
-
-      # OPNsense → WAN
-      iifname "lan1010" oifname "ppp0" accept
-
-
-      # WAN → OPNsense (stateful return)
-      iifname "ppp0" oifname "lan1010" ct state established,related accept
-
-
-      # LAN → WAN
-      iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010"} oifname "ppp0" accept
-
-
-      # WAN → LAN denied
-      iifname "ppp0" log prefix "DROP_FWD_PPP0: "
-      iifname "ppp0" drop
-      }
-
-
-      chain output {
-      type filter hook output priority 0;
-      policy accept;
-      }
-      }
-    '';
+    ruleset = builtins.readFile ./nftables.nft;
   };
   system.stateVersion = "25.11";
 
@@ -100,6 +21,7 @@
     ppp
     iproute2
     tcpdump
+    tmux
     kea
   ];
 
@@ -112,6 +34,33 @@
   ];
 
   systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
+
+  #systemd.network.networks."10-ppp0" = {
+  #matchConfig.Name = "ppp0";
+
+  #networkConfig = {
+  #  DHCP = "ipv6";
+  #  IPv6AcceptRA = true;
+  #};
+
+  #dhcpV6Config = {
+  #  # optional hint; set to what ISP supports (often 56 or 60)
+  #  PrefixDelegationHint = "::/56";
+  #};
+  #};
+  #systemd.network.networks."20-lan2" = {
+  #  matchConfig.Name = "lan2";
+  #  networkConfig = {
+  #    ConfigureWithoutCarrier = true;
+  #    IPv6SendRA = true;
+  #    DHCPPrefixDelegation = true;
+  #  };
+  #  dhcpPrefixDelegationConfig = {
+  #    UplinkInterface = "ppp0";
+  #    SubnetId = "00";
+  #    Announce = true;
+  #  };
+  #};
 
   networking.useHostResolvConf = lib.mkForce false;
 
@@ -150,6 +99,12 @@
         prefixLength = 24;
       }
     ];
+    lan1010.ipv4.addresses = [
+      {
+        address = "10.255.255.1";
+        prefixLength = 30;
+      }
+    ];
   };
 
   boot.kernel.sysctl = {
@@ -179,21 +134,6 @@
     "net.bridge.bridge-nf-call-arptables" = 0;
   };
 
-  systemd.network.networks."30-lan1010" = {
-    matchConfig.Name = "lan1010";
-
-    networkConfig = {
-      Address = "203.0.113.1/30";
-    };
-
-    routes = [
-      {
-        Destination = "203.0.113.0/30";
-        Scope = "link";
-      }
-    ];
-  };
-
   networking.nat = {
     enable = true;
     externalInterface = "ppp0";
@@ -202,7 +142,7 @@
       "lan3"
       "lan10"
       "lan1000"
-      #"lan1010"
+      "lan1010"
     ];
   };
 
@@ -286,7 +226,7 @@
             "pools": [ { "pool": "192.168.1.100 - 192.168.1.200" } ],
             "option-data": [
               { "name": "routers", "data": "192.168.1.1" },
-              { "name": "domain-name-servers", "data": "192.168.1.1, 1.1.1.1, 8.8.8.8" }
+              { "name": "domain-name-servers", "data": "1.1.1.1, 8.8.8.8, 192.168.1.1" }
             ]
           },
           {
@@ -403,6 +343,8 @@
       pkgs.systemd
       pkgs.kea
       pkgs.gnugrep
+      pkgs.iproute2
+      pkgs.gawk
     ];
 
     serviceConfig = {
@@ -418,23 +360,21 @@
       '';
 
       Restart = "always";
-      RestartSec = 20;
+      RestartSec = 10;
       ExecStartPost = pkgs.writeShellScript "kea-dhcp4-postcheck" ''
+        #!/usr/bin/env bash
         set -euo pipefail
-        set -x
-        LOG=$(journalctl -u kea-dhcp4 -b --since "$(systemctl show kea-dhcp4 -p InactiveEnterTimestamp --value)")
 
-        if ! echo "$LOG" | grep -q "listening on interface"; then
-          echo "kea-dhcp4 not listening on any interface"
-          exit 1
-        fi
+        sleep 1
+        REQUIRED_IFACES=(lan2 lan3 lan10 lan1000)
 
-        sleep 3
-        LOG=$(journalctl -u kea-dhcp4 -b --since "$(systemctl show kea-dhcp4 -p InactiveEnterTimestamp --value)")
-        if echo "$LOG" | grep -q "DHCPSRV_OPEN_SOCKET_FAIL"; then
-          echo "kea-dhcp4 failed to open sockets"
-          exit 1
-        fi
+        for i in ''${REQUIRED_IFACES[@]}; do
+          ip="$(ip -4 addr show dev "$i" | awk '/inet / {print $2}' | cut -d/ -f1)"
+          if ! ss -lunp | grep -q "$ip:67"; then
+            echo "kea-dhcp4 not listening on $i ($ip)"
+            exit 1
+          fi
+        done
       '';
     };
 
