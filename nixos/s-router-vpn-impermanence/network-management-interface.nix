@@ -7,7 +7,7 @@
 
 {
   networking = {
-    interfaces.ens20 = {
+    interfaces.ens18 = {
       ipv4.addresses = [
         {
           address = "192.168.1.3";
