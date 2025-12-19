@@ -77,6 +77,7 @@
     ../01-general/desktop/shell-env.nix
 
     ./test-vlan1010.nix
+./network-management-interface.nix
 
     {
       environment.interactiveShellInit = ''
