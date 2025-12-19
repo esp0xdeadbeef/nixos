@@ -187,6 +187,7 @@ require("lazy").setup({
 			vim.opt.showtabline = 2
 		end,
 	},
+{ "nfnty/vim-nftables", ft = "nftables" },
 	{ "neovim/nvim-lspconfig" },
 	{ "hrsh7th/nvim-cmp" },
 	{ "hrsh7th/cmp-nvim-lsp" },
