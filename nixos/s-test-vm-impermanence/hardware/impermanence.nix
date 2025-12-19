@@ -16,14 +16,17 @@
   boot.initrd.systemd.enable = true;
 
   boot.initrd.systemd.initrdBin = with pkgs; [
-    util-linux btrfs-progs coreutils findutils
+    util-linux
+    btrfs-progs
+    coreutils
+    findutils
   ];
 
   boot.initrd.systemd.services.rotateBtrfsRoot = {
     description = "Rotate /root Btrfs subvolume and prune >1 day snapshots";
-    wantedBy    = [ "initrd.target" ];
-    after       = [ "systemd-cryptsetup@crypted.service" ];
-    before      = [ "sysroot.mount" ];
+    wantedBy = [ "initrd.target" ];
+    after = [ "systemd-cryptsetup@crypted.service" ];
+    before = [ "sysroot.mount" ];
     unitConfig.DefaultDependencies = false;
     serviceConfig.Type = "oneshot";
 
@@ -99,6 +102,7 @@
     ];
     users.deadbeef = {
       directories = [
+        "github"
         "Downloads"
         "Music"
         "Pictures"
