@@ -39,18 +39,31 @@ in
 
   networking.networkmanager.enable = false;
 
-  systemd.network.networks."10-mgmt" = {
-    matchConfig.Name = management_interface;
-    networkConfig.DHCP = "yes";
-    routingPolicyRules = [
-      {
-        Priority = 100;
-        From = "192.168.1.0/24"; # or just your mgmt IP /32
-        Table = "main";
-      }
-    ];
+  #systemd.network.networks."10-mgmt" = {
+  #  matchConfig.Name = management_interface;
+  #  networkConfig.DHCP = "yes";
+  #  routingPolicyRules = [
+  #    {
+  #      Priority = 100;
+  #      From = "192.168.1.0/24"; # or just your mgmt IP /32
+  #      Table = "main";
+  #    }
+  #  ];
+  #};
+  networking = {
+    interfaces.ens18 = {
+      ipv4.addresses = [
+        {
+          address = "192.168.1.3";
+          prefixLength = 24;
+        }
+      ];
+    };
+    defaultGateway = {
+      address = "192.168.1.1";
+      interface = "ens18";
+    };
   };
-
 
   networking.useNetworkd = true;
 
