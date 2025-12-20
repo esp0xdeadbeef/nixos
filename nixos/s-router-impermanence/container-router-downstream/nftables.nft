@@ -1,15 +1,8 @@
-
 table ip nat {
-  # example for portforwarding:
-  chain prerouting {
-    type nat hook prerouting priority dstnat; policy accept;
-    iifname "lan1010" tcp dport 5555 dnat to 192.168.1.196:5555
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+    oifname "lan1010" masquerade
   }
-
-  #chain postrouting {
-  #  type nat hook postrouting priority srcnat; policy accept;
-  #  oifname "lan1010" ip saddr 192.168.1.0/24 masquerade
-  #}
 }
 
 table ip6 nat {
@@ -33,6 +26,7 @@ table inet filter {
 
             iifname { "lan2", "lan3", "lan10", "lan1000" } fib daddr type local udp dport 53 accept
             iifname { "lan2", "lan3", "lan10", "lan1000" } fib daddr type local tcp dport 53 accept
+
 
             # Established / related
             ct state established,related accept
@@ -77,6 +71,10 @@ table inet filter {
 
             # LAN → WAN (all LANs)
             iifname { "lan2", "lan3", "lan10", "lan1000"} oifname "lan1010" accept
+            iifname { "lan2", "lan3", "lan10", "lan1000" } oifname "lan1010" accept
+
+            
+            iifname "lan1010" ct state established,related accept
 
             # WAN → LAN denied
             iifname "lan1010" log prefix "DROP_FWD_PPP0: "

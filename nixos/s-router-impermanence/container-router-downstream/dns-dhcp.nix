@@ -154,34 +154,6 @@
     };
   };
 
-  systemd.services.radvd = {
-    wantedBy = [ "multi-user.target" ];
-    after = [ "dhcpcd-ipv6.service" ];
-    serviceConfig.ExecStart = "${pkgs.radvd}/bin/radvd -n -d 5 -C /etc/radvd.conf";
-  };
-
-  environment.etc."radvd.conf".text = ''
-    interface lan2 {
-      AdvSendAdvert on;
-      prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-    };
-
-    interface lan3 {
-      AdvSendAdvert on;
-      prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-    };
-
-    interface lan10 {
-      AdvSendAdvert on;
-      prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-    };
-
-    interface lan1000 {
-      AdvSendAdvert on;
-      prefix ::/64 { AdvOnLink on; AdvAutonomous on; };
-    };
-  '';
-
   systemd.services.kea-dhcp4 = {
     description = "Kea DHCPv4 Server";
     wantedBy = [ "multi-user.target" ];
