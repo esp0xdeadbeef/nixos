@@ -21,6 +21,13 @@ table inet filter {
     type filter hook input priority 0;
     policy drop;
 
+    iifname "ppp0" udp sport 547 udp dport 546 accept
+    iifname "ppp0" udp sport 546 udp dport 547 accept
+
+    ip6 daddr ff02::1:2 udp dport 547 accept
+
+
+
     ip protocol icmp accept
     ip6 nexthdr icmpv6 accept
 
@@ -34,8 +41,9 @@ table inet filter {
     policy drop;
 
     ct state established,related accept
-    ip iifname @lan_if oifname @wan_if accept
-    ip iifname @wan_if oifname @lan_if accept
+    iifname @lan_if oifname @wan_if accept
+    iifname @wan_if oifname @lan_if accept
+
   }
 
 

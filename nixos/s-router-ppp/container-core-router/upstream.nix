@@ -6,13 +6,13 @@
     networkConfig = {
       ConfigureWithoutCarrier = true;
 
-      IPv6SendRA = true; # <-- DIT MOET AAN
+      IPv6SendRA = true;
       IPv6AcceptRA = false;
-      IPv6Forwarding = true; # transit = router
+      IPv6Forwarding = true;
     };
 
     ipv6Prefixes = [
-      { Prefix = "::/64"; } # <-- automatisch uit PD
+      { Prefix = "::/64"; }
     ];
 
     addresses = [

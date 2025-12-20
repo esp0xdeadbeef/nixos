@@ -11,7 +11,7 @@
     serviceConfig = {
       ExecStart = pkgs.writeShellScript "ppp-connect" ''
         set -euo pipefail
-        exec pppd call pppoe-wan nodetach
+        exec pppd call pppoe-wan nodetach debug
       '';
       Restart = "always";
       RestartSec = 2;
@@ -25,7 +25,6 @@
       "${builtins.readFile /run/secrets/pppoe-username}" * "${builtins.readFile /run/secrets/pppoe-password}" *
     '';
   };
-
   environment.etc."ppp/peers/pppoe-wan" = {
     mode = "0600";
     text = ''
@@ -49,34 +48,39 @@
 
       mtu 1492
       mru 1492
+
     '';
   };
 
-  ############################################################
-  # systemd-networkd: PD from ISP on ppp0 and delegate to lan1010
-  ############################################################
+  systemd.services.dhcpcd-ipv6 = {
+    description = "DHCPv6-PD client";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
 
-  # WAN: request IPv6 + Prefix Delegation from ISP
-  #  systemd.network.networks."10-ppp0" = {
-  #matchConfig.Name = "ppp0";
-  #networkConfig = {
-  #  DHCP = "ipv6";
-  #IPv6AcceptRA = true; # allow ISP RA if they use it
-  #};
-  #};
-  systemd.network.networks."10-ppp0" = {
-    matchConfig.Name = "ppp0";
-
-    networkConfig = {
-      DHCP = "ipv6"; # <-- DIT WAS DE MISSENDE SCHAKEL
-      IPv6AcceptRA = false; # geen RA nodig
-      IPv6Forwarding = true; # nodig voor PD doorgeven
-    };
-
-    dhcpV6Config = {
-      PrefixDelegationHint = "::/56"; # of /60, afhankelijk van ISP
-      UseDelegatedPrefix = true;
+    serviceConfig = {
+      ExecStart = "${pkgs.dhcpcd}/bin/dhcpcd -6 -w -d -f /etc/dhcpcd.conf ppp0";
+      Restart = "always";
+      RestartSec = 2;
     };
   };
+  environment.etc."dhcpcd.conf".text = ''
+    duid
+    persistent
+    noipv6rs
+    noipv4
+    ipv6only
+
+    #interface ppp0
+    #  iaid 1
+    #  ia_na 1
+    #  ia_pd 1 lan1010/0/64
+    interface ppp0
+      ipv6rs        # stuur Router Solicitations (voor RA)
+      ia_na 1       # vraag een IPv6-adres (Identity Assoc. NA)
+      ia_pd 1/::/56 lan1010/0/64
+
+
+  '';
 
 }
