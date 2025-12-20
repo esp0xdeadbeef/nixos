@@ -8,7 +8,7 @@ table ip nat {
 table ip6 nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    iifname "lan1010" tcp dport 5555 dnat ip6 to [2a10:3781:59de:0:3eb2:ea7c:cf5c:a1f6]:5555
+    #iifname "lan1010" tcp dport 5555 dnat ip6 to [2xxx:xxxx:xxxx:xxxx...]:5555
   }
 }
 

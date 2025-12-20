@@ -30,7 +30,7 @@
 
             "pd-pools": [
               {
-                "prefix": "2001:db8::",
+                "prefix": "2xxx:xxxx:xxxx::",
                 "prefix-len": 56,
                 "delegated-len": 64
               }
