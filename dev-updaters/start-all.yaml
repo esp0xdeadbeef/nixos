@@ -1,19 +1,21 @@
-session_name: rsync update switch
+session_name: rsync update reboot
 windows:
   - window_name: main
     layout: main-vertical
     panes:
       - shell_command: |
-          while :; do ./rsync-update-switch.sh s-lxc-test ; done
+          while :; do ./rsync-update-reboot.sh s-lxc-test ; done
       #- shell_command: |
-      #    while :; do ./rsync-update-switch.sh s-lxc-router ; done
+      #    while :; do ./rsync-update-reboot.sh s-lxc-router ; done
     #   - shell_command: |
-    #       while :; do ./rsync-update-switch.sh s-router-vpn-1 ; done
+    #       while :; do ./rsync-update-reboot.sh s-router-vpn-1 ; done
       - shell_command: |
-          while :; do ./rsync-update-switch.sh s-test-vm-impermanence ; done
+          while :; do ./rsync-update-reboot.sh s-test-vm-impermanence ; done
       #- shell_command: |
-      #    while :; do ./rsync-update-switch.sh s-test-vm ; done
+      #    while :; do ./rsync-update-reboot.sh s-test-vm ; done
       - shell_command: |
-          while :; do ./rsync-update-switch.sh s-router-vpn-impermanence ; done
+          while :; do ./rsync-update-reboot.sh s-router-vpn-impermanence ; done
       - shell_command: |
-          while :; do ./rsync-update-switch.sh s-router-impermanence ; done
+          while :; do ./rsync-update-reboot.sh s-router-impermanence ; done
+      - shell_command: |
+          while :; do ./rsync-update-reboot.sh s-router-ppp ; done

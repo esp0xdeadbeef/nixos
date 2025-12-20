@@ -9,15 +9,19 @@ fi
 HOST="$1"
 
 echo "[*] Checking uptime on $HOST..."
-ssh "deadbeef@$HOST" uptime || { echo "❌ SSH to $HOST failed"; sleep 2; exit 1; }
+ssh "deadbeef@$HOST" uptime || {
+  echo "❌ SSH to $HOST failed"
+  sleep 2
+  exit 1
+}
 
 echo "[*] Running rsync to $HOST..."
-if timeout 5 rsync -va --exclude='.git' /home/deadbeef/github/nixos "deadbeef@$HOST:~/github/" | grep '\.nix$\|flake.lock' | grep -q "nixos/$HOST/\|flake.lock"; then
+if timeout 5 rsync -va --exclude='.git' /home/deadbeef/github/nixos "deadbeef@$HOST:~/github/" | grep '\.nix$\|flake.lock' | grep -q "nixos/$HOST/\|flake.lock$\|/$HOST/.*\.nft$"; then
   echo "[*] Changes detected, rebuilding and switching (no reboot) $HOST..."
   if [[ "$HOST" == "s-router-vpn-1" ]]; then
-    ( ssh "deadbeef@$HOST" 'sudo nmcli connection down tun0' ) || true
+    (ssh "deadbeef@$HOST" 'sudo nmcli connection down tun0') || true
   fi
-  ssh "deadbeef@$HOST" 'sudo nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname) --no-write-lock-file' 
+  ssh "deadbeef@$HOST" 'sudo nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname) --no-write-lock-file'
 else
   echo "[*] No changes, sleeping"
   sleep 2
