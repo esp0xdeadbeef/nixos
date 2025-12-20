@@ -9,11 +9,7 @@ let
   lanIf = "ens21";
   wanIf = "ens19";
 
-  natVlans =
-    builtins.genList (i: i + 2) 2
-    ++ builtins.genList (i: i + 10) 1
-    ++ builtins.genList (i: i + 1000) 1
-    ++ builtins.genList (i: i + 1010) 1;
+  natVlans = [ 1010 ]; # builtins.genList (i: i + 1010) 1; # 1010
   wanVlan = 6;
 in
 {
@@ -64,7 +60,23 @@ in
           Kind = "bridge";
         };
       }
-    );
+    )
+    // {
+      "10-${wanIf}-vlan${toString wanVlan}" = {
+        netdevConfig = {
+          Name = "${wanIf}.${toString wanVlan}";
+          Kind = "vlan";
+        };
+        vlanConfig.Id = wanVlan;
+      };
+
+      "20-br-wan${toString wanVlan}" = {
+        netdevConfig = {
+          Name = "br-wan${toString wanVlan}";
+          Kind = "bridge";
+        };
+      };
+    };
 
   systemd.network.networks = {
     "20-${lanIf}" = {
@@ -77,6 +89,20 @@ in
       };
     };
 
+    "40-${wanIf}" = {
+      matchConfig.Name = wanIf;
+      networkConfig = {
+        DHCP = "no";
+        IPv6AcceptRA = false;
+        LinkLocalAddressing = "no";
+        VLAN = [ "${wanIf}.${toString wanVlan}" ];
+      };
+    };
+
+    "50-${wanIf}.${toString wanVlan}" = {
+      matchConfig.Name = "${wanIf}.${toString wanVlan}";
+      networkConfig.Bridge = "br-wan${toString wanVlan}";
+    };
   }
   // lib.genAttrs (map (v: "30-${lanIf}.${toString v}") natVlans) (
     name:
@@ -97,27 +123,61 @@ in
       matchConfig.Name = "br-vlan${toString v}";
       networkConfig.ConfigureWithoutCarrier = true;
     }
-  );
+  )
+  // {
+    "60-br-wan${toString wanVlan}" = {
+      matchConfig.Name = "br-wan${toString wanVlan}";
+      networkConfig.ConfigureWithoutCarrier = true;
+    };
+  };
 
   containers.downstream-router = {
     autoStart = true;
     privateNetwork = true;
 
-    extraVeths = lib.genAttrs (map (v: "lan${toString v}") natVlans) (
-      name:
-      let
-        v = lib.toInt (lib.removePrefix "lan" name);
-      in
+    extraVeths =
+      lib.genAttrs (map (v: "lan${toString v}") natVlans) (
+        name:
+        let
+          v = lib.toInt (lib.removePrefix "lan" name);
+        in
+        {
+          hostBridge = "br-vlan${toString v}";
+        }
+      )
+      // {
+        wan.hostBridge = "br-wan${toString wanVlan}";
+      };
+
+    allowedDevices = [
       {
-        hostBridge = "br-vlan${toString v}";
+        node = "/dev/ppp";
+        modifier = "rw";
       }
-    );
+    ];
+
+    bindMounts = {
+      "/dev/ppp" = {
+        hostPath = "/dev/ppp";
+        isReadOnly = false;
+      };
+
+      "/run/secrets/pppoe-username" = {
+        hostPath = config.sops.secrets.pppoe-username.path;
+        isReadOnly = true;
+      };
+
+      "/run/secrets/pppoe-password" = {
+        hostPath = config.sops.secrets.pppoe-password.path;
+        isReadOnly = true;
+      };
+    };
 
     additionalCapabilities = [
       "CAP_NET_ADMIN"
       "CAP_NET_RAW"
     ];
 
-    config = ./container-router-downstream/configuration.nix;
+    config = ./container-core-router/configuration.nix;
   };
 }

@@ -3,15 +3,11 @@
 
   imports = [
     ./dns-dhcp.nix
+    ./wan.nix
+    ./debugging-packages.nix
+    ./firewall.nix
   ];
-  networking.firewall.enable = false;
 
-  networking.nftables = {
-    enable = true;
-    ruleset = builtins.readFile ./nftables.nft;
-  };
-
-  # trying to fix dns issues
   services.resolved.enable = false;
 
   system.stateVersion = "25.11";
@@ -21,18 +17,6 @@
     enable = true;
     defaultEditor = true;
   };
-
-  environment.systemPackages = with pkgs; [
-    dnsutils
-    radvd
-    dhcpcd
-    networkmanager
-    ppp
-    iproute2
-    tcpdump
-    tmux
-    kea
-  ];
 
   systemd.tmpfiles.rules = [
     "d /run/kea 0777 root root -"
@@ -73,12 +57,6 @@
         prefixLength = 24;
       }
     ];
-    lan1010.ipv4.addresses = [
-      {
-        address = "10.255.255.1";
-        prefixLength = 30;
-      }
-    ];
   };
 
   boot.kernel.sysctl = {
@@ -100,7 +78,6 @@
     "net.ipv6.conf.lan3.accept_ra" = 2;
     "net.ipv6.conf.lan10.accept_ra" = 2;
     "net.ipv6.conf.lan1000.accept_ra" = 2;
-    "net.ipv6.conf.lan1010.accept_ra" = 2;
 
     # RA over bridges WILL NOT WORK without this
     "net.bridge.bridge-nf-call-ip6tables" = 0;
@@ -110,13 +87,12 @@
 
   networking.nat = {
     enable = true;
-    externalInterface = "ppp0";
+    externalInterface = "lan1010";
     internalInterfaces = [
       "lan2"
       "lan3"
       "lan10"
       "lan1000"
-      "lan1010"
     ];
   };
 
@@ -137,62 +113,5 @@
       ia_pd 1 lan2/0/64 lan3/1/64 lan10/2/64 lan1000/3/64 
 
   '';
-
-  environment.etc."ppp/pap-secrets" = {
-    mode = "0600";
-    text = ''
-      "${builtins.readFile /run/secrets/pppoe-username}" * "${builtins.readFile /run/secrets/pppoe-password}" *
-    '';
-  };
-  environment.etc."ppp/peers/pppoe-wan" = {
-    mode = "0600";
-    text = ''
-      plugin pppoe.so
-      nic-wan
-
-      user "${builtins.readFile /run/secrets/pppoe-username}"
-
-      # --- AUTH ---
-      noauth              # never require peer authentication
-      refuse-chap
-      refuse-mschap
-      refuse-mschap-v2
-      refuse-eap
-      # NOTE: no +pap
-
-      # --- ROUTING ---
-      defaultroute
-      persist
-
-      # --- IPv6 ---
-      +ipv6
-      ipv6cp-accept-local
-      ipv6cp-accept-remote
-
-      mtu 1492
-      mru 1492
-
-    '';
-  };
-
-  environment.etc."NetworkManager/system-connections/isp-pppoe.nmconnection" = {
-    mode = "0600";
-    text = ''
-      [connection]
-      id=pppoe-wan
-      type=pppoe
-      interface-name=wan
-
-      [pppoe]
-      username=${builtins.readFile /run/secrets/pppoe-username}
-      password=${builtins.readFile /run/secrets/pppoe-password}
-
-      [ipv4]
-      method=auto
-
-      [ipv6]
-      method=disabled
-    '';
-  };
 
 }

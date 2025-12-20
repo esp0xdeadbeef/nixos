@@ -82,17 +82,29 @@
     ./hardware/impermanence.nix
     ./hardware/lanzaboote.nix
     ./hardware/swap-and-tmpfs.nix
+    #./hardware/network-onlymgmt.nix
 
+    #./containers/start_containers.nix
+    #../01-general/network/nmcli.nix
     ../01-general/packages/1-general/tooling.nix
+    #./containers/lan.nix
 
     ../01-general/desktop/shell-env.nix
     ../01-general/system/autoupdate.nix
+    # it's a vm.. if you pwn the host you'll be able to login anyway.
     ../99-testing/autologin.nix
+    # ../02-window-manager-i3/environment.nix
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
-    ./pppoe-container-network.nix
+    #inputs.nixos-router.nixosModules
+    #inputs.nixos-router.nixosModules.default
+
+    #./containers/lan-v2.nix
+
+    ./container-edge-pppoe-transit.nix
+    #./isp-to-fake-isp.nix
   ];
 
   sops.defaultSopsFile = ../../secrets/s-router-impermanence-root.yaml;
@@ -163,7 +175,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-router-impermanence";
+  networking.hostName = "s-router-ppp";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
@@ -203,7 +215,7 @@
   boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
-    ZSH_THEME=example
+    ZSH_THEME=pygmalion
     alias vim=nvim
   '';
 
@@ -220,5 +232,5 @@
     }
   ];
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "24.11";
+  system.stateVersion = "25.11";
 }
