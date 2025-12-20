@@ -6,6 +6,11 @@ table inet filter {
             # Loopback
             iif lo accept
 
+#            iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010"} udp dport 53 accept
+            iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010" } fib daddr type local udp dport 53 accept
+
+            iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010" } fib daddr type local tcp dport 53 accept
+
 
             # Established / related
             ct state established,related accept

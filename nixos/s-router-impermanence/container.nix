@@ -1,10 +1,16 @@
 { pkgs, lib, ... }:
 {
 
+  networking.firewall.enable = false;
+
   networking.nftables = {
     enable = true;
     ruleset = builtins.readFile ./nftables.nft;
   };
+
+  # trying to fix dns issues
+  services.resolved.enable = false;
+
   system.stateVersion = "25.11";
 
   services.dbus.enable = true;
@@ -26,8 +32,6 @@
   ];
 
   systemd.tmpfiles.rules = [
-    #"L+ /etc/resolv.conf - - - - /run/NetworkManager/resolv.conf"
-    #"L+ /etc/resolv.conf - - - - /etc/ppp/resolv.conf"
     "d /run/kea 0777 root root -"
     "d /var/lib/kea 0777 root root -"
     "d /etc/ppp/peers/ 0777 root root -"
@@ -35,43 +39,10 @@
 
   systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
 
-  #systemd.network.networks."10-ppp0" = {
-  #matchConfig.Name = "ppp0";
-
-  #networkConfig = {
-  #  DHCP = "ipv6";
-  #  IPv6AcceptRA = true;
-  #};
-
-  #dhcpV6Config = {
-  #  # optional hint; set to what ISP supports (often 56 or 60)
-  #  PrefixDelegationHint = "::/56";
-  #};
-  #};
-  #systemd.network.networks."20-lan2" = {
-  #  matchConfig.Name = "lan2";
-  #  networkConfig = {
-  #    ConfigureWithoutCarrier = true;
-  #    IPv6SendRA = true;
-  #    DHCPPrefixDelegation = true;
-  #  };
-  #  dhcpPrefixDelegationConfig = {
-  #    UplinkInterface = "ppp0";
-  #    SubnetId = "00";
-  #    Announce = true;
-  #  };
-  #};
-
   networking.useHostResolvConf = lib.mkForce false;
 
   networking.useNetworkd = true;
 
-  #networking.networkmanager = {
-  #  enable = true;
-  #  dns = "default";
-  #};
-
-  #networking.networkmanager.enable = true;
   networking.useDHCP = false;
 
   networking.interfaces = {
@@ -146,55 +117,55 @@
     ];
   };
 
-  ############################
-  # Kea DHCP-DDNS (FIXED)
-  ############################
+  #systemd.services.kea-dhcp-ddns.serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
+
+  #systemd.services.kea-dhcp-ddns.after = [ "kea-tsig-init.service" ];
+  #systemd.services.kea-dhcp-ddns.wants = [ "kea-tsig-init.service" ];
+
   services.kea.dhcp-ddns = {
     enable = true;
 
     settings = {
-      DhcpDdns = {
-        ip-address = "127.0.0.1";
-        port = 53001;
+      ip-address = "127.0.0.1";
+      port = 53001;
 
-        tsig-keys = [
+      tsig-keys = [
+        {
+          name = "kea-ddns-key";
+          algorithm = "hmac-sha256";
+          digest-bits = 256;
+          secret = "%{env:KEA_TSIG_SECRET}";
+        }
+      ];
+
+      forward-ddns = {
+        ddns-domains = [
           {
-            name = "kea-ddns-key";
-            algorithm = "hmac-sha256";
-            digest-bits = 256;
-            secret = "%{env:KEA_TSIG_SECRET}";
+            name = "lan.";
+            key-name = "kea-ddns-key";
+            dns-servers = [
+              {
+                ip-address = "127.0.0.1";
+                port = 53;
+              }
+            ];
           }
         ];
+      };
 
-        forward-ddns = {
-          ddns-domains = [
-            {
-              name = "lan.";
-              key-name = "kea-ddns-key";
-              dns-servers = [
-                {
-                  ip-address = "127.0.0.1";
-                  port = 53;
-                }
-              ];
-            }
-          ];
-        };
-
-        reverse-ddns = {
-          ddns-domains = [
-            {
-              name = "168.192.in-addr.arpa.";
-              key-name = "kea-ddns-key";
-              dns-servers = [
-                {
-                  ip-address = "127.0.0.1";
-                  port = 53;
-                }
-              ];
-            }
-          ];
-        };
+      reverse-ddns = {
+        ddns-domains = [
+          {
+            name = "168.192.in-addr.arpa.";
+            key-name = "kea-ddns-key";
+            dns-servers = [
+              {
+                ip-address = "127.0.0.1";
+                port = 53;
+              }
+            ];
+          }
+        ];
       };
     };
   };
@@ -405,14 +376,6 @@
           "168.192.in-addr.arpa. transparent"
         ];
       };
-
-      #key = [
-      #  {
-      #    name = "kea-ddns-key";
-      #    algorithm = "hmac-sha256";
-      #    secret = "%{env:KEA_TSIG_SECRET}";
-      #  }
-      #];
     };
   };
 
@@ -507,11 +470,6 @@
 
     '';
   };
-
-  systemd.services.kea-dhcp-ddns.serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
-
-  systemd.services.kea-dhcp-ddns.after = [ "kea-tsig-init.service" ];
-  systemd.services.kea-dhcp-ddns.wants = [ "kea-tsig-init.service" ];
 
   environment.etc."NetworkManager/system-connections/isp-pppoe.nmconnection" = {
     mode = "0600";

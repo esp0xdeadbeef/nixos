@@ -75,9 +75,10 @@
     ../99-testing/autologin.nix
     ../01-general/packages/1-general/tooling.nix
     ../01-general/desktop/shell-env.nix
+    ./test-packages.nix
 
     ./test-vlan1010.nix
-./network-management-interface.nix
+    ./network-management-interface.nix
 
     {
       environment.interactiveShellInit = ''
