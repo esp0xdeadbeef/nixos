@@ -71,16 +71,10 @@
     noipv4
     ipv6only
 
-    #interface ppp0
-    #  iaid 1
-    #  ia_na 1
-    #  ia_pd 1 lan1010/0/64
     interface ppp0
-      ipv6rs        # stuur Router Solicitations (voor RA)
-      ia_na 1       # vraag een IPv6-adres (Identity Assoc. NA)
-      ia_pd 1/::/56 lan1010/0/64
-
-
+      ipv6rs
+      ia_na 1
+      ia_pd 1/::/56
   '';
 
 }

@@ -1,19 +1,20 @@
 { pkgs, lib, ... }:
 {
-  systemd.network.networks."20-lan1010" = {
+  systemd.network.networks."10-lan1010-uplink" = {
     matchConfig.Name = "lan1010";
 
     networkConfig = {
       ConfigureWithoutCarrier = true;
 
-      IPv6SendRA = true;
+      # IPv4 transit (keep this)
+      #Address = "10.255.255.1/30";
+      #Gateway = "10.255.255.1";
+
       IPv6AcceptRA = false;
       IPv6Forwarding = true;
-    };
 
-    ipv6Prefixes = [
-      { Prefix = "::/64"; }
-    ];
+      DHCP = "no";
+    };
 
     addresses = [
       { Address = "10.255.255.1/30"; }

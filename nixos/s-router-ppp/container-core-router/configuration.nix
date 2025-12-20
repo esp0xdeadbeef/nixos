@@ -6,6 +6,7 @@
     ./firewall.nix
     ./upstream.nix
     ./kernel.nix
+    ./kea-dhcp6.nix
   ];
 
   system.stateVersion = "25.11";

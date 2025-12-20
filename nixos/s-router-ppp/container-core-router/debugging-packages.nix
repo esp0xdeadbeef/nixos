@@ -7,6 +7,7 @@
   };
 
   environment.systemPackages = with pkgs; [
+    traceroute
     nmap
     dnsutils
     radvd

@@ -11,23 +11,17 @@
     matchConfig.Name = "lan1010";
 
     networkConfig = {
-      ConfigureWithoutCarrier = true;
-
-      # IPv4 transit
       Address = "10.255.255.2/30";
       Gateway = "10.255.255.1";
 
-      # IPv6 upstream behavior
       IPv6AcceptRA = true;
       IPv6Forwarding = true;
-
-      # IMPORTANT: this is what makes PD happen here
       DHCP = "ipv6";
     };
 
     dhcpV6Config = {
       UseDelegatedPrefix = true;
-      PrefixDelegationHint = "::/56"; # adjust if needed
+      PrefixDelegationHint = "::/56";
     };
   };
 

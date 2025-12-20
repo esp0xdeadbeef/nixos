@@ -2,6 +2,7 @@
 {
 
   environment.systemPackages = with pkgs; [
+    traceroute
     nmap
     dnsutils
     ppp
