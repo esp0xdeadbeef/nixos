@@ -1,16 +1,13 @@
 table inet filter {
-     chain input {
+      chain input {
             type filter hook input priority 0;
             policy drop;
 
             # Loopback
             iif lo accept
 
-#            iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010"} udp dport 53 accept
             iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010" } fib daddr type local udp dport 53 accept
-
             iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010" } fib daddr type local tcp dport 53 accept
-
 
             # Established / related
             ct state established,related accept
@@ -47,26 +44,26 @@ table inet filter {
       }
 
 
-chain forward {
-  type filter hook forward priority 0;
-  policy drop;
+      chain forward {
+            type filter hook forward priority 0;
+            policy drop;
 
-  ct state established,related accept
+            ct state established,related accept
 
-  # OPNsense → WAN
-  iifname "lan1010" oifname "ppp0" accept
+            # OPNsense → WAN
+            iifname "lan1010" oifname "ppp0" accept
 
-  # LAN → WAN (all LANs)
-  iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010"} oifname "ppp0" accept
+            # LAN → WAN (all LANs)
+            iifname { "lan2", "lan3", "lan10", "lan1000", "lan1010"} oifname "ppp0" accept
 
-  # >>> THIS IS THE FIX <<<
-  # WAN → LAN ICMP (traceroute, PMTU, errors)
-  iifname "ppp0" oifname "lan1010" ip protocol icmp accept
+            # >>> THIS IS THE FIX <<<
+            # WAN → LAN ICMP (traceroute, PMTU, errors)
+            iifname "ppp0" oifname "lan1010" ip protocol icmp accept
 
-  # WAN → LAN denied
-  iifname "ppp0" log prefix "DROP_FWD_PPP0: "
-  iifname "ppp0" drop
-}
+            # WAN → LAN denied
+            iifname "ppp0" log prefix "DROP_FWD_PPP0: "
+            iifname "ppp0" drop
+      }
 
 
       chain output {
