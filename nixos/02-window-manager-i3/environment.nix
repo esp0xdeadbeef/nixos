@@ -50,7 +50,7 @@
     };
   };
   services.displayManager.defaultSession = "none+i3";
-  services.xserver.displayManager.gdm.enable = true;
+  services.displayManager.gdm.enable = true;
   # programs.xwayland.enable = true;
 
   #environment.variables.GTK_THEME = "Adwaita:dark";

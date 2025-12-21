@@ -7,18 +7,19 @@
 }:
 let
   unstablePkgs = import inputs.nixpkgs-unstable {
-    system = pkgs.system;
+    system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
 in
 {
   home.packages =
-  let
-    stable = with pkgs; [
-      koodo-reader
-    ];
-    unstable = with unstablePkgs; [
-    ];
-  in
+    let
+      stable = with pkgs; [
+        koodo-reader
+      ];
+      unstable = with unstablePkgs; [
+      ];
+    in
     stable ++ unstable;
 }
+

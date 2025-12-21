@@ -10,7 +10,7 @@ args@{
 let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
-    system = pkgs.system;
+    system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
   stablePkgs = import inputs.nixpkgs-stable {
@@ -34,16 +34,14 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     # ../02-window-manager-i3/i3/packages.nix
     ../02-window-manager-i3/i3status-rust/packages.nix
 
-
     inputs.sops-nix.homeManagerModules.sops
   ];
 
-  
   sops = {
     defaultSopsFile = ../../secrets/l-werk-default-deadbeef.yaml;
 
@@ -101,7 +99,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
         rofi
         remmina
         ffuf
-        black 
+        black
         tmuxp
 
       ];

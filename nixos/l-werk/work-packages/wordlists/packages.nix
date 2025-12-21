@@ -9,7 +9,7 @@
 let
   # Use the same system as your current pkgs to avoid cross-system eval issues
   unstablePkgs = import inputs.nixpkgs-unstable {
-    system = pkgs.system;
+    system = pkgs.stdenv.hostPlatform.system;
   };
 
   # SecLists via the wordlists meta-package (as you did before), but from unstable
