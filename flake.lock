@@ -578,11 +578,11 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1766341661,
-        "narHash": "sha256-XH/RGeRURFV4YIdi8LvKKqewcEtLNVxFa3CsM9LxDUY=",
+        "lastModified": 1766358780,
+        "narHash": "sha256-GZdGdNKgpe4FKSpVlrNE+9tvLKKgpUh64tT4NkfXliM=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-router-vpn-gateway",
-        "rev": "7d6b2e03fcd844cb876fa4217d01025e6e854f13",
+        "rev": "e40fc8f93f89f3e973917073cde35aa88a8f62e4",
         "type": "github"
       },
       "original": {
@@ -849,11 +849,11 @@
         "systems": "systems_4"
       },
       "locked": {
-        "lastModified": 1766326623,
-        "narHash": "sha256-20uzo3X4mJBF+hfneJMdV/ycTm+4j6bpONaIQ6pq6Vc=",
+        "lastModified": 1766356779,
+        "narHash": "sha256-fSuy/nW19K9r9Uoa7NbhFkRxGskfj6BzVSHFUMqyeHM=",
         "owner": "nix-community",
         "repo": "nixvim",
-        "rev": "710ade017755c3b292fd218965f3d282f13a23d7",
+        "rev": "814894ba73f95a73ce2827567a1263994af085a9",
         "type": "github"
       },
       "original": {
