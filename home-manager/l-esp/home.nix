@@ -10,7 +10,8 @@ args@{
 let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = import inputs.nixpkgs-unstable {
-    system = pkgs.system;
+    system = pkgs.stdenv.hostPlatform.system;
+
     config.allowUnfree = true;
   };
   stablePkgs = import inputs.nixpkgs-stable {
@@ -49,12 +50,10 @@ in
     ../01-general/pentesting/packages.nix
     ../01-general/virt-manager-config/default.nix
 
-
     ../02-window-manager-i3/i3/packages.nix
     ../02-window-manager-i3/i3status-rust/packages.nix
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
-
 
     # zen browser:
     # inputs.zen-browser.homeModules.beta
@@ -73,7 +72,6 @@ in
     };
 
   };
-
 
   nixpkgs = {
     # You can add overlays here
