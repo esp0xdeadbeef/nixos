@@ -72,9 +72,8 @@
     ipv6only
 
     interface ppp0
-      ipv6rs
-      ia_na 1
-      ia_pd 1/::/56
+      iaid 1
+      ia_pd 1 lan1010/0/64
   '';
 
 }
