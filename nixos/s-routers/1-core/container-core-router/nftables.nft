@@ -1,0 +1,34 @@
+flush ruleset
+
+############################
+# FILTER (ALLOW EVERYTHING)
+############################
+table inet filter {
+
+  chain input {
+    type filter hook input priority 0;
+    policy accept;
+  }
+
+  chain forward {
+    type filter hook forward priority 0;
+    policy accept;
+  }
+
+  chain output {
+    type filter hook output priority 0;
+    policy accept;
+  }
+}
+
+############################
+# NAT (IPv4 ONLY)
+############################
+table ip nat {
+
+  chain postrouting {
+    type nat hook postrouting priority 100;
+    oifname "ppp0" masquerade
+  }
+}
+
