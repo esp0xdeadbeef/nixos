@@ -1,5 +1,6 @@
 Where 1-core is isp WAN this moment, edge is the polcy router, transport-fabric is my existing routers and switches, and client part doesn't exist yet.:
-```
+
+```mermaid
 flowchart TB
     %% ========================
     %% External upstreams
