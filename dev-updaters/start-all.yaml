@@ -1,21 +1,20 @@
 session_name: rsync update reboot
 windows:
-  - window_name: main
+  - window_name: testing
     layout: main-vertical
     panes:
       - shell_command: |
           while :; do ./rsync-update-reboot.sh s-lxc-test ; done
-      #- shell_command: |
-      #    while :; do ./rsync-update-reboot.sh s-lxc-router ; done
-    #   - shell_command: |
-    #       while :; do ./rsync-update-reboot.sh s-router-vpn-1 ; done
       - shell_command: |
           while :; do ./rsync-update-reboot.sh s-test-vm-impermanence ; done
-      #- shell_command: |
-      #    while :; do ./rsync-update-reboot.sh s-test-vm ; done
+  - window_name: routers
+    layout: main-vertical
+    panes:
       - shell_command: |
-          while :; do ./rsync-update-reboot.sh s-router-vpn-impermanence ; done
+          while :; do ./rsync-update-reboot.sh s-router-access; done
       - shell_command: |
-          while :; do ./rsync-update-reboot.sh s-router-impermanence ; done
+          while :; do ./rsync-update-reboot.sh s-router-vpn-egress ; done
       - shell_command: |
-          while :; do ./rsync-update-reboot.sh s-router-ppp ; done
+          while :; do ./rsync-update-reboot.sh s-router-edge; done
+      - shell_command: |
+          while :; do ./rsync-update-reboot.sh s-router-core; done

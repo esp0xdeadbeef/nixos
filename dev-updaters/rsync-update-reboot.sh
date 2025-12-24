@@ -6,27 +6,65 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
+sleep 1
+
 HOST="$1"
+USER="deadbeef"
+SSH="$USER@$HOST"
+SRC="$HOME/github/nixos/"
+DST="$SSH:~/github/nixos/"
 
 echo "[*] Checking uptime on $HOST..."
-ssh "deadbeef@$HOST" uptime || {
-  echo "❌ SSH to $HOST failed"
-  sleep 2
-  exit 1
-}
+ssh -o BatchMode=yes -o ConnectTimeout=5 "$SSH" uptime
 
-echo "[*] Running rsync to $HOST..."
-if timeout 5 rsync -va --exclude='.git' /home/deadbeef/github/nixos "deadbeef@$HOST:~/github/" | grep '\.nix$\|flake.lock' | grep -q "nixos/$HOST/\|flake.lock$\|/$HOST/.*\.nft$"; then
+echo "[*] Syncing repo to $HOST..."
+RSYNC_OUT=$(rsync -a --delete --itemize-changes --exclude='.git' "$SRC" "$DST")
 
-  echo "[*] Changes detected, rebuilding and rebooting $HOST..."
+# --- Host-specific path patterns ---
+HOST_REGEX=""
+case "$HOST" in
+  s-router-core)
+    HOST_REGEX='^.*nixos/s-routers/1-core/'
+    ;;
+  s-router-edge)
+    HOST_REGEX='^.*nixos/s-routers/2-edge/'
+    ;;
+  s-router-access)
+    HOST_REGEX='^.*nixos/s-routers/3-access/'
+    ;;
+  s-router-vpn-egress)
+    HOST_REGEX='^.*nixos/s-routers/z-vpn-egress/'
+    ;;
+  l-*)
+    HOST_REGEX="^.*nixos/$HOST/"
+    ;;
+  *)
+    echo "❌ Unknown host layout for $HOST"
+    exit 1
+    ;;
+esac
+
+# --- Shared paths affecting all hosts ---
+SHARED_REGEX='^.*(flake\.nix|flake\.lock|modules/|overlays/).*'
+
+# --- Relevant file types ---
+FILE_REGEX='\.nix$|\.nft$'
+
+if echo "$RSYNC_OUT" | awk '{print $2}' | grep -E "$FILE_REGEX" | grep -E "$HOST_REGEX|$SHARED_REGEX" >/dev/null; then
+  echo "[*] Relevant changes detected for $HOST"
+
   if [[ "$HOST" == "s-router-vpn-1" ]]; then
-    (ssh "deadbeef@$HOST" 'sudo nmcli connection down tun0') || true
+    echo "[*] Bringing down VPN"
+    ssh "$SSH" 'sudo nmcli connection down tun0' || true
   fi
-  ssh "deadbeef@$HOST" 'sudo nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) --no-write-lock-file' &&
-    ssh "deadbeef@$HOST" 'sudo reboot' &&
-    echo "[*] Rebooting $HOST..." &&
-    sleep 20
+
+  echo "[*] Rebuilding on $HOST..."
+  ssh "$SSH" \
+    'sudo nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) --no-write-lock-file'
+
+  echo "[*] Rebooting $HOST..."
+  ssh "$SSH" 'sudo reboot'
 else
-  echo "[*] No changes, sleeping"
-  sleep 2
+  echo "[*] No relevant changes for $HOST"
 fi
+

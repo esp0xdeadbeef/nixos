@@ -178,40 +178,51 @@
             ./nixos/s-test-vm-impermanence/configuration.nix
           ];
         };
-        # s-router-vpn-1 = nixpkgs.lib.nixosSystem {
-        #   specialArgs = { inherit inputs outputs; };
-        #   modules = [
-        #     # required for secure boot:
-        #     lanzaboote.nixosModules.lanzaboote
-        #     # > Our main nixos configuration file <
-        #     ./nixos/s-router-vpn-1/configuration.nix
-        #   ];
-        # };
-        s-router-impermanence = nixpkgs.lib.nixosSystem {
+        # router-core
+        #  - Terminates ISP (PPPoE, DHCPv6-PD)
+        #  - Receives large prefix (/48, /52, etc.)
+        #  - Provides routed transit
+        s-router-core = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
-            ./nixos/s-router-impermanence/configuration.nix
+            ./nixos/s-routers/1-core/configuration.nix
           ];
         };
-        s-router-ppp = nixpkgs.lib.nixosSystem {
+
+        # router-edge
+        #  - Aggregates routing
+        #  - Slices prefixes
+        #  - Decides allocation policy
+        s-router-edge = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
-            ./nixos/s-router-ppp/configuration.nix
+            ./nixos/s-routers/2-edge/configuration.nix
           ];
         };
-        s-router-vpn-impermanence = nixpkgs.lib.nixosSystem {
+
+        # router-access
+        #  - Receives one or more IPv6 prefixes from router-edge
+        #  - Does not perform upstream prefix delegation
+        #  - Advertises client-facing prefixes via RA (typically /64 for SLAAC)
+        #  - Hosts client VLANs
+        s-router-access = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            lanzaboote.nixosModules.lanzaboote
+            ./nixos/s-routers/3-access/configuration.nix
+          ];
+        };
+
+        #  - vlan -> vpn profile
+        s-router-vpn-egress = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
-            ./nixos/s-router-vpn-impermanence/configuration.nix
+            ./nixos/s-routers/z-vpn-egress/configuration.nix
           ];
         };
 
