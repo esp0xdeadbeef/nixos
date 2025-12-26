@@ -1,33 +1,32 @@
 
-# Router architecture overview
+# Router Architecture Overview
 
-This directory contains a **layered, fully declarative NixOS-based routing architecture** intended to replace traditional “do-everything” firewall appliances (e.g. OPNsense).
+This repository documents a **layered, deterministic, IPv6-first routing architecture** used in my environment.
 
-The design is based on **strict separation of concerns**:
+The goal is not abstraction for abstraction’s sake, but **explicit control**, **predictable failure modes**, and **clear responsibility boundaries** between components. The design explicitly accounts for real-world constraints (ISP/VPN limitations, single-address uplinks, NAT) while keeping the system understandable and debuggable.
 
-* each router has exactly **one responsibility**
-    
-* policy decisions are centralized
-    
-* translation (NAT) is constrained and explicit
-    
-* transport is dumb and replaceable
-    
-* IPv6 is first-class
-    
+* * *
 
-The goal is a system that is:
+## Core Principles
 
-* auditable (no GUI magic, no hidden state)
+* Each component has **one clearly defined responsibility**
     
-* evolvable (routers can be replaced independently)
+* Routing and policy decisions are **explicit and auditable**
     
-* safe by construction (no accidental WAN/VPN fallback, no DNS leaks)
+* **Policy lives in one place** (`router-edge`)
+    
+* NAT is treated as a **compatibility shim**, never as a design primitive
+    
+* Internal addressing remains stable regardless of upstream changes
+    
+* No implicit RA/DHCPv6 “magic” on transit links
     
 
 * * *
 
-## High-level topology (target state)
+## High-Level Topology
+
+> This is the target layering. Core routers terminate upstreams. `router-edge` is the only policy router. Fabric is dumb transport. Access serves clients.
 
 ```mermaid
 flowchart TB
@@ -35,29 +34,33 @@ flowchart TB
     %% External upstreams
     %% ========================
     ISP["ISP WAN<br/>(PPPoE, DHCPv6-PD)"]
-    VPNP["VPN Provider(s)<br/>(External ISPs)"]
+    VPNP["VPN Provider(s)<br/>(WireGuard/OpenVPN)<br/>Treat as external ISP(s)"]
 
     %% ========================
-    %% Core routers (termination only)
+    %% Core routers (upstream termination)
     %% ========================
     CW["router-core-wan<br/><small>
     - Terminates ISP<br/>
     - Owns public v4 + delegated v6<br/>
     - Default route → ISP<br/>
-    - NAT44 (egress only)<br/>
-    - Optional DNAT
+    - Upstream-constraint shim only (see NAT rules)<br/>
+    - No policy decisions
     </small>"]
 
     CVA["router-core-vpn-a<br/><small>
     - Terminates VPN tunnel A<br/>
+    - Owns provider-assigned IPs/prefixes<br/>
     - Default route → tunA<br/>
-    - NAT44 (if required)
+    - Upstream-constraint shim only (see NAT rules)<br/>
+    - No policy decisions
     </small>"]
 
     CVB["router-core-vpn-b<br/><small>
     - Terminates VPN tunnel B<br/>
+    - Owns provider-assigned IPs/prefixes<br/>
     - Default route → tunB<br/>
-    - NAT44 (if required)
+    - Upstream-constraint shim only (see NAT rules)<br/>
+    - No policy decisions
     </small>"]
 
     %% ========================
@@ -66,9 +69,10 @@ flowchart TB
     E["router-edge<br/><small>
     - ONLY policy router<br/>
     - Firewall & segmentation<br/>
-    - Classification (fwmarks)<br/>
-    - Policy routing<br/>
-    - Kill-switch semantics
+    - Classification (fwmarks/sets/VRFs as needed)<br/>
+    - Policy routing (WAN vs VPN upstreams)<br/>
+    - Kill-switch semantics<br/>
+    - Service selection (port-forward logic)
     </small>"]
 
     %% ========================
@@ -81,11 +85,11 @@ flowchart TB
     </small>"]
 
     %% ========================
-    %% Client router
+    %% Access layer
     %% ========================
     A["router-access<br/><small>
     - VLAN gateways<br/>
-    - RA / SLAAC (/64 per VLAN)<br/>
+    - RA/SLAAC (/64 per VLAN)<br/>
     - DHCPv4 (optional)
     </small>"]
 
@@ -101,9 +105,9 @@ flowchart TB
     %% ========================
     %% Explicit L3 transit links
     %% ========================
-    CW <-->|"L3 transit<br/>p2p /31 + /64"| E
-    CVA <-->|"L3 transit<br/>p2p /31 + /64"| E
-    CVB <-->|"L3 transit<br/>p2p /31 + /64"| E
+    CW <-->|"L3 transit<br/>p2p /31 + ULA /64 (or v6 /127)"| E
+    CVA <-->|"L3 transit<br/>p2p /31 + ULA /64 (or v6 /127)"| E
+    CVB <-->|"L3 transit<br/>p2p /31 + ULA /64 (or v6 /127)"| E
 
     %% ========================
     %% Internal forwarding
@@ -115,200 +119,210 @@ flowchart TB
 
 * * *
 
-## Design invariants (non-negotiable)
+## Addressing Model
 
-These rules are what make the architecture predictable and debuggable.
+### Internal addressing (stable)
 
-### Global
+A single ULA block is used for internal infrastructure and VLANs:
 
-* **Prefixes flow downstream** (core → edge → access)
+```
+fd42:dead:beef::/48
+```
+
+Example VLAN allocations (/64 per VLAN):
+
+| Segment | Prefix |
+| --- | --- |
+| Users | `fd42:dead:beef:1000::/64` |
+| Servers | `fd42:dead:beef:1100::/64` |
+| Lab | `fd42:dead:beef:1200::/64` |
+| Infra | `fd42:dead:beef:1300::/64` |
+
+### Inter-router transit links (core ↔ edge)
+
+Transit links are **explicit L3** with **static addressing**:
+
+* IPv6: either `ULA /64` **or** p2p `/127` (both valid; `/127` is cleaner for “p2p-only”)
     
-* **Decisions flow upstream** (access → edge only)
+* IPv4: p2p `/31` (preferred) or `/30` (if you want conventional tooling expectations)
     
-* **VPN providers are treated as external ISPs**
+
+**RA is disabled** and **DHCPv6 is disabled** on transit links.
+
+* * *
+
+## Policy vs NAT (the rule that prevents spaghetti)
+
+This is the piece that must be unambiguous:
+
+### `router-edge` is the only policy router
+
+Policy includes:
+
+* segmentation and filtering
     
-* **IPv6 is first-class** (no NAT66 unless unavoidable and documented)
+* service exposure decisions (what should be reachable)
     
-* **IPv4 NAT is explicit, minimal, and constrained**
+* policy routing / kill-switch semantics
     
-* **No hidden policy state**
+* DNS egress enforcement
+    
+* per-VLAN/per-host classification
+    
+
+### NAT is not “policy”; it is an upstream constraint shim
+
+Some upstreams give you:
+
+* IPv4 `/32`
+    
+* IPv6 `/128`
+    
+* or otherwise insufficient routed space
+    
+
+In those cases, something must translate/redirect traffic to make multi-host internal networks usable.
+
+**The contract is:**
+
+* **Core routers may perform only the minimum translation/redirect required by the upstream** to hand traffic to `router-edge`.
+    
+* **All service-level “portforwarding magic” and filtering remains on `router-edge`.**
+    
+
+Think of the core’s role (when upstream is single-address) as:
+
+> “Make the uplink usable, then punt everything to the policy engine.”
+
+* * *
+
+## NAT / Redirect Behavior (normative)
+
+### Case A: Upstream provides a routed prefix (ISP / delegated v6, or VPN routed block)
+
+* No NAT needed for IPv6
+    
+* Core routes the prefix(es) to `router-edge`
+    
+* `router-edge` may further route to access/VLANs
+    
+
+### Case B: Upstream provides a single address (`/32` or `/128`)
+
+* The public `/32` or `/128` **terminates on the core** (it must; that’s the provider adjacency)
+    
+* The core installs a **coarse inbound redirect** to `router-edge`:
+    
+    * Either “forward all ports” (DNAT/redirect) to the edge
+        
+    * Or a small allowed set (if you insist), but the intent is to avoid per-service rules here
+        
+* `router-edge` performs:
+    
+    * service selection (per-port/per-service routing to server VLANs)
+        
+    * firewall policy
+        
+    * segmentation
+        
+
+**Result:** policy stays centralized, while the core remains “dumb” and provider-facing.
+
+* * *
+
+## Example 1: VPN Provider with IPv6 `/128` (single-address uplink)
+
+This example shows the “shim NAT/redirect at core, policy at edge” pattern.
+
+```mermaid
+flowchart TB
+    VPNP["VPN Provider<br/>(WireGuard)<br/>Gives IPv6 /128"]
+    CV["router-core-vpn<br/><small>
+    - Owns provider /128 on wg0<br/>
+    - Coarse inbound redirect → router-edge<br/>
+    - Optional SNAT for outbound (if required)<br/>
+    - No service policy
+    </small>"]
+    E["router-edge<br/><small>
+    - Firewall & segmentation<br/>
+    - Per-service port mapping to servers<br/>
+    - Policy routing / kill-switch
+    </small>"]
+    S["Servers VLAN<br/>(fd42:dead:beef:1100::/64)"]
+    U["Users VLAN<br/>(fd42:dead:beef:1000::/64)"]
+
+    VPNP -->|"wg0: <provider>/128"| CV
+    CV <-->|"p2p transit<br/>ULA /64 or /127"| E
+    E --> S
+    E --> U
+
+    CV -. "DNAT/redirect all inbound ports → edge" .-> E
+```
+
+Notes:
+
+* The `/128` is **not** subdivided.
+    
+* The core can’t avoid owning it, but also shouldn’t become your service firewall.
+    
+* Edge decides whether `:443` goes to `server-1`, `server-2`, or nowhere.
     
 
 * * *
 
-## Router roles and contracts
+## Example 2: VPN Provider with a routed IPv6 `/52` (routed-prefix uplink)
 
-### `router-core-wan`
+Here, the VPN provider gives enough address space to route cleanly. No NAT66 required.
 
-**Responsibility:** WAN termination only.
+```mermaid
+flowchart TB
+    VPNP["VPN Provider<br/>(WireGuard)<br/>Routes IPv6 /52"]
+    CV["router-core-vpn<br/><small>
+    - Terminates tunnel<br/>
+    - Routes VPN /52 → router-edge<br/>
+    - No NAT66 required<br/>
+    - No policy logic
+    </small>"]
+    E["router-edge<br/><small>
+    - Policy engine<br/>
+    - Routes /64s to VLANs<br/>
+    - Firewall & segmentation
+    </small>"]
+    A["router-access<br/><small>
+    - RA/SLAAC per VLAN (/64)<br/>
+    - Client gateways
+    </small>"]
+    C["Clients"]
 
-Allowed:
+    VPNP -->|"WG uplink"| CV
+    CV -->|"Route: VPN /52 → edge"| E
+    E -->|"Assign /64s to VLANs"| A
+    A --> C
+```
 
-* PPPoE, DHCPv6-PD
+Notes:
+
+* This is the “ideal” model: routing, not translation.
     
-* owning public IPv4 and delegated IPv6 prefixes
-    
-* default route to ISP
-    
-* NAT44 on WAN egress
-    
-* DNAT for inbound services (if required)
-    
-
-Forbidden:
-
-* VLANs
-    
-* firewall policy decisions
-    
-* policy routing
-    
-* client-facing services
-    
-
-This router is intentionally _boring_.
-
-* * *
-
-### `router-core-vpn-*`
-
-**Responsibility:** VPN tunnel termination only.
-
-Allowed:
-
-* WireGuard/OpenVPN termination
-    
-* default route into the tunnel
-    
-* NAT44 only if required by the provider
-    
-
-Forbidden:
-
-* traffic classification
-    
-* client VLAN awareness
-    
-* firewall policy decisions
-    
-* fallback logic
-    
-
-Each VPN provider gets its **own instance**.  
-VPN cores are treated exactly like external ISPs.
-
-* * *
-
-### `router-edge`
-
-**Responsibility:** **the only policy router in the system**.
-
-Allowed:
-
-* firewalling and segmentation
-    
-* traffic classification (per VLAN, prefix, etc.)
-    
-* policy routing (WAN vs VPN upstreams)
-    
-* kill-switch semantics (fail closed)
-    
-* DNS leak prevention enforcement
-    
-
-Forbidden:
-
-* NAT (except explicitly documented IPv4 edge cases)
-    
-* tunnel termination
-    
-* WAN ownership
-    
-
-If traffic escapes policy, it is a bug **here**.
-
-* * *
-
-### `transport-fabric`
-
-**Responsibility:** packet transport only.
-
-Allowed:
-
-* VLAN trunks
-    
-* bridges
-    
-* underlay connectivity
-    
-
-Forbidden:
-
-* firewall rules
-    
-* NAT
-    
-* routing policy
-    
-
-This layer must remain dumb and replaceable.
-
-* * *
-
-### `router-access`
-
-**Responsibility:** client-facing L3.
-
-Allowed:
-
-* VLAN gateways
-    
-* IPv6 RA / SLAAC (/64 per VLAN)
-    
-* DHCPv4 for legacy clients
-    
-
-Forbidden:
-
-* prefix delegation logic
-    
-* firewall policy
-    
-* NAT
-    
-* upstream selection
+* `router-edge` can allocate /64s per VLAN out of the routed `/52`.
     
 
 * * *
 
-## Current state vs target state
+## Routing Summary
 
-**Current:**
-
-* `router-core-wan` and `router-edge` are partially collapsed
-    
-* `transport-fabric` is implemented by existing routers/switches
-    
-* `router-access` does not exist yet
-    
-
-**Target:**
-
-* all roles separated as documented above
-    
-* explicit L3 transit links between edge and each upstream
-    
-* no policy outside `router-edge`
-    
-
-This README documents the **target architecture**.  
-Temporary deviations during migration must be treated as technical debt and removed.
+| Layer | Responsibility |
+| --- | --- |
+| Core | Upstream termination + _minimum_ shim required by upstream constraints |
+| Edge | **All policy**: firewall, segmentation, service selection, PBR |
+| Fabric | Transport only |
+| Access | Client L3 services (RA/SLAAC, DHCPv4 optional) |
 
 * * *
 
-## Why this exists
+## Design Rationale
 
-This layout exists to avoid:
+This architecture exists to avoid:
 
 * implicit WAN/VPN fallback
     
@@ -316,8 +330,14 @@ This layout exists to avoid:
     
 * DNS leaks under failure
     
-* “it works but nobody knows why” firewall rules
+* “it works but nobody knows why” rule sets
     
 
-Every router here should be independently replaceable without rewriting the rest.
+It accepts that **perfect IPv6 is not always available** — but constrains the damage:
 
+* internal topology stays stable
+    
+* policy stays centralized
+    
+* upstream constraints are handled explicitly as a shim
+    

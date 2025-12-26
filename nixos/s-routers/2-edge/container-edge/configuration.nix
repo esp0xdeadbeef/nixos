@@ -9,6 +9,8 @@
     ./networkd.nix
     ./wan.nix
     ./unbound.nix
+    ./radvd.nix
+    ../../tools-debugging.nix
   ];
 
   services.resolved.enable = false;
