@@ -103,9 +103,8 @@
 
   time.timeZone = "Europe/Amsterdam";
 
-
-    services.qemuGuest.enable = true;
-  services.spice-vdagentd.enable = true;  # enable copy and paste between host and guest
+  services.qemuGuest.enable = true;
+  services.spice-vdagentd.enable = true; # enable copy and paste between host and guest
 
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;

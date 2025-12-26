@@ -1,140 +1,143 @@
-{ pkgs, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
-  wanIf = "lan1010";
+  prefixFile = "/run/secrets/subnet-ipv6";
 
-  lanMap = {
-    lan7 = 7;
-    lan10 = 10;
-    lan20 = 20;
+  # Explicit, declarative: only these get a /64 + RA
+  lanIfaces = [ "lan7" "lan10" "lan20" ];
+
+  genScript = pkgs.writeShellScript "v6-ra-generate" ''
+    set -euo pipefail
+
+    PREFIX_FILE="${prefixFile}"
+    RADVD_CONF="/run/radvd.conf"
+    ALLOWED_IFACES="${lib.concatStringsSep " " lanIfaces}"
+
+    if [ ! -r "$PREFIX_FILE" ]; then
+      echo "ERROR: missing prefix file $PREFIX_FILE" >&2
+      exit 1
+    fi
+
+    RAW_PREFIX="$(tr -d ' \t\n' < "$PREFIX_FILE")"
+    PREFIX_LEN="''${RAW_PREFIX##*/}"
+    BASE_PREFIX="''${RAW_PREFIX%%/*}"
+
+    if [ "$PREFIX_LEN" != "48" ]; then
+      echo "ERROR: expected /48, got /$PREFIX_LEN" >&2
+      exit 1
+    fi
+
+    EXPANDED="$(sipcalc "$BASE_PREFIX" | awk '/Expanded Address/ {print $NF}')"
+    IFS=':' read -r H1 H2 H3 _ <<< "$EXPANDED"
+
+    echo "[v6-ra] base prefix: $H1:$H2:$H3::/48"
+
+    > "$RADVD_CONF"
+
+    for IFACE in $ALLOWED_IFACES; do
+      if [ ! -d "/sys/class/net/$IFACE" ]; then
+        echo "[v6-ra] skipping $IFACE (not present)"
+        continue
+      fi
+
+      # must be UP
+      ip link show "$IFACE" | grep -q "UP" || {
+        echo "[v6-ra] skipping $IFACE (not UP)"
+        continue
+      }
+
+      # numeric suffix (lan7 -> 7)
+      IDX="$(echo "$IFACE" | sed -n 's/[^0-9]*\([0-9]\+\)$/\1/p')"
+      if [ -z "$IDX" ]; then
+        echo "[v6-ra] skipping $IFACE (no numeric suffix)"
+        continue
+      fi
+
+      HEX="$(printf "%04x" "$IDX")"
+      PREFIX="$H1:$H2:$H3:$HEX"
+
+      echo "[v6-ra] $IFACE -> $PREFIX::/64"
+
+      ip -6 addr replace "$PREFIX::1/64" dev "$IFACE"
+      ip -6 route replace "$PREFIX::/64" dev "$IFACE" proto static metric 256
+
+      cat >> "$RADVD_CONF" <<EOF
+interface $IFACE {
+  AdvSendAdvert on;
+  MinRtrAdvInterval 10;
+  MaxRtrAdvInterval 30;
+
+  AdvManagedFlag off;
+  AdvOtherConfigFlag off;
+
+  prefix $PREFIX::/64 {
+    AdvOnLink on;
+    AdvAutonomous on;
   };
+};
+EOF
+    done
 
-  gen = pkgs.writeShellScript "v6-ra-generate" ''
-        set -euo pipefail
+    if ! grep -q '^interface ' "$RADVD_CONF"; then
+      echo "ERROR: generated empty $RADVD_CONF (no eligible interfaces?)" >&2
+      exit 1
+    fi
 
-        WAN="${wanIf}"
-        RADVD="/run/radvd.conf"
-
-        echo "[v6-ra-generate] Reading routed prefix from RA on $WAN"
-
-        RA_PREFIX="$(
-          ${pkgs.iproute2}/bin/ip -6 route show dev "$WAN" proto ra \
-            | ${pkgs.gawk}/bin/awk '
-                /via/ && $1 ~ /\/[0-9]+$/ {
-                  split($1, a, "/");
-                  if (a[2] <= 64) print $1
-                }' \
-            | ${pkgs.coreutils}/bin/sort -t/ -k2,2n \
-            | ${pkgs.coreutils}/bin/head -n1
-        )"
-
-        if [ -z "''${RA_PREFIX:-}" ]; then
-          echo "[v6-ra-generate] No RA routed prefix found yet; leaving existing $RADVD in place"
-          exit 0
-        fi
-
-        BASE="$(echo "$RA_PREFIX" | ${pkgs.coreutils}/bin/cut -d/ -f1)"
-        LEN="$(echo "$RA_PREFIX" | ${pkgs.coreutils}/bin/cut -d/ -f2)"
-
-        if [ "$LEN" -gt 64 ]; then
-          echo "ERROR: Routed prefix length $LEN > 64; cannot carve /64s" >&2
-          exit 1
-        fi
-
-        echo "[v6-ra-generate] Upstream prefix: $BASE/$LEN"
-
-        tmp="$(${pkgs.coreutils}/bin/mktemp)"
-        : > "$tmp"
-
-        for entry in ${
-          lib.concatStringsSep " " (lib.mapAttrsToList (n: v: "${n}:${toString v}") lanMap)
-        }; do
-          IFACE="''${entry%%:*}"
-          IDX="''${entry##*:}"
-
-          if [ ! -d "/sys/class/net/$IFACE" ]; then
-            echo "[v6-ra-generate] skipping $IFACE (not present)"
-            continue
-          fi
-
-          PREFIX="''${BASE%::}:$IDX::"
-          echo "[v6-ra-generate] $IFACE → $PREFIX/64"
-
-          # Stable router address on each LAN
-          ${pkgs.iproute2}/bin/ip -6 addr replace "$PREFIX""1/64" dev "$IFACE"
-
-          # On-link route for that /64 (defensive)
-          ${pkgs.iproute2}/bin/ip -6 route replace "$PREFIX/64" dev "$IFACE" proto static metric 256
-
-          cat >> "$tmp" <<EOF
-    interface $IFACE {
-      AdvSendAdvert on;
-      MinRtrAdvInterval 10;
-      MaxRtrAdvInterval 30;
-
-      AdvDefaultLifetime 1800;
-      AdvManagedFlag off;
-      AdvOtherConfigFlag off;
-
-      prefix $PREFIX/64 {
-        AdvOnLink on;
-        AdvAutonomous on;
-      };
-    };
-    EOF
-        done
-
-        if [ ! -s "$tmp" ]; then
-          echo "[v6-ra-generate] No LAN interfaces present from lanMap; not updating $RADVD"
-          rm -f "$tmp"
-          exit 0
-        fi
-
-        install -m 0644 "$tmp" "$RADVD"
-        rm -f "$tmp"
-
-        echo "[v6-ra-generate] Wrote $RADVD"
-
-        # Signal to ExecStartPost that config was updated
-        touch /run/v6-ra-generate.updated
+    echo "[v6-ra] wrote $RADVD_CONF"
   '';
 in
 {
-  services.networkd-dispatcher.enable = true;
+  # Router behavior (you likely already have this elsewhere)
+  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = lib.mkDefault 1;
 
-  environment.etc."networkd-dispatcher/routable.d/50-v6-ra-generate".source =
-    pkgs.writeShellScript "v6-ra-dispatch" ''
-      #!/bin/sh
-      exec ${pkgs.systemd}/bin/systemctl start v6-ra-generate.service
-    '';
+  environment.systemPackages = [
+    pkgs.radvd
+    pkgs.iproute2
+    pkgs.sipcalc
+  ];
 
-  systemd.services.v6-ra-generate = {
+  systemd.services.radvd-generate-configs = {
+    description = "Generate radvd.conf + assign deterministic /64s from /48";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+
+    # Critical: provide PATH for the script
     path = [
-      pkgs.iproute2
-      pkgs.gawk
+      pkgs.bash
       pkgs.coreutils
-      pkgs.findutils
+      pkgs.gawk
+      pkgs.gnugrep
+      pkgs.iproute2
+      pkgs.sipcalc
     ];
 
     serviceConfig = {
       Type = "oneshot";
-      wantedBy = [ "multi-user.target" ];
-      ExecStart = gen;
-      Restart = "no";
-
-      # Restart radvd only if we actually updated the config this run
-      ExecStartPost = [
-        "${pkgs.bash}/bin/bash -c '${pkgs.coreutils}/bin/test -f /run/v6-ra-generate.updated && ${pkgs.coreutils}/bin/rm -f /run/v6-ra-generate.updated && ${pkgs.systemd}/bin/systemctl restart radvd.service || true'"
-      ];
-
+      ExecStart = genScript;
+      RemainAfterExit = true;
     };
   };
 
   systemd.services.radvd = {
+    description = "Router Advertisement Daemon";
     wantedBy = [ "multi-user.target" ];
+    after = [ "v6-ra-generate.service" ];
+    requires = [ "v6-ra-generate.service" ];
+
+    # Optional, but nice if you ever add ExecStartPre/Post helpers
+    path = [
+      pkgs.bash
+      pkgs.coreutils
+      pkgs.iproute2
+      pkgs.radvd
+    ];
+
     serviceConfig = {
       ExecStart = "${pkgs.radvd}/bin/radvd -n -C /run/radvd.conf";
       Restart = "always";
+      RestartSec = "2s";
     };
   };
 }
+

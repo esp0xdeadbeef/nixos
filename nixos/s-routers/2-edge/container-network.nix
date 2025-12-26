@@ -8,6 +8,7 @@ in
   networking.useNetworkd = true;
   networking.networkmanager.enable = false;
   systemd.network.enable = true;
+  sops.secrets.subnet-ipv6 = { };
 
   ########################################
   # NETDEVS: VLANs + BRIDGES
@@ -89,6 +90,13 @@ in
         hostBridge = "br-vlan${toString v}";
       }
     );
+
+    bindMounts = {
+      "/run/secrets/subnet-ipv6" = {
+        hostPath = config.sops.secrets.subnet-ipv6.path;
+        isReadOnly = true;
+      };
+    };
 
     additionalCapabilities = [
       "CAP_NET_ADMIN"

@@ -18,5 +18,6 @@
     tmux
     kea
     ndisc6 # gives (collection of IPv6 debugging) rdisc6
+    sipcalc
   ];
 }
