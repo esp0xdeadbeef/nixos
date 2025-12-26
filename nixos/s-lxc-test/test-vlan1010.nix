@@ -11,6 +11,7 @@
 
   networking.networkmanager.unmanaged = [
     "interface-name:eth1"
+    "interface-name:eth0"
   ];
 
   systemd.network.networks."eth1" = {
