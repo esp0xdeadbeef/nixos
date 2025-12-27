@@ -122,8 +122,8 @@ in
   systemd.services.radvd = {
     description = "Router Advertisement Daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "v6-ra-generate.service" ];
-    requires = [ "v6-ra-generate.service" ];
+    after = [ "radvd-generate-configs.service" ];
+    requires = [ "radvd-generate-configs.service" ];
 
     # Optional, but nice if you ever add ExecStartPre/Post helpers
     path = [
