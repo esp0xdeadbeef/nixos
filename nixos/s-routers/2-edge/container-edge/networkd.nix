@@ -32,12 +32,18 @@
   #  linkConfig.Unmanaged = true;
   #};
 
-systemd.network.networks."10-lan1010" = {
+  systemd.network.networks."10-lan1010" = {
     matchConfig.Name = "lan1010";
 
     networkConfig = {
-      Address = ["10.255.255.2/30" "fd42:dead:beef:100::2/64"] ;
-      Gateway = ["10.255.255.1" "fd42:dead:beef:100::1"];
+      Address = [
+        "10.255.255.2/30"
+        "fd42:dead:beef:100::2/64"
+      ];
+      Gateway = [
+        "10.255.255.1"
+        "fd42:dead:beef:100::1"
+      ];
 
       #IPv6AcceptRA = true;
       IPv6AcceptRA = false;
@@ -69,7 +75,6 @@ systemd.network.networks."10-lan1010" = {
       IPv6Forwarding = true;
     };
   };
-
 
   systemd.services.write-temp-10-lan1010-network = {
 
