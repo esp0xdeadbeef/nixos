@@ -1,38 +1,45 @@
 { pkgs, lib, ... }:
 {
-
   services.unbound = {
     enable = true;
 
     settings = {
       server = {
         interface = [
-          "127.0.0.1"
           "0.0.0.0"
-          "::1"
           "::0"
         ];
+        port = 53;
 
         access-control = [
-          "127.0.0.1 allow"
-          "192.168.0.0/16 allow"
-          "10.0.0.0/8 allow"
-          "172.16.0.0/12 allow"
-          "fd00::/8 allow"
+          "0.0.0.0/0 allow"
+          "::/0 allow"
         ];
+
+        hide-version = true;
 
         local-zone = [
-          "lan. transparent"
-          "168.192.in-addr.arpa. transparent"
+          "lan. static"
         ];
 
+        local-data = [
+          "\"router.lan. IN A 192.168.1.1\""
+          "\"nas.lan. IN A 192.168.1.10\""
+          "\"nas.lan. IN AAAA fd00::10\""
+        ];
       };
+
+      forward-zone = [
+        {
+          name = ".";
+          forward-addr = [
+            "9.9.9.9#dns.quad9.net"
+            "149.112.112.112#dns.quad9.net"
+          ];
+          forward-tls-upstream = true;
+        }
+      ];
     };
   };
 
-  systemd.services.unbound = {
-    after = [ "kea-tsig-init.service" ];
-    wants = [ "kea-tsig-init.service" ];
-    serviceConfig.EnvironmentFile = "-/var/lib/kea/tsig.env";
-  };
 }
