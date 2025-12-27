@@ -10,6 +10,11 @@
   # boot.initrd.systemd.enable = true;
   boot.initrd.systemd.tpm2.enable = true; # keep your TPM2 settings
 
+  # make a /mnt/current_pentest directory
+  systemd.tmpfiles.rules = [
+    "d /mnt/current_pentest 0755 root root -"
+  ];
+
   fileSystems."/persist".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
 
@@ -23,14 +28,12 @@
   ];
 
   boot.initrd.systemd.services.rotateBtrfsRoot = {
-    description = "Rotate /root Btrfs subvolume and prune >1 day snapshots";
+    description = "Rotate /root Btrfs subvolume and prune >30 day snapshots";
     wantedBy = [ "initrd.target" ];
     after = [ "systemd-cryptsetup@crypted.service" ];
     before = [ "sysroot.mount" ];
     unitConfig.DefaultDependencies = false;
     serviceConfig.Type = "oneshot";
-
-    # a real script; systemd will write it to a temp file + run it
     script = ''
       #!${pkgs.bash}/bin/bash -euo pipefail
       mkdir /btrfs_tmp
@@ -76,12 +79,23 @@
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
     directories = [
-      # "/root"
+      "/root"
+      {
+        directory = "/var/lib/private";
+        mode = "0700";
+      }
+      {
+        directory = "/var/lib/private/ollama";
+        mode = "0700";
+      }
       "/var/log"
-      # "/var/lib/bluetooth"
+      "/var/lib/bluetooth"
       "/var/lib/nixos"
+      "/var/lib/sbctl"
       "/var/lib/systemd/coredump"
-      # "/etc/NetworkManager/system-connections"
+      "/etc/NetworkManager/system-connections"
+      "/var/lib/libvirt" # libvirt configurations
+      "/var/lib/waydroid/"
       {
         directory = "/var/lib/colord";
         user = "colord";
@@ -92,22 +106,76 @@
     files = [
       "/etc/machine-id"
       {
-        file = "/var/keys/secret_file";
+        file = "/var/cache/locatedb";
         parentDirectory = {
-          mode = "u=rwx,g=,o=";
+          # leave group/owner alone—just set mode
+          mode = "u=rwx,g=rx,o=";
         };
       }
-      "/root/.zsh_history"
-      "/root/.config/sops/age/keys.txt"
     ];
     users.deadbeef = {
       directories = [
-        "github"
-        "Downloads"
-        "Music"
-        "Pictures"
+
+        # "Downloads"
+        # "Music"
+        # "Pictures"
+        # "Videos"
+        ".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
+        # persist kde connect (phone)
+        ".config/kdeconnect"
+
         "Documents"
-        "Videos"
+
+        "github" # custom dir for my github projects
+        "pentest"
+        "vms"
+
+        ".BurpSuite"
+        ".java/.userPrefs/burp"
+
+        ".config/teams-for-linux"
+
+        ".local/share/lxc"
+        ".local/share/containers"
+
+        ".cache/nix-index" # added this to persist the nix-locate output.
+        ".config/rclone" # state file of rclone
+        ".config/legcord" # (legcord -> armcord -> discord)
+        ".config/libvirt/qemu" # libvirt qemu settings
+        ".config/discord"
+        ".config/spotify"
+        ".config/autorandr" # autorandr profile
+        ".config/google-chrome"
+        ".config/chromium"
+        ".config/sops"
+        ".config/gh"
+        ".config/qBittorrent" # qBittorrent settings
+        ".config/obsidian" # Obsidian vault
+
+        ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
+        
+        ".config/freerdp/server" # remmina ssl certs
+
+        ".cache/remmina" # ffs, just remember shit remmina!
+        # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk/remmina/config.nix)
+
+        ".config/Code" # vscode settings and data
+        ".vscode" # workspace-specific settings and plugins
+        ".config/VSCodium" # VSCodium settings and data
+        ".vscode-oss" # VSCodium workspace-specific settings and plugins
+        ".quickget" # quickget downloads
+        ".continue" # continue plugins for vscode
+
+        # ".dropbox"
+        # ".dropbox-dist"
+        ".mitmproxy" # mitmproxy certificates
+        ".mozilla" # firefox import certificates taking too long
+        # ".local/state/wireplumber" # audio profiles
+
+        ".config/slack" # Slack configuration
+        ".config/zoom" # Zoom settings
+        ".config/1Password" # 1Password
+
         {
           directory = ".gnupg";
           mode = "0700";
@@ -117,22 +185,17 @@
           mode = "0700";
         }
         {
-          directory = ".nixops";
-          mode = "0700";
-        }
-        {
           directory = ".local/share/keyrings";
           mode = "0700";
         }
-        {
-          directory = ".local/share/lxc";
-          mode = "0700";
-        }
-        ".local/share/direnv"
       ];
       files = [
-        ".screenrc"
-        # ".zsh_history" # why the fuck does this give errors?
+        ".local/state/wireplumber/default-nodes"
+        # ".screenrc"
+        ".config/nix/nix.conf"
+        ".zsh_history"
+        ".zshrc"
+        ".aliases"
       ];
     };
   };

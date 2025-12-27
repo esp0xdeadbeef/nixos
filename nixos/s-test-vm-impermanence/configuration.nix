@@ -88,7 +88,11 @@
 
     ../01-general/desktop/shell-env.nix
     ../99-testing/autologin.nix
-    # ../02-window-manager-i3/environment.nix
+
+
+    # Will test this box if relyable for router firmware hosting:
+    ../01-general/virtualization-as-host/libvirt.nix
+    ../02-window-manager-i3/environment.nix
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
