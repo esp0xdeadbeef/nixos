@@ -7,22 +7,32 @@
   config,
   pkgs,
   ...
-}: {
+}:
+{
   # You can import other NixOS modules here
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
 
     # Or modules from other flakes (such as nixos-hardware):
-    inputs.hardware.nixosModules.common-cpu-intel
+    ## Using the specific lenovo-thinkpad-p16s-intel-gen2 model with nvidia overwrite
+    # inputs.hardware.nixosModules.common-cpu-intel
     # inputs.hardware.nixosModules.common-gpu-nvidia
 
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
 
-    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    ./connect-nas
+    ./hardware
+    ./llms
+    ./neovim-configuration
+    ./osee
+    ./signal
+    ./torrents
+    ./unmount-pentest-directory
 
-    ../02-window-manager-i3/environment.nix
+    ../01-general
+    ../02-window-manager-i3
     # ../30-physical-hardware-connections/why2025-badge/default.nix
     # ../99-testing/autologin-ssh-and-tty.nix
 
@@ -62,7 +72,7 @@
 
   sops.defaultSopsFile = ../../secrets/l-esp-default.yaml;
   # This will automatically import SSH keys as age keys
-  sops.age.sshKeyPaths = ["/persist/root/.ssh/id_ed25519"];
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   # This is using an age key that is expected to already be in the filesystem
   # sops.age.keyFile = "/var/lib/sops-nix/key.txt";
   # This will generate a new key if the key specified above does not exist
@@ -110,24 +120,26 @@
     };
   };
 
-  nix = let
-    flakeInputs = lib.filterAttrs (_: lib.isType "flake") inputs;
-  in {
-    settings = {
-      # Enable flakes and new 'nix' command
-      experimental-features = "nix-command flakes";
-      # Opinionated: disable global registry
-      flake-registry = "";
-      # Workaround for https://github.com/NixOS/nix/issues/9574
-      nix-path = config.nix.nixPath;
-    };
-    # Opinionated: disable channels
-    channel.enable = false;
+  nix =
+    let
+      flakeInputs = lib.filterAttrs (_: lib.isType "flake") inputs;
+    in
+    {
+      settings = {
+        # Enable flakes and new 'nix' command
+        experimental-features = "nix-command flakes";
+        # Opinionated: disable global registry
+        flake-registry = "";
+        # Workaround for https://github.com/NixOS/nix/issues/9574
+        nix-path = config.nix.nixPath;
+      };
+      # Opinionated: disable channels
+      channel.enable = false;
 
-    # Opinionated: make flake registry and nix path match flake inputs
-    registry = lib.mapAttrs (_: flake: {inherit flake;}) flakeInputs;
-    nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
-  };
+      # Opinionated: make flake registry and nix path match flake inputs
+      registry = lib.mapAttrs (_: flake: { inherit flake; }) flakeInputs;
+      nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
+    };
 
   # FIXME: Add the rest of your current configuration
 
@@ -163,7 +175,7 @@
         # "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
       ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
-      extraGroups = ["wheel"];
+      extraGroups = [ "wheel" ];
     };
   };
 
