@@ -4,6 +4,7 @@ keys:
   - &l-werk-deadbeef age1z6k6e4ywawn44u83tmwv9304ufaq4ahteszuadechj34jcp9tusqevrm6d
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
   - &l-esp-deadbeef age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
+  - &s-sigma-nixos-proxmox-replacement age172vz7pyznaj5sattexdjg43aekx5qv9sjs49axshrlty6ndrdeyskajktk
   - &s-test-vm-impermanence-root age1v0jkptx0aulxrapktgptzvn82tt25gyq3qf8hn8e0dyheqwz446qa798t2
   - &s-router-vpn-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
   - &s-router-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
@@ -64,6 +65,14 @@ creation_rules:
           - *l-esp-deadbeef
           - *s-test-vm-impermanence-root
 
+  - path_regex: '^(secrets/)*s-sigma.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-sigma-nixos-proxmox-replacement
 
   - path_regex: '^(secrets/)*s-router-vpn-impermanence-.*\.(env|ya?ml)$'
     input_type: env
