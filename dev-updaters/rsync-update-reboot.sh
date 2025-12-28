@@ -36,10 +36,10 @@ case "$HOST" in
     HOST_REGEX='^.*nixos/s-routers/z-vpn-egress/'
     ;;
   s-*)
-    HOST_REGEX="^.*nixos/$HOST/"
+    HOST_REGEX="^.*$HOST.*"
     ;;
   l-*)
-    HOST_REGEX="^.*nixos/$HOST/"
+    HOST_REGEX="^.*$HOST.*"
     ;;
   *)
     echo "❌ Unknown host layout for $HOST"
@@ -51,8 +51,11 @@ esac
 SHARED_REGEX='^.*(flake\.nix|flake\.lock|modules/|overlays/).*'
 
 # --- Relevant file types ---
-FILE_REGEX='\.nix$|\.nft$'
-
+FILE_REGEX='\.nix$|\.nft$|\.yaml$'
+#echo $RSYNC_OUT
+#echo $FILE_REGEX
+#echo $HOST_REGEX
+#echo $SHARED_REGEX
 if echo "$RSYNC_OUT" | awk '{print $2}' | grep -E "$FILE_REGEX" | grep -E "$HOST_REGEX|$SHARED_REGEX" >/dev/null; then
   echo "[*] Relevant changes detected for $HOST"
 
