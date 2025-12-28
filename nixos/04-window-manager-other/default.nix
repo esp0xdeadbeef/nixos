@@ -54,5 +54,6 @@
   #programs.xwayland.enable = true;
   services.gnome.gnome-keyring.enable = true;
   services.desktopManager.plasma6.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
+  #services.xserver.displayManager.gdm.enable = true;
+  services.displayManager.gdm.enable = true;
 }

@@ -88,8 +88,10 @@
     ../01-general/virtualization-as-host/libvirt.nix
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix
-
-    ../04-window-manager-other/environment.nix
+    
+    ../01-general
+    #../04-window-manager-other/environment.nix
+    ../04-window-manager-other
 
     # ../99-testing/autologin-ssh-and-tty.nix
     # ../99-testing/autologin.nix
