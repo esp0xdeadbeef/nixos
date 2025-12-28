@@ -1,50 +1,70 @@
 { config, pkgs, lib, ... }:
 
+let
+  lanIf = "ens21";
+  natVlans = [ 2 ];
+in
 {
-  networking.useNetworkd = true;
-  networking.useDHCP = false;
+  systemd.network.netdevs =
+    lib.genAttrs (map (v: "10-${lanIf}-vlan${toString v}") natVlans) (name:
+      let
+        v = lib.toInt (lib.last (lib.splitString "vlan" name));
+      in {
+        netdevConfig = {
+          Name = "${lanIf}.${toString v}";
+          Kind = "vlan";
+        };
+        vlanConfig.Id = v;
+      }
+    )
+    //
+    lib.genAttrs (map (v: "20-br-vlan${toString v}") natVlans) (name:
+      let
+        v = lib.toInt (lib.last (lib.splitString "vlan" name));
+      in {
+        netdevConfig = {
+          Name = "br-vlan${toString v}";
+          Kind = "bridge";
+        };
+      }
+    );
 
-  systemd.network = {
-    enable = true;
-
-    netdevs."br-lan-0" = {
-      netdevConfig = {
-        Name = "br-lan-0";
-        Kind = "bridge";
+  ########################################
+  # NETWORKS
+  ########################################
+  systemd.network.networks =
+    {
+      "20-${lanIf}" = {
+        matchConfig.Name = lanIf;
+        networkConfig = {
+          DHCP = "no";
+          IPv6AcceptRA = false;
+          LinkLocalAddressing = "no";
+          VLAN = map (v: "${lanIf}.${toString v}") natVlans;
+        };
       };
-    };
-
-    netdevs."br-lan-dummy" = {
-      netdevConfig = {
-        Name = "br-lan-dummy";
-        Kind = "dummy";
-      };
-    };
-
-    networks."br-lan-dummy" = {
-      matchConfig.Name = "br-lan-dummy";
-      networkConfig = {
-        Bridge = "br-lan-0";
-      };
-    };
-
-    networks."ens21" = {
-      matchConfig.Name = "ens21";
-      networkConfig = {
-        Bridge = "br-lan-0";
-        DHCP = "no";
-        LinkLocalAddressing = "no";
-      };
-    };
-
-    networks."br-lan-0" = {
-      matchConfig.Name = "br-lan-0";
-      networkConfig = {
-        DHCP = "no";
-        LinkLocalAddressing = "no";
-        ConfigureWithoutCarrier = true;
-      };
-    };
-  };
+    }
+    //
+    lib.genAttrs (map (v: "30-${lanIf}.${toString v}") natVlans) (name:
+      let
+        v = lib.toInt (lib.last (lib.splitString "." name));
+      in {
+        matchConfig.Name = "${lanIf}.${toString v}";
+        networkConfig.Bridge = "br-vlan${toString v}";
+      }
+    )
+    //
+    lib.genAttrs (map (v: "60-br-vlan${toString v}") natVlans) (name:
+      let
+        v = lib.toInt (lib.last (lib.splitString "vlan" name));
+      in {
+        matchConfig.Name = "br-vlan${toString v}";
+        networkConfig = {
+          ConfigureWithoutCarrier = true;
+          DHCP = "no";
+          IPv6AcceptRA = false;
+          LinkLocalAddressing = "no";
+        };
+      }
+    );
 }
-

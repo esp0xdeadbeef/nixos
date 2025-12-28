@@ -9,7 +9,7 @@ https://github.com/Misterio77/nix-starter-configs
 
 - [ ] Revisit all hosts with the ugly importer, remove build_ files.
 ```bash
-(echo '{pkgs, ...}: {imports = ['; find . -name '*.nix' -not -name 'default.nix' ; echo '];}') | nixfmt | tee ./default.nix
+(echo '{ pkgs, ... }: { imports = ['; find . -name 'build_*' -prune -o -name '*.nix' ! -name 'default.nix' -print; echo ']; }') | nixfmt | tee ./default.nix
 ```
 
 - [ ] Make hosts usb bootable (check git history on this file)

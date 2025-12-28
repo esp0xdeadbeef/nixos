@@ -104,44 +104,19 @@
     ../02-window-manager-i3/environment.nix
 
     # Just testing, i need shit to be installed:
-    ../01-general/desktop/applet-nm.nix
-    ../01-general/desktop/fonts.nix
-    ../01-general/desktop/packages.nix
-    ../01-general/desktop/screen-recording.nix
-    ../01-general/desktop/shell-env.nix
-    ../01-general/desktop/users-and-groups.nix
-    ../01-general/desktop/xdg-portal.nix
-    ../01-general/enable-etc-hosts-editing/default.nix
-    ../01-general/firmware-update/default.nix
-    ../01-general/network/firewall.nix
-    ../01-general/network/nat-lxc.nix
-    #../01-general/network/nmcli.nix
-    ../01-general/packages/1-general/archive-tools.nix
-    ../01-general/packages/1-general/tooling.nix
-    ../01-general/packages/data-tranformation/packages.nix
-    ../01-general/packages/editors/packages.nix
-    ../01-general/packages/encryption-and-password-management/packages.nix
-    ../01-general/packages/git/packages.nix
-    ../01-general/packages/network-troubleshooting/packages.nix
-    ../01-general/packages/nix-specific/packages.nix
-    ../01-general/packages/packages.nix
-    ../01-general/packages/terminals/packages.nix
-    ../01-general/packages/terminals/terminal-optimisers/packages.nix
-    ../01-general/packages/terminals/terminal-optimisers/updatedb.nix
-    ../01-general/packages/window-managers/X-org/i3-wm/packages.nix
-    ../01-general/packages/window-managers/X-org/packages.nix
-    ../01-general/secrets/import-secrets.nix
-    ../01-general/security/default.nix
-    ../01-general/system/autoupdate.nix
-    ../01-general/system/garbage-collection.nix
-    ../01-general/system/locale.nix
-    ../01-general/terminals/tmux/settings.nix
+    ../01-general
 
-    ./hardware/general-networking.nix
+    ./hardware/network-general.nix
     ./hardware/network-onlymgmt.nix
     ./hardware/network-hypervisor-isp.nix
     ./hardware/network-hypervisor-lan.nix
+
+    #./connect-nas/default.nix
+    ./connect-nas
   ];
+
+
+  
 
   sops.defaultSopsFile = ../../secrets/s-sigma-nixos-proxmox-replacement-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
@@ -240,6 +215,7 @@
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
       ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];

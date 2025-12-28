@@ -3,6 +3,14 @@ This is going to be the replacement server of my currently running proxmox serve
 
 This server needs to be emulated at this moment, because I'm having restrictions with my router configurations, which i want to have first tested, in a lab / semi prod env.
 
+
+
+
+
+# !!!!! before fysical setup !!!!!
+Before you begin with the fysical setup, MAKE SURE YOU EDIT THE MGMT interface!
+
+
 # Before setting up
 
 1. use the gnome iso (vim installed by default)
@@ -76,9 +84,11 @@ nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/
 # passwd: password updated successfully
 # installation finished!
 
-# I think this is bad, tpm is cleared already to run the installation media:
-# previously i always rebooted here.
+# previously i always rebooted here, but sign first (sec boot is in setup mode / disabled / wiped, otherwise you can not boot into the iso.)
 nix-shell -p sbctl --run 'sbctl enroll-keys -m'
+
+# MAKE SURE YOU READ THE /home/deabeef/github/nixos/secrets/ DIRECTORY, you need to get the PUBLIC sops key, and update the ``
+
 # now reboot:
 reboot
 # no tricks with sec boot now, we only need to sign in with our new luks password.
@@ -87,7 +97,7 @@ reboot
 ```bash
 # so we will first do this:
 sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3
-# 🔐 Please enter current passphrase for disk /dev/sda3: •                       
+# 🔐 Please enter current passphrase for disk /dev/sda3: 
 # New TPM2 token enrolled as key slot 2.
 # we can not do the next step because:
 ls /mnt/boot/

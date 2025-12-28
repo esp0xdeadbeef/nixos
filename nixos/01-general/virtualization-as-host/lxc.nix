@@ -103,25 +103,24 @@ in
     mode = "0755";
   };
 
+  #environment.systemPackages = with pkgs; [
+  #  bindfs
+  #  skopeo
+  #  umoci
 
-  environment.systemPackages = with pkgs; [
-    bindfs
-    skopeo
-    umoci
+  #  (writeShellScriptBin "reboot" ''
+  #    /etc/nuke-lxc-from-orbit-on-shutdown.sh
+  #    exec ${pkgs.systemd}/bin/reboot "$@"
+  #  '')
 
-    (writeShellScriptBin "reboot" ''
-      /etc/nuke-lxc-from-orbit-on-shutdown.sh
-      exec ${pkgs.systemd}/bin/reboot "$@"
-    '')
+  #  (writeShellScriptBin "poweroff" ''
+  #    /etc/nuke-lxc-from-orbit-on-shutdown.sh
+  #    exec ${pkgs.systemd}/bin/poweroff "$@"
+  #  '')
 
-    (writeShellScriptBin "poweroff" ''
-      /etc/nuke-lxc-from-orbit-on-shutdown.sh
-      exec ${pkgs.systemd}/bin/poweroff "$@"
-    '')
-
-    (writeShellScriptBin "shutdown" ''
-      /etc/nuke-lxc-from-orbit-on-shutdown.sh
-      exec ${pkgs.systemd}/bin/shutdown "$@"
-    '')
-  ];
+  #  (writeShellScriptBin "shutdown" ''
+  #    /etc/nuke-lxc-from-orbit-on-shutdown.sh
+  #    exec ${pkgs.systemd}/bin/shutdown "$@"
+  #  '')
+  #];
 }

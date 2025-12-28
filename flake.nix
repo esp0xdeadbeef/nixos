@@ -259,7 +259,7 @@
           modules = [
             lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
-            ./nixos/l-esp/configuration.nix
+            ./nixos/l-esp
           ];
         };
         # lxc server

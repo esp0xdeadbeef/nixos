@@ -3,10 +3,8 @@
   nix.gc = {
     automatic = true;
     persistent = true;
-    # dates = "daily";
+    dates = "*:0/15";
     options = "--delete-older-than 30d";
-    dates = "17:00";                    # base time
-    randomizedDelaySec = "15min";      # run somewhere between 18:00 and 18:15
-    
+    randomizedDelaySec = "5min";
   };
 }
