@@ -168,6 +168,16 @@
             ./nixos/s-test-vm/configuration.nix
           ];
         };
+        s-sigma-nixos-proxmox-replacement = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            # required for secure boot:
+            lanzaboote.nixosModules.lanzaboote
+
+            # > Our main nixos configuration file <
+            ./nixos/s-sigma-nixos-proxmox-replacement/configuration.nix
+          ];
+        };
         s-test-vm-impermanence = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
