@@ -35,6 +35,9 @@ case "$HOST" in
   s-router-vpn-egress)
     HOST_REGEX='^.*nixos/s-routers/z-vpn-egress/'
     ;;
+  s-*)
+    HOST_REGEX="^.*nixos/$HOST/"
+    ;;
   l-*)
     HOST_REGEX="^.*nixos/$HOST/"
     ;;

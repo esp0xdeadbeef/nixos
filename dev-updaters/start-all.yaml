@@ -18,3 +18,8 @@ windows:
           while :; do ./rsync-update-reboot.sh s-router-edge; done
       - shell_command: |
           while :; do ./rsync-update-reboot.sh s-router-core; done
+  - window_name: hypervisors
+    layout: main-vertical
+    panes:
+      - shell_command: |
+          while :; do ./rsync-update-reboot.sh s-sigma-nixos-proxmox-replacement; done
