@@ -175,7 +175,7 @@
             lanzaboote.nixosModules.lanzaboote
 
             # > Our main nixos configuration file <
-            ./nixos/s-sigma-nixos-proxmox-replacement/configuration.nix
+            ./nixos/s-sigma-nixos-proxmox-replacement
           ];
         };
         s-test-vm-impermanence = nixpkgs.lib.nixosSystem {
