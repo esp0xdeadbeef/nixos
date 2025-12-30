@@ -2,7 +2,20 @@
 
 # generate a key with:
 
-## impermanence
+## impermanence (while setup)
+
+```bash
+[ -d /mnt ] || echo "mount /mnt first"
+[ -f /mnt/persist/$HOME/.ssh/id_ed25519 ] || ( mkdir /mnt/persist/$HOME/.ssh ; ssh-keygen -t ed25519 -N "" -f /mnt/persist/$HOME/.ssh/id_ed25519 -q)
+mkdir -p /mnt/persist/$HOME/.config/sops/age
+nix-shell -p ssh-to-age --run 'bash -c "ssh-to-age -private-key -i /mnt/persist/$HOME/.ssh/id_ed25519 > /mnt/persist/$HOME/.config/sops/age/keys.txt"'
+
+key=$(nix-shell -p age --run "age-keygen -y /mnt/persist/$HOME/.config/sops/age/keys.txt")
+echo -e "public key:\n$key"
+```
+
+
+## impermanence (after setup)
 
 ```bash
 [ -f /persist/$HOME/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N "" -f $HOME/.ssh/id_ed25519 -q
