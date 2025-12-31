@@ -61,6 +61,39 @@ nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/s
 nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer'
 
 cp -r /mnt/persist/var/lib/sbctl/* /persist/etc/secureboot/
+
+# BELOW NOT NEEDED, AND DOESN'T WORK, JUST IGNORE ERRORS IN -> MALLICIOUS -> CONTINUE ON ERRORS DONT PROMPT FOR F1 / F2.
+# 1. Download Microsoft certificates from reliable sources:
+nix-shell -p wget --run '
+  # Windows Production PCA 2011 (base64 format from GitHub)
+  wget -O /tmp/ms.pem https://raw.githubusercontent.com/microsoft/msix-packaging/master/resources/certs/base64_Windows_Production_PCA_2011.cer
+
+  # Microsoft Corporation UEFI CA 2011 (from Microsoft's Secure Boot Objects)
+  wget -O /tmp/ms2.der https://uefipkisrevoked.blob.core.windows.net/replacedcerts/MicCorUEFCA2011_2011-06-27.crt
+  openssl x509 -inform der -in /tmp/ms2.der -out /tmp/ms2.pem
+'
+
+# 2. Combine with your db certificate:
+nix-shell -p openssl --run '
+  cat /mnt/persist/var/lib/sbctl/keys/db/db.pem /tmp/ms.pem /tmp/ms2.pem > /tmp/combined-db.pem
+  cp /tmp/combined-db.pem /mnt/persist/var/lib/sbctl/keys/db/db.pem
+
+  # Regenerate the DER certificate for BIOS import
+  openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer
+'
+
+# 3. Sign your boot files with the updated key:
+nix-shell -p sbsigntool --run '
+  sbsign --key /mnt/persist/var/lib/sbctl/keys/db/db.key \
+         --cert /mnt/persist/var/lib/sbctl/keys/db/db.pem \
+         --output /mnt/boot/EFI/nixos/kernel.efi \
+         /mnt/boot/EFI/nixos/kernel.efi
+
+  sbsign --key /mnt/persist/var/lib/sbctl/keys/db/db.key \
+         --cert /mnt/persist/var/lib/sbctl/keys/db/db.pem \
+         --output /mnt/boot/EFI/nixos/grubx64.efi \
+         /mnt/boot/EFI/nixos/grubx64.efi
+'
 ```
 
 
@@ -85,7 +118,8 @@ nix-shell -p ssh-to-age --run 'bash -c "ssh-to-age -private-key -i /mnt/persist/
 
 key=$(nix-shell -p age --run "age-keygen -y /mnt/persist/$HOME/.config/sops/age/keys.txt")
 echo -e "public key:\n$key"
-# age1evz7q5h6hqwgs5apscnehvn9jcf4tsl02tqak0xkyx702rxzcdlq3l5zgg
+# age1y0m2kr2n9ejp7q9u80lgtl6fdcddm8t0nz2fhtxtxdkpps0u4dcqhk8pm0
+
 ```
 
 Add it to the secrets (.sops.yaml, read the readme (also update the keys related to this machine)).

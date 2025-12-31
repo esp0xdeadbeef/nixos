@@ -4,7 +4,7 @@
 {
   networking.useNetworkd = true;
   networking.useDHCP = false;
-  networking.networkmanager.enable = lib.mkForce false;
+  #networking.networkmanager.enable = lib.mkForce false;
 
   # Disable networkd-wait-online
   systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
@@ -130,23 +130,23 @@
       };
 
       # Bridge configurations
-      "20-vmbr0" = {
-        matchConfig.Name = "vmbr0";
-        networkConfig = {
-          DHCP = "no";
-          ConfigureWithoutCarrier = true;
-        };
-        address = [
-          "192.168.1.71/24"
-        ];
-        routes = [
-          {
-            routeConfig = {
-              Gateway = "192.168.1.1";
-            };
-          }
-        ];
-      };
+      #"20-vmbr0" = {
+      #  matchConfig.Name = "vmbr0";
+      #  networkConfig = {
+      #    DHCP = "no";
+      #    ConfigureWithoutCarrier = true;
+      #  };
+      #  address = [
+      #    "192.168.1.71/24"
+      #  ];
+      #  routes = [
+      #    {
+      #      routeConfig = {
+      #        Gateway = "192.168.1.1";
+      #      };
+      #    }
+      #  ];
+      #};
       "20-vmbr1" = {
         matchConfig.Name = "vmbr1";
         networkConfig = {
