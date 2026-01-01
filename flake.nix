@@ -185,7 +185,8 @@
             lanzaboote.nixosModules.lanzaboote
 
             # > Our main nixos configuration file <
-            ./nixos/s-sigma          ];
+            ./nixos/s-sigma
+          ];
         };
         s-test-vm-impermanence = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
@@ -241,7 +242,7 @@
             # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
-            ./nixos/s-routers/z-vpn-egress/configuration.nix
+            ./nixos/s-routers/z-vpn-egress
           ];
         };
 
