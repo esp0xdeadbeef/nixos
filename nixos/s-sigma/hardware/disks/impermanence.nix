@@ -10,11 +10,6 @@
   # boot.initrd.systemd.enable = true;
   boot.initrd.systemd.tpm2.enable = true; # keep your TPM2 settings
 
-  # make a /mnt/current_pentest directory
-  systemd.tmpfiles.rules = [
-    "d /mnt/current_pentest 0755 root root -"
-  ];
-
   fileSystems."/persist".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
 
@@ -34,6 +29,8 @@
     before = [ "sysroot.mount" ];
     unitConfig.DefaultDependencies = false;
     serviceConfig.Type = "oneshot";
+
+    # a real script; systemd will write it to a temp file + run it
     script = ''
       #!${pkgs.bash}/bin/bash -euo pipefail
       mkdir /btrfs_tmp
@@ -52,7 +49,7 @@
           btrfs subvolume delete "$1"
       }
 
-      for i in $(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -mtime +1); do
+      for i in $(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
           delete_subvolume_recursively "$i"
       done
 
@@ -75,12 +72,31 @@
     ];
   };
 
+  # fileSystems."/var/lib/private" = {
+  #   device = "/persist/var/lib/private";
+  #   fsType = "none";
+  #   options = [ "bind" ];
+  # };
+
+  # # 2) Make sure the source dir has the right perms
+  # systemd.tmpfiles.rules = [
+  #   "d /persist/var/lib/private 0700 root root -"
+  # ];
+
+  systemd.tmpfiles.rules = [
+    "d /mnt/current_pentest 0755 root root -"
+  ];
   environment.persistence."/persist" = {
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
     directories = [
       "/root"
+      # "/var/lib/ollama/models" # AI models
+      # "/var/lib/ollama/.ollama" # AI ssh keys
+      # "/var/lib/ollama"
       {
+        # ls -la /var/lib/ollama # will output:
+        # lrwxrwxrwx 1 root root 14  3 aug 05:06 /var/lib/ollama -> private/ollama
         directory = "/var/lib/private";
         mode = "0700";
       }
@@ -95,7 +111,6 @@
       "/var/lib/systemd/coredump"
       "/etc/NetworkManager/system-connections"
       "/var/lib/libvirt" # libvirt configurations
-      "/var/lib/waydroid/"
       {
         directory = "/var/lib/colord";
         user = "colord";
@@ -105,6 +120,19 @@
     ];
     files = [
       "/etc/machine-id"
+      # "/var/cache/locatedb" # added it to persistent output in updatedb.nix (/persist/var/cache/locatedb); updatedb (locate <something>) history
+      # {
+      #   file = "/var/keys/secret_file";
+      #   parentDirectory = {
+      #     mode = "u=rwx,g=,o=";
+      #   };
+      # }
+      # {
+      #   file = "/var/cache/locatedb";
+      #   parentDirectory = {
+      #     mode = "u=rwx,g=rx,o=";
+      #   };
+      # }
       {
         file = "/var/cache/locatedb";
         parentDirectory = {
@@ -115,33 +143,26 @@
     ];
     users.deadbeef = {
       directories = [
-
-        # "Downloads"
-        # "Music"
-        # "Pictures"
-        # "Videos"
-        ".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
-        # persist kde connect (phone)
-        ".config/kdeconnect"
-
-        "Documents"
-
         "github" # custom dir for my github projects
+
+        "vms/isos"
+        "vms/disks"
+        "vms/nvrams"
         "pentest"
-        "vms"
+        "firefox-pentest-profile"
 
-        ".BurpSuite"
-        ".java/.userPrefs/burp"
-
-        ".config/teams-for-linux"
-
+        #"Downloads"
+        "Music"
+        "Pictures"
+        "Documents"
+        "Videos"
         ".local/share/lxc"
         ".local/share/containers"
+        ".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
 
-        ".cache/nix-index" # added this to persist the nix-locate output.
-        ".config/rclone" # state file of rclone
         ".config/legcord" # (legcord -> armcord -> discord)
         ".config/libvirt/qemu" # libvirt qemu settings
+        ".config/freerdp/server" # remmina ssl certs
         ".config/discord"
         ".config/spotify"
         ".config/autorandr" # autorandr profile
@@ -151,23 +172,16 @@
         ".config/gh"
         ".config/qBittorrent" # qBittorrent settings
         ".config/obsidian" # Obsidian vault
-
-        ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
-        
-        ".config/freerdp/server" # remmina ssl certs
-
-        ".cache/remmina" # ffs, just remember shit remmina!
-        # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk/remmina/config.nix)
-
+        ".local/share/remmina" # remmina remote desktop connections
         ".config/Code" # vscode settings and data
         ".vscode" # workspace-specific settings and plugins
         ".config/VSCodium" # VSCodium settings and data
         ".vscode-oss" # VSCodium workspace-specific settings and plugins
         ".quickget" # quickget downloads
-        ".continue" # continue plugins for vscode
+        ".continue" # quickget downloads
 
-        # ".dropbox"
-        # ".dropbox-dist"
+        ".dropbox"
+        ".dropbox-dist"
         ".mitmproxy" # mitmproxy certificates
         ".mozilla" # firefox import certificates taking too long
         # ".local/state/wireplumber" # audio profiles
@@ -175,6 +189,16 @@
         ".config/slack" # Slack configuration
         ".config/zoom" # Zoom settings
         ".config/1Password" # 1Password
+
+        # signal:
+        ".config/Signal"
+        ".config/maestral"
+
+        # zap plugins:
+        ".ZAP/plugin"
+	
+        # lm studio (backends, models etc.):
+        ".lmstudio"
 
         {
           directory = ".gnupg";
@@ -188,10 +212,15 @@
           directory = ".local/share/keyrings";
           mode = "0700";
         }
+        ".local/share/direnv"
       ];
       files = [
         ".local/state/wireplumber/default-nodes"
-        # ".screenrc"
+        ".screenrc"
+
+        # zap (persist the config, which is containing the certificates):
+        ".ZAP/config.xml"
+
         ".config/nix/nix.conf"
         ".zsh_history"
         ".zshrc"

@@ -59,17 +59,13 @@ FILE_REGEX='\.nix$|\.nft$|\.yaml$'
 if echo "$RSYNC_OUT" | awk '{print $2}' | grep -E "$FILE_REGEX" | grep -E "$HOST_REGEX|$SHARED_REGEX" >/dev/null; then
   echo "[*] Relevant changes detected for $HOST"
 
-  if [[ "$HOST" == "s-router-vpn-1" ]]; then
-    echo "[*] Bringing down VPN"
-    ssh "$SSH" 'sudo nmcli connection down tun0' || true
-  fi
-
   echo "[*] Rebuilding on $HOST..."
   ssh "$SSH" \
     'sudo nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) --no-write-lock-file'
 
   echo "[*] Rebooting $HOST..."
   ssh "$SSH" 'sudo reboot'
+  sleep 10
 else
   echo "[*] No relevant changes for $HOST"
 fi

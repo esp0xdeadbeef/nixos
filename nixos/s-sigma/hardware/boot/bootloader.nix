@@ -7,8 +7,10 @@
 }:
 
 {
+  # saidly not a TPM on board:
+  #boot.initrd.systemd.tpm2.enable = true;
 
-  boot.initrd.systemd.tpm2.enable = true;
+
   # boot.initrd.luks.devices.root = {
   #   device = "/dev/disk/by-partuuid/c5c3e4e1-f22d-429f-b3a2-50775c673279";
   # };

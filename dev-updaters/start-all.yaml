@@ -22,4 +22,4 @@ windows:
     layout: main-vertical
     panes:
       - shell_command: |
-          while :; do ./rsync-update-reboot.sh s-sigma-nixos-proxmox-replacement; done
+          while :; do ./rsync-update-reboot.sh s-sigma; done

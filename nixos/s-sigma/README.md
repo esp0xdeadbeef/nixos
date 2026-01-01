@@ -61,39 +61,6 @@ nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/s
 nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer'
 
 cp -r /mnt/persist/var/lib/sbctl/* /persist/etc/secureboot/
-
-# BELOW NOT NEEDED, AND DOESN'T WORK, JUST IGNORE ERRORS IN -> MALLICIOUS -> CONTINUE ON ERRORS DONT PROMPT FOR F1 / F2.
-# 1. Download Microsoft certificates from reliable sources:
-nix-shell -p wget --run '
-  # Windows Production PCA 2011 (base64 format from GitHub)
-  wget -O /tmp/ms.pem https://raw.githubusercontent.com/microsoft/msix-packaging/master/resources/certs/base64_Windows_Production_PCA_2011.cer
-
-  # Microsoft Corporation UEFI CA 2011 (from Microsoft's Secure Boot Objects)
-  wget -O /tmp/ms2.der https://uefipkisrevoked.blob.core.windows.net/replacedcerts/MicCorUEFCA2011_2011-06-27.crt
-  openssl x509 -inform der -in /tmp/ms2.der -out /tmp/ms2.pem
-'
-
-# 2. Combine with your db certificate:
-nix-shell -p openssl --run '
-  cat /mnt/persist/var/lib/sbctl/keys/db/db.pem /tmp/ms.pem /tmp/ms2.pem > /tmp/combined-db.pem
-  cp /tmp/combined-db.pem /mnt/persist/var/lib/sbctl/keys/db/db.pem
-
-  # Regenerate the DER certificate for BIOS import
-  openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer
-'
-
-# 3. Sign your boot files with the updated key:
-nix-shell -p sbsigntool --run '
-  sbsign --key /mnt/persist/var/lib/sbctl/keys/db/db.key \
-         --cert /mnt/persist/var/lib/sbctl/keys/db/db.pem \
-         --output /mnt/boot/EFI/nixos/kernel.efi \
-         /mnt/boot/EFI/nixos/kernel.efi
-
-  sbsign --key /mnt/persist/var/lib/sbctl/keys/db/db.key \
-         --cert /mnt/persist/var/lib/sbctl/keys/db/db.pem \
-         --output /mnt/boot/EFI/nixos/grubx64.efi \
-         /mnt/boot/EFI/nixos/grubx64.efi
-'
 ```
 
 
@@ -146,6 +113,48 @@ Is this okay? (y/n):y
 rsync -va /home/deadbeef/github/nixos nixos@192.168.1.150:~/github/
 ```
 
+# Setup Clevis/Tang Auto-Decrypt
+
+Auto-decrypt LUKS via Tang server - no password at boot.
+
+## Generate JWE on the target machine
+
+```bash
+ssh nixos@192.168.1.150
+sudo -i
+cd /home/deadbeef/github/nixos/nixos/s-sigma/hardware/disks/ 
+./clevis-init-jwe.sh # you will be prompted for your luks password
+```
+
+Output should look like this:
+
+```bash
+./clevis-init-jwe.sh
+Enter any existing passphrase:
+The advertisement contains the following signing keys:
+
+<redacted>
+
+Do you wish to trust these keys? [ynYN] y
+✅ works
+JWE created at /tmp/nvme0n1p1.jwe
+```
+
+
+```bash
+# host that contains the nixos configuration:
+rsync -va nixos@192.168.1.150:/tmp/nvme0n1p1.jwe /home/deadbeef/github/nixos/nixos/s-sigma/hardware/disks/nvme0n1p1.jwe
+rsync -va nixos@192.168.1.150:/tmp/nvme0n1p1.jwe /home/deadbeef/github/nixos/nixos/s-sigma/hardware/disks/nvme0n1p1.jwe
+```
+
+```bash
+rsync -va /home/deadbeef/github/nixos nixos@192.168.1.150:~/github/
+```
+
+## Security Note
+
+JWE is safe in public repo - only decryptable via your LAN Tang server.
+
 # Installing the vm:
 
 ```bash
@@ -160,79 +169,9 @@ nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/
 # previously i always rebooted here, but sign first (sec boot is in setup mode / disabled / wiped, otherwise you can not boot into the iso.)
 nix-shell -p sbctl --run 'sbctl enroll-keys -m'
 
-# MAKE SURE YOU READ THE /home/deabeef/github/nixos/secrets/ DIRECTORY, you need to get the PUBLIC sops key, and update the ``
+# MAKE SURE YOU READ THE /home/deabeef/github/nixos/secrets/ DIRECTORY, you need to get the PUBLIC sops key, and update the `sops edit ./s-sigma-root.yaml`
 
 # now reboot:
 reboot
 # no tricks with sec boot now, we only need to sign in with our new luks password.
 ```
-
-```bash
-# so we will first do this:
-sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3
-# 🔐 Please enter current passphrase for disk /dev/sda3: 
-# New TPM2 token enrolled as key slot 2.
-# we can not do the next step because:
-ls /mnt/boot/
-# db.cer  EFI  KEK.cer  loader  PK.cer
-
-# if the output is like this we can enroll the keys:
-nix-shell -p sbctl --run 'sbctl status'
-# Installed:      ✓ sbctl is installed
-# Owner GUID:     c48257e4-f5b8-447a-9ae9-c78aae5e7021
-# Setup Mode:     ✗ Enabled
-# Secure Boot:    ✗ Disabled
-# Vendor Keys:    none
-
-
-# with microsoft:
-nix-shell -p sbctl --run 'sbctl enroll-keys -m'
-# Enrolling keys to EFI variables...
-# With vendor keys from microsoft...✓ 
-# Enrolled keys to the EFI variables!
-nix-shell -p sbctl --run 'sbctl status'
-# Installed:      ✓ sbctl is installed
-# Owner GUID:     c48257e4-f5b8-447a-9ae9-c78aae5e7021
-# Setup Mode:     ✓ Disabled
-# Secure Boot:    ✗ Disabled
-# Vendor Keys:    microsoft
-
-# without microsoft (read the wiki - know what you're doing - https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot):
-nix-shell -p sbctl --run 'sbctl enroll-keys'
-
-# add them to the bios (boot into the firmware) -> secureboot -> add PK KEK db cer files from the first entry (boot directory)
-reboot
-```
-
-# Setup the environment so it is using safeboot
-
-```bash
-
-
-# check if you're enrolled:
-nix-shell -p sbctl --run 'sbctl status'
-# Installed:	✓ sbctl is installed
-# Owner GUID:	839f409d-60b2-458a-8524-80ee6aa9a295
-# Setup Mode:	✓ Disabled
-# Secure Boot:	✓ Enabled
-# Vendor Keys:	none
-
-
-# use this setting on fysical devices (7 is important here):
-# doesn't look like applicable to us, this works for me 
-# https://superuser.com/questions/1640985/how-to-enable-bitlocker-when-booting-windows-10-from-a-non-microsoft-boot-manage
-# It still works for me though in a qemu image on proxmox:
-sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3
-```
-
-
-# Switch to a different config
-
-
-```bash
-# deadbeef i my user (ssh) don't worry about the eavedropping error in ssh, to get rid of the errors, rm the last two LINES of the `~/.ssh/known_hosts` of your host, then do a rsync:
-rsync -va /home/deadbeef/github/nixos deadbeef@192.168.1.150:~/github/
-nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname)
-nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3 && reboot
-```
-

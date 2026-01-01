@@ -159,7 +159,7 @@
     };
   };
 
-  boot.loader.systemd-boot.configurationLimit = 2;
+  boot.loader.systemd-boot.configurationLimit = 12;
 
   environment.interactiveShellInit = ''
     ZSH_THEME=xiong-chiamiov
