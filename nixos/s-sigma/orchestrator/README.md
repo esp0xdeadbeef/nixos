@@ -34,6 +34,48 @@ This contract is strict. Violations are considered bugs.
 
 * * *
 
+## Storage & Persistence Model
+
+The system distinguishes **logical state** from **durable persistence**.
+
+### Design Principle
+
+The control plane operates on _declared state_, not transactional durability.  
+Disk writes exist to preserve intent across restarts — not to guarantee synchronous durability.
+
+### Storage Tiers
+
+| Layer | Purpose | Characteristics |
+| --- | --- | --- |
+| **tmpfs (RAM)** | Active working state | Fast, volatile, frequently updated |
+| **Persistent storage (NAS)** | Durable snapshot of state | Slower, authoritative, infrequently written |
+
+### Write Strategy
+
+* All active state is written to an in-memory filesystem (e.g. `/run/vmctl`)
+    
+* Periodic flush synchronizes state to persistent storage
+    
+* Flushes are **batched and atomic**
+    
+* No per-event synchronous writes
+    
+
+This avoids disk spin-ups, minimizes latency, and preserves correctness.
+
+### Persistence Guarantees
+
+* Loss of power may lose _recent_ state updates
+    
+* System recovers by reconciling desired state with actual state
+    
+* No correctness depends on sub-second durability
+    
+
+This design favors **determinism and recoverability** over immediacy.
+
+* * *
+
 ## Coordinator Behavior
 
 The coordinator is **stateless** and **level-triggered**.
@@ -78,33 +120,33 @@ Each host is an autonomous executor that reconciles declared state with reality.
     
 * Execute assigned VM lifecycle actions
     
-* Enforce local safety and resource limits
+* Enforce local safety constraints
     
-* Report actual state back to NAS
+* Report observed state back to NAS
     
 
 ### Host State Semantics
 
 **Important distinction:**
 
-* **HELD** — operator-initiated pause (intentional, administrative)
+* **HELD** — operator-initiated pause (administrative)
     
-* **SUSPENDED** — infrastructure-induced pause (e.g. NAS unavailable)
+* **SUSPENDED** — infrastructure-induced pause (e.g., storage unavailable)
     
 
-This distinction is critical for incident analysis and recovery automation.
+This distinction is critical for recovery logic and operational clarity.
 
 * * *
 
 ## VM Lifecycle
 
-Each VM is managed as an independent state machine:
+Each VM is managed as an independent state machine.
 
 * State transitions are explicit
     
 * No implicit side effects
     
-* VM runtime behavior is isolated from placement logic
+* Runtime behavior is isolated from placement logic
     
 
 VMs respond only to:
@@ -133,7 +175,7 @@ Migration is a controlled, serialized operation.
 * Hosts must refuse to act on conflicting migrations
     
 
-This prevents split-brain execution during coordinator restarts or network partitions.
+This prevents split-brain execution during coordinator failure or restart.
 
 * * *
 
