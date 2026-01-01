@@ -1,0 +1,11 @@
+# /mnt/nas/private/vmstore/hosts/hypervisor-01/config.yaml
+hostname: hypervisor-01
+registered: 2026-01-01T10:00:00Z
+resources:
+  cpus: 16
+  memory_gb: 64
+  storage_gb: 500
+tags:
+  - production
+  - ssd
+

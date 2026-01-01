@@ -1,15 +1,49 @@
 
+# VM Orchestration Design Specification
+
+This repository defines the design and operational model for managing virtual machines using a **NAS-centric control plane**.
+
+The authoritative system state is stored on the NAS. All hypervisors and orchestration components derive their behavior from this shared state. VM lifecycle, placement, and recovery are driven by declarative data rather than local configuration.
+
+The orchestration model is inspired by **ISA-88 / PackML**, applying its state-machine principles to infrastructure management. Each component (coordinator, host, VM) follows an explicit and well-defined lifecycle with deterministic transitions.
+
+## Structure
+
+* `./orchestrator/`  
+    Contains the conceptual and logical design of the orchestration system, including:
+    
+    * State machines for coordinators, hosts, and virtual machines
+        
+    * Interaction rules and control flow
+        
+    * Expected filesystem layout and ownership of state
+        
+    * Failure handling and recovery semantics
+        
+
+## Design Principles
+
+* **NAS as source of truth**  
+    All authoritative state is stored on the NAS. Local state is ephemeral and reconstructible.
+    
+* **Deterministic behavior**  
+    Every component operates as a finite state machine with explicit transitions.
+    
+* **Decoupled orchestration**  
+    Hosts do not coordinate directly with each other; all coordination flows through shared state.
+    
+* **Declarative intent, imperative execution**  
+    Desired state is declared in the filesystem; agents reconcile actual state accordingly.
+    
+* **Predictable recovery**  
+    Power loss, host failure, or network interruptions converge to a known-safe state.
+    
+
+This repository focuses on _design correctness and clarity_, not implementation convenience.
+
+# Current state
+
 This is going to be the replacement server of my currently running proxmox server.
-
-This server needs to be emulated at this moment, because I'm having restrictions with my router configurations, which i want to have first tested, in a lab / semi prod env.
-
-
-
-
-
-# !!!!! before fysical setup !!!!!
-Before you begin with the fysical setup, MAKE SURE YOU EDIT THE MGMT interface!
-
 
 # Before setting up
 

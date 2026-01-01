@@ -1,0 +1,32 @@
+# /mnt/nas/private/vmstore/vms/webserver/manifest.yaml
+vm: webserver
+generation: 42
+
+# === PLACEMENT ===
+placement:
+  strategy: spread          # spread | pack | pinned
+  pinnedHost: null          # If pinned
+  antiAffinity:             # Don't colocate with
+    - database
+  constraints:
+    minCpus: 2
+    minMemoryGb: 4
+    requiredTags:
+      - production
+
+# === FAILOVER ===
+failover:
+  policy: auto              # auto | manual | none
+  maxDowntimeSeconds: 300
+
+# === PACKML POLICY ===
+packml:
+  degradedPolicy: allowStale
+  bootstrapLocal: false
+  requireAgent: true
+
+# === RETENTION ===
+retention:
+  keepLast: 10
+  keepDaily: 7
+
