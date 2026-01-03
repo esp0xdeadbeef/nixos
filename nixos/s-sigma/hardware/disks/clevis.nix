@@ -4,7 +4,6 @@
   boot.initrd.systemd.enable = true;
 
   boot.initrd.luks.devices."crypted" = {
-    device = "/dev/disk/by-uuid/d05a14b3-1b49-4dc1-884c-784d48569839";
     allowDiscards = true;
   };
 

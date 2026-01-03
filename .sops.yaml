@@ -5,7 +5,7 @@ keys:
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
   - &l-esp-deadbeef age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
   - &s-sigma-nixos-proxmox-replacement age172vz7pyznaj5sattexdjg43aekx5qv9sjs49axshrlty6ndrdeyskajktk
-  - &s-sigma age1e2ak64ge83ylxgcyuu9gsxjcwl0vedjqg484wqx23cn62drf3eysgqvjpd
+  - &s-sigma age1lkqlezc852g3svecanwg7ctl2y9ur0qs9pquwjas5dhkhcl9yq5qvr33q2
   - &s-test-vm-impermanence-root age1v0jkptx0aulxrapktgptzvn82tt25gyq3qf8hn8e0dyheqwz446qa798t2
   - &s-router-vpn-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
   - &s-router-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
