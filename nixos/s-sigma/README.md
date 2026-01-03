@@ -77,8 +77,8 @@ cryptsetup luksAddKey /dev/disk/by-partlabel/disk-vda-luks -d /tmp/disk.key
 # generate the hardware configuration
 nixos-generate-config --root /mnt/
 # mkdir the persist directory on the nvme disk:
-mkdir -p /mnt/persist
-mount --bind /persist /mnt/persist
+mkdir -p /persist
+mount --bind /mnt/persist /persist
 ```
 
 To sign the keys:
@@ -94,6 +94,7 @@ nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/s
 nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/KEK/KEK.pem -out /mnt/boot/KEK.cer'
 nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer'
 
+mkdir -p /persist/etc/secureboot/
 cp -r /mnt/persist/var/lib/sbctl/* /persist/etc/secureboot/
 ```
 
