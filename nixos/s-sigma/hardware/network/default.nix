@@ -1,7 +1,6 @@
 { pkgs, ... }:
 {
   imports = [
-    ./all-interfaces.nix
-    ./temp-all.nix
+    ./setup-with-one-mgmt.nix
   ];
 }

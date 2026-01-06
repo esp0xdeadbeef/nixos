@@ -64,7 +64,7 @@ if echo "$RSYNC_OUT" | awk '{print $2}' | grep -E "$FILE_REGEX" | grep -E "$HOST
     'sudo nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) --no-write-lock-file'
 
   echo "[*] Rebooting $HOST..."
-  ssh "$SSH" 'sudo reboot'
+  ssh "$SSH" 'sudo systemctl kexec; sudo reboot'
   sleep 10
 else
   echo "[*] No relevant changes for $HOST"
