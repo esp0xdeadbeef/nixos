@@ -1,6 +1,8 @@
 { pkgs, ... }:
 {
   imports = [
-    ./setup-with-one-mgmt.nix
+    ./setup-mgmt.nix
+    ./qemu-and-fw.nix
+    ./setup-bridge-adapters.nix
   ];
 }
