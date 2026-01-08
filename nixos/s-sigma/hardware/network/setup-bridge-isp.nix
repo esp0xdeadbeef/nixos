@@ -18,8 +18,8 @@
   };
 
   ###### PHYSICAL NIC -> BRIDGE ######
-  systemd.network.networks."10-enp132s0f1" = {
-    matchConfig.Name = "enp132s0f1";
+  systemd.network.networks."10-eno1" = {
+    matchConfig.Name = "eno1";
     networkConfig = {
       Bridge = "vmbr1";
     };
