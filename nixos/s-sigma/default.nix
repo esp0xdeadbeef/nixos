@@ -40,6 +40,7 @@
     # autologin for this vm
     ../99-testing
     ./libvirt.nix
+    ./nixos-shell-servers/gameservers
   ];
 
   sops.defaultSopsFile = ../../secrets/s-sigma-root.yaml;

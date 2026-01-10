@@ -40,7 +40,7 @@
   };
 
   #############################################
-  # Minecraft – TEST (IPv6-only mirror)
+  # Minecraft – TEST
   #############################################
 
   virtualisation.oci-containers.containers.minecraft-test = {
@@ -57,7 +57,7 @@
 
     # IPv6-only bind
     ports = [
-      "[::]:25566:25565"
+      "25566:25565"
     ];
 
     volumes = [
@@ -83,8 +83,8 @@
     script = ''
       set -euo pipefail
 
-      SRC="/persist/minecraft/prod/world/"
-      DST="/persist/minecraft/test/world/"
+      SRC="/persist/minecraft/prod"
+      DST="/persist/minecraft/test"
 
       mkdir -p "$DST"
 

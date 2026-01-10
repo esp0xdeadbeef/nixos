@@ -295,11 +295,11 @@
             ./nixos/s-lxc-router/configuration.nix
           ];
         };
-        s-minecraft-server = nixpkgs.lib.nixosSystem {
+        s-gameservers = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/s-minecraft-server
+            ./nixos/s-gameservers
           ];
         };
       };
