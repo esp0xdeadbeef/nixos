@@ -302,6 +302,13 @@
             ./nixos/s-gameservers
           ];
         };
+        s-infra = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            inputs.nixos-shell.nixosModules.nixos-shell
+            ./nixos/s-infra
+          ];
+        };
       };
     };
 }
