@@ -7,6 +7,7 @@
 
 {
 
+  nixpkgs.hostPlatform = "x86_64-linux";
   virtualisation.qemu.networkingOptions = [
     "-nic bridge,br=vmbr4,model=virtio-net-pci"
     #"-netdev user"
@@ -32,6 +33,7 @@
   ];
 
   system.stateVersion = "25.11";
+  networking.hostName = "gameservers";
 
   ############################################################
   # Boot (EFI, image-friendly)

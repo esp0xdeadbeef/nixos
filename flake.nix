@@ -112,6 +112,11 @@
       url = "github:BrainWart/x13s-nixos";
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
+    # integrated:
+    # nix run github:Mic92/nixos-shell --  --flake .#vm
+    nixos-shell = {
+      url = "github:Mic92/nixos-shell";
+    };
   };
 
   outputs =
@@ -288,6 +293,13 @@
             # lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
             ./nixos/s-lxc-router/configuration.nix
+          ];
+        };
+        s-minecraft-server = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            inputs.nixos-shell.nixosModules.nixos-shell
+            ./nixos/s-minecraft-server
           ];
         };
       };
