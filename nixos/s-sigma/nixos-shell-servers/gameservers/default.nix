@@ -40,19 +40,13 @@
         nix run path:/home/deadbeef/github/nixos#nixosConfigurations.s-gameservers.config.system.build.nixos-shell
       '';
 
-      # Allow nix + root dir writes
-      #ReadWritePaths = [
-      #  "/nix"
-      #  "/var/lib/nixos-shell"
-      #  "/home/deadbeef"
-      #  "/persist/minecraft"
-      #];
-
-      #ProtectSystem = "strict";
       ProtectHome = "false";
       PrivateTmp = true;
       StateDirectory = "gameserver-vm";
-      WorkingDirectory = "/var/lib/gameserver-vm";
+      WorkingDirectory = "/persist/nix-shell-vms";
     };
   };
+systemd.tmpfiles.rules = [
+    "d /persist/nix-shell-vms 0755 root root -"
+  ];
 }

@@ -6,6 +6,11 @@
     25566
   ];
 
+networking.firewall.allowedUDPPortRanges = [
+  { from = 2456; to = 2458; }
+];
+
+
   virtualisation.podman = {
     enable = true;
     autoPrune.enable = true;
@@ -14,15 +19,41 @@
 
   virtualisation.oci-containers.backend = "podman";
 
+  
+  
+  virtualisation.oci-containers.containers.valheim-server = {
+    image = "docker.io/lloesche/valheim-server";
+    autoStart = true;
+
+    environment = {
+      SERVER_NAME="test-server";
+      SERVER_PASS="abc2222";
+      WORLD_NAME="test-world";
+      SERVER_PUBLIC="true";
+    };
+
+    ports = [
+      "2456-2458:2456-2458/udp"
+    ];
+
+    volumes = [
+      "/persist/game-servers/valheim/prod:/config"
+    ];
+
+    extraOptions = [
+      "--name=valheim-server"
+    ];
+  };
+
   virtualisation.oci-containers.containers.minecraft-prod = {
-    image = "itzg/minecraft-server";
+    image = "docker.io/itzg/minecraft-server";
     autoStart = true;
 
     environment = {
       VERSION = "1.21.11";
       EULA = "TRUE";
       TYPE = "SPIGOT";
-      MEMORY = "4G";
+      MEMORY = "8G";
       ENABLE_ROLLING_LOGS = "true";
     };
 
@@ -31,7 +62,7 @@
     ];
 
     volumes = [
-      "/persist/minecraft/prod:/data"
+      "/persist/game-servers/minecraft/prod:/data"
     ];
 
     extraOptions = [
@@ -39,29 +70,24 @@
     ];
   };
 
-  #############################################
-  # Minecraft – TEST
-  #############################################
-
   virtualisation.oci-containers.containers.minecraft-test = {
-    image = "itzg/minecraft-server";
+    image = "docker.io/itzg/minecraft-server";
     autoStart = true;
 
     environment = {
       VERSION = "1.21.11";
       EULA = "TRUE";
       TYPE = "SPIGOT";
-      MEMORY = "4G";
-      ONLINE_MODE = "false"; # useful for testing
+      MEMORY = "8G";
+      ENABLE_ROLLING_LOGS = "true";
     };
 
-    # IPv6-only bind
     ports = [
       "25566:25565"
     ];
 
     volumes = [
-      "/persist/minecraft/test:/data"
+      "/persist/game-servers/minecraft/test:/data"
     ];
 
     extraOptions = [
@@ -79,27 +105,29 @@
       Type = "oneshot";
       User = "root";
     };
+    path = [
+      pkgs.systemd
+      pkgs.rsync
+    ];
 
     script = ''
       set -euo pipefail
 
-      SRC="/persist/minecraft/prod"
-      DST="/persist/minecraft/test"
+      SRC="/persist/game-servers/minecraft/prod/"
+      DST="/persist/game-servers/minecraft/test/"
 
-      mkdir -p "$DST"
+      echo "[$(date -Is)] Stopping test server"
+      systemctl stop podman-minecraft-test.service
 
-      echo "[$(date -Is)] Starting Minecraft world sync"
-
-      # Stop test server to avoid corruption
-      ${pkgs.podman}/bin/podman stop minecraft-test || true
-
-      ${pkgs.rsync}/bin/rsync -a \
+      echo "[$(date -Is)] Syncing world data"
+      rsync -a \
         --delete \
         --numeric-ids \
         --inplace \
         "$SRC" "$DST"
 
-      ${pkgs.podman}/bin/podman start minecraft-test
+      echo "[$(date -Is)] Starting test server"
+      systemctl start podman-minecraft-test.service
 
       echo "[$(date -Is)] Sync complete"
     '';
@@ -108,8 +136,30 @@
   systemd.timers.minecraft-world-sync = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnCalendar = "*/4:00";
+
+      OnCalendar = "*-*-* 04:00:00";
       Persistent = true;
+    };
+  };
+
+  systemd.services.minecraft-world-test-message = {
+    description = "Test message service to the test-server with rcon-cli.";
+    serviceConfig = {
+      Type = "oneshot";
+      User = "root";
+    };
+    path = [ pkgs.podman ];
+
+    script = ''
+      podman exec minecraft-test rcon-cli say '!!!Test server!!!'
+    '';
+  };
+  systemd.timers.minecraft-world-test-message = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "minutely";
+      Persistent = true;
+      AccuracySec = "1s";
     };
   };
 
@@ -118,10 +168,8 @@
   #############################################
 
   systemd.tmpfiles.rules = [
-    "d /persist/minecraft 0755 root root -"
-    "d /persist/minecraft/prod 0755 root root -"
-    "d /persist/minecraft/prod/world 0755 root root -"
-    "d /persist/minecraft/test 0755 root root -"
-    "d /persist/minecraft/test/world 0755 root root -"
+    "d /persist/game-servers/minecraft/prod 0755 root root -"
+    "d /persist/game-servers/minecraft/test 0755 root root -"
+    "d /persist/game-servers/valheim/prod 0755 root root -"
   ];
 }

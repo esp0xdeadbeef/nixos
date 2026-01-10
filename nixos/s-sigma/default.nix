@@ -41,6 +41,7 @@
     ../99-testing
     ./libvirt.nix
     ./nixos-shell-servers/gameservers
+    ./nixos-shell-servers/infra
   ];
 
   sops.defaultSopsFile = ../../secrets/s-sigma-root.yaml;
