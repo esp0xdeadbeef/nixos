@@ -11,8 +11,11 @@ let
 
   nameAirvpn = "airvpn";
   nameMullvad = "mullvad";
+  vlan2 = "vlan2";
+  vlan4 = "vlan4";
   vlan5 = "vlan5";
   vlan6 = "vlan6";
+  vlan7 = "vlan7";
 
   mkVpnConfigService =
     name: tun: secretName:
@@ -32,45 +35,45 @@ in
 {
   networking.useNetworkd = lib.mkForce true;
 
-  # Default WAN (host keeps full routing only here)
-  networking.interfaces.ens19.useDHCP = true;
-
   # VLANs for downstream networks
   networking.vlans = {
-    lan5 = {
-      interface = "ens21";
+    vlan2 = {
+      interface = "eth1";
+      id = 2;
+    };
+    vlan4 = {
+      interface = "eth1";
+      id = 4;
+    };
+    vlan5 = {
+      interface = "eth1";
       id = 5;
     };
-    lan6 = {
-      interface = "ens21";
+    vlan6 = {
+      interface = "eth1";
       id = 6;
     };
-    lan100 = {
-      interface = "ens21";
-      id = 100;
-    };
-    lan3001 = {
-      interface = "ens21";
-      id = 3001;
+    vlan7 = {
+      interface = "eth1";
+      id = 7;
     };
   };
 
   # Bridges (used by containers)
   networking.bridges = {
-    br-lan5.interfaces = [ "lan5" ];
-    br-lan6.interfaces = [ "lan6" ];
-    br-ens19.interfaces = [ "ens19" ];
-    br-ens20.interfaces = [ "ens20" ];
-    br-lan100.interfaces = [ "lan100" ];
-    br-lan3001.interfaces = [ "lan3001" ];
+    br-vlan2.interfaces = [ "vlan2" ];
+    br-vlan4.interfaces = [ "vlan4" ];
+    br-vlan5.interfaces = [ "vlan5" ];
+    br-vlan6.interfaces = [ "vlan6" ];
+    br-vlan7.interfaces = [ "vlan7" ];
   };
 
   # Disable autoconfig on non-primary adapters and bridges
   systemd.network = {
     enable = true;
     networks = {
-      "ens20" = {
-        matchConfig.Name = "ens20";
+      "eth1" = {
+        matchConfig.Name = "eth1";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -79,18 +82,8 @@ in
           ConfigureWithoutCarrier = true;
         };
       };
-      "ens21" = {
-        matchConfig.Name = "ens21";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          IPv6AcceptRA = false;
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-      "br-ens19" = {
-        matchConfig.Name = "br-ens19";
+      "br-vlan2" = {
+        matchConfig.Name = "br-vlan2";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -98,8 +91,8 @@ in
           ConfigureWithoutCarrier = true;
         };
       };
-      "br-ens20" = {
-        matchConfig.Name = "br-ens20";
+      "br-vlan4" = {
+        matchConfig.Name = "br-vlan4";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -107,8 +100,8 @@ in
           ConfigureWithoutCarrier = true;
         };
       };
-      "br-lan5" = {
-        matchConfig.Name = "br-lan5";
+      "br-vlan5" = {
+        matchConfig.Name = "br-vlan5";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -116,8 +109,8 @@ in
           ConfigureWithoutCarrier = true;
         };
       };
-      "br-lan6" = {
-        matchConfig.Name = "br-lan6";
+      "br-vlan6" = {
+        matchConfig.Name = "br-vlan6";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -125,17 +118,8 @@ in
           ConfigureWithoutCarrier = true;
         };
       };
-      "br-lan100" = {
-        matchConfig.Name = "br-lan100";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-      "br-lan3001" = {
-        matchConfig.Name = "br-lan3001";
+      "br-vlan7" = {
+        matchConfig.Name = "br-vlan7";
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           DHCP = "no";
@@ -150,12 +134,11 @@ in
   boot.kernel.sysctl = {
     "net.ipv6.conf.all.accept_ra" = 0;
     "net.ipv6.conf.default.accept_ra" = 0;
-    "net.ipv6.conf.br-ens19.accept_ra" = 0;
-    "net.ipv6.conf.br-ens20.accept_ra" = 0;
-    "net.ipv6.conf.br-lan5.accept_ra" = 0;
-    "net.ipv6.conf.br-lan6.accept_ra" = 0;
-    "net.ipv6.conf.br-lan100.accept_ra" = 0;
-    "net.ipv6.conf.br-lan3001.accept_ra" = 0;
+    "net.ipv6.conf.br-vlan2.accept_ra" = 0;
+    "net.ipv6.conf.br-vlan4.accept_ra" = 0;
+    "net.ipv6.conf.br-vlan5.accept_ra" = 0;
+    "net.ipv6.conf.br-vlan6.accept_ra" = 0;
+    "net.ipv6.conf.br-vlan7.accept_ra" = 0;
   };
 
   # VPN containers configuration
@@ -163,8 +146,8 @@ in
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-vlan4".hostBridge = "br-ens19";
-      "lan-vlan4".hostBridge = "br-ens20";
+      "wan-vlan4".hostBridge = "br-vlan7";
+      "lan-vlan4".hostBridge = "br-vlan4";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -188,41 +171,12 @@ in
       };
   };
 
-  containers."lan-to-vpn-vlan3000" = {
-    autoStart = true;
-    privateNetwork = true;
-    extraVeths = {
-      "wan-vlan3000".hostBridge = "br-ens19";
-      "lan-vlan3000".hostBridge = "br-lan3001";
-    };
-    bindMounts."/etc/vpn" = {
-      hostPath = "/etc/vpn";
-      isReadOnly = true;
-    };
-    config =
-      { pkgs, config, ... }:
-      {
-        imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
-        services.router-vpn-gateway = {
-          enable = true;
-          wanInterface = "wan-vlan3000";
-          lanInterface = "lan-vlan3000";
-          vpnInterface = "tun1";
-          vpnProfile = "/etc/vpn/tun1.conf";
-          subnets.ipv4 = "10.12.0.1/24";
-          subnets.ipv6 = "fd11:dead:beef::1/64";
-          dhcp4.enable = true;
-          ra.enable = true;
-        };
-      };
-  };
-
   containers."lan-to-vpn-vlan5" = {
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-vlan5".hostBridge = "br-ens19";
-      "lan-vlan5".hostBridge = "br-lan5";
+      "wan-vlan5".hostBridge = "br-vlan7";
+      "lan-vlan5".hostBridge = "br-vlan5";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -250,8 +204,8 @@ in
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-vlan6".hostBridge = "br-ens19";
-      "lan-vlan6".hostBridge = "br-lan6";
+      "wan-vlan6".hostBridge = "br-vlan7";
+      "lan-vlan6".hostBridge = "br-vlan6";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -268,7 +222,7 @@ in
           vpnInterface = "tun3";
           vpnProfile = "/etc/vpn/tun3.conf";
           subnets.ipv4 = "10.14.0.1/24";
-          subnets.ipv6 = "fd13:dead:beef::1/64";
+          subnets.ipv6 = "fd14:dead:beef::1/64";
           dhcp4.enable = true;
           ra.enable = true;
         };
@@ -277,26 +231,17 @@ in
 
   systemd.services."container@lan-to-vpn-vlan4".serviceConfig.ConditionPathExists =
     "/etc/vpn/tun0.conf";
-  systemd.services."container@lan-to-vpn-vlan3000".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun1.conf";
   systemd.services."container@lan-to-vpn-vlan5".serviceConfig.ConditionPathExists =
     "/etc/vpn/tun2.conf";
   systemd.services."container@lan-to-vpn-vlan6".serviceConfig.ConditionPathExists =
     "/etc/vpn/tun3.conf";
 
-  # Decode VPN profiles from sops secrets
   sops.secrets."vpn-lan-to-vpn-vlan4" = {
     owner = "root";
     group = "root";
     mode = "0400";
   };
-  sops.secrets."vpn-lan-to-vpn-vlan3000" = {
-    owner = "root";
-    group = "root";
-    mode = "0400";
-  };
 
-  # Decode VPN profiles from sops secrets
   sops.secrets."vpn-lan-to-vpn-vlan5" = {
     owner = "root";
     group = "root";
@@ -310,7 +255,7 @@ in
   };
 
   systemd.services."write-vpn-config-vlan4" = {
-    description = "Decode AirVPN config";
+    description = "Decode config";
     wantedBy = [ "network-pre.target" ];
     before = [ "network-online.target" ];
     after = [ "local-fs.target" ];
@@ -320,19 +265,9 @@ in
     };
   };
 
-  systemd.services."write-vpn-config-vlan3000" = {
-    description = "Decode Mullvad config";
-    wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
-    after = [ "local-fs.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = mkVpnConfigService "vlan3000" "tun1" "vpn-lan-to-vpn-vlan3000";
-    };
-  };
 
   systemd.services."write-vpn-config-vlan5" = {
-    description = "Decode AirVPN config";
+    description = "Decode config";
     wantedBy = [ "network-pre.target" ];
     before = [ "network-online.target" ];
     after = [ "local-fs.target" ];
@@ -343,7 +278,7 @@ in
   };
 
   systemd.services."write-vpn-config-vlan6" = {
-    description = "Decode Mullvad config";
+    description = "Decode config";
     wantedBy = [ "network-pre.target" ];
     before = [ "network-online.target" ];
     after = [ "local-fs.target" ];
@@ -352,4 +287,5 @@ in
       ExecStart = mkVpnConfigService "vlan6" "tun3" "vpn-lan-to-vpn-vlan6";
     };
   };
+systemd.tmpfiles.rules = [ "d /etc/vpn 0755 root root -" ];
 }

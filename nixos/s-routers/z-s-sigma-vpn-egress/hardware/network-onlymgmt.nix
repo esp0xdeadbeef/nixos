@@ -6,9 +6,9 @@
 }:
 
 let
-  management_interface = "ens18";
-  upstream_VPN_interface = "ens19";
-  vpnNATInterface = "ens20";
+  management_interface = "eth0";
+  upstream_VPN_interface = "eth1";
+  vpnNATInterface = "eth2";
 
   vpnInterface = "tun0";
   vpnConfBasePath = "/etc/vpn";

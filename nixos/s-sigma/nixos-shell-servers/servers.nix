@@ -15,11 +15,11 @@ in
 
     (mkVM "s-gameservers" {
       description = "Gameserver VM (nixos-shell)";
-      keep = 2;
+      keep = 1;
     })
     (mkVM "s-sigma-s-router-vpn-egress" {
-      description = "Gameserver VM (nixos-shell)";
-      keep = 2;
+      description = "VPN-egress VM (nixos-shell)";
+      keep = 1;
     })
   ];
 }

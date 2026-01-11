@@ -1,6 +1,6 @@
 { config, pkgs, lib, ... }:
 {
-  services.openssh.enable = true;
+  services.openssh.enable = lib.mkDefault true;
   users.users = {
     deadbeef = {
       openssh.authorizedKeys.keys = [

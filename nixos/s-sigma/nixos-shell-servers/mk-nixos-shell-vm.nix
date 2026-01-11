@@ -6,6 +6,7 @@ name:
   keep ? 1,
   workingDir ? "/persist/nix-shell-vms",
   extraTmpfiles ? [ ],
+  repostiory ? "path:/home/deadbeef/github/nixos",
 }:
 
 let
@@ -27,6 +28,7 @@ in
       pkgs.nix
       pkgs.socat
       pkgs.coreutils
+      pkgs.screen
     ];
 
     serviceConfig = {
@@ -40,6 +42,7 @@ in
       # -------------------------
       ExecStart = pkgs.writeShellScript "start-${serviceName}" ''
         set -euo pipefail
+        cd ${workingDir}
 
         ROOT_DIR=/var/lib/nixos-shell
         KEEP=${toString keep}
@@ -50,7 +53,7 @@ in
         OUT="$ROOT_DIR/$VM_NAME-$(date --rfc-3339=seconds | sed 's/ /_/g')"
 
         nix build \
-          path:/home/deadbeef/github/nixos#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
+          ${repostiory}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
           --out-link "$OUT"
 
         ls -dt "$ROOT_DIR"/"$VM_NAME"-* 2>/dev/null \
@@ -59,8 +62,8 @@ in
 
         export QEMU_OPTS="-qmp unix:${qmpSocket},server=on,wait=off"
 
-        exec nix run \
-          path:/home/deadbeef/github/nixos#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell
+        exec screen -DmS "$VM_NAME" nix run \
+          ${repostiory}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell
       '';
 
       # -------------------------
@@ -100,6 +103,7 @@ in
 
   systemd.tmpfiles.rules = [
     "d ${workingDir} 0755 root root -"
+    "d /persist/vm-persists/${name} 0755 root root -"
     # DO NOT pre-create the QMP socket as a regular file.
     # QEMU creates the unix socket itself.
     # "f ${qmpSocket} 0660 root root -"

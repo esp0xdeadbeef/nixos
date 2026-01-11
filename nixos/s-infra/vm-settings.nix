@@ -24,7 +24,8 @@
   nixos-shell.mounts = {
     mountHome = false;
     extraMounts = {
-      "/var/lib/containers/storage" = /var/lib/containers/storage;
+      # this gives errors on minecraft, will happen here also.
+      #"/var/lib/containers/storage" = /var/lib/containers/storage;
       "/var/lib/unifi" = "/persist/infra/unifi";
       "/root/.ssh" = "/persist/infra/ssh-root";
       "/etc/ssh" = "/persist/infra/ssh-base-keys";
