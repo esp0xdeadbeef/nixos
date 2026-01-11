@@ -10,16 +10,24 @@ name:
 
 let
   serviceName = "${name}-vm";
+  qmpSocket = "/run/${serviceName}.qmp";
 in
 {
   systemd.services.${serviceName} = {
     inherit description;
 
-    after = [ "network-online.target" "nix-daemon.service" ];
+    after = [
+      "network-online.target"
+      "nix-daemon.service"
+    ];
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
 
-    path = [ pkgs.nix ];
+    path = [
+      pkgs.nix
+      pkgs.socat
+      pkgs.coreutils
+    ];
 
     serviceConfig = {
       Type = "simple";
@@ -27,6 +35,9 @@ in
       RestartSec = 10;
       User = "root";
 
+      # -------------------------
+      # START
+      # -------------------------
       ExecStart = pkgs.writeShellScript "start-${serviceName}" ''
         set -euo pipefail
 
@@ -46,9 +57,39 @@ in
           | tail -n +$((KEEP+1)) \
           | xargs -r rm
 
+        export QEMU_OPTS="-qmp unix:${qmpSocket},server=on,wait=off"
+
         exec nix run \
           path:/home/deadbeef/github/nixos#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell
       '';
+
+      # -------------------------
+      # STOP (graceful ACPI)
+      # -------------------------
+      ExecStop = pkgs.writeShellScript "stop-${serviceName}" ''
+        set -u
+
+        if [ -S "${qmpSocket}" ]; then
+          printf '%s\n' \
+            '{"execute":"qmp_capabilities"}' \
+            '{"execute":"system_powerdown"}' \
+          | ${pkgs.socat}/bin/socat - UNIX-CONNECT:${qmpSocket} || true
+        fi
+
+        # Wait until QEMU exits (socket disappears)
+        while [ -S "${qmpSocket}" ]; do
+          sleep 1
+        done
+      '';
+
+      # Give the guest time to shut down cleanly
+      TimeoutStopSec = "2min";
+
+      # CRITICAL: don't SIGTERM the whole cgroup immediately
+      KillMode = "process";
+
+      # Optional: keep default KillSignal (SIGTERM) is fine.
+      # KillSignal = "SIGTERM";
 
       ProtectHome = false;
       PrivateTmp = true;
@@ -57,8 +98,11 @@ in
     };
   };
 
-  systemd.tmpfiles.rules =
-    [ "d ${workingDir} 0755 root root -" ]
-    ++ extraTmpfiles;
+  systemd.tmpfiles.rules = [
+    "d ${workingDir} 0755 root root -"
+    # DO NOT pre-create the QMP socket as a regular file.
+    # QEMU creates the unix socket itself.
+    # "f ${qmpSocket} 0660 root root -"
+  ]
+  ++ extraTmpfiles;
 }
-
