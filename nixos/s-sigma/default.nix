@@ -27,10 +27,6 @@
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
-    ./hardware
-    # /mnt/nas/private # directory from proxmox
-    ./connect-nas
-
     # still need to destill this:
     ../01-general
     # good env:
@@ -39,9 +35,13 @@
     ../02-window-manager-i3
     # autologin for this vm
     ../99-testing
+    
+    # local nix files:
     ./libvirt.nix
     ./nixos-shell-servers/gameservers
     ./nixos-shell-servers/infra
+    ./hardware
+    ./connect-nas
   ];
 
   sops.defaultSopsFile = ../../secrets/s-sigma-root.yaml;

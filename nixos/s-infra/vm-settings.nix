@@ -25,7 +25,9 @@
     mountHome = false;
     extraMounts = {
       "/var/lib/containers/storage" = /var/lib/containers/storage;
-      "/persist/infra/unifi" = /usr/lib/unifi/data;
+      #"/persist/infra/unifi" = /usr/lib/unifi/data;
+
+    "/var/lib/unifi" = "/persist/infra/unifi";
     };
   };
 
