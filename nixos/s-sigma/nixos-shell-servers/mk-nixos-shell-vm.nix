@@ -6,7 +6,8 @@ name:
   keep ? 1,
   workingDir ? "/persist/nix-shell-vms",
   extraTmpfiles ? [ ],
-  repostiory ? "path:/home/deadbeef/github/nixos",
+  #repostiory ? "path:/home/deadbeef/github/nixos",
+  repostiory ? "github:esp0xdeadbeef/nixos",
 }:
 
 let
