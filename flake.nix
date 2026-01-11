@@ -309,6 +309,14 @@
             ./nixos/s-infra
           ];
         };
+        s-sigma-s-router-vpn-egress = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            inputs.nixos-shell.nixosModules.nixos-shell
+            # > Our main nixos configuration file <
+            ./nixos/s-routers/z-s-sigma-vpn-egress/default.nix
+          ];
+        };
       };
     };
 }

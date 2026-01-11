@@ -26,6 +26,8 @@
     extraMounts = {
       "/persist/game-servers" = /persist/game-servers;
       "/var/lib/containers/storage" = /var/lib/containers/storage;
+      "/root/.ssh" = "/persist/gameservers/ssh-root";
+      "/etc/ssh" = "/persist/gameservers/ssh-base-keys";
     };
   };
 
