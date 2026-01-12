@@ -1,4 +1,4 @@
-{ pkgs, lib }:
+{ pkgs, lib, self }:
 
 name:
 {
@@ -6,15 +6,28 @@ name:
   keep ? 1,
   workingDir ? "/persist/nix-shell-vms",
   extraTmpfiles ? [ ],
-  #repostiory ? "path:/home/deadbeef/github/nixos",
-  repostiory ? "github:esp0xdeadbeef/nixos",
+  repository ? "path:${self.outPath}",
 }:
 
 let
   serviceName = "${name}-vm";
   qmpSocket = "/run/${serviceName}.qmp";
+
+  flakeRef = "${repository}";
+
+  activationName = "buildDependentVM-${name}";
 in
 {
+  # Build the VM derivation during activation (host-side)
+  # NOTE: must be unique per VM, otherwise snippets overwrite each other.
+  system.activationScripts.${activationName}.text = ''
+    set -euo pipefail
+    echo "Building dependent VM ${name}..."
+
+    ${pkgs.nix}/bin/nix build \
+      ${flakeRef}#nixosConfigurations.${name}.config.system.build.nixos-shell
+  '';
+
   systemd.services.${serviceName} = {
     inherit description;
 
@@ -25,6 +38,7 @@ in
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
 
+    # Optional; you're already using absolute paths in scripts now.
     path = [
       pkgs.nix
       pkgs.socat
@@ -38,9 +52,6 @@ in
       RestartSec = 10;
       User = "root";
 
-      # -------------------------
-      # START
-      # -------------------------
       ExecStart = pkgs.writeShellScript "start-${serviceName}" ''
         set -euo pipefail
         cd ${workingDir}
@@ -51,10 +62,10 @@ in
 
         mkdir -p "$ROOT_DIR"
 
-        OUT="$ROOT_DIR/$VM_NAME-$(date --rfc-3339=seconds | sed 's/ /_/g')"
+        OUT="$ROOT_DIR/$VM_NAME-$(date --rfc-3339=seconds | tr ' ' '_')"
 
-        nix build \
-          ${repostiory}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
+        ${pkgs.nix}/bin/nix build \
+          ${flakeRef}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
           --out-link "$OUT"
 
         ls -dt "$ROOT_DIR"/"$VM_NAME"-* 2>/dev/null \
@@ -63,13 +74,11 @@ in
 
         export QEMU_OPTS="-qmp unix:${qmpSocket},server=on,wait=off"
 
-        exec screen -DmS "$VM_NAME" nix run \
-          ${repostiory}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell
+        exec ${pkgs.screen}/bin/screen -DmS "$VM_NAME" \
+          ${pkgs.nix}/bin/nix run \
+          ${flakeRef}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell
       '';
 
-      # -------------------------
-      # STOP (graceful ACPI)
-      # -------------------------
       ExecStop = pkgs.writeShellScript "stop-${serviceName}" ''
         set -u
 
@@ -80,20 +89,13 @@ in
           | ${pkgs.socat}/bin/socat - UNIX-CONNECT:${qmpSocket} || true
         fi
 
-        # Wait until QEMU exits (socket disappears)
         while [ -S "${qmpSocket}" ]; do
           sleep 1
         done
       '';
 
-      # Give the guest time to shut down cleanly
       TimeoutStopSec = "2min";
-
-      # CRITICAL: don't SIGTERM the whole cgroup immediately
       KillMode = "process";
-
-      # Optional: keep default KillSignal (SIGTERM) is fine.
-      # KillSignal = "SIGTERM";
 
       ProtectHome = false;
       PrivateTmp = true;
@@ -102,12 +104,11 @@ in
     };
   };
 
-  systemd.tmpfiles.rules = [
-    "d ${workingDir} 0755 root root -"
-    "d /persist/vm-persists/${name} 0755 root root -"
-    # DO NOT pre-create the QMP socket as a regular file.
-    # QEMU creates the unix socket itself.
-    # "f ${qmpSocket} 0660 root root -"
-  ]
-  ++ extraTmpfiles;
+  systemd.tmpfiles.rules =
+    [
+      "d ${workingDir} 0755 root root -"
+      "d /persist/vm-persists/${name} 0755 root root -"
+    ]
+    ++ extraTmpfiles;
 }
+

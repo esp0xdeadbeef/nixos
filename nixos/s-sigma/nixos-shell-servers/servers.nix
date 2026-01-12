@@ -1,7 +1,7 @@
-{ lib, pkgs, ... }:
+{ lib, pkgs,self, ... }:
 
 let
-  mkVM = import ./mk-nixos-shell-vm.nix { inherit pkgs lib; };
+  mkVM = import ./mk-nixos-shell-vm.nix { inherit pkgs lib self; };
 in
 {
   config = lib.mkMerge [
