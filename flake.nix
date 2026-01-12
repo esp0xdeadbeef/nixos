@@ -184,7 +184,8 @@
           ];
         };
         s-sigma = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
+          # got the self arg, to build vms:
+          specialArgs = { inherit inputs outputs self; };
           modules = [
             # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
@@ -315,6 +316,14 @@
             inputs.nixos-shell.nixosModules.nixos-shell
             # > Our main nixos configuration file <
             ./nixos/s-routers/z-s-sigma-vpn-egress/default.nix
+          ];
+        };
+        s-more-threads-then-the-host = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            #inputs.nixos-shell.nixosModules.nixos-shell
+            # > Our main nixos configuration file <
+            ./nixos/s-more-threads-then-the-host
           ];
         };
       };
