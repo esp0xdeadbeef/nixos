@@ -228,16 +228,16 @@
           ];
         };
 
-        # router-access
-        #  - Receives one or more IPv6 prefixes from router-edge
-        #  - Does not perform upstream prefix delegation
-        #  - Advertises client-facing prefixes via RA (typically /64 for SLAAC)
-        #  - Hosts client VLANs
-        s-router-access = nixpkgs.lib.nixosSystem {
+        # router-edge
+        #  - Aggregates routing
+        #  - Slices prefixes
+        #  - Decides allocation policy
+        s-sigma-s-router-edge = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
-            ./nixos/s-routers/3-access/configuration.nix
+            inputs.nixos-shell.nixosModules.nixos-shell
+
+            ./nixos/s-routers/2-s-sigma-edge
           ];
         };
 

@@ -1,4 +1,9 @@
-{ lib, pkgs,self, ... }:
+{
+  lib,
+  pkgs,
+  self,
+  ...
+}:
 
 let
   mkVM = import ./mk-nixos-shell-vm.nix { inherit pkgs lib self; };
@@ -20,6 +25,11 @@ in
     (mkVM "s-sigma-s-router-vpn-egress" {
       description = "VPN-egress VM (nixos-shell)";
       keep = 1;
+    })
+    (mkVM "s-sigma-s-router-edge" {
+      description = "s-router-edge VM (nixos-shell)";
+      keep = 1;
+      repository = "path:/home/deadbeef/github/nixos";
     })
   ];
 }

@@ -1,10 +1,17 @@
-{ pkgs, lib, self }:
+{
+  pkgs,
+  lib,
+  self,
+}:
 
 name:
 {
   description ? "NixOS VM (nixos-shell)",
   keep ? 1,
+  # this is the working dir for the qcow2 files.
   workingDir ? "/persist/nix-shell-vms",
+  # this is the dir where /persist is mounted in the vm.
+  persistDir ? "/persist/vm-persists",
   extraTmpfiles ? [ ],
   repository ? "path:${self.outPath}",
 }:
@@ -12,9 +19,7 @@ name:
 let
   serviceName = "${name}-vm";
   qmpSocket = "/run/${serviceName}.qmp";
-
   flakeRef = "${repository}";
-
   activationName = "buildDependentVM-${name}";
 in
 {
@@ -104,11 +109,10 @@ in
     };
   };
 
-  systemd.tmpfiles.rules =
-    [
-      "d ${workingDir} 0755 root root -"
-      "d /persist/vm-persists/${name} 0755 root root -"
-    ]
-    ++ extraTmpfiles;
+  systemd.tmpfiles.rules = [
+    "d ${workingDir} 0755 root root -"
+    "d ${persistDir} 0755 root root -"
+    "d /persist/vm-persists/${name} 0755 root root -"
+  ]
+  ++ extraTmpfiles;
 }
-
