@@ -1,7 +1,8 @@
-{ pkgs,self, ... }:
-{
+{ config, lib, pkgs, self, ... }:
+
+lib.mkIf (!config.system.build.installing) {
   imports = [
-    #./mk-nixos-shell-vm.nix # this is the generator, don't use it.
     ./servers.nix
   ];
 }
+

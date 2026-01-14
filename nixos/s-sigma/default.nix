@@ -38,7 +38,7 @@
     
     # local nix files:
     ./libvirt.nix
-    #./nixos-shell-servers
+    ./nixos-shell-servers
     ./hardware
     ./connect-nas
   ];
