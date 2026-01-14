@@ -20,19 +20,8 @@ let
   serviceName = "${name}-vm";
   qmpSocket = "/run/${serviceName}.qmp";
   flakeRef = "${repository}";
-  activationName = "buildDependentVM-${name}";
 in
 {
-  # Build the VM derivation during activation (host-side)
-  # NOTE: must be unique per VM, otherwise snippets overwrite each other.
-  system.activationScripts.${activationName}.text = ''
-    set -euo pipefail
-    echo "Building dependent VM ${name}..."
-
-    ${pkgs.nix}/bin/nix build \
-      ${flakeRef}#nixosConfigurations.${name}.config.system.build.nixos-shell
-  '';
-
   systemd.services.${serviceName} = {
     inherit description;
 
@@ -41,9 +30,10 @@ in
       "nix-daemon.service"
     ];
     wants = [ "network-online.target" ];
-    wantedBy = [ "multi-user.target" ];
 
-    # Optional; you're already using absolute paths in scripts now.
+    # ⛔ REMOVED wantedBy to prevent boot-time execution
+    # wantedBy = [ "multi-user.target" ];
+
     path = [
       pkgs.nix
       pkgs.socat
@@ -108,11 +98,21 @@ in
       WorkingDirectory = workingDir;
     };
   };
+  systemd.timers.${serviceName} = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "1sec";
+      Unit = serviceName;
+    };
+  };
 
-  systemd.tmpfiles.rules = [
-    "d ${workingDir} 0755 root root -"
-    "d ${persistDir} 0755 root root -"
-    "d /persist/vm-persists/${name} 0755 root root -"
-  ]
-  ++ extraTmpfiles;
+
+  systemd.tmpfiles.rules =
+    [
+      "d ${workingDir} 0755 root root -"
+      "d ${persistDir} 0755 root root -"
+      "d /persist/vm-persists/${name} 0755 root root -"
+    ]
+    ++ extraTmpfiles;
 }
+
