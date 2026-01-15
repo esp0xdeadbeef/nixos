@@ -26,7 +26,7 @@
     ./hardware
     ./llms
     ./neovim-configuration
-    ./osee
+    #./osee
     ./signal
     ./torrents
     ./unmount-pentest-directory
