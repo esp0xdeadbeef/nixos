@@ -24,8 +24,10 @@ let
       mkdir -p /etc/vpn/
       secret_path="${config.sops.secrets.${secretName}.path}"
       if [ -f "$secret_path" ] && [ -s "$secret_path" ]; then
-        cat "$secret_path" | ${pkgs.coreutils}/bin/base64 -d > /etc/vpn/${tun}.conf
-        chmod 600 /etc/vpn/${tun}.conf
+        tmp=$(mktemp)
+        ${pkgs.coreutils}/bin/base64 -d "$secret_path" > "$tmp"
+        install -m 600 "$tmp" "/etc/vpn/${tun}.conf"
+        rm "$tmp"
       else
         echo "[ERROR] VPN config secret missing or empty: $secret_path" >&2
         exit 1
@@ -229,13 +231,7 @@ in
       };
   };
 
-  systemd.services."container@lan-to-vpn-vlan4".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun0.conf";
-  systemd.services."container@lan-to-vpn-vlan5".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun2.conf";
-  systemd.services."container@lan-to-vpn-vlan6".serviceConfig.ConditionPathExists =
-    "/etc/vpn/tun3.conf";
-
+  # Secrets for VPN configs
   sops.secrets."vpn-lan-to-vpn-vlan4" = {
     owner = "root";
     group = "root";
@@ -254,23 +250,26 @@ in
     mode = "0400";
   };
 
+  # Ensure /etc/vpn exists early
+  systemd.tmpfiles.rules = [ "d /etc/vpn 0755 root root -" ];
+
+  # Write VPN configs (run once at boot, after sops is ready)
   systemd.services."write-vpn-config-vlan4" = {
+    enable = true;
     description = "Decode config";
-    wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
-    after = [ "local-fs.target" ];
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" "sops-nix.service" ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = mkVpnConfigService "vlan4" "tun0" "vpn-lan-to-vpn-vlan4";
     };
   };
 
-
   systemd.services."write-vpn-config-vlan5" = {
+    enable = true;
     description = "Decode config";
-    wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
-    after = [ "local-fs.target" ];
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" "sops-nix.service" ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = mkVpnConfigService "vlan5" "tun2" "vpn-lan-to-vpn-vlan5";
@@ -278,14 +277,30 @@ in
   };
 
   systemd.services."write-vpn-config-vlan6" = {
+    enable = true;
     description = "Decode config";
-    wantedBy = [ "network-pre.target" ];
-    before = [ "network-online.target" ];
-    after = [ "local-fs.target" ];
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" "sops-nix.service" ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = mkVpnConfigService "vlan6" "tun3" "vpn-lan-to-vpn-vlan6";
     };
   };
-systemd.tmpfiles.rules = [ "d /etc/vpn 0755 root root -" ];
+
+  # Make containers wait for their config file to be written
+  systemd.services."container@lan-to-vpn-vlan4" = {
+    requires = [ "write-vpn-config-vlan4.service" ];
+    after = [ "write-vpn-config-vlan4.service" ];
+  };
+
+  systemd.services."container@lan-to-vpn-vlan5" = {
+    requires = [ "write-vpn-config-vlan5.service" ];
+    after = [ "write-vpn-config-vlan5.service" ];
+  };
+
+  systemd.services."container@lan-to-vpn-vlan6" = {
+    requires = [ "write-vpn-config-vlan6.service" ];
+    after = [ "write-vpn-config-vlan6.service" ];
+  };
 }
+

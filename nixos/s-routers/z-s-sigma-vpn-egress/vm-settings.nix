@@ -18,8 +18,8 @@
 
   virtualisation.qemu.networkingOptions = lib.mkForce [
     "-nic none" # disable NAT.
-    "-nic bridge,br=vmbr0,mac=BA:24:11:8D:59:5D,model=virtio-net-pci"
-    "-nic bridge,br=vmbr4,mac=BC:24:11:1D:0E:B9,model=virtio-net-pci"
+    "-nic bridge,br=vmbr0,mac=BA:24:11:8D:19:5D,model=virtio-net-pci"
+    "-nic bridge,br=vmbr4,mac=BC:24:11:1D:1E:B9,model=virtio-net-pci"
   ];
   
   #services.openssh.permitRootLogin = lib.mkForce "yes";

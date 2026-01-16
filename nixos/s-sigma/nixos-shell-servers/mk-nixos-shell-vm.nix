@@ -31,9 +31,6 @@ in
     ];
     wants = [ "network-online.target" ];
 
-    # ⛔ REMOVED wantedBy to prevent boot-time execution
-    # wantedBy = [ "multi-user.target" ];
-
     path = [
       pkgs.nix
       pkgs.socat

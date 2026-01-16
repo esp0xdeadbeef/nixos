@@ -25,11 +25,13 @@ in
     (mkVM "s-sigma-s-router-vpn-egress" {
       description = "VPN-egress VM (nixos-shell)";
       keep = 1;
+      repository = "path:/home/deadbeef/github/nixos";
     })
     (mkVM "s-sigma-s-router-edge" {
       description = "s-router-edge VM (nixos-shell)";
       keep = 1;
       #repository = "path:/home/deadbeef/github/nixos";
+      repository = "path:/home/deadbeef/github/nixos";
     })
   ];
 }
