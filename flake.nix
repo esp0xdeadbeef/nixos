@@ -266,8 +266,7 @@
           modules = [
             lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
-            ./nixos/l-werk/configuration.nix
-          ];
+            ./nixos/laptop/l-werk          ];
         };
         # private laptop:
         l-esp = nixpkgs.lib.nixosSystem {
@@ -275,7 +274,7 @@
           modules = [
             lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
-            ./nixos/l-esp
+            ./nixos/laptops/l-esp
           ];
         };
         # lxc server

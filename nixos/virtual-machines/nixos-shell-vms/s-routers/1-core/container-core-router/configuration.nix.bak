@@ -1,0 +1,24 @@
+{ pkgs, lib, ... }:
+{
+  imports = [
+    ./wan.nix
+    ./debugging-packages.nix
+    ./firewall.nix
+    ./upstream.nix
+    ./kernel.nix
+    ./kea-dhcp6.nix
+  ];
+
+  system.stateVersion = "25.11";
+
+  services.resolved.enable = false;
+  services.dbus.enable = true;
+
+  networking.useNetworkd = true;
+  systemd.network.enable = true;
+  networking.useDHCP = false;
+  networking.useHostResolvConf = lib.mkForce false;
+
+  systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
+
+}
