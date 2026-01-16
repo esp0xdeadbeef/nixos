@@ -72,29 +72,23 @@
       ../01-general/virtualization-as-host/podman.nix
     */
 
-    ./hardware/bootloader.nix
-    ./hardware/boot-package.nix
-    ./hardware/force-update.nix
-    ./hardware/hardware-configuration.nix
-    ./hardware/impermanence.nix
-    ./hardware/lanzaboote.nix
-    ./hardware/swap-and-tmpfs.nix
+    ../../../../01-general/packages/1-general/tooling.nix
 
-    ../../01-general/packages/1-general/tooling.nix
-
-    ../../01-general/desktop/shell-env.nix
-    ../../01-general/system/autoupdate.nix
-    ../../99-testing/autologin.nix
-    ../../01-general/system/garbage-collection.nix
-    ../../01-general/time/timezone.nix
+    ../../../../01-general/desktop/shell-env.nix
+    ../../../../01-general/system/autoupdate.nix
+    #../../99-testing/autologin.nix
+    ../../../../01-general/system/garbage-collection.nix
+    ../../../../01-general/time/timezone.nix
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
     ./container-network.nix
+    ./network-onlymgmt.nix
+    ./vm-settings.nix
   ];
 
-  sops.defaultSopsFile = ../../../secrets/s-router-impermanence-root.yaml;
+  sops.defaultSopsFile = ../../../../../secrets/s-router-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
   sops.secrets."deadbeef-passwd" = {
@@ -165,7 +159,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-router-edge";
+  networking.hostName = "s-sigma-s-router-edge";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
@@ -222,5 +216,4 @@
     }
   ];
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "24.11";
 }

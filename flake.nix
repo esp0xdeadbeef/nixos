@@ -191,7 +191,7 @@
             lanzaboote.nixosModules.lanzaboote
 
             # > Our main nixos configuration file <
-            ./nixos/s-sigma
+            ./nixos/server/s-sigma
           ];
         };
         s-test-vm-impermanence = nixpkgs.lib.nixosSystem {
@@ -237,7 +237,7 @@
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
 
-            ./nixos/s-routers/2-s-sigma-edge
+            ./nixos/virtual-machine/nixos-shell-vms/s-routers/2-edge
           ];
         };
 
@@ -266,7 +266,8 @@
           modules = [
             lanzaboote.nixosModules.lanzaboote
             # > Our main nixos configuration file <
-            ./nixos/laptop/l-werk          ];
+            ./nixos/laptop/l-werk
+          ];
         };
         # private laptop:
         l-esp = nixpkgs.lib.nixosSystem {
@@ -286,27 +287,18 @@
             ./nixos/s-lxc-test/configuration.nix
           ];
         };
-        # lxc server
-        s-lxc-router = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            # lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
-            ./nixos/s-lxc-router/configuration.nix
-          ];
-        };
         s-gameservers = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/s-gameservers
+            ./nixos/virtual-machine/nixos-shell-vms/s-gameservers
           ];
         };
         s-infra = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/s-infra
+            ./nixos/virtual-machine/nixos-shell-vms/s-infra
           ];
         };
         s-sigma-s-router-vpn-egress = nixpkgs.lib.nixosSystem {
@@ -314,7 +306,7 @@
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
             # > Our main nixos configuration file <
-            ./nixos/s-routers/z-s-sigma-vpn-egress/default.nix
+            ./nixos/virtual-machine/nixos-shell-vms/s-routers/z-vpn-egress/default.nix
           ];
         };
         s-more-threads-then-the-host = nixpkgs.lib.nixosSystem {

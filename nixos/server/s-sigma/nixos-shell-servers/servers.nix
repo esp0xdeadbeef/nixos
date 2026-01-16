@@ -16,6 +16,7 @@ in
       extraTmpfiles = [
         "d /persist/infra/unifi 0755 root root -"
       ];
+      repository = "path:/home/deadbeef/github/nixos";
     })
     (mkVM "s-sigma-s-router-edge" {
       description = "s-router-edge VM (nixos-shell)";
@@ -27,6 +28,7 @@ in
     (mkVM "s-gameservers" {
       description = "Gameserver VM (nixos-shell)";
       keep = 1;
+      repository = "path:/home/deadbeef/github/nixos";
     })
     (mkVM "s-sigma-s-router-vpn-egress" {
       description = "VPN-egress VM (nixos-shell)";
@@ -37,6 +39,7 @@ in
     (mkVM "s-test-vm-impermanence" {
       description = "s-test-vm (nixos-shell)";
       keep = 1;
+      repository = "path:/home/deadbeef/github/nixos";
     })
   ];
 }
