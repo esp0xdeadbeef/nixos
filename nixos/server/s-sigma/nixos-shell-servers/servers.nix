@@ -36,9 +36,9 @@ in
       repository = "path:/home/deadbeef/github/nixos";
     })
 
-    (mkVM "s-test-vm-impermanence" {
-      description = "s-test-vm (nixos-shell)";
-      keep = 1;
+    (mkVM "s-test" {
+      description = "s-test (nixos-shell)";
+      keep = 2;
       repository = "path:/home/deadbeef/github/nixos";
     })
   ];
