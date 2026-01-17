@@ -25,9 +25,6 @@
     mountHome = false;
     extraMounts = {
       "/persist/game-servers" = /persist/game-servers;
-      # gives errors like:
-      # Error: removing container efad71... from database: removing container efad... config from database: database disk image is malformed
-      #"/var/lib/containers/storage" = /var/lib/containers/storage;
       "/root/.ssh" = "/persist/gameservers/ssh-root";
       "/etc/ssh" = "/persist/gameservers/ssh-base-keys";
     };

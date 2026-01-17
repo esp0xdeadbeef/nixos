@@ -11,24 +11,40 @@
 {
   # You can import other NixOS modules here
   imports = [
-    ./vm-settings.nix
+    # If you want to use modules your own flake exports (from modules/nixos):
+    # outputs.nixosModules.example
 
-    ./containers/start_containers.nix
+    # Or modules from other flakes (such as nixos-hardware):
+    # inputs.hardware.nixosModules.common-cpu-intel
+    # inputs.hardware.nixosModules.common-ssd
 
-    # auto update the vm.
-    ../../../../01-general/desktop/shell-env.nix
+    # You can also split up your configuration and import pieces of it here:
+    # ./users.nix
+    # Import your generated (nixos-generate-config) hardware configuration
 
-    # it's a vm.. if you pwn the host you'll be able to login anyway.
-    #../../99-testing/autologin.nix
+    /*
+      # testing router config, disable:
+      STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    */
+
+    ./hardware/bootloader.nix
+    ./hardware/boot-package.nix
+    ./hardware/force-update.nix
+    ./hardware/hardware-configuration.nix
+    ./hardware/impermanence.nix
+    ./hardware/lanzaboote.nix
+    ./hardware/swap-and-tmpfs.nix
+
+    ../01-general/desktop/shell-env.nix
+    ../99-testing/autologin.nix
     # ../02-window-manager-i3/environment.nix
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
-    ../../../../99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix
-
   ];
 
-  sops.defaultSopsFile = ../../../../../secrets/s-router-vpn-impermanence-root.yaml;
+
+  sops.defaultSopsFile = ../../secrets/s-test-vm-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
   sops.secrets."deadbeef-passwd" = {
@@ -36,7 +52,7 @@
   };
 
   time.timeZone = "Europe/Amsterdam";
-
+  
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
 
@@ -44,6 +60,7 @@
     sops
     age
   ];
+
 
   nixpkgs = {
     # You can add overlays here
@@ -95,7 +112,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-router-vpn-egress";
+  networking.hostName = "s-test-vm-impermanence";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
@@ -129,7 +146,8 @@
       PasswordAuthentication = true;
     };
   };
-
+  
+  
   boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
@@ -150,5 +168,5 @@
     }
   ];
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "25.11";
+  system.stateVersion = "24.11";
 }

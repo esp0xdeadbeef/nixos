@@ -11,24 +11,38 @@
 {
   # You can import other NixOS modules here
   imports = [
-    ./vm-settings.nix
+    # If you want to use modules your own flake exports (from modules/nixos):
+    # outputs.nixosModules.example
 
-    ./containers/start_containers.nix
+    # Or modules from other flakes (such as nixos-hardware):
+    # inputs.hardware.nixosModules.common-cpu-intel
+    # inputs.hardware.nixosModules.common-ssd
 
-    # auto update the vm.
-    ../../../../01-general/desktop/shell-env.nix
+    # You can also split up your configuration and import pieces of it here:
+    # ./users.nix
+    # Import your generated (nixos-generate-config) hardware configuration
 
-    # it's a vm.. if you pwn the host you'll be able to login anyway.
-    #../../99-testing/autologin.nix
-    # ../02-window-manager-i3/environment.nix
+    ../../../01-general/desktop/shell-env.nix
+    #../../../99-testing/autologin.nix
+
+    # Will test this box if relyable for router firmware hosting:
+    ../../../01-general/virtualization-as-host/general.nix
+    ../../../01-general/virtualization-as-host/libvirt.nix
+    ../../../02-window-manager-i3
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
-    ../../../../99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix
 
+    # auto update the vm.
+    #../../../01-general/system/autoupdate.nix
+
+    # good env:
+    ../../../02-window-manager-i3
+    # Just testing, i need shit to be installed:
+    #../01-general
   ];
 
-  sops.defaultSopsFile = ../../../../../secrets/s-router-vpn-impermanence-root.yaml;
+  sops.defaultSopsFile = ../../../../secrets/s-test-vm-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
   sops.secrets."deadbeef-passwd" = {
@@ -43,7 +57,21 @@
   environment.systemPackages = with pkgs; [
     sops
     age
+    dmenu
   ];
+
+  home-manager = {
+    sharedModules = [
+      inputs.sops-nix.homeManagerModules.sops
+    ];
+    extraSpecialArgs = {
+      inherit inputs outputs;
+    };
+    users = {
+      # Import your home-manager configuration
+      deadbeef = import ../../../../home-manager/s-test-vm/home.nix;
+    };
+  };
 
   nixpkgs = {
     # You can add overlays here
@@ -95,7 +123,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-router-vpn-egress";
+  networking.hostName = "s-test-vm-impermanence";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
@@ -150,5 +178,5 @@
     }
   ];
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "25.11";
+  system.stateVersion = "24.11";
 }

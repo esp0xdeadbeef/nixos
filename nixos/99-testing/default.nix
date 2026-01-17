@@ -1,7 +1,7 @@
 { pkgs, ... }:
 {
   imports = [
-    ./autologin-ssh-and-tty.nix
+    ./enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix
     ./autologin.nix
   ];
 }

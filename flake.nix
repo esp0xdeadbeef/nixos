@@ -294,6 +294,13 @@
             ./nixos/virtual-machine/nixos-shell-vms/s-gameservers
           ];
         };
+        s-test = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          modules = [
+            inputs.nixos-shell.nixosModules.nixos-shell
+            ./nixos/virtual-machine/nixos-shell-vms/s-test
+          ];
+        };
         s-infra = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [

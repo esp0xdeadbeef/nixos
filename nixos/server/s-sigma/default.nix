@@ -31,7 +31,8 @@
     ../../01-general
     ../../02-window-manager-i3
     # autologin for this vm
-    ../../99-testing
+    #../../99-testing
+    ../../99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix
 
     # local nix files:
     ./libvirt.nix
