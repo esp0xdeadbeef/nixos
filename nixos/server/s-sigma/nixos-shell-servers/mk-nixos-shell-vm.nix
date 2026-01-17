@@ -46,7 +46,6 @@ in
       User = "root";
 
       ExecStart = pkgs.writeShellScript "start-${serviceName}" ''
-        set -euo pipefail
         cd ${workingDir}
 
         ROOT_DIR=/var/lib/nixos-shell
@@ -57,9 +56,11 @@ in
 
         OUT="$ROOT_DIR/$VM_NAME-$(date --rfc-3339=seconds | tr ' ' '_')"
 
+
+        # the only reason I do this, is to defeat the nix-gc.service:
         ${pkgs.nix}/bin/nix build \
           ${flakeRef}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
-          --out-link "$OUT"
+          --out-link "$OUT" & 
 
         ls -dt "$ROOT_DIR"/"$VM_NAME"-* 2>/dev/null \
           | tail -n +$((KEEP+1)) \
