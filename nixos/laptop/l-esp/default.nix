@@ -49,6 +49,8 @@
     nvidiaBusId = "PCI:01:00:0";
   };
 
+  services.fwupd.enable = true;
+
   # programs.nixvim = {
   #   enable = true;
   #   extraConfigLua = ''
