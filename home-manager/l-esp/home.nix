@@ -41,9 +41,9 @@ in
     ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/sway/packages.nix
     ./configs/tmuxp/packages.nix
-    ./projects/osee/create-x2go-profile.nix
-    ./projects/osee/start-lxc.nix
-    ./projects/osee/vm-settings-resize-guest.nix
+    #./projects/osee/create-x2go-profile.nix
+    #./projects/osee/start-lxc.nix
+    #./projects/osee/vm-settings-resize-guest.nix
 
     ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
