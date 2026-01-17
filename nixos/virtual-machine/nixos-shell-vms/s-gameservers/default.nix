@@ -4,6 +4,6 @@
     ./debug-packages.nix
     ./disk-layout.nix
     ./minecraft-services.nix
-    ../default-vm-settings
+    ../1-default-vm-settings
   ];
 }
