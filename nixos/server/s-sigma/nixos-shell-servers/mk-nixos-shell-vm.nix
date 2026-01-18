@@ -14,7 +14,7 @@ name:
   persistDir ? "/persist/vm-persists",
   extraTmpfiles ? [ ],
   repository ? "path:${self.outPath}",
-  restartTime ? 10,
+  restartTime ? 1,
 }:
 
 let
@@ -62,6 +62,7 @@ in
         ${pkgs.nix}/bin/nix build \
           ${flakeRef}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
           --out-link "$OUT" & 
+        sleep .1
 
         ls -dt "$ROOT_DIR"/"$VM_NAME"-* 2>/dev/null \
           | tail -n +$((KEEP+1)) \
