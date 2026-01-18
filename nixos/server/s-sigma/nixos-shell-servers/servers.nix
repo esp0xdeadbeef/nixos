@@ -10,15 +10,14 @@ let
 
   useLocalRepo = true;
 
-  repoArg =
-    if useLocalRepo
-    then "path:/home/deadbeef/github/nixos"
-    else null;
+  repoArg = if useLocalRepo then "path:/home/deadbeef/github/nixos" else null;
 
-  withRepo = attrs:
-    if repoArg == null
-    then builtins.removeAttrs attrs [ "repository" ]
-    else attrs // { repository = repoArg; };
+  withRepo =
+    attrs:
+    if repoArg == null then
+      builtins.removeAttrs attrs [ "repository" ]
+    else
+      attrs // { repository = repoArg; };
 
 in
 {
@@ -39,6 +38,7 @@ in
     (mkVM "s-gameservers" (withRepo {
       description = "Gameserver VM (nixos-shell)";
       keep = 1;
+      restartTime = 1;
     }))
 
     (mkVM "s-sigma-s-router-vpn-egress" (withRepo {
@@ -52,4 +52,3 @@ in
     }))
   ];
 }
-

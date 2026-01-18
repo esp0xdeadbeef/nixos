@@ -14,6 +14,7 @@ name:
   persistDir ? "/persist/vm-persists",
   extraTmpfiles ? [ ],
   repository ? "path:${self.outPath}",
+  restartTime ? 10,
 }:
 
 let
@@ -42,7 +43,7 @@ in
     serviceConfig = {
       Type = "simple";
       Restart = "always";
-      RestartSec = 10;
+      RestartSec = restartTime;
       User = "root";
 
       ExecStart = pkgs.writeShellScript "start-${serviceName}" ''
