@@ -62,7 +62,8 @@ in
         ${pkgs.nix}/bin/nix build \
           ${flakeRef}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
           --out-link "$OUT" & 
-        sleep .1
+        # a really small delay so the screen session doesn't use new internet connections.
+        sleep .3
 
         ls -dt "$ROOT_DIR"/"$VM_NAME"-* 2>/dev/null \
           | tail -n +$((KEEP+1)) \
