@@ -8,7 +8,7 @@
 let
   mkVM = import ./mk-nixos-shell-vm.nix { inherit pkgs lib self; };
 
-  useLocalRepo = true;
+  useLocalRepo = false;
 
   repoArg = if useLocalRepo then "path:/home/deadbeef/github/nixos" else null;
 
