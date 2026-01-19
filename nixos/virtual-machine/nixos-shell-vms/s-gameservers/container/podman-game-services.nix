@@ -6,10 +6,12 @@
     25566
   ];
 
-networking.firewall.allowedUDPPortRanges = [
-  { from = 2456; to = 2458; }
-];
-
+  networking.firewall.allowedUDPPortRanges = [
+    {
+      from = 2456;
+      to = 2458;
+    }
+  ];
 
   virtualisation.podman = {
     enable = true;
@@ -19,17 +21,15 @@ networking.firewall.allowedUDPPortRanges = [
 
   virtualisation.oci-containers.backend = "podman";
 
-  
-  
   virtualisation.oci-containers.containers.valheim-server = {
     image = "docker.io/lloesche/valheim-server";
     autoStart = true;
 
     environment = {
-      SERVER_NAME="test-server";
-      SERVER_PASS="abc2222";
-      WORLD_NAME="test-world";
-      SERVER_PUBLIC="true";
+      SERVER_NAME = "test-server";
+      SERVER_PASS = "abc2222";
+      WORLD_NAME = "test-world";
+      SERVER_PUBLIC = "true";
     };
 
     ports = [

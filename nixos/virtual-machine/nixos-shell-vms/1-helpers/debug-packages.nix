@@ -7,6 +7,7 @@
     neovim
     nmap
     nftables
+    dig
   ];
 
 }

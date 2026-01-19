@@ -8,30 +8,6 @@
 
   systemd.services.systemd-networkd-wait-online.enable = lib.mkForce false;
 
-  # Uplink/transit: lan1010
-  #systemd.network.networks."10-lan1010-uplink" = {
-  #  matchConfig.Name = "lan1010";
-
-  #  networkConfig = {
-  #    Address = "10.255.255.2/30";
-  #    Gateway = "10.255.255.1";
-
-  #    IPv6AcceptRA = true;
-  #    IPv6Forwarding = true;
-  #    DHCP = "ipv6";
-  #  };
-
-  #  dhcpV6Config = {
-  #    UseAddress = true;
-  #    UseDelegatedPrefix = false;
-  #  };
-  #};
-
-  #systemd.network.networks."00-ignore-lan1010" = {
-  #  matchConfig.Name = "lan1010";
-  #  linkConfig.Unmanaged = true;
-  #};
-
   systemd.network.networks."10-lan1010" = {
     matchConfig.Name = "lan1010";
 
@@ -44,22 +20,10 @@
         "10.255.255.1"
         "fd42:dead:beef:100::1"
       ];
-
-      #IPv6AcceptRA = true;
       IPv6AcceptRA = false;
       IPv6Forwarding = true;
-      #DHCP = "ipv6";
       DHCP = "no";
     };
-
-    #dhcpV6Config = {
-    #  UseAddress = true;
-    #  UseDelegatedPrefix = false;
-    #};
-
-    #ipv6AcceptRAConfig = {
-    #  UseAutonomousPrefix = true;
-    #};
   };
 
   # =========================
