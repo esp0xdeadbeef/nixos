@@ -61,8 +61,7 @@ in
       Restart = "on-failure";
     };
   };
+programs.adb.enable = true;
 
-  environment.persistence."/persist".directories = [
-    "/var/lib/waydroid"
-  ];
+
 }

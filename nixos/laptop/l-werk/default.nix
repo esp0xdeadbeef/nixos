@@ -24,7 +24,7 @@
     ./1-custom-packages/azurehound/package.nix
     ./1-custom-packages/burp-fix.nix
     ./1-custom-packages/mxbuild/package.nix
-    ./android/kde-connect.nix
+    ./android
     ./hardware/audio-and-bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
