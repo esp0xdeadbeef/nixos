@@ -8,7 +8,7 @@
 let
   mkVM = import ./mk-nixos-shell-vm.nix { inherit pkgs lib self; };
 
-  useLocalRepo = false;
+  useLocalRepo = true;
 
   repoArg = if useLocalRepo then "path:/home/deadbeef/github/nixos" else null;
 
@@ -49,6 +49,7 @@ in
     (mkVM "s-test" (withRepo {
       description = "s-test (nixos-shell)";
       keep = 2;
+      ephemeralRoot = true;
     }))
   ];
 }

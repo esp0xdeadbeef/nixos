@@ -15,15 +15,23 @@ name:
   extraTmpfiles ? [ ],
   repository ? "path:${self.outPath}",
   restartTime ? 1,
+  # NEW: if true, the VM disk is wiped before every start
+  ephemeralRoot ? false,
 }:
 
 let
   serviceName = "${name}-vm";
   qmpSocket = "/run/${serviceName}.qmp";
   flakeRef = "${repository}";
+
+  # Where nixos-shell keeps the VM disk by default
+  #qcow2Path = "/var/lib/nixos-shell/${name}.qcow2";
+  qcow2Path = "${workingDir}/${name}.qcow2";
+
 in
 {
   system.build.vmImages.${name} = self.nixosConfigurations.${name}.config.system.build.nixos-shell;
+
   systemd.services.${serviceName} = {
     inherit description;
 
@@ -46,7 +54,14 @@ in
       RestartSec = restartTime;
       User = "root";
 
+      # Make the chosen mode visible in journalctl
+      Environment = [
+        "NIXOS_SHELL_EPHEMERAL_ROOT=${if ephemeralRoot then "1" else "0"}"
+      ];
+
       ExecStart = pkgs.writeShellScript "start-${serviceName}" ''
+        set -eu
+
         cd ${workingDir}
 
         ROOT_DIR=/var/lib/nixos-shell
@@ -55,13 +70,17 @@ in
 
         mkdir -p "$ROOT_DIR"
 
+        ${lib.optionalString ephemeralRoot ''
+          echo "[nixos-shell] ephemeralRoot=true → deleting ${qcow2Path}"
+          rm -f "${qcow2Path}" || true
+        ''}
+
         OUT="$ROOT_DIR/$VM_NAME-$(date --rfc-3339=seconds | tr ' ' '_')"
 
-
-        # the only reason I do this, is to defeat the nix-gc.service:
+        # Build the VM derivation and keep a rolling window to defeat nix-gc
         ${pkgs.nix}/bin/nix build \
           ${flakeRef}#nixosConfigurations.$VM_NAME.config.system.build.nixos-shell \
-          --out-link "$OUT" & 
+          --out-link "$OUT" &
 
         ls -dt "$ROOT_DIR"/"$VM_NAME"-* 2>/dev/null \
           | tail -n +$((KEEP+1)) \
@@ -98,6 +117,7 @@ in
       WorkingDirectory = workingDir;
     };
   };
+
   systemd.timers.${serviceName} = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
