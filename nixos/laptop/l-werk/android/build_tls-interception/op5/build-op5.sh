@@ -1,3 +1,4 @@
+sudo nixos-firewall-tool open tcp 8082
 nix run path:.#inject-mitm-android-full
 echo remove the proxy with:
 echo "adb shell settings put global http_proxy :0"
