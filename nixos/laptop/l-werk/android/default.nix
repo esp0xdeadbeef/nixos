@@ -2,6 +2,6 @@
 {
   imports = [
     ./kde-connect.nix
-    ./waydroid.nix
+    #./waydroid.nix
   ];
 }
