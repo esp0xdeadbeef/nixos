@@ -11,6 +11,7 @@
 {
   # You can import other NixOS modules here
   imports = [
+
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
 
@@ -22,32 +23,19 @@
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
 
-    ../../../01-general/desktop/shell-env.nix
-    #../../../99-testing/autologin.nix
-
-    # Will test this box if relyable for router firmware hosting:
-    ../../../01-general/virtualization-as-host/general.nix
-    ../../../01-general/virtualization-as-host/libvirt.nix
-    ../../../02-window-manager-i3
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
-    # auto update the vm.
-    #../../../01-general/system/autoupdate.nix
+    # this box is a nixos-shell vm:
+    inputs.nixos-shell.nixosModules.nixos-shell
+    ../../../01-general/desktop/shell-env.nix
 
-    # good env:
-    ../../../02-window-manager-i3
-    # Just testing, i need shit to be installed:
-    #../01-general
+    ./host
   ];
 
   sops.defaultSopsFile = ../../../../secrets/s-test-vm-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
-
-  sops.secrets."deadbeef-passwd" = {
-    neededForUsers = true; # make it available before the user is created
-  };
 
   time.timeZone = "Europe/Amsterdam";
 
@@ -60,18 +48,18 @@
     dmenu
   ];
 
-  home-manager = {
-    sharedModules = [
-      inputs.sops-nix.homeManagerModules.sops
-    ];
-    extraSpecialArgs = {
-      inherit inputs outputs;
-    };
-    users = {
-      # Import your home-manager configuration
-      deadbeef = import ../../../../home-manager/s-test-vm/home.nix;
-    };
-  };
+  #home-manager = {
+  #  sharedModules = [
+  #    inputs.sops-nix.homeManagerModules.sops
+  #  ];
+  #  extraSpecialArgs = {
+  #    inherit inputs outputs;
+  #  };
+  #  users = {
+  #    # Import your home-manager configuration
+  #    deadbeef = import ../../../../../home-manager/s-test-vm/home.nix;
+  #  };
+  #};
 
   nixpkgs = {
     # You can add overlays here
@@ -123,7 +111,10 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-test-vm-impermanence";
+  networking.hostName = "s-test";
+  sops.secrets."deadbeef-passwd" = {
+    neededForUsers = true; # make it available before the user is created
+  };
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
@@ -139,6 +130,7 @@
       openssh.authorizedKeys.keys = [
         # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg "
       ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];
@@ -158,25 +150,15 @@
     };
   };
 
-  boot.loader.systemd-boot.configurationLimit = 2;
+  #boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''
-    ZSH_THEME=example
+    ZSH_THEME=suvash
     alias vim=nvim
   '';
 
   security.sudo.enable = true;
-  security.sudo.extraRules = [
-    {
-      groups = [ "wheel" ];
-      commands = [
-        {
-          command = "ALL";
-          options = [ "NOPASSWD" ];
-        }
-      ];
-    }
-  ];
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "24.11";
+  system.stateVersion = "25.11";
+
 }

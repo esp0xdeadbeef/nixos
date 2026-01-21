@@ -159,7 +159,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-sigma-s-router-edge";
+  networking.hostName = "s-router-edge";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {

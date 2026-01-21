@@ -173,16 +173,6 @@
             ./nixos/s-test-vm/configuration.nix
           ];
         };
-        s-sigma-nixos-proxmox-replacement = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            # required for secure boot:
-            lanzaboote.nixosModules.lanzaboote
-
-            # > Our main nixos configuration file <
-            ./nixos/s-sigma-nixos-proxmox-replacement
-          ];
-        };
         s-sigma = nixpkgs.lib.nixosSystem {
           # got the self arg, to build vms:
           specialArgs = { inherit inputs outputs self; };
@@ -223,32 +213,9 @@
         s-router-edge = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
-            ./nixos/s-routers/2-edge/configuration.nix
-          ];
-        };
-
-        # router-edge
-        #  - Aggregates routing
-        #  - Slices prefixes
-        #  - Decides allocation policy
-        s-sigma-s-router-edge = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
 
             ./nixos/virtual-machine/nixos-shell-vms/s-routers/2-edge
-          ];
-        };
-
-        #  - vlan -> vpn profile
-        s-router-vpn-egress = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            # required for secure boot:
-            lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
-            ./nixos/s-routers/z-vpn-egress
           ];
         };
 
@@ -297,7 +264,6 @@
         s-test = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            inputs.nixos-shell.nixosModules.nixos-shell
             ./nixos/virtual-machine/nixos-shell-vms/s-test
           ];
         };
@@ -308,7 +274,7 @@
             ./nixos/virtual-machine/nixos-shell-vms/s-infra
           ];
         };
-        s-sigma-s-router-vpn-egress = nixpkgs.lib.nixosSystem {
+        s-router-vpn-egress = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell

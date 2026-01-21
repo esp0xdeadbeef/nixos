@@ -24,32 +24,28 @@ in
   config = lib.mkMerge [
     (mkVM "s-infra" (withRepo {
       description = "Infra VM (nixos-shell)";
-      keep = 1;
       extraTmpfiles = [
         "d /persist/infra/unifi 0755 root root -"
       ];
     }))
 
-    (mkVM "s-sigma-s-router-edge" (withRepo {
+    (mkVM "s-router-edge" (withRepo {
       description = "s-router-edge VM (nixos-shell)";
-      keep = 1;
     }))
 
     (mkVM "s-gameservers" (withRepo {
       description = "Gameserver VM (nixos-shell)";
-      keep = 1;
       restartTime = 1;
     }))
 
-    (mkVM "s-sigma-s-router-vpn-egress" (withRepo {
+    (mkVM "s-router-vpn-egress" (withRepo {
       description = "VPN-egress VM (nixos-shell)";
-      keep = 1;
     }))
 
     (mkVM "s-test" (withRepo {
       description = "s-test (nixos-shell)";
-      keep = 2;
       ephemeralRoot = true;
+      #buildDelaySec = 60;
     }))
   ];
 }
