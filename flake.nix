@@ -129,6 +129,7 @@
     }@inputs:
     let
       inherit (self) outputs;
+
       # Supported systems for your flake packages, shell, etc.
       systems = [
         "aarch64-linux"
@@ -137,28 +138,71 @@
         "aarch64-darwin"
         "x86_64-darwin"
       ];
+
       # This is a function that generates an attribute by calling a function you
       # pass to it, with each system as an argument
       forAllSystems = nixpkgs.lib.genAttrs systems;
+      lib = nixpkgs.lib;
+
+      # Minimal flake source for per-VM builds
+      vmSourceForPath =
+        relPath:
+        let
+          root = self.outPath;
+          vmPath = "${root}/${relPath}";
+        in
+        if builtins.pathExists vmPath then
+          builtins.path {
+            name = "esp0xdeadbeef-vm-src-${builtins.replaceStrings [ "/" ] [ "-" ] relPath}";
+            path = root;
+            filter =
+              p: _:
+              lib.any (prefix: lib.hasPrefix prefix p) [
+                "${root}/flake.nix"
+                "${root}/flake.lock"
+
+                # VM subtree
+                "${vmPath}"
+
+                # YOUR repo uses these top-level dirs (NOT nixos/modules)
+                "${root}/nixos"
+                "${root}/modules"
+                "${root}/overlays"
+                "${root}/pkgs"
+                "${root}/home-manager"
+                "${root}/secrets"
+                "${root}/dev-updaters"
+              ];
+          }
+        else
+          # fallback to full flake root (still works as a path flake)
+          root;
     in
     {
+      lib = {
+        inherit vmSourceForPath;
+      };
+
       # Your custom packages
       # Accessible through 'nix build', 'nix shell', etc
-      packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
+      packages =
+        if builtins.pathExists ./pkgs then
+          forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system})
+        else
+          { };
+
       # Formatter for your nix files, available through 'nix fmt'
-      # Other options beside 'alejandra' include 'nixpkgs-fmt'
-      # formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
       formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
 
       # Your custom packages and modifications, exported as overlays
-      overlays = import ./overlays { inherit inputs; };
+      overlays = if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { };
+
       # Reusable nixos modules you might want to export
-      # These are usually stuff you would upstream into nixpkgs
-      nixosModules = import ./modules/nixos;
+      nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
 
       # Reusable home-manager modules you might want to export
-      # These are usually stuff you would upstream into home-manager
-      homeManagerModules = import ./modules/home-manager;
+      homeManagerModules =
+        if builtins.pathExists ./modules/home-manager then import ./modules/home-manager else { };
 
       # NixOS configuration entrypoint
       # Available through 'nixos-rebuild --flake .#your-hostname'
@@ -167,37 +211,28 @@
         s-test-vm = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
             ./nixos/s-test-vm/configuration.nix
           ];
         };
+
         s-sigma = nixpkgs.lib.nixosSystem {
-          # got the self arg, to build vms:
           specialArgs = { inherit inputs outputs self; };
           modules = [
-            # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
-
-            # > Our main nixos configuration file <
             ./nixos/server/s-sigma
           ];
         };
+
         s-test-vm-impermanence = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            # required for secure boot:
             lanzaboote.nixosModules.lanzaboote
-
-            # > Our main nixos configuration file <
             ./nixos/s-test-vm-impermanence/configuration.nix
           ];
         };
+
         # router-core
-        #  - Terminates ISP (PPPoE, DHCPv6-PD)
-        #  - Receives large prefix (/48, /52, etc.)
-        #  - Provides routed transit
         s-router-core = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
@@ -207,14 +242,10 @@
         };
 
         # router-edge
-        #  - Aggregates routing
-        #  - Slices prefixes
-        #  - Decides allocation policy
         s-router-edge = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
-
             ./nixos/virtual-machine/nixos-shell-vms/s-routers/2-edge
           ];
         };
@@ -223,37 +254,36 @@
         l-x13s = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            # > Our main nixos configuration file <
             ./nixos/l-x13s/configuration.nix
           ];
         };
+
         # work laptop:
         l-werk = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
             ./nixos/laptop/l-werk
           ];
         };
+
         # private laptop:
         l-esp = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
             ./nixos/laptop/l-esp
           ];
         };
+
         # lxc server
         s-lxc-test = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            # lanzaboote.nixosModules.lanzaboote
-            # > Our main nixos configuration file <
             ./nixos/s-lxc-test/configuration.nix
           ];
         };
+
         s-gameservers = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
@@ -261,12 +291,14 @@
             ./nixos/virtual-machine/nixos-shell-vms/s-gameservers
           ];
         };
+
         s-test = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             ./nixos/virtual-machine/nixos-shell-vms/s-test
           ];
         };
+
         s-infra = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
@@ -274,19 +306,18 @@
             ./nixos/virtual-machine/nixos-shell-vms/s-infra
           ];
         };
+
         s-router-vpn-egress = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
-            # > Our main nixos configuration file <
             ./nixos/virtual-machine/nixos-shell-vms/s-routers/z-vpn-egress/default.nix
           ];
         };
+
         s-more-threads-then-the-host = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            #inputs.nixos-shell.nixosModules.nixos-shell
-            # > Our main nixos configuration file <
             ./nixos/s-more-threads-then-the-host
           ];
         };

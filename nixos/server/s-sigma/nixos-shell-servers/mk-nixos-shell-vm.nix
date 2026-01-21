@@ -10,7 +10,8 @@ name:
   workingDir ? "/persist/nix-shell-vms",
   persistDir ? "/persist/vm-persists",
   extraTmpfiles ? [ ],
-  repository ? "path:${self.outPath}",
+  #repository ? "path:${self.outPath}",
+  repository ? "path:${self.lib.vmSourceFor name}",
   restartTime ? 5,
   ephemeralRoot ? true,
 

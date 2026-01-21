@@ -4,44 +4,63 @@
   self,
   ...
 }:
+# for testing, use:
+# nix run path:/home/deadbeef/github/nixos#nixosConfigurations.<vm-hostname>.config.system.build.nixos-shell
 
 let
   mkVM = import ./mk-nixos-shell-vm.nix { inherit pkgs lib self; };
-
-  useLocalRepo = true;
-
-  repoArg = if useLocalRepo then "path:/home/deadbeef/github/nixos" else null;
-
-  withRepo =
-    attrs:
-    if repoArg == null then
-      builtins.removeAttrs attrs [ "repository" ]
-    else
-      attrs // { repository = repoArg; };
-
 in
 {
   config = lib.mkMerge [
-    (mkVM "s-infra" (withRepo {
-      description = "Infra VM (nixos-shell)";
-    }))
+    (mkVM "s-infra" (
+      let
+        repo = self.lib.vmSourceForPath "nixos/virtual-machine/nixos-shell-vms/s-infra";
+      in
+      {
+        description = "Infra VM (nixos-shell)";
+        repository = "path:${repo}";
+      }
+    ))
 
-    (mkVM "s-router-edge" (withRepo {
-      description = "s-router-edge VM (nixos-shell)";
-    }))
+    (mkVM "s-router-edge" (
+      let
+        repo = self.lib.vmSourceForPath "nixos/virtual-machine/nixos-shell-vms/s-routers/2-edge";
+      in
+      {
+        description = "s-router-edge VM (nixos-shell)";
+        repository = "path:${repo}";
+      }
+    ))
 
-    (mkVM "s-gameservers" (withRepo {
-      description = "Gameserver VM (nixos-shell)";
-    }))
+    (mkVM "s-gameservers" (
+      let
+        repo = self.lib.vmSourceForPath "nixos/virtual-machine/nixos-shell-vms/s-gameservers";
+      in
+      {
+        description = "Gameserver VM (nixos-shell)";
+        repository = "path:${repo}";
+      }
+    ))
 
-    (mkVM "s-router-vpn-egress" (withRepo {
-      description = "VPN-egress VM (nixos-shell)";
-    }))
+    (mkVM "s-router-vpn-egress" (
+      let
+        repo = self.lib.vmSourceForPath "nixos/virtual-machine/nixos-shell-vms/s-routers/z-vpn-egress";
+      in
+      {
+        description = "VPN-egress VM (nixos-shell)";
+        repository = "path:${repo}";
+      }
+    ))
 
-    (mkVM "s-test" (withRepo {
-      description = "s-test (nixos-shell)";
-      ephemeralRoot = true;
-      #buildDelaySec = 60;
-    }))
+    (mkVM "s-test" (
+      let
+        repo = self.lib.vmSourceForPath "nixos/virtual-machine/nixos-shell-vms/s-test";
+      in
+      {
+        description = "s-test (nixos-shell)";
+        repository = "path:${repo}";
+        ephemeralRoot = true;
+      }
+    ))
   ];
 }
