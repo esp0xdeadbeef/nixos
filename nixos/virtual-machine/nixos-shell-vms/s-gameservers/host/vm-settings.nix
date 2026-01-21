@@ -31,7 +31,7 @@
   };
 
   system.stateVersion = "25.11";
-  networking.hostName = "gameservers";
+  networking.hostName = "s-gameservers";
 
   boot.loader.grub.enable = false;
   boot.loader.systemd-boot.enable = true;
