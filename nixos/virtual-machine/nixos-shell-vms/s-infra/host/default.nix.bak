@@ -1,0 +1,10 @@
+{ pkgs, ... }:
+{
+  imports = [
+    ./debug-packages.nix
+    ./unifi.nix
+    ./vm-settings.nix
+    ./network.nix
+    ../../1-helpers/vm-storage-persist.nix
+  ];
+}

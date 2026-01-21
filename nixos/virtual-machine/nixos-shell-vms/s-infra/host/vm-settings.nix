@@ -21,17 +21,6 @@
     "-nic bridge,br=vmbr4,mac=BC:24:11:1D:0E:B9,model=virtio-net-pci"
   ];
 
-  nixos-shell.mounts = {
-    mountHome = false;
-    extraMounts = {
-      # this gives errors on minecraft, will happen here also.
-      #"/var/lib/containers/storage" = /var/lib/containers/storage;
-      "/var/lib/unifi" = "/persist/infra/unifi";
-      "/root/.ssh" = "/persist/infra/ssh-root";
-      "/etc/ssh" = "/persist/infra/ssh-base-keys";
-    };
-  };
-
   system.stateVersion = "25.11";
   networking.hostName = "s-infra";
 

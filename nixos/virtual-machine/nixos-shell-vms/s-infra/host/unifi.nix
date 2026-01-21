@@ -42,7 +42,7 @@
     ];
 
     volumes = [
-      "/var/lib/unifi:/unifi"
+      "/persist/var/lib/unifi:/unifi"
     ];
 
     extraOptions = [
