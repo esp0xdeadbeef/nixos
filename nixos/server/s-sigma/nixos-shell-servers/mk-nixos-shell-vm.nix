@@ -12,7 +12,7 @@ name:
   extraTmpfiles ? [ ],
   repository ? "path:${self.outPath}",
   restartTime ? 5,
-  ephemeralRoot ? false,
+  ephemeralRoot ? true,
 
   # Image manager behavior
   buildDelaySec ? 600,

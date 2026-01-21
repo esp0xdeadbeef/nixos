@@ -24,9 +24,6 @@ in
   config = lib.mkMerge [
     (mkVM "s-infra" (withRepo {
       description = "Infra VM (nixos-shell)";
-      extraTmpfiles = [
-        "d /persist/infra/unifi 0755 root root -"
-      ];
     }))
 
     (mkVM "s-router-edge" (withRepo {
@@ -35,7 +32,6 @@ in
 
     (mkVM "s-gameservers" (withRepo {
       description = "Gameserver VM (nixos-shell)";
-      restartTime = 1;
     }))
 
     (mkVM "s-router-vpn-egress" (withRepo {
