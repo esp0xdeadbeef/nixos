@@ -7,27 +7,28 @@
   config,
   pkgs,
   ...
-}:
-{
   # You can import other NixOS modules here
+}:
+
+{
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
-    # inputs.nvf.nixosModules.default
-    # inputs.nixvim.nixosModules.nixvim
+
     ./vm-settings.nix
     ./start-container.nix
     ./network.nix
     ./ssh.nix
+    ./impermanence.nix
     ../../1-helpers/vm-storage-persist.nix
     ../../1-helpers/debug-packages.nix
     ../../1-helpers/ssh-auth.nix
   ];
 
-  sops.defaultSopsFile = ../../../../../secrets/s-test.yaml;
+  sops.defaultSopsFile = ../../../../../secrets/${config.networking.hostName}.yaml;
   # This will automatically import SSH keys as age keys
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   # This is using an age key that is expected to already be in the filesystem
@@ -47,15 +48,6 @@
       outputs.overlays.modifications
       outputs.overlays.unstable-packages
 
-      # You can also add overlays exported from other flakes:
-      # neovim-nightly-overlay.overlays.default
-
-      # Or define it inline, for example:
-      # (final: prev: {
-      #   hi = final.hello.overrideAttrs (oldAttrs: {
-      #     patches = [ ./change-hello-to-hi.patch ];
-      #   });
-      # })
     ];
     # Configure your nixpkgs instance
     config = {

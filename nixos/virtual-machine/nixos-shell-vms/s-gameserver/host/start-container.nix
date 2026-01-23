@@ -6,24 +6,28 @@
   ...
 }:
 {
-  containers."container-gameservers" = {
+systemd.services."container@s-gameserver-container".serviceConfig = {
+  TasksMax = "infinity";
+  TimeoutStartSec = lib.mkForce "15min";
+};
+  containers."s-gameserver-container" = {
     autoStart = true;
     privateNetwork = true;
-
     extraVeths = {
-      veth-vlan7.hostBridge = "vlan7";
+       #veth-vlan2.hostBridge = "vlan2";
+       #veth-vlan3.hostBridge = "vlan3";
+       #veth-vlan4.hostBridge = "vlan4";
+       #veth-vlan5.hostBridge = "vlan5";
+       #veth-vlan6.hostBridge = "vlan6";
+       veth-vlan7.hostBridge = "vlan7";
+       #veth-vlan8.hostBridge = "vlan8";
+       #veth-vlan9.hostBridge = "vlan9";
     };
 
-    bindMounts."/persist/game-servers" = {
-      hostPath = "/persist/game-servers";
-      isReadOnly = false;
+    bindMounts."/persist" = {
+      hostPath = "/persist"; # ← folder on the HOST
+      isReadOnly = false; # change to true if you want it read-only
     };
-
-    #bindMounts."/var/lib/containers" = {
-    #  hostPath = "/persist/var/lib/containers";
-    #  isReadOnly = false;
-    #};
-
     config = ../container;
     additionalCapabilities = [
       "CAP_BPF"
@@ -31,6 +35,5 @@
       "CAP_NET_ADMIN"
       "CAP_SYS_ADMIN"
     ];
-
   };
 }

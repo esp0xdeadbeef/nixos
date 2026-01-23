@@ -20,7 +20,11 @@
     "-nic none"
     "-nic bridge,br=vmbr4,mac=BC:24:11:1D:0E:FF,model=virtio-net-pci"
   ];
-  networking.interfaces.eth1.useDHCP = false;
 
-  networking.hostName = "s-gameserver";
+  nixos-shell.mounts = {
+    mountHome = false;
+    extraMounts = {
+      "/persist" = "/persist/vm-persists/${config.networking.hostName}";
+    };
+  };
 }

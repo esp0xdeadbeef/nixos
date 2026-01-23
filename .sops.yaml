@@ -10,6 +10,7 @@ keys:
   - &s-router-vpn-impermanence-root age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
   - &s-router-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
   - &s-lxc-router-root age1nnm22xdfv4ptx0vy3exh24djhmdc4cgc0hjghmk5y4l0hggfcswq8j88j9
+  - &s-gameserver age16kxdq47yrc0hzapje3tsplrw6eerdxxzwqzj6emg8yyk6r5dzfcs9xelvd
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -121,3 +122,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-lxc-router-root
+  - path_regex: '^(secrets/)*s-gameserver.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-gameserver

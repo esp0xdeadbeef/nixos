@@ -27,7 +27,7 @@ nix-shell -p ssh-to-age --run 'bash -c "ssh-to-age -private-key -i $HOME/.ssh/id
     mkdir -p .$HOME/.config/sops/age && cp $HOME/.config/sops/age/keys.txt /persist/$HOME/.config/sops/age/keys.txt
     mkdir -p .$HOME/.ssh/ && cp $HOME/.ssh/id_ed25519 /persist/$HOME/.ssh/id_ed25519
 )
-key=$(age-keygen -y ~/.config/sops/age/keys.txt)
+key=$(nix-shell -p age --run 'age-keygen -y ~/.config/sops/age/keys.txt')
 echo -e "public key:\n$key"
 
 ```

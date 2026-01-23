@@ -284,11 +284,11 @@
           ];
         };
 
-        s-gameservers = nixpkgs.lib.nixosSystem {
+        s-gameserver = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/virtual-machine/nixos-shell-vms/s-gameservers
+            ./nixos/virtual-machine/nixos-shell-vms/s-gameserver
           ];
         };
 

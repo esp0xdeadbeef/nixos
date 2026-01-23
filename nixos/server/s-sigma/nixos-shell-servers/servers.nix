@@ -32,9 +32,9 @@ in
       }
     ))
 
-    (mkVM "s-gameservers" (
+    (mkVM "s-gameserver" (
       let
-        repo = self.lib.vmSourceForPath "nixos/virtual-machine/nixos-shell-vms/s-gameservers";
+        repo = self.lib.vmSourceForPath "nixos/virtual-machine/nixos-shell-vms/s-gameserver";
       in
       {
         description = "Gameserver VM (nixos-shell)";

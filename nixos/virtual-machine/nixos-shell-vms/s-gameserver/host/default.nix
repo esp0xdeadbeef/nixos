@@ -21,11 +21,10 @@
     ./vm-settings.nix
     ./start-container.nix
     ./network.nix
-    ../../1-helpers/impermanence.nix
-    ../../1-helpers/ssh-auth.nix
+    ./ssh.nix
     ../../1-helpers/vm-storage-persist.nix
     ../../1-helpers/debug-packages.nix
-    ../../../../01-general/desktop/shell-env.nix
+    ../../1-helpers/ssh-auth.nix
   ];
 
   sops.defaultSopsFile = ../../../../../secrets/s-gameserver.yaml;
