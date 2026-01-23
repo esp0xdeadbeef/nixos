@@ -10,14 +10,11 @@
     mountHome = false;
     extraMounts = {
       "/persist" = "/persist/vm-persists/${config.networking.hostName}";
-      "/var/lib/containers" = "/persist/vm-persists/${config.networking.hostName}/var/lib/containers";
+      # I need an option to cache those images, will try to make them persistent, without using p9 shares.
+      #"/var/lib/containers" = "/persist/vm-persists/${config.networking.hostName}/var/lib/containers";
     };
   };
 
-  environment.etc."containers/storage.conf".text = ''
-    [storage]
-    driver = "vfs"
-  '';
   fileSystems."/" = {
     device = "tmpfs";
     fsType = "tmpfs";
