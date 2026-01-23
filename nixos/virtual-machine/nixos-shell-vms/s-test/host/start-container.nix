@@ -32,10 +32,11 @@
       hostPath = "/persist"; # ← folder on the HOST
       isReadOnly = false; # change to true if you want it read-only
     };
-    bindMounts."/var/lib" = {
-      hostPath = "/var/lib";
-      isReadOnly = false;
-    };
+    # P9 shares are fucking me over.
+    #bindMounts."/var/lib" = {
+    #  hostPath = "/var/lib";
+    #  isReadOnly = false;
+    #};
     config = ../container;
     additionalCapabilities = [
       "CAP_BPF"

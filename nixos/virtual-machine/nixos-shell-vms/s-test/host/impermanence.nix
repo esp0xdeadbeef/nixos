@@ -6,8 +6,8 @@
     hideMounts = true;
 
     directories = [
-      #"/etc/ssh"
-      #"/var/lib"
+      "/etc/ssh"
+      "/var/lib"
       "/var/log"
       "/root/.ssh"
     ];
