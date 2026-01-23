@@ -9,7 +9,6 @@ in
     (mkMgmt "eth0" 2 { bridge = "vlan2"; })
     #(mkBridge "eth0" 2 { bridge = "vlan2"; })
     (mkBridge "eth0" 7 { bridge = "vlan7"; })
-    (mkBridge "eth0" 6 { bridge = "vlan6"; })
   ];
 
 }

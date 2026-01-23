@@ -21,13 +21,14 @@
     ./vm-settings.nix
     ./start-container.nix
     ./network.nix
-    ./ssh.nix
+    ../../1-helpers/impermanence.nix
+    ../../1-helpers/ssh-auth.nix
     ../../1-helpers/vm-storage-persist.nix
     ../../1-helpers/debug-packages.nix
-    ../../1-helpers/ssh-auth.nix
+    ../../../../01-general/desktop/shell-env.nix
   ];
 
-  sops.defaultSopsFile = ../../../../../secrets/s-test.yaml;
+  sops.defaultSopsFile = ../../../../../secrets/s-gameserver.yaml;
   # This will automatically import SSH keys as age keys
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   # This is using an age key that is expected to already be in the filesystem
@@ -87,7 +88,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-test";
+  networking.hostName = "s-gameserver";
   # networking.networkmanager.enable = true;
   time.timeZone = "Europe/Amsterdam";
 

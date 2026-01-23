@@ -9,15 +9,20 @@
   containers."container-gameservers" = {
     autoStart = true;
     privateNetwork = true;
-    #extraVeths = {
-    #  "net0".hostBridge = "br-vlan6";
-    #};
-    hostBridge = "vlan7";
+
+    extraVeths = {
+      veth-vlan7.hostBridge = "vlan7";
+    };
 
     bindMounts."/persist/game-servers" = {
-      hostPath = "/persist/game-servers"; # ← folder on the HOST
-      isReadOnly = false; # change to true if you want it read-only
+      hostPath = "/persist/game-servers";
+      isReadOnly = false;
     };
+
+    #bindMounts."/var/lib/containers" = {
+    #  hostPath = "/persist/var/lib/containers";
+    #  isReadOnly = false;
+    #};
 
     config = ../container;
     additionalCapabilities = [
@@ -28,7 +33,4 @@
     ];
 
   };
-  systemd.tmpfiles.rules = [
-    "d /persist/game-servers 0755 root root -"
-  ];
 }

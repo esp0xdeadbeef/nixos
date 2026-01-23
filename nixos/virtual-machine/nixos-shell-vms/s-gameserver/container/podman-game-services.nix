@@ -21,6 +21,17 @@
 
   virtualisation.oci-containers.backend = "podman";
 
+  systemd.services."valheim-server" = {
+    unitConfig = {
+      StartLimitIntervalSec = 0;
+    };
+
+    serviceConfig = {
+      Restart = "always";
+      RestartSec = "5s";
+    };
+  };
+
   virtualisation.oci-containers.containers.valheim-server = {
     image = "docker.io/lloesche/valheim-server";
     autoStart = true;
@@ -45,6 +56,16 @@
     ];
   };
 
+  systemd.services."minecraft-prod" = {
+    unitConfig = {
+      StartLimitIntervalSec = 0;
+    };
+
+    serviceConfig = {
+      Restart = "always";
+      RestartSec = "5s";
+    };
+  };
   virtualisation.oci-containers.containers.minecraft-prod = {
     image = "docker.io/itzg/minecraft-server";
     autoStart = true;
@@ -68,6 +89,16 @@
     extraOptions = [
       "--name=minecraft-prod"
     ];
+  };
+  systemd.services."minecraft-test" = {
+    unitConfig = {
+      StartLimitIntervalSec = 0;
+    };
+
+    serviceConfig = {
+      Restart = "always";
+      RestartSec = "5s";
+    };
   };
 
   virtualisation.oci-containers.containers.minecraft-test = {

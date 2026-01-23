@@ -1,0 +1,17 @@
+  networking.useNetworkd = true;
+  networking.useDHCP = false;
+  networking.networkmanager.enable = true;
+
+  systemd.services.systemd-networkd-wait-online.enable = lib.mkForce false;
+  services.resolved.enable = false;
+  systemd.network = {
+    enable = true;
+    networks = {
+      "vlan7" = {
+        name = "vlan7";
+        linkConfig.MACAddress = "02:11:22:33:44:55";
+        DHCP = "yes";
+      };
+    };
+  };
+
