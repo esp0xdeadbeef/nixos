@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+
 echo "You are designing and debugging a SCALABLE multi-WAN policy-routing NixOS router (IPv4/IPv6)."
 echo
 echo "CONTEXT:"

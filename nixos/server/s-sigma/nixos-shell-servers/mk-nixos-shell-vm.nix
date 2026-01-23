@@ -10,7 +10,6 @@ name:
   workingDir ? "/persist/nix-shell-vms",
   persistDir ? "/persist/vm-persists",
   extraTmpfiles ? [ ],
-  #repository ? "path:${self.outPath}",
   repository ? "path:${self.lib.vmSourceFor name}",
   restartTime ? 5,
   ephemeralRoot ? true,
@@ -27,46 +26,62 @@ let
   imageServiceName = "${name}-image";
   flakeRef = "${repository}";
 
-  # QMP for graceful shutdown
   qmpSocket = "/run/${vmServiceName}.qmp";
 
-  # tmux attach socket (stable, predictable path)
   tmuxDir = "/run/nixos-shell";
   tmuxSocket = "${tmuxDir}/${name}.tmux";
   tmuxSession = "vm";
 
   qcow2Path = "${workingDir}/${name}.qcow2";
 
-  # Persistent, host-side image state (GC roots)
   imgBase = "/persist/nixos-shell-images/${name}";
   currentLink = "${imgBase}/current";
   candidateLink = "${imgBase}/candidate";
   pinLock = "${imgBase}/pin.lock";
 
   nixBuildFlagsStr = lib.concatStringsSep " " (map lib.escapeShellArg nixBuildFlags);
-
   buildAttr = "${flakeRef}#nixosConfigurations.${name}.config.system.build.nixos-shell";
+
+  # ---- STABLE LAUNCHER ----
+  innerStart = pkgs.writeShellScript "inner-${vmServiceName}" ''
+    set -euo pipefail
+
+    mkdir -p "${tmuxDir}" "${workingDir}" "${imgBase}"
+
+    if [ ! -e "${currentLink}" ]; then
+      nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "${candidateLink}"
+      ln -sfn "$(readlink -f "${candidateLink}")" "${currentLink}"
+    fi
+
+    ${lib.optionalString ephemeralRoot ''rm -f "${qcow2Path}" || true''}
+
+    if ! tmux -S "${tmuxSocket}" has-session -t "${tmuxSession}" 2>/dev/null; then
+      tmux -S "${tmuxSocket}" new-session -d -s "${tmuxSession}" \
+        bash -lc "export QEMU_OPTS='-qmp unix:${qmpSocket},server=on,wait=off'; \"$(readlink -f "${currentLink}")/bin/run-${name}-vm\""
+    fi
+
+    while tmux -S "${tmuxSocket}" has-session -t "${tmuxSession}" 2>/dev/null; do
+      sleep 2
+    done
+
+    exit 1
+  '';
+
+  stableLauncher = "/run/nixos-shell/${name}.sh";
 in
 {
-  # Keep visibility of the built VM image (optional, but consistent)
-  system.build.vmImages.${name} = self.nixosConfigurations.${name}.config.system.build.nixos-shell;
+  system.build.vmImages.${name} =
+    self.nixosConfigurations.${name}.config.system.build.nixos-shell;
 
   #####################################################################
-  # 1) IMAGE MANAGER — TIMER DRIVEN ONLY
+  # IMAGE MANAGER
   #####################################################################
   systemd.services.${imageServiceName} = {
-    description = "NixOS VM image manager (nixos-shell) for ${name}";
+    description = "VM image manager (nixos-shell) for ${name}";
+    after = [ "nix-daemon.service" ];
+    wants = [ ];
 
-    after = [
-      "network-online.target"
-      "nix-daemon.service"
-    ];
-    wants = [ "network-online.target" ];
-
-    path = [
-      pkgs.nix
-      pkgs.coreutils
-    ];
+    path = [ pkgs.nix pkgs.coreutils ];
 
     serviceConfig = {
       Type = "oneshot";
@@ -82,31 +97,31 @@ in
       ''}
 
       if [ -f "${pinLock}" ]; then
-        echo "[image] pinned -> skipping build"
         exit 0
       fi
 
-      echo "[image] building candidate for ${name} ..."
-      nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "${candidateLink}"
+      BUILT_NOW=0
+      if [ ! -e "${candidateLink}" ]; then
+        BUILT_NOW=1
+        nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "${candidateLink}"
+      fi
 
       NEW_PATH="$(readlink -f "${candidateLink}")"
-      echo "[image] candidate -> $NEW_PATH"
-
-      if [ ! -e "${currentLink}" ]; then
-        ln -sfn "$NEW_PATH" "${currentLink}"
-        echo "[image] initialized current"
-        exit 0
-      fi
-
-      OLD_PATH="$(readlink -f "${currentLink}" || true)"
+      OLD_PATH="$(readlink -f "${currentLink}" 2>/dev/null || true)"
 
       if [ "$NEW_PATH" = "$OLD_PATH" ]; then
-        echo "[image] current already up-to-date"
         exit 0
       fi
 
       ln -sfn "$NEW_PATH" "${currentLink}"
-      echo "[image] promoted current (will restart VM)"
+
+      if [ "$BUILT_NOW" = "1" ]; then
+        HOST="$(${pkgs.coreutils}/bin/hostname)"
+        SEED="$HOST-${name}"
+        HASH="$(${pkgs.coreutils}/bin/echo -n "$SEED" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -c1-8)"
+        OFFSET=$(( 0x$HASH % 900 ))
+        sleep "$OFFSET"
+      fi
 
       /run/current-system/sw/bin/systemctl try-restart "${vmServiceName}.service" || true
     '';
@@ -122,129 +137,59 @@ in
   };
 
   #####################################################################
-  # 2) VM RUNNER — NO ENV VARS, MANUALLY-RUNNABLE SCRIPT
+  # VM RUNNER (STABLE)
   #####################################################################
   systemd.services.${vmServiceName} = {
     inherit description;
 
-    after = [
-      "network-online.target"
-      "nix-daemon.service"
-    ];
-    wants = [ "network-online.target" ];
+    stopIfChanged = false;
+    reloadIfChanged = false;
 
-    path = [
-      pkgs.nix
-      pkgs.socat
-      pkgs.coreutils
-      pkgs.tmux
-      pkgs.bash
-    ];
+    unitConfig = {
+      DefaultDependencies = false;
+      IgnoreOnIsolate = true;
+      Before = [ "shutdown.target" ];
+      Conflicts = [ "shutdown.target" ];
+    };
+
+    after = lib.mkForce [ ];
+    wants = lib.mkForce [ ];
+    requires = lib.mkForce [ ];
+    bindsTo = lib.mkForce [ ];
+    partOf = lib.mkForce [ ];
+    wantedBy = lib.mkForce [ ];
+
+    path = [ pkgs.nix pkgs.socat pkgs.coreutils pkgs.tmux pkgs.bash ];
 
     serviceConfig = {
       Type = "simple";
       Restart = "always";
       RestartSec = restartTime;
       User = "root";
+      KillMode = "process";
+      TimeoutStopSec = "2min";
+      WorkingDirectory = workingDir;
 
-      ExecStart = pkgs.writeShellScript "start-${vmServiceName}" ''
-        set -euo pipefail
-
-        WORKDIR="${workingDir}"
-        IMG_BASE="${imgBase}"
-        CURRENT_LINK="${currentLink}"
-        CANDIDATE_LINK="${candidateLink}"
-        TMUX_SOCKET="${tmuxSocket}"
-        TMUX_SESSION="${tmuxSession}"
-        QMP_SOCKET="${qmpSocket}"
-
-        mkdir -p "$WORKDIR"
-        mkdir -p "$IMG_BASE"
-        mkdir -p "${tmuxDir}"
-
-        # Seed image if needed
-        if [ ! -e "$CURRENT_LINK" ]; then
-          echo "[vm] no current image -> building seed (blocking)"
-          nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "$CANDIDATE_LINK"
-          SEED="$(readlink -f "$CANDIDATE_LINK")"
-          ln -sfn "$SEED" "$CURRENT_LINK"
-          echo "[vm] seeded current -> $SEED"
-        fi
-
-        IMG="$(readlink -f "$CURRENT_LINK")"
-        echo "[vm] using image -> $IMG"
-
-        ${lib.optionalString ephemeralRoot ''
-          echo "[vm] ephemeralRoot=true -> deleting ${qcow2Path}"
-          rm -f "${qcow2Path}" || true
-        ''}
-
-        # Start detached tmux session running the exact command you validated
-        if ! tmux -S "$TMUX_SOCKET" has-session -t "$TMUX_SESSION" 2>/dev/null; then
-          tmux -S "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" \
-            bash -lc "export QEMU_OPTS='-qmp unix:$QMP_SOCKET,server=on,wait=off'; \"$IMG/bin/run-${name}-vm\""
-        fi
-
-        # Keep systemd alive while the VM is alive
-        while true; do
-          if ! tmux -S "$TMUX_SOCKET" has-session -t "$TMUX_SESSION" 2>/dev/null; then
-            echo "[vm] tmux session vanished"
-            break
-          fi
-          sleep 2
-        done
-
-        echo "[vm] tmux session exited; restarting"
-        exit 1
-      '';
+      ExecStart = stableLauncher;
 
       ExecStop = pkgs.writeShellScript "stop-${vmServiceName}" ''
-        set -u
-
-        QMP_SOCKET="${qmpSocket}"
-        TMUX_SOCKET="${tmuxSocket}"
-        TMUX_SESSION="${tmuxSession}"
-
-        if [ -S "$QMP_SOCKET" ]; then
+        if [ -S "${qmpSocket}" ]; then
           printf '%s\n' \
             '{"execute":"qmp_capabilities"}' \
             '{"execute":"system_powerdown"}' \
-          | ${pkgs.socat}/bin/socat - UNIX-CONNECT:"$QMP_SOCKET" || true
+          | ${pkgs.socat}/bin/socat - UNIX-CONNECT:"${qmpSocket}" || true
         fi
-
-        end=$((SECONDS + 110))
-        while [ -S "$QMP_SOCKET" ] && [ $SECONDS -lt $end ]; do
-          sleep 1
-        done
-
-        if [ -S "$TMUX_SOCKET" ]; then
-          tmux -S "$TMUX_SOCKET" kill-session -t "$TMUX_SESSION" 2>/dev/null || true
-        fi
+        sleep 5
+        tmux -S "${tmuxSocket}" kill-session -t "${tmuxSession}" 2>/dev/null || true
       '';
-
-      TimeoutStopSec = "2min";
-      KillMode = "process";
-
-      ProtectHome = false;
-      PrivateTmp = true;
-      StateDirectory = name;
-      WorkingDirectory = workingDir;
-    };
-  };
-
-  # Start VM shortly after boot
-  systemd.timers.${vmServiceName} = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "1sec";
-      Unit = "${vmServiceName}.service";
     };
   };
 
   #####################################################################
-  # Directories and persistence
+  # STABLE SYMLINK
   #####################################################################
   systemd.tmpfiles.rules = [
+    "L+ ${stableLauncher} - - - - ${innerStart}"
     "d ${workingDir} 0755 root root -"
     "d ${persistDir} 0755 root root -"
     "d /persist/vm-persists/${name} 0755 root root -"
@@ -254,3 +199,4 @@ in
   ]
   ++ extraTmpfiles;
 }
+
