@@ -70,8 +70,7 @@ let
   stableLauncher = "/run/nixos-shell/${name}.sh";
 in
 {
-  system.build.vmImages.${name} =
-    self.nixosConfigurations.${name}.config.system.build.nixos-shell;
+  system.build.vmImages.${name} = self.nixosConfigurations.${name}.config.system.build.nixos-shell;
 
   #####################################################################
   # IMAGE MANAGER
@@ -81,7 +80,10 @@ in
     after = [ "nix-daemon.service" ];
     wants = [ ];
 
-    path = [ pkgs.nix pkgs.coreutils ];
+    path = [
+      pkgs.nix
+      pkgs.coreutils
+    ];
 
     serviceConfig = {
       Type = "oneshot";
@@ -159,7 +161,13 @@ in
     partOf = lib.mkForce [ ];
     wantedBy = lib.mkForce [ ];
 
-    path = [ pkgs.nix pkgs.socat pkgs.coreutils pkgs.tmux pkgs.bash ];
+    path = [
+      pkgs.nix
+      pkgs.socat
+      pkgs.coreutils
+      pkgs.tmux
+      pkgs.bash
+    ];
 
     serviceConfig = {
       Type = "simple";
@@ -186,6 +194,17 @@ in
   };
 
   #####################################################################
+  # BOOT DELAYED START (TIMER)
+  #####################################################################
+  systemd.timers.${vmServiceName} = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "1";
+      Unit = "${vmServiceName}.service";
+    };
+  };
+
+  #####################################################################
   # STABLE SYMLINK
   #####################################################################
   systemd.tmpfiles.rules = [
@@ -199,4 +218,3 @@ in
   ]
   ++ extraTmpfiles;
 }
-
