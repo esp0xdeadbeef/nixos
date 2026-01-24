@@ -5,24 +5,28 @@
     hideMounts = true;
 
     directories = [
-      "/etc/ssh"
       "/var/lib"
       "/var/log"
-      "/root/.ssh"
+      {
+        directory = "/root/.ssh";
+        user = "root";
+        group = "root";
+        mode = "0600";
+      }
+      {
+        directory = "/root/.config/sops/age";
+        user = "root";
+        group = "root";
+        mode = "0600";
+      }
     ];
 
     files = [
       "/etc/machine-id"
     ];
 
-    # This is the important bit for your case:
     users.deadbeef = {
       directories = [
-        #    "Downloads"
-        #    "Documents"
-        #    ".cache"
-        #    ".config"
-        #    ".local"
         ".ssh"
       ];
       files = [
@@ -37,5 +41,7 @@
     fsType = "tmpfs";
     options = [ "mode=755" ];
   };
-
+  systemd.tmpfiles.rules = [
+    "f /persist/home/deadbeef/.zshrc 0644 deadbeef users -"
+  ];
 }

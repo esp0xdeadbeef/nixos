@@ -36,7 +36,7 @@
     };
 
     # This is the key line:
-    # Resolves to /nix/store/...-source/nixos/virtual-machine/nixos-shell-vm/s-test/container
+    # Resolves to /nix/store/...-source/nixos/virtual-machine/nixos-shell-vm/{container-host}/container
     config = vmRoot + "/container";
 
     additionalCapabilities = [
@@ -45,10 +45,6 @@
       "CAP_NET_ADMIN"
       "CAP_SYS_ADMIN"
     ];
+    enableTun = true;
   };
-
-  systemd.tmpfiles.rules = [
-    "d /persist/var/lib/containers 0755 root root -"
-  ];
 }
-

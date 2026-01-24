@@ -25,6 +25,7 @@
     ./start-container.nix
     ./network.nix
     ./ssh.nix
+    ./impermanence.nix
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
