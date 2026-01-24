@@ -18,6 +18,11 @@ in
       repository = "path:${self.lib.vmSourceForHost "s-infra"}";
     })
 
+    (mkVM "s-nebula" {
+      description = "Nebula VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-nebula"}";
+    })
+
     (mkVM "s-router-edge" {
       description = "s-router-edge VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-edge"}";

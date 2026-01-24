@@ -13,7 +13,7 @@ keys:
   - &s-gameserver age16kxdq47yrc0hzapje3tsplrw6eerdxxzwqzj6emg8yyk6r5dzfcs9xelvd
   - &s-router-edge age1rk2075857skug3ljwg42wkxgsg0xu84y4m54c20j0g9zapf0kuus4z7smu
   - &s-router-infra age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
-
+  - &s-nebula age1seqn6c56kxch7epv6dr3k43tx5eecj4aktlcg0njqg8ef3ewrvpq9vwsmw
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
     encrypted_regex: '.*'
@@ -148,3 +148,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-infra
+  - path_regex: '^(secrets/)*s-nebula.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-nebula

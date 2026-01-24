@@ -1,0 +1,4 @@
+{ ... }:
+{
+  networking.useHostResolvConf = false;
+}
