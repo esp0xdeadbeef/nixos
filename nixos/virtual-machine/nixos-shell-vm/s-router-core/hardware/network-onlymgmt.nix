@@ -51,7 +51,6 @@ in
     ];
   };
 
-
   networking.useNetworkd = true;
 
   # Disable networkd-wait-online

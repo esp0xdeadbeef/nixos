@@ -1,8 +1,15 @@
-{ outPath, lib, config, ... }:
+{
+  outPath,
+  lib,
+  config,
+  ...
+}:
 let
   vmRoot =
-    let file = __curPos.file;
-    in builtins.dirOf file;
+    let
+      file = __curPos.file;
+    in
+    builtins.dirOf file;
 in
 {
   _module.args.vmRoot = vmRoot;
@@ -12,4 +19,3 @@ in
     ./overwrites.nix
   ];
 }
-

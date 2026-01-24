@@ -1,4 +1,4 @@
-{ ...}:
+{ ... }:
 {
-networking.useHostResolvConf = false;
+  networking.useHostResolvConf = false;
 }

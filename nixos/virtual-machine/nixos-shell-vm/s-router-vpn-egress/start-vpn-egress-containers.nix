@@ -151,7 +151,10 @@ in
     enable = true;
     description = "Decode config";
     wantedBy = [ "multi-user.target" ];
-    after = [ "local-fs.target" "sops-nix.service" ];
+    after = [
+      "local-fs.target"
+      "sops-nix.service"
+    ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = mkVpnConfigService "vlan4" "tun0" "vpn-lan-to-vpn-vlan4";
@@ -162,7 +165,10 @@ in
     enable = true;
     description = "Decode config";
     wantedBy = [ "multi-user.target" ];
-    after = [ "local-fs.target" "sops-nix.service" ];
+    after = [
+      "local-fs.target"
+      "sops-nix.service"
+    ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = mkVpnConfigService "vlan5" "tun2" "vpn-lan-to-vpn-vlan5";
@@ -173,7 +179,10 @@ in
     enable = true;
     description = "Decode config";
     wantedBy = [ "multi-user.target" ];
-    after = [ "local-fs.target" "sops-nix.service" ];
+    after = [
+      "local-fs.target"
+      "sops-nix.service"
+    ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = mkVpnConfigService "vlan6" "tun3" "vpn-lan-to-vpn-vlan6";
@@ -196,4 +205,3 @@ in
     after = [ "write-vpn-config-vlan6.service" ];
   };
 }
-

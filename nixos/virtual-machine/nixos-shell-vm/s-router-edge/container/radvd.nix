@@ -1,89 +1,98 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   prefixFile = "/run/secrets/subnet-ipv6";
 
   # Explicit, declarative: only these get a /64 + RA
-  lanIfaces = [ "lan7" "lan10" "lan20" ];
+  lanIfaces = [
+    "lan7"
+    "lan10"
+    "lan20"
+  ];
 
   genScript = pkgs.writeShellScript "v6-ra-generate" ''
-    set -euo pipefail
+        set -euo pipefail
 
-    PREFIX_FILE="${prefixFile}"
-    RADVD_CONF="/run/radvd.conf"
-    ALLOWED_IFACES="${lib.concatStringsSep " " lanIfaces}"
+        PREFIX_FILE="${prefixFile}"
+        RADVD_CONF="/run/radvd.conf"
+        ALLOWED_IFACES="${lib.concatStringsSep " " lanIfaces}"
 
-    if [ ! -r "$PREFIX_FILE" ]; then
-      echo "ERROR: missing prefix file $PREFIX_FILE" >&2
-      exit 1
-    fi
+        if [ ! -r "$PREFIX_FILE" ]; then
+          echo "ERROR: missing prefix file $PREFIX_FILE" >&2
+          exit 1
+        fi
 
-    RAW_PREFIX="$(tr -d ' \t\n' < "$PREFIX_FILE")"
-    PREFIX_LEN="''${RAW_PREFIX##*/}"
-    BASE_PREFIX="''${RAW_PREFIX%%/*}"
+        RAW_PREFIX="$(tr -d ' \t\n' < "$PREFIX_FILE")"
+        PREFIX_LEN="''${RAW_PREFIX##*/}"
+        BASE_PREFIX="''${RAW_PREFIX%%/*}"
 
-    if [ "$PREFIX_LEN" != "48" ]; then
-      echo "ERROR: expected /48, got /$PREFIX_LEN" >&2
-      exit 1
-    fi
+        if [ "$PREFIX_LEN" != "48" ]; then
+          echo "ERROR: expected /48, got /$PREFIX_LEN" >&2
+          exit 1
+        fi
 
-    EXPANDED="$(sipcalc "$BASE_PREFIX" | awk '/Expanded Address/ {print $NF}')"
-    IFS=':' read -r H1 H2 H3 _ <<< "$EXPANDED"
+        EXPANDED="$(sipcalc "$BASE_PREFIX" | awk '/Expanded Address/ {print $NF}')"
+        IFS=':' read -r H1 H2 H3 _ <<< "$EXPANDED"
 
-    echo "[v6-ra] base prefix: $H1:$H2:$H3::/48"
+        echo "[v6-ra] base prefix: $H1:$H2:$H3::/48"
 
-    > "$RADVD_CONF"
+        > "$RADVD_CONF"
 
-    for IFACE in $ALLOWED_IFACES; do
-      if [ ! -d "/sys/class/net/$IFACE" ]; then
-        echo "[v6-ra] skipping $IFACE (not present)"
-        continue
-      fi
+        for IFACE in $ALLOWED_IFACES; do
+          if [ ! -d "/sys/class/net/$IFACE" ]; then
+            echo "[v6-ra] skipping $IFACE (not present)"
+            continue
+          fi
 
-      # must be UP
-      ip link show "$IFACE" | grep -q "UP" || {
-        echo "[v6-ra] skipping $IFACE (not UP)"
-        continue
-      }
+          # must be UP
+          ip link show "$IFACE" | grep -q "UP" || {
+            echo "[v6-ra] skipping $IFACE (not UP)"
+            continue
+          }
 
-      # numeric suffix (lan7 -> 7)
-      IDX="$(echo "$IFACE" | sed -n 's/[^0-9]*\([0-9]\+\)$/\1/p')"
-      if [ -z "$IDX" ]; then
-        echo "[v6-ra] skipping $IFACE (no numeric suffix)"
-        continue
-      fi
+          # numeric suffix (lan7 -> 7)
+          IDX="$(echo "$IFACE" | sed -n 's/[^0-9]*\([0-9]\+\)$/\1/p')"
+          if [ -z "$IDX" ]; then
+            echo "[v6-ra] skipping $IFACE (no numeric suffix)"
+            continue
+          fi
 
-      HEX="$(printf "%04x" "$IDX")"
-      PREFIX="$H1:$H2:$H3:$HEX"
+          HEX="$(printf "%04x" "$IDX")"
+          PREFIX="$H1:$H2:$H3:$HEX"
 
-      echo "[v6-ra] $IFACE -> $PREFIX::/64"
+          echo "[v6-ra] $IFACE -> $PREFIX::/64"
 
-      ip -6 addr replace "$PREFIX::1/64" dev "$IFACE"
-      ip -6 route replace "$PREFIX::/64" dev "$IFACE" proto static metric 256
+          ip -6 addr replace "$PREFIX::1/64" dev "$IFACE"
+          ip -6 route replace "$PREFIX::/64" dev "$IFACE" proto static metric 256
 
-      cat >> "$RADVD_CONF" <<EOF
-interface $IFACE {
-  AdvSendAdvert on;
-  MinRtrAdvInterval 10;
-  MaxRtrAdvInterval 30;
+          cat >> "$RADVD_CONF" <<EOF
+    interface $IFACE {
+      AdvSendAdvert on;
+      MinRtrAdvInterval 10;
+      MaxRtrAdvInterval 30;
 
-  AdvManagedFlag off;
-  AdvOtherConfigFlag off;
+      AdvManagedFlag off;
+      AdvOtherConfigFlag off;
 
-  prefix $PREFIX::/64 {
-    AdvOnLink on;
-    AdvAutonomous on;
-  };
-};
-EOF
-    done
+      prefix $PREFIX::/64 {
+        AdvOnLink on;
+        AdvAutonomous on;
+      };
+    };
+    EOF
+        done
 
-    if ! grep -q '^interface ' "$RADVD_CONF"; then
-      echo "ERROR: generated empty $RADVD_CONF (no eligible interfaces?)" >&2
-      exit 1
-    fi
+        if ! grep -q '^interface ' "$RADVD_CONF"; then
+          echo "ERROR: generated empty $RADVD_CONF (no eligible interfaces?)" >&2
+          exit 1
+        fi
 
-    echo "[v6-ra] wrote $RADVD_CONF"
+        echo "[v6-ra] wrote $RADVD_CONF"
   '';
 in
 {
@@ -140,4 +149,3 @@ in
     };
   };
 }
-

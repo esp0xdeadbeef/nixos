@@ -10,7 +10,7 @@
     ./wan.nix
     ./unbound.nix
     ./radvd.nix
-  ./debug-packages.nix
+    ./debug-packages.nix
   ];
 
   services.resolved.enable = false;
