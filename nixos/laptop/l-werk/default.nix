@@ -20,6 +20,7 @@
 
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-werk ; ./generate-imports.sh
+    inputs.lanzaboote.nixosModules.lanzaboote
 
     ./1-custom-packages/azurehound/package.nix
     ./1-custom-packages/burp-fix.nix
@@ -41,7 +42,7 @@
     ./work-packages/work/packages.nix
 
     ../../01-general
-    
+
     ../../04-window-manager-other
 
     # ../99-testing/autologin-ssh-and-tty.nix
@@ -52,17 +53,13 @@
     inputs.sops-nix.nixosModules.sops
   ];
 
-security.pam.services.login.enableGnomeKeyring = true;
+  security.pam.services.login.enableGnomeKeyring = true;
 
   sops.defaultSopsFile = ../../../secrets/l-werk-default.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 
-
-
-  
   programs.zsh.ohMyZsh.theme = "clean";
-
 
   home-manager = {
     sharedModules = [

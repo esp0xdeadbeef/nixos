@@ -102,11 +102,7 @@ in
         exit 0
       fi
 
-      BUILT_NOW=0
-      if [ ! -e "${candidateLink}" ]; then
-        BUILT_NOW=1
-        nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "${candidateLink}"
-      fi
+      nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "${candidateLink}"
 
       NEW_PATH="$(readlink -f "${candidateLink}")"
       OLD_PATH="$(readlink -f "${currentLink}" 2>/dev/null || true)"
@@ -117,13 +113,11 @@ in
 
       ln -sfn "$NEW_PATH" "${currentLink}"
 
-      if [ "$BUILT_NOW" = "1" ]; then
-        HOST="$(${pkgs.coreutils}/bin/hostname)"
-        SEED="$HOST-${name}"
-        HASH="$(${pkgs.coreutils}/bin/echo -n "$SEED" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -c1-8)"
-        OFFSET=$(( 0x$HASH % 900 ))
-        sleep "$OFFSET"
-      fi
+      #HOST="$(${pkgs.hostname}/bin/hostname)"
+      #SEED="$HOST-${name}"
+      #HASH="$(${pkgs.coreutils}/bin/echo -n "$SEED" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -c1-8)"
+      #OFFSET=$(( 0x$HASH % 900 ))
+      #sleep "$OFFSET"
 
       /run/current-system/sw/bin/systemctl try-restart "${vmServiceName}.service" || true
     '';

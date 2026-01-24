@@ -6,11 +6,11 @@
   ...
 }:
 {
-systemd.services."container@s-gameserver-container".serviceConfig = {
+systemd.services."container@${config.networking.hostName}-container".serviceConfig = {
   TasksMax = "infinity";
   TimeoutStartSec = lib.mkForce "15min";
 };
-  containers."s-gameserver-container" = {
+  containers."${config.networking.hostName}-container" = {
     autoStart = true;
     privateNetwork = true;
     extraVeths = {

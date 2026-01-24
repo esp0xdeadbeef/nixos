@@ -15,7 +15,7 @@
     # outputs.nixosModules.example
 
     # Or modules from other flakes (such as nixos-hardware):
-    # inputs.hardware.nixosModules.common-cpu-intel
+    inputs.hardware.nixosModules.common-cpu-intel
     # inputs.hardware.nixosModules.common-ssd
 
     # You can also split up your configuration and import pieces of it here:
@@ -23,6 +23,8 @@
     # Import your generated (nixos-generate-config) hardware configuration
 
     # Will test this box if relyable for router firmware hosting:
+    inputs.lanzaboote.nixosModules.lanzaboote
+
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops

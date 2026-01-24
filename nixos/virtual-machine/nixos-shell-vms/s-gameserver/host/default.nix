@@ -27,7 +27,7 @@
     ../../1-helpers/ssh-auth.nix
   ];
 
-  sops.defaultSopsFile = ../../../../../secrets/s-gameserver.yaml;
+  sops.defaultSopsFile = ../../../../../secrets/${config.networking.hostName}.yaml;
   # This will automatically import SSH keys as age keys
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   # This is using an age key that is expected to already be in the filesystem
@@ -87,7 +87,6 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-gameserver";
   # networking.networkmanager.enable = true;
   time.timeZone = "Europe/Amsterdam";
 

@@ -124,7 +124,6 @@
       self,
       nixpkgs,
       home-manager,
-      lanzaboote,
       ...
     }@inputs:
     let
@@ -211,7 +210,7 @@
         s-test-vm = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
+            #lanzaboote.nixosModules.lanzaboote
             ./nixos/s-test-vm/configuration.nix
           ];
         };
@@ -219,7 +218,7 @@
         s-sigma = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs self; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
+            #lanzaboote.nixosModules.lanzaboote
             ./nixos/server/s-sigma
           ];
         };
@@ -227,7 +226,7 @@
         s-test-vm-impermanence = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
+            #lanzaboote.nixosModules.lanzaboote
             ./nixos/s-test-vm-impermanence/configuration.nix
           ];
         };
@@ -236,8 +235,8 @@
         s-router-core = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
-            ./nixos/s-routers/1-core/configuration.nix
+            #lanzaboote.nixosModules.lanzaboote
+            ./nixos/virtual-machine/nixos-shell-vm/s-router-core/configuration.nix
           ];
         };
 
@@ -245,8 +244,7 @@
         s-router-edge = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/virtual-machine/nixos-shell-vms/s-routers/2-edge
+            ./nixos/virtual-machine/nixos-shell-vm/s-router-edge
           ];
         };
 
@@ -262,7 +260,7 @@
         l-werk = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
+            #lanzaboote.nixosModules.lanzaboote
             ./nixos/laptop/l-werk
           ];
         };
@@ -271,7 +269,6 @@
         l-esp = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            lanzaboote.nixosModules.lanzaboote
             ./nixos/laptop/l-esp
           ];
         };
@@ -287,31 +284,28 @@
         s-gameserver = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/virtual-machine/nixos-shell-vms/s-gameserver
+            ./nixos/virtual-machine/nixos-shell-vm/s-gameserver
           ];
         };
 
         s-test = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            ./nixos/virtual-machine/nixos-shell-vms/s-test
+            ./nixos/virtual-machine/nixos-shell-vm/s-test
           ];
         };
 
         s-infra = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/virtual-machine/nixos-shell-vms/s-infra
+            ./nixos/virtual-machine/nixos-shell-vm/s-infra
           ];
         };
 
         s-router-vpn-egress = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
-            inputs.nixos-shell.nixosModules.nixos-shell
-            ./nixos/virtual-machine/nixos-shell-vms/s-routers/z-vpn-egress/default.nix
+            ./nixos/virtual-machine/nixos-shell-vm/s-router-vpn-egress
           ];
         };
 

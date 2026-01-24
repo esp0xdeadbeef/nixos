@@ -18,6 +18,7 @@
     ## Using the specific lenovo-thinkpad-p16s-intel-gen2 model with nvidia overwrite
     # inputs.hardware.nixosModules.common-cpu-intel
     # inputs.hardware.nixosModules.common-gpu-nvidia
+    inputs.lanzaboote.nixosModules.lanzaboote
 
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
