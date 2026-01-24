@@ -6,6 +6,7 @@
   lib,
   config,
   pkgs,
+  outPath,
   ...
 }:
 {
@@ -41,9 +42,9 @@
     ./work-packages/wordlists/packages.nix
     ./work-packages/work/packages.nix
 
-    ../../01-general
+    "${outPath}/library/01-general"
 
-    ../../04-window-manager-other
+    "${outPath}/library/04-window-manager-other"
 
     # ../99-testing/autologin-ssh-and-tty.nix
     # ../99-testing/autologin.nix
@@ -55,7 +56,7 @@
 
   security.pam.services.login.enableGnomeKeyring = true;
 
-  sops.defaultSopsFile = ../../../secrets/l-werk-default.yaml;
+  sops.defaultSopsFile = "${outPath}/secrets/l-werk-default.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 
@@ -70,7 +71,7 @@
     };
     users = {
       # Import your home-manager configuration
-      deadbeef = import ../../../home-manager/l-werk/home.nix;
+      deadbeef = import "${outPath}/home-manager/l-werk/home.nix";
     };
   };
 
