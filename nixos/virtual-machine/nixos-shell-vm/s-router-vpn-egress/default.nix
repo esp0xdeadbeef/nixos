@@ -1,8 +1,15 @@
-{ outPath, lib, config, ... }:
+{
+  outPath,
+  lib,
+  config,
+  ...
+}:
 let
   vmRoot =
-    let file = __curPos.file;
-    in builtins.dirOf file;
+    let
+      file = __curPos.file;
+    in
+    builtins.dirOf file;
 in
 {
   _module.args.vmRoot = vmRoot;
@@ -11,7 +18,6 @@ in
     "${outPath}/library/10-vms/nixos-shell-vm/host-config"
     ./overwrites.nix
     #./host
-./sops-write.nix
+    ./start-vpn-egress-containers.nix
   ];
 }
-
