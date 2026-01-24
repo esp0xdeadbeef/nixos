@@ -118,7 +118,6 @@
       url = "github:Mic92/nixos-shell";
     };
   };
-
   outputs =
     {
       self,
@@ -127,9 +126,9 @@
       ...
     }@inputs:
     let
+      lib = nixpkgs.lib;
       inherit (self) outputs;
 
-      # Supported systems for your flake packages, shell, etc.
       systems = [
         "aarch64-linux"
         "i686-linux"
@@ -138,183 +137,99 @@
         "x86_64-darwin"
       ];
 
-      # This is a function that generates an attribute by calling a function you
-      # pass to it, with each system as an argument
-      forAllSystems = nixpkgs.lib.genAttrs systems;
-      lib = nixpkgs.lib;
+      forAllSystems = lib.genAttrs systems;
 
-      # Minimal flake source for per-VM builds
-      vmSourceForPath =
-        relPath:
+      root = self.outPath;
+
+      # ------------------------------------------------------------
+      # STRUCTURAL HOST ROOTS (semantic, stable)
+      # ------------------------------------------------------------
+      hostRoots = [
+        "nixos/laptop"
+        "nixos/server"
+        "nixos/virtual-machine/nixos-shell-vm"
+      ];
+
+      # List direct subdirectories
+      listDirs =
+        path:
         let
-          root = self.outPath;
-          vmPath = "${root}/${relPath}";
+          abs = "${root}/${path}";
         in
-        if builtins.pathExists vmPath then
-          builtins.path {
-            name = "esp0xdeadbeef-vm-src-${builtins.replaceStrings [ "/" ] [ "-" ] relPath}";
-            path = root;
-            filter =
-              p: _:
-              lib.any (prefix: lib.hasPrefix prefix p) [
-                "${root}/flake.nix"
-                "${root}/flake.lock"
-
-                # VM subtree
-                "${vmPath}"
-
-                # YOUR repo uses these top-level dirs (NOT nixos/modules)
-                "${root}/nixos"
-                "${root}/modules"
-                "${root}/overlays"
-                "${root}/pkgs"
-                "${root}/home-manager"
-                "${root}/secrets"
-                "${root}/dev-updaters"
-              ];
-          }
+        if builtins.pathExists abs then
+          lib.filterAttrs (_: v: v == "directory") (builtins.readDir abs)
         else
-          # fallback to full flake root (still works as a path flake)
-          root;
+          { };
+
+      # Discover all hosts automatically
+      hosts = lib.foldl' (
+        acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
+      ) { } hostRoots;
+
+      allHostAbs = lib.mapAttrsToList (_: v: "${root}/${v}") hosts;
+
+      # ------------------------------------------------------------
+      # MINIMAL SOURCE PER HOST
+      # ------------------------------------------------------------
+      vmSourceForHost =
+        name:
+        let
+          mine = "${root}/${hosts.${name}}";
+          others = lib.filter (p: p != mine) allHostAbs;
+        in
+        builtins.path {
+          name = "esp0xdeadbeef-vm-src-${name}";
+          path = root;
+          filter =
+            p: _:
+            let
+              inOther = lib.any (o: lib.hasPrefix o p) others;
+            in
+            # include everything EXCEPT other hosts
+            !inOther;
+        };
+
     in
     {
       lib = {
-        inherit vmSourceForPath;
+        inherit vmSourceForHost hosts;
       };
 
-      # Your custom packages
-      # Accessible through 'nix build', 'nix shell', etc
       packages =
         if builtins.pathExists ./pkgs then
           forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system})
         else
           { };
 
-      # Formatter for your nix files, available through 'nix fmt'
       formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
 
-      # Your custom packages and modifications, exported as overlays
       overlays = if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { };
 
-      # Reusable nixos modules you might want to export
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
 
-      # Reusable home-manager modules you might want to export
       homeManagerModules =
         if builtins.pathExists ./modules/home-manager then import ./modules/home-manager else { };
 
-      # NixOS configuration entrypoint
-      # Available through 'nixos-rebuild --flake .#your-hostname'
-      nixosConfigurations = {
-        # test vm:
-        s-test-vm = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
+      # ------------------------------------------------------------
+      # GENERATED NIXOS CONFIGURATIONS
+      # ------------------------------------------------------------
+      nixosConfigurations = lib.mapAttrs (
+        name: path:
+        nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          specialArgs = {
+            inherit
+              inputs
+              outputs
+              self
+              name
+              ;
+          };
           modules = [
-            #lanzaboote.nixosModules.lanzaboote
-            ./nixos/s-test-vm/configuration.nix
+            (./. + "/${path}")
           ];
-        };
-
-        s-sigma = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs self; };
-          modules = [
-            #lanzaboote.nixosModules.lanzaboote
-            ./nixos/server/s-sigma
-          ];
-        };
-
-        s-test-vm-impermanence = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            #lanzaboote.nixosModules.lanzaboote
-            ./nixos/s-test-vm-impermanence/configuration.nix
-          ];
-        };
-
-        # router-core
-        s-router-core = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            #lanzaboote.nixosModules.lanzaboote
-            ./nixos/virtual-machine/nixos-shell-vm/s-router-core/configuration.nix
-          ];
-        };
-
-        # router-edge
-        s-router-edge = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/virtual-machine/nixos-shell-vm/s-router-edge
-          ];
-        };
-
-        # x13s laptop:
-        l-x13s = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/l-x13s/configuration.nix
-          ];
-        };
-
-        # work laptop:
-        l-werk = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            #lanzaboote.nixosModules.lanzaboote
-            ./nixos/laptop/l-werk
-          ];
-        };
-
-        # private laptop:
-        l-esp = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/laptop/l-esp
-          ];
-        };
-
-        # lxc server
-        s-lxc-test = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/s-lxc-test/configuration.nix
-          ];
-        };
-
-        s-gameserver = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/virtual-machine/nixos-shell-vm/s-gameserver
-          ];
-        };
-
-        s-test = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/virtual-machine/nixos-shell-vm/s-test
-          ];
-        };
-
-        s-infra = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/virtual-machine/nixos-shell-vm/s-infra
-          ];
-        };
-
-        s-router-vpn-egress = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/virtual-machine/nixos-shell-vm/s-router-vpn-egress
-          ];
-        };
-
-        s-more-threads-then-the-host = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          modules = [
-            ./nixos/s-more-threads-then-the-host
-          ];
-        };
-      };
+        }
+      ) hosts;
     };
+
 }

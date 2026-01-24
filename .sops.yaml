@@ -12,6 +12,7 @@ keys:
   - &s-lxc-router-root age1nnm22xdfv4ptx0vy3exh24djhmdc4cgc0hjghmk5y4l0hggfcswq8j88j9
   - &s-gameserver age16kxdq47yrc0hzapje3tsplrw6eerdxxzwqzj6emg8yyk6r5dzfcs9xelvd
   - &s-router-edge age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
+  - &s-router-infra age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -139,3 +140,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-edge
+  - path_regex: '^(secrets/)*s-infra.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-infra
