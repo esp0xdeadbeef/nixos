@@ -11,11 +11,11 @@ let
 
   nameAirvpn = "airvpn";
   nameMullvad = "mullvad";
-  vlan2 = "vlan2";
-  vlan4 = "vlan4";
-  vlan5 = "vlan5";
-  vlan6 = "vlan6";
-  vlan7 = "vlan7";
+  vlan2 = "veth2";
+  vlan4 = "veth4";
+  vlan5 = "veth5";
+  vlan6 = "veth6";
+  vlan7 = "veth7";
 
   mkVpnConfigService =
     name: tun: secretName:
@@ -35,121 +35,14 @@ let
     '';
 in
 {
-  networking.useNetworkd = lib.mkForce true;
-
-  # VLANs for downstream networks
-  networking.vlans = {
-    vlan2 = {
-      interface = "eth1";
-      id = 2;
-    };
-    vlan4 = {
-      interface = "eth1";
-      id = 4;
-    };
-    vlan5 = {
-      interface = "eth1";
-      id = 5;
-    };
-    vlan6 = {
-      interface = "eth1";
-      id = 6;
-    };
-    vlan7 = {
-      interface = "eth1";
-      id = 7;
-    };
-  };
-
-  # Bridges (used by containers)
-  networking.bridges = {
-    br-vlan2.interfaces = [ "vlan2" ];
-    br-vlan4.interfaces = [ "vlan4" ];
-    br-vlan5.interfaces = [ "vlan5" ];
-    br-vlan6.interfaces = [ "vlan6" ];
-    br-vlan7.interfaces = [ "vlan7" ];
-  };
-
-  # Disable autoconfig on non-primary adapters and bridges
-  systemd.network = {
-    enable = true;
-    networks = {
-      "eth1" = {
-        matchConfig.Name = "eth1";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          IPv6AcceptRA = false;
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-      "br-vlan2" = {
-        matchConfig.Name = "br-vlan2";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-      "br-vlan4" = {
-        matchConfig.Name = "br-vlan4";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-      "br-vlan5" = {
-        matchConfig.Name = "br-vlan5";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-      "br-vlan6" = {
-        matchConfig.Name = "br-vlan6";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-      "br-vlan7" = {
-        matchConfig.Name = "br-vlan7";
-        linkConfig.RequiredForOnline = "no";
-        networkConfig = {
-          DHCP = "no";
-          LinkLocalAddressing = "no";
-          ConfigureWithoutCarrier = true;
-        };
-      };
-    };
-  };
-
-  # Disable IPv6 RA on all bridges
-  boot.kernel.sysctl = {
-    "net.ipv6.conf.all.accept_ra" = 0;
-    "net.ipv6.conf.default.accept_ra" = 0;
-    "net.ipv6.conf.br-vlan2.accept_ra" = 0;
-    "net.ipv6.conf.br-vlan4.accept_ra" = 0;
-    "net.ipv6.conf.br-vlan5.accept_ra" = 0;
-    "net.ipv6.conf.br-vlan6.accept_ra" = 0;
-    "net.ipv6.conf.br-vlan7.accept_ra" = 0;
-  };
 
   # VPN containers configuration
   containers."lan-to-vpn-vlan4" = {
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-vlan4".hostBridge = "br-vlan7";
-      "lan-vlan4".hostBridge = "br-vlan4";
+      "wan-vlan4".hostBridge = "vlan7";
+      "lan-vlan4".hostBridge = "vlan4";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -177,8 +70,8 @@ in
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-vlan5".hostBridge = "br-vlan7";
-      "lan-vlan5".hostBridge = "br-vlan5";
+      "wan-vlan5".hostBridge = "vlan7";
+      "lan-vlan5".hostBridge = "vlan5";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";
@@ -206,8 +99,8 @@ in
     autoStart = true;
     privateNetwork = true;
     extraVeths = {
-      "wan-vlan6".hostBridge = "br-vlan7";
-      "lan-vlan6".hostBridge = "br-vlan6";
+      "wan-vlan6".hostBridge = "vlan7";
+      "lan-vlan6".hostBridge = "vlan6";
     };
     bindMounts."/etc/vpn" = {
       hostPath = "/etc/vpn";

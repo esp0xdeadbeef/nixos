@@ -1,8 +1,0 @@
-{
-  ...
-}:
-{
-
-  networking.hostName = "s-infra";
-
-}

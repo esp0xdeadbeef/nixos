@@ -7,8 +7,8 @@
   systemd.network = {
     enable = true;
 
-    networks."10-veth7" = {
-      matchConfig.Name = "veth7";
+    networks."10-veth-game" = {
+      matchConfig.Name = "veth-game";
 
       networkConfig = {
         DHCP = "yes"; # v4 + v6
