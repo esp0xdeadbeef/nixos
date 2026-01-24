@@ -6,6 +6,8 @@
   lib,
   config,
   pkgs,
+  name,
+  outPath,
   ...
 }:
 {
@@ -30,11 +32,11 @@
     inputs.sops-nix.nixosModules.sops
 
     # still need to destill this:
-    ../../01-general
-    ../../02-window-manager-i3
+    "${outPath}/library/01-general"
+    "${outPath}/library/02-window-manager-i3"
     # autologin for this vm
     #../../99-testing
-    ../../99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix
+    "${outPath}/library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix"
 
     # local nix files:
     ./libvirt.nix
@@ -43,7 +45,7 @@
     ./connect-nas
   ];
 
-  sops.defaultSopsFile = ../../../secrets/s-sigma-root.yaml;
+  sops.defaultSopsFile = "${outPath}/secrets/${name}-root.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
   sops.secrets."deadbeef-passwd" = {
@@ -70,7 +72,7 @@
     };
     users = {
       # Import your home-manager configuration
-      deadbeef = import ../../../home-manager/s-sigma/home.nix;
+      deadbeef = import "${outPath}/home-manager/${name}/home.nix";
     };
   };
 

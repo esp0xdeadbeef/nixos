@@ -10,7 +10,7 @@
     ./wan.nix
     ./unbound.nix
     ./radvd.nix
-    ../../../../10-vms/nixos-shell-vm/../../10-vms/nixos-shell-vm/1-helpers/debug-packages.nix
+  ./debug-packages.nix
   ];
 
   services.resolved.enable = false;

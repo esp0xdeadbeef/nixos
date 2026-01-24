@@ -6,6 +6,7 @@
   lib,
   config,
   pkgs,
+outPath,
   ...
 }:
 {
@@ -32,8 +33,8 @@
     ./torrents
     ./unmount-pentest-directory
 
-    ../../01-general
-    ../../02-window-manager-i3
+    "${outPath}/library/01-general"
+    "${outPath}/library/02-window-manager-i3"
     # ../30-physical-hardware-connections/why2025-badge/default.nix
     # ../99-testing/autologin-ssh-and-tty.nix
 

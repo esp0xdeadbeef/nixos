@@ -6,6 +6,8 @@
   lib,
   config,
   pkgs,
+  name,
+  outPath,
   ...
 }:
 {
@@ -22,12 +24,14 @@
     ./start-container.nix
     ./network.nix
     ./ssh.nix
-    ../../../../10-vms/nixos-shell-vm/../../10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix
-    ../../../../10-vms/nixos-shell-vm/../../10-vms/nixos-shell-vm/1-helpers/debug-packages.nix
-    ../../../../10-vms/nixos-shell-vm/../../10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix
+    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
+    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
+    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
   ];
 
-  sops.defaultSopsFile = ../../../../../secrets/${config.networking.hostName}.yaml;
+  networking.hostName = name;
+
+  sops.defaultSopsFile = "${outPath}/secrets/${config.networking.hostName}.yaml";
   # This will automatically import SSH keys as age keys
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   # This is using an age key that is expected to already be in the filesystem
@@ -113,10 +117,6 @@
       hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
 
       isNormalUser = true;
-      openssh.authorizedKeys.keys = [
-        # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
-        # "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
-      ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];
     };

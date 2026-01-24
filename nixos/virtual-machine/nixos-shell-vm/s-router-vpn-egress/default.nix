@@ -6,18 +6,19 @@
   lib,
   config,
   pkgs,
+  outPath,
   ...
 }:
 {
   # You can import other NixOS modules here
   imports = [
-    ../../../10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix
+    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
     ./vm-settings.nix
 
     ./containers/start_containers.nix
 
     # auto update the vm.
-    ../../../01-general/desktop/shell-env.nix
+    "${outPath}/library/01-general/desktop/shell-env.nix"
 
     # it's a vm.. if you pwn the host you'll be able to login anyway.
     #../../99-testing/autologin.nix
@@ -25,11 +26,11 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
-    ../../../99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix
+    "${outPath}/library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix"
 
   ];
 
-  sops.defaultSopsFile = ../../../../secrets/s-router-vpn-impermanence-root.yaml;
+  sops.defaultSopsFile = "${outPath}/secrets/s-router-vpn-impermanence-root.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
   sops.secrets."deadbeef-passwd" = {

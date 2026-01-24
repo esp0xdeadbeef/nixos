@@ -1,8 +1,8 @@
-{ lib, pkgs, ... }:
+{ outPath, lib, pkgs, ... }:
 
 let
-  mkMgmt = import ../../../../10-vms/nixos-shell-vm/1-helpers/mk-management-networkd.nix { inherit lib pkgs; };
-  mkBridge = import ../../../../10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix { inherit lib pkgs; };
+  mkMgmt = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-management-networkd.nix" { inherit lib pkgs; };
+  mkBridge = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix" { inherit lib pkgs; };
 in
 {
   imports = [

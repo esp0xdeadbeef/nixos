@@ -224,6 +224,7 @@
               self
               name
               ;
+            outPath = self.outPath;
           };
           modules = [
             (./. + "/${path}")

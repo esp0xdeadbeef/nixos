@@ -2,6 +2,5 @@
 {
   imports = [
     ./host
-    ./hostname.nix
   ];
 }
