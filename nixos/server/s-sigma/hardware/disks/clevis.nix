@@ -23,6 +23,13 @@
       Address = "192.168.1.98/24";
     };
   };
+  # added this because sometimes it fails.
+  boot.initrd.systemd.services."cryptsetup-clevis-crypted".serviceConfig = {
+    Restart = "on-failure";
+    RestartSec = "5s";
+    StartLimitBurst = 3;
+    StartLimitIntervalSec = 60;
+  };
 
   # this server (s-sigma) will start my router, this will lead to raceconditions with DHCP:
   #boot.initrd.systemd.network.networks."10-eno4" = {
