@@ -118,6 +118,7 @@
       url = "github:Mic92/nixos-shell";
     };
   };
+
   outputs =
     {
       self,
@@ -184,9 +185,10 @@
             p: _:
             let
               inOther = lib.any (o: lib.hasPrefix o p) others;
+              inGit = lib.hasPrefix "${root}/.git" p;
             in
-            # include everything EXCEPT other hosts
-            !inOther;
+            # include everything EXCEPT other hosts and .git
+            !(inOther || inGit);
         };
 
     in
@@ -232,5 +234,5 @@
         }
       ) hosts;
     };
-
 }
+
