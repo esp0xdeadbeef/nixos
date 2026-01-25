@@ -14,18 +14,19 @@ name:
   restartTime ? 5,
   ephemeralRoot ? true,
 
-  # Image manager behavior
   buildDelaySec ? 600,
   buildIntervalSec ? 600,
   pinned ? false,
   nixBuildFlags ? [ ],
+
+  stateDiskSize ? "100G",
 }:
 
 let
   vmServiceName = "${name}-vm";
   imageServiceName = "${name}-image";
-  flakeRef = "${repository}";
 
+  flakeRef = "${repository}";
   qmpSocket = "/run/${vmServiceName}.qmp";
 
   tmuxDir = "/run/nixos-shell";
@@ -40,24 +41,50 @@ let
   pinLock = "${imgBase}/pin.lock";
 
   nixBuildFlagsStr = lib.concatStringsSep " " (map lib.escapeShellArg nixBuildFlags);
-  buildAttr = "${flakeRef}#nixosConfigurations.${name}.config.system.build.nixos-shell";
 
-  # ---- STABLE LAUNCHER ----
+  perVmPersistDir = "${persistDir}/${name}";
+  stateDiskPath = "${perVmPersistDir}/state.qcow2";
+
+  # SAFE: each token escaped, then joined
+  qemuExtraOpts = lib.concatStringsSep " " (
+    map lib.escapeShellArg [
+      "-qmp"
+      "unix:${qmpSocket},server=on,wait=off"
+      "-drive"
+      "file=${stateDiskPath},if=virtio,format=qcow2,cache=none,aio=native"
+    ]
+  );
+
   innerStart = pkgs.writeShellScript "inner-${vmServiceName}" ''
     set -euo pipefail
 
-    mkdir -p "${tmuxDir}" "${workingDir}" "${imgBase}"
+    mkdir -p "${tmuxDir}" "${workingDir}" "${imgBase}" "${perVmPersistDir}"
+
+    if [ -n "''${NIXOS_VM_FLAKE:-}" ]; then
+      FLAKE="path:''${NIXOS_VM_FLAKE}"
+    else
+      FLAKE="${flakeRef}"
+    fi
+    BUILD_ATTR="''${FLAKE}#nixosConfigurations.${name}.config.system.build.nixos-shell"
+
+    if [ ! -e "${stateDiskPath}" ]; then
+      echo "Creating persistent state disk: ${stateDiskPath} (${stateDiskSize})"
+      ${pkgs.qemu}/bin/qemu-img create -f qcow2 "${stateDiskPath}" "${stateDiskSize}" >/dev/null
+    fi
 
     if [ ! -e "${currentLink}" ]; then
-      nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "${candidateLink}"
+      nix build ${nixBuildFlagsStr} "''${BUILD_ATTR}" --out-link "${candidateLink}"
       ln -sfn "$(readlink -f "${candidateLink}")" "${currentLink}"
     fi
 
     ${lib.optionalString ephemeralRoot ''rm -f "${qcow2Path}" || true''}
 
+    CMD="export QEMU_OPTS='${qemuExtraOpts}'; exec \"$(readlink -f "${currentLink}")/bin/run-${name}-vm\""
+
+    echo "$CMD" > "${tmuxDir}/${name}.cmd"
+
     if ! tmux -S "${tmuxSocket}" has-session -t "${tmuxSession}" 2>/dev/null; then
-      tmux -S "${tmuxSocket}" new-session -d -s "${tmuxSession}" \
-        bash -lc "export QEMU_OPTS='-qmp unix:${qmpSocket},server=on,wait=off'; \"$(readlink -f "${currentLink}")/bin/run-${name}-vm\""
+      tmux -S "${tmuxSocket}" new-session -d -s "${tmuxSession}" bash -lc "$CMD"
     fi
 
     while tmux -S "${tmuxSocket}" has-session -t "${tmuxSession}" 2>/dev/null; do
@@ -72,19 +99,14 @@ in
 {
   system.build.vmImages.${name} = self.nixosConfigurations.${name}.config.system.build.nixos-shell;
 
-  #####################################################################
-  # IMAGE MANAGER
-  #####################################################################
   systemd.services.${imageServiceName} = {
     description = "VM image manager (nixos-shell) for ${name}";
     after = [ "nix-daemon.service" ];
-    wants = [ ];
-
     path = [
       pkgs.nix
       pkgs.coreutils
+      pkgs.systemd
     ];
-
     serviceConfig = {
       Type = "oneshot";
       User = "root";
@@ -98,28 +120,23 @@ in
         : > "${pinLock}"
       ''}
 
-      if [ -f "${pinLock}" ]; then
-        exit 0
-      fi
+      if [ -f "${pinLock}" ]; then exit 0; fi
 
-      nix build ${nixBuildFlagsStr} "${buildAttr}" --out-link "${candidateLink}"
+      if [ -n "''${NIXOS_VM_FLAKE:-}" ]; then
+        FLAKE="path:''${NIXOS_VM_FLAKE}"
+      else
+        FLAKE="${flakeRef}"
+      fi
+      BUILD_ATTR="''${FLAKE}#nixosConfigurations.${name}.config.system.build.nixos-shell"
+
+      nix build ${nixBuildFlagsStr} "''${BUILD_ATTR}" --out-link "${candidateLink}"
 
       NEW_PATH="$(readlink -f "${candidateLink}")"
       OLD_PATH="$(readlink -f "${currentLink}" 2>/dev/null || true)"
-
-      if [ "$NEW_PATH" = "$OLD_PATH" ]; then
-        exit 0
-      fi
+      if [ "$NEW_PATH" = "$OLD_PATH" ]; then exit 0; fi
 
       ln -sfn "$NEW_PATH" "${currentLink}"
-
-      #HOST="$(${pkgs.hostname}/bin/hostname)"
-      #SEED="$HOST-${name}"
-      #HASH="$(${pkgs.coreutils}/bin/echo -n "$SEED" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -c1-8)"
-      #OFFSET=$(( 0x$HASH % 900 ))
-      #sleep "$OFFSET"
-
-      /run/current-system/sw/bin/systemctl try-restart "${vmServiceName}.service" || true
+      systemctl restart "${vmServiceName}.service" || true
     '';
   };
 
@@ -132,12 +149,8 @@ in
     };
   };
 
-  #####################################################################
-  # VM RUNNER (STABLE)
-  #####################################################################
   systemd.services.${vmServiceName} = {
     inherit description;
-
     stopIfChanged = false;
     reloadIfChanged = false;
 
@@ -161,6 +174,7 @@ in
       pkgs.coreutils
       pkgs.tmux
       pkgs.bash
+      pkgs.qemu
     ];
 
     serviceConfig = {
@@ -171,10 +185,10 @@ in
       KillMode = "process";
       TimeoutStopSec = "2min";
       WorkingDirectory = workingDir;
-
       ExecStart = stableLauncher;
 
       ExecStop = pkgs.writeShellScript "stop-${vmServiceName}" ''
+        set -euo pipefail
         if [ -S "${qmpSocket}" ]; then
           printf '%s\n' \
             '{"execute":"qmp_capabilities"}' \
@@ -187,9 +201,6 @@ in
     };
   };
 
-  #####################################################################
-  # BOOT DELAYED START (TIMER)
-  #####################################################################
   systemd.timers.${vmServiceName} = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
@@ -198,14 +209,11 @@ in
     };
   };
 
-  #####################################################################
-  # STABLE SYMLINK
-  #####################################################################
   systemd.tmpfiles.rules = [
     "L+ ${stableLauncher} - - - - ${innerStart}"
     "d ${workingDir} 0755 root root -"
     "d ${persistDir} 0755 root root -"
-    "d /persist/vm-persists/${name} 0755 root root -"
+    "d ${perVmPersistDir} 0755 root root -"
     "d ${imgBase} 0755 root root -"
     "d ${tmuxDir} 0755 root root -"
     (lib.optionalString pinned "f ${pinLock} 0644 root root - -")
