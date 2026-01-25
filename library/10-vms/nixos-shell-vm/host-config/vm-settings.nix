@@ -18,7 +18,7 @@
   # Network settings:
   virtualisation.qemu.networkingOptions = [
     "-nic none"
-    "-nic bridge,br=vmbr4,mac=BC:24:11:1D:0E:FF,model=virtio-net-pci"
+    "-nic bridge,br=vmbr4,model=virtio-net-pci"
   ];
 
   nixos-shell.mounts = {

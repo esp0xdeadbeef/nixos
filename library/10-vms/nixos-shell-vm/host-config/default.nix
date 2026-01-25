@@ -20,16 +20,16 @@
     inputs.sops-nix.nixosModules.sops
     # inputs.nvf.nixosModules.default
     # inputs.nixvim.nixosModules.nixvim
+    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
+    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
+    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
+    "${outPath}/library/01-general/desktop/shell-env.nix"
     ./vm-settings.nix
     ./start-container.nix
     ./network.nix
     ./ssh.nix
     ./impermanence.nix
     ./persist-state-disk.nix
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
-    "${outPath}/library/01-general/desktop/shell-env.nix"
   ];
 
   networking.hostName = name;
