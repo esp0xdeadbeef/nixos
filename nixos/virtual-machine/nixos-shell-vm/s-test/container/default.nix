@@ -6,11 +6,12 @@
 {
   imports = [
     ./networking.nix
-    ./container-settings.nix
     #./podman-hello-world.nix
     ./debug-packages.nix
-    ./podman-fix.nix
-    ./container-lab.nix
+    #./podman-fix.nix
+    ./containerlab.nix
   ];
+  networking.useHostResolvConf = false;
+
   system.stateVersion = "25.11";
 }

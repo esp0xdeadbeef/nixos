@@ -7,7 +7,6 @@
   config,
   pkgs,
   name,
-  
   outPath,
   ...
 }:
@@ -26,10 +25,11 @@
     ./network.nix
     ./ssh.nix
     ./impermanence.nix
+    ./persist-state-disk.nix
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
-    "${outPath}/library/01-general/desktop/shell-env.nix"    
+    "${outPath}/library/01-general/desktop/shell-env.nix"
   ];
 
   networking.hostName = name;
