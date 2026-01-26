@@ -1,4 +1,9 @@
-{ pkgs, lib, helpers, args }:
+{
+  pkgs,
+  lib,
+  helpers,
+  args,
+}:
 { ... }:
 
 let
@@ -21,7 +26,7 @@ let
       # DNS
       {
         name = "domain-name-servers";
-        data = lib.concatStringsSep "," (args.upstreamDns or []);
+        data = lib.concatStringsSep "," (args.upstreamDns or [ ]);
       }
 
       {
@@ -32,8 +37,8 @@ let
   };
 in
 {
-  environment.etc =
-    lib.listToAttrs (map (l: {
+  environment.etc = lib.listToAttrs (
+    map (l: {
       name = "kea/${l.name}.json";
       value.text = builtins.toJSON {
         Dhcp4 = {
@@ -50,6 +55,6 @@ in
           subnet4 = [ (mkSubnet l) ];
         };
       };
-    }) lans);
+    }) lans
+  );
 }
-

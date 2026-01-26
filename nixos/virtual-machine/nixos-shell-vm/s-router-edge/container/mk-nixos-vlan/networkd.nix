@@ -1,4 +1,9 @@
-{ pkgs, lib, helpers, args }:
+{
+  pkgs,
+  lib,
+  helpers,
+  args,
+}:
 { config, ... }:
 
 let
@@ -15,23 +20,33 @@ in
   };
 
   systemd.network.networks =
-    lib.listToAttrs (map (l: {
-      name = "20-${l.name}-${l.iface}";
-      value.matchConfig.Name = l.iface;
-      value.networkConfig = {
-        Address = [ l.ip4 l.ip6 ];
-        DHCP = "no";
-        IPv6AcceptRA = false;
-        IPv6Forwarding = true;
-      };
-    }) lans)
-    //
-    {
+    lib.listToAttrs (
+      map (l: {
+        name = "20-${l.name}-${l.iface}";
+        value.matchConfig.Name = l.iface;
+        value.networkConfig = {
+          Address = [
+            l.ip4
+            l.ip6
+          ];
+          DHCP = "no";
+          IPv6AcceptRA = false;
+          IPv6Forwarding = true;
+        };
+      }) lans
+    )
+    // {
       "10-wan-${wan.iface}" = {
         matchConfig.Name = wan.iface;
         networkConfig = {
-          Address = [ wan.ip4 wan.ip6 ];
-          Gateway = [ wan.gw4 wan.gw6 ];
+          Address = [
+            wan.ip4
+            wan.ip6
+          ];
+          Gateway = [
+            wan.gw4
+            wan.gw6
+          ];
           DHCP = "no";
           IPv6AcceptRA = wan.acceptRA or false;
           IPv6Forwarding = true;
@@ -39,4 +54,3 @@ in
       };
     };
 }
-

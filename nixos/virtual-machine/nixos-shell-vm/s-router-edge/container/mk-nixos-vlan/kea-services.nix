@@ -1,4 +1,8 @@
-{ pkgs, lib, args }:
+{
+  pkgs,
+  lib,
+  args,
+}:
 { ... }:
 
 let
@@ -35,8 +39,8 @@ let
 
 in
 {
-  systemd.services =
-    lib.listToAttrs (map (l: {
+  systemd.services = lib.listToAttrs (
+    map (l: {
       name = svcFor l;
       value = {
         description = "Kea DHCPv4 on ${l.iface}";
@@ -77,6 +81,6 @@ in
           RestartSec = "2s";
         };
       };
-    }) lans);
+    }) lans
+  );
 }
-
