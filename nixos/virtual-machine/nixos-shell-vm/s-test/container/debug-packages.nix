@@ -1,13 +1,21 @@
-{ config, pkgs, ... }:
+{ pkgs, lib, ... }:
 {
-  environment.etc.hosts.enable = false;
 
   environment.systemPackages = with pkgs; [
-    tcpdump
-    neovim
+    traceroute
     nmap
-    nftables
+    dnsutils
+    ppp
+    iproute2
+    tcpdump
+    tmux
+    kea
+    dhcpcd
+    networkmanager
     dig
+    neovim
+    nftables
   ];
 
+  environment.etc.hosts.enable = false;
 }

@@ -1,4 +1,4 @@
-
+## small note to myself:
 For testing purposes, do this on the host, so you can rebuild the container with, without rebuilding ;)
 
 ```bash

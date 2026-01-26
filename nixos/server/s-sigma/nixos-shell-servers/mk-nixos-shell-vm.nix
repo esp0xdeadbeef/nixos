@@ -36,8 +36,11 @@ let
   qcow2Path = "${workingDir}/${name}.qcow2";
 
   imgBase = "/persist/nixos-shell-images/${name}";
+  runImgBase = "/run/nixos-shell-images/${name}";
+
   currentLink = "${imgBase}/current";
-  candidateLink = "${imgBase}/candidate";
+  candidateLink = "${runImgBase}/candidate";
+
   pinLock = "${imgBase}/pin.lock";
 
   nixBuildFlagsStr = lib.concatStringsSep " " (map lib.escapeShellArg nixBuildFlags);
@@ -58,7 +61,7 @@ let
   innerStart = pkgs.writeShellScript "inner-${vmServiceName}" ''
     set -euo pipefail
 
-    mkdir -p "${tmuxDir}" "${workingDir}" "${imgBase}" "${perVmPersistDir}"
+    mkdir -p "${tmuxDir}" "${workingDir}" "${imgBase}" "${perVmPersistDir}" "${runImgBase}"
 
     if [ -n "''${NIXOS_VM_FLAKE:-}" ]; then
       FLAKE="path:''${NIXOS_VM_FLAKE}"
@@ -215,6 +218,7 @@ in
     "d ${persistDir} 0755 root root -"
     "d ${perVmPersistDir} 0755 root root -"
     "d ${imgBase} 0755 root root -"
+    "d ${runImgBase} 0755 root root -"
     "d ${tmuxDir} 0755 root root -"
     (lib.optionalString pinned "f ${pinLock} 0644 root root - -")
   ]

@@ -41,7 +41,6 @@ in
     (mkVM "s-test" {
       description = "s-test (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-test"}";
-      ephemeralRoot = true;
     })
   ];
 }

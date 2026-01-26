@@ -14,6 +14,8 @@ keys:
   - &s-router-edge age1rk2075857skug3ljwg42wkxgsg0xu84y4m54c20j0g9zapf0kuus4z7smu
   - &s-router-infra age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
   - &s-nebula age1seqn6c56kxch7epv6dr3k43tx5eecj4aktlcg0njqg8ef3ewrvpq9vwsmw
+  - &s-test age1n49y8n965sjwt6l8tk2nss5wcsww3qtg0rvqt974sz5npsvmpezs8pllr6
+
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
     encrypted_regex: '.*'
@@ -27,6 +29,7 @@ creation_rules:
           - *s-test-vm-impermanence-root
           - *s-router-vpn-impermanence-root
           - *s-router-impermanence-root
+          - *s-test
 
   - path_regex: '^(secrets/)*l-esp-default-deadbeef\.(env|ya?ml)$'
     input_type: env
@@ -156,3 +159,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-nebula
+  - path_regex: '^(secrets/)*s-test.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-test

@@ -39,7 +39,11 @@ let
     domain = "lan.";
     upstreamDns = [
       "9.9.9.9"
-      "149.112.112.112"
+      "1.1.1.1"
+      "2606:4700:4700::1111"
+      "2606:4700:4700::1001"
+      "2001:4860:4860::8888"
+      "2001:4860:4860::8844"
     ];
     publicPrefixFile = "/run/secrets/subnet-ipv6";
   };
@@ -47,8 +51,8 @@ in
 {
   imports = [
     ./debugging-packages.nix
-    ./debug-packages.nix
     vlanModule
   ];
   system.stateVersion = "25.11";
+  boot.isContainer = true;
 }

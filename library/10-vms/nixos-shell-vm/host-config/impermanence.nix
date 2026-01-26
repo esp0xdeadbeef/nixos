@@ -40,6 +40,7 @@
       users.deadbeef = {
         directories = [
           ".ssh"
+          "github"
         ];
 
         files = [
