@@ -17,6 +17,7 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config"
     ./overwrites.nix
+    ./mount-utils.nix
     #./host
   ];
 }

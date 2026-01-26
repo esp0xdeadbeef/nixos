@@ -1,40 +1,49 @@
 { pkgs, lib, ... }:
-{
 
-  imports = [
-    ./debugging-packages.nix
-    ./kea-dhcp.nix
-    ./firewall.nix
-    ./kernel.nix
-    ./networkd.nix
-    ./wan.nix
-    ./unbound.nix
-    ./radvd.nix
-    ./debug-packages.nix
-  ];
+let
+  mk-nixos-vlan = import ./mk-nixos-vlan.nix { inherit pkgs lib; };
 
-  services.resolved.enable = false;
+  vlanModule = mk-nixos-vlan {
+    wan = {
+      iface = "lan1010";
+      dhcp4 = false;
+      dhcp6 = false;
+      ip4 = "10.255.255.2/30";
+      gw4 = "10.255.255.1";
+      ip6 = "fd42:dead:beef:100::2/64";
+      gw6 = "fd42:dead:beef:100::1";
+      acceptRA = true;
+    };
 
-  system.stateVersion = "25.11";
+lans = [
+  {
+    id = 7;
+    name = "lan7";
+    iface = "lan7";
+    ip4 = "10.13.37.1/24";
+    ip6 = "fd42:dead:beef:7::1/64";
+    dhcp4 = true;
+    ra6 = true;
+  }
+  {
+    id = 3;
+    name = "lan3";
+    iface = "lan3";
+    ip4 = "10.10.3.1/24";
+    ip6 = "fd42:dead:beef:3::1/64";
+    dhcp4 = true;
+    ra6 = true;
+  }
+];
 
-  services.dbus.enable = true;
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
+
+    domain = "lan.";
+    upstreamDns = [ "9.9.9.9" "149.112.112.112" ];
+    publicPrefixFile = "/run/secrets/subnet-ipv6";
   };
-
-  systemd.tmpfiles.rules = [
-    "d /run/kea 0777 root root -"
-    "d /var/lib/kea 0777 root root -"
-    "d /etc/ppp/peers/ 0777 root root -"
-  ];
-
-  systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
-
-  networking.useHostResolvConf = lib.mkForce false;
-
-  networking.useNetworkd = true;
-
-  networking.useDHCP = false;
-
+in
+{
+  imports = [ ./debugging-packages.nix  ./debug-packages.nix vlanModule ];
+  system.stateVersion = "25.11";
 }
+
