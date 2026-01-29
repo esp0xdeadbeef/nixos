@@ -47,6 +47,8 @@ let
     upstreamDns = [
       "1.1.1.1"
       "9.9.9.9"
+      "2606:4700:4700::1111"
+      "2606:4700:4700::1001"
     ];
   };
 in
@@ -58,7 +60,6 @@ in
 
   system.stateVersion = "25.11";
   boot.isContainer = true;
-networking.firewall.enable = false;
+  networking.firewall.enable = false;
 
 }
-
