@@ -51,6 +51,9 @@ in
     config =
       { pkgs, config, ... }:
       {
+        environment.systemPackages = with pkgs; [
+          conntrack-tools
+        ];
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;
@@ -80,6 +83,9 @@ in
     config =
       { pkgs, config, ... }:
       {
+        environment.systemPackages = with pkgs; [
+          conntrack-tools
+        ];
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;
@@ -109,6 +115,10 @@ in
     config =
       { pkgs, config, ... }:
       {
+        environment.systemPackages = with pkgs; [
+          conntrack-tools
+        ];
+
         imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
         services.router-vpn-gateway = {
           enable = true;

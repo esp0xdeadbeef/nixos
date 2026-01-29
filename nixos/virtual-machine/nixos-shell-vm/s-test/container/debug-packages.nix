@@ -2,6 +2,7 @@
 {
 
   environment.systemPackages = with pkgs; [
+    conntrack-tools
     traceroute
     nmap
     dnsutils
