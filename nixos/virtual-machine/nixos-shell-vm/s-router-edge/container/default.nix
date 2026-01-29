@@ -1,19 +1,26 @@
+# default.nix
 { pkgs, lib, ... }:
 
 let
   mk-nixos-vlan = import ./mk-nixos-vlan.nix { inherit pkgs lib; };
 
   vlanModule = mk-nixos-vlan {
-    wan = {
-      iface = "lan1010";
-      dhcp4 = false;
-      dhcp6 = false;
-      ip4 = "10.255.255.2/30";
-      gw4 = "10.255.255.1";
-      ip6 = "fd42:dead:beef:100::2/64";
-      gw6 = "fd42:dead:beef:100::1";
-      acceptRA = true;
-    };
+    wans = [
+      {
+        name = "wanA";
+        mark = "1";
+        iface = "lan1010";
+
+        ip4 = "10.255.255.2/30";
+        gw4 = "10.255.255.1";
+
+        ip6 = "fd42:dead:beef:100::2/64";
+        gw6 = "fd42:dead:beef:100::1";
+        acceptRA = true;
+
+        publicPrefixFile = "/run/secrets/subnet-ipv6";
+      }
+    ];
 
     lans = [
       {
@@ -38,14 +45,9 @@ let
 
     domain = "lan.";
     upstreamDns = [
-      "9.9.9.9"
       "1.1.1.1"
-      "2606:4700:4700::1111"
-      "2606:4700:4700::1001"
-      "2001:4860:4860::8888"
-      "2001:4860:4860::8844"
+      "9.9.9.9"
     ];
-    publicPrefixFile = "/run/secrets/subnet-ipv6";
   };
 in
 {
@@ -53,6 +55,10 @@ in
     ./debugging-packages.nix
     vlanModule
   ];
+
   system.stateVersion = "25.11";
   boot.isContainer = true;
+networking.firewall.enable = false;
+
 }
+

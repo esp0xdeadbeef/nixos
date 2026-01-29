@@ -2,6 +2,19 @@
 For testing purposes, do this on the host, so you can rebuild the container with, without rebuilding ;)
 
 ```bash
+# inside the container:
+printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf # fix dns if required
+
+# if paths are broken by installs:
+nix-store --verify
+
+nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#nixos-rebuild --command nixos-rebuild switch --impure --flake path:/persist/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-edge/container#s-router-edge-container
+
+networkctl reload
+
+
+
+# old:
 rsync --delete -va /home/deadbeef/github/nixos s-router-edge:~/github/
 nixos-container update s-router-edge-container --flake path:/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-edge/container#s-router-edge-container && nixos-container root-login s-router-edge-container
 ```
