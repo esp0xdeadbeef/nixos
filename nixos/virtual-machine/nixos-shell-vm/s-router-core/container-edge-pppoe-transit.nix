@@ -35,10 +35,9 @@ in
     #  wan.hostInterface = wanIf;  # full WAN trunk
     #};
     extraVeths = {
-  lan.hostBridge = "br-lan-trunk";
-  wan.hostBridge = "br-wan-trunk";
-};
-
+      lan.hostBridge = "br-lan-trunk";
+      wan.hostBridge = "br-wan-trunk";
+    };
 
     allowedDevices = [
       {
@@ -73,4 +72,3 @@ in
     config = ./container;
   };
 }
-

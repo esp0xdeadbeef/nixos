@@ -36,7 +36,8 @@ let
   qcow2Path = "${workingDir}/${name}.qcow2";
 
   imgBase = "/persist/nixos-shell-images/${name}";
-  runImgBase = "/run/nixos-shell-images/${name}";
+  # sadly it din't cache it last time i've tried this, so i was offline (core router):
+  runImgBase = "/persist/nixos-shell-images/${name}";
 
   currentLink = "${imgBase}/current";
   candidateLink = "${runImgBase}/candidate";
