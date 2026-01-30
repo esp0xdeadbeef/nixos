@@ -26,7 +26,7 @@ in
 
   ## Container = real router
   containers.pppoe-wan-to-downstream = {
-    autoStart = false;
+    autoStart = true;
     privateNetwork = true;
 
     # Pass raw trunks
