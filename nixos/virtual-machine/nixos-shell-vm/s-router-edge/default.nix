@@ -19,5 +19,7 @@ in
     ./overwrites.nix
     ./mount-utils.nix
     #./host
+    ./container-settings.nix
+
   ];
 }

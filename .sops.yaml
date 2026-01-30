@@ -11,10 +11,12 @@ keys:
   - &s-router-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
   - &s-lxc-router-root age1nnm22xdfv4ptx0vy3exh24djhmdc4cgc0hjghmk5y4l0hggfcswq8j88j9
   - &s-gameserver age16kxdq47yrc0hzapje3tsplrw6eerdxxzwqzj6emg8yyk6r5dzfcs9xelvd
-  - &s-router-edge age1rk2075857skug3ljwg42wkxgsg0xu84y4m54c20j0g9zapf0kuus4z7smu
+  - &s-router-edge age1ceu4u9ujawzxctc7kf0f39cwjv7gnv250gnya60muqxa9qxfp5lscvjxj6
   - &s-router-infra age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
   - &s-nebula age1seqn6c56kxch7epv6dr3k43tx5eecj4aktlcg0njqg8ef3ewrvpq9vwsmw
   - &s-test age1n49y8n965sjwt6l8tk2nss5wcsww3qtg0rvqt974sz5npsvmpezs8pllr6
+  - &s-router-core age16lrtp9fnvamca3g78pzr4jxcq0nzlj5vs4p5n5jerkxylnwh294syst0yh
+  
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -167,3 +169,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-test
+  - path_regex: '^(secrets/)*s-router-core.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-core

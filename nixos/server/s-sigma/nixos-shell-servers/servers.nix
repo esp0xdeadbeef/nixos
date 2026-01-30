@@ -28,6 +28,10 @@ in
       repository = "path:${self.lib.vmSourceForHost "s-router-edge"}";
     })
 
+    (mkVM "s-router-core" {
+      description = "s-router-core VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
+    })
     (mkVM "s-gameserver" {
       description = "Gameserver VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";

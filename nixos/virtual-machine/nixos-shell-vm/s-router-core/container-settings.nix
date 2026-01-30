@@ -1,11 +1,17 @@
-{ config, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  vmRoot,
+  ...
+}:
 {
   containers."${config.networking.hostName}-container" = {
-    autoStart = false;
+    autoStart = true;
     privateNetwork = true;
 
     extraVeths = {
-      veth2.hostBridge = "vlan2";
+      vmbr1-cont.hostBridge = "vm";
       veth3.hostBridge = "vlan3";
       veth4.hostBridge = "vlan4";
       veth5.hostBridge = "vlan5";
@@ -30,10 +36,6 @@
       hostPath = "/persist-state/var/lib/docker";
       isReadOnly = false;
     };
-      bindMounts."/run/secrets" = {
-        hostPath = "/run/secrets";
-        isReadOnly = true;
-      };
 
     # This is the key line:
     # Resolves to /nix/store/...-source/nixos/virtual-machine/nixos-shell-vm/{container-host}/container
