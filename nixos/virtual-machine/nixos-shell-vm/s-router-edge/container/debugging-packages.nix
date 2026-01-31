@@ -16,7 +16,6 @@
     dig
     neovim
     nftables
-    netexec
   ];
 
   environment.etc.hosts.enable = false;

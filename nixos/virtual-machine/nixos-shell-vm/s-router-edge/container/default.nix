@@ -1,4 +1,3 @@
-# default.nix
 { pkgs, lib, ... }:
 
 let
@@ -8,7 +7,7 @@ let
     wans = [
       {
         name = "wanA";
-        mark = "1";
+        mark = "1010";
         iface = "lan1010";
 
         ip4 = "10.255.255.2/29";
@@ -24,11 +23,11 @@ let
 
     lans = [
       {
-        id = 7;
-        name = "lan7";
-        iface = "lan7";
-        ip4 = "10.13.37.1/24";
-        ip6 = "fd42:dead:beef:7::1/64";
+        id = 2;
+        name = "lan2";
+        iface = "lan2";
+        ip4 = "192.168.1.1/24";
+        ip6 = "fd42:1::1/64";
         dhcp4 = true;
         ra6 = true;
       }
@@ -38,6 +37,15 @@ let
         iface = "lan3";
         ip4 = "10.10.3.1/24";
         ip6 = "fd42:dead:beef:3::1/64";
+        dhcp4 = true;
+        ra6 = true;
+      }
+      {
+        id = 7;
+        name = "lan7";
+        iface = "lan7";
+        ip4 = "10.13.37.1/24";
+        ip6 = "fd42:dead:beef:7::1/64";
         dhcp4 = true;
         ra6 = true;
       }

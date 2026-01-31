@@ -15,6 +15,7 @@ let
     set -euo pipefail
     IF="$1"
 
+
     # max ~10s
     for i in $(seq 1 40); do
       if ${pkgs.iproute2}/bin/ip link show "$IF" >/dev/null 2>&1; then

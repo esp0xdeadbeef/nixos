@@ -37,8 +37,6 @@
       isReadOnly = false;
     };
 
-    # This is the key line:
-    # Resolves to /nix/store/...-source/nixos/virtual-machine/nixos-shell-vm/{container-host}/container
     config = vmRoot + "/container";
 
     additionalCapabilities = [

@@ -23,7 +23,13 @@
       }
       {
         routeConfig = {
-          Destination = "10.10.3.100/24";
+          Destination = "10.10.3.0/24";
+          Gateway = "10.255.255.2";
+        };
+      }
+      {
+        routeConfig = {
+          Destination = "192.168.1.0/24";
           Gateway = "10.255.255.2";
         };
       }

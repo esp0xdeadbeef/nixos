@@ -1,4 +1,3 @@
-# mk-nixos-vlan.nix
 { pkgs, lib }:
 args@{ ... }:
 { config, ... }:

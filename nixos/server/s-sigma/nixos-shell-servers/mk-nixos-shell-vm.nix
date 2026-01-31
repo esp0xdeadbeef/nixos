@@ -66,7 +66,7 @@ let
 
     if [ -n "''${NIXOS_VM_FLAKE:-}" ]; then
       FLAKE="path:''${NIXOS_VM_FLAKE}"
-      rm "${currentLink}"
+      rm "${currentLink}" || true
     else
       FLAKE="${flakeRef}"
     fi

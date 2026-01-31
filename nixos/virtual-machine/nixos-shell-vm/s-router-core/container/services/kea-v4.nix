@@ -68,7 +68,7 @@ in
           subnet = "10.255.255.0/29";
 
           pools = [
-            { pool = "10.255.255.5-10.255.255.6"; }
+            { pool = "10.255.255.4-10.255.255.6"; }
           ];
 
           option-data = [
@@ -106,8 +106,7 @@ in
       ];
 
       # REAL service
-      ExecStart =
-        "${pkgs.kea}/bin/kea-dhcp4 -d -c /etc/kea/vlan1010.json";
+      ExecStart = "${pkgs.kea}/bin/kea-dhcp4 -d -c /etc/kea/vlan1010.json";
 
       # POST: prove kernel socket truth
       ExecStartPost = [
@@ -133,4 +132,3 @@ in
     };
   };
 }
-

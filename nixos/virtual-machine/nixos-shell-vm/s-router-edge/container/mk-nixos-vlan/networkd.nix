@@ -1,4 +1,3 @@
-# mk-nixos-vlan/networkd.nix
 {
   pkgs,
   lib,
