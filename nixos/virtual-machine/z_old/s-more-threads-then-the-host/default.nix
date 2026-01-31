@@ -1,4 +1,9 @@
-{ lib, pkgs, modulesPath, ... }:
+{
+  lib,
+  pkgs,
+  modulesPath,
+  ...
+}:
 
 {
   imports = [
@@ -14,13 +19,13 @@
   #};
   # Basic VM tweak
   #virtualisation.writableStore = true;
-#virtualisation.mountHostNixStore = false;
-#virtualisation.useNixStoreImage = true;
-#virtualisation.writableStore = true;
-#virtualisation.writableStoreUseTmpfs = false;
+  #virtualisation.mountHostNixStore = false;
+  #virtualisation.useNixStoreImage = true;
+  #virtualisation.writableStore = true;
+  #virtualisation.writableStoreUseTmpfs = false;
 
-virtualisation.mountHostNixStore = true;
-#virtualisation.directBoot = true;
+  virtualisation.mountHostNixStore = true;
+  #virtualisation.directBoot = true;
   virtualisation.sharedDirectories = {
     homefolder = {
       source = "/home/deadbeef/github/nixos";
@@ -75,4 +80,3 @@ virtualisation.mountHostNixStore = true;
   virtualisation.diskSize = 20 * 1024;
 
 }
-

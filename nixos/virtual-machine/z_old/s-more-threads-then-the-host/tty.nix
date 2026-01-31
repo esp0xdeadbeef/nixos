@@ -10,4 +10,3 @@
 
   systemd.services."serial-getty@ttyS0".enable = true;
 }
-

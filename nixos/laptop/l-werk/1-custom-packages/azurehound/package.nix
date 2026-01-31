@@ -6,7 +6,8 @@ let
       lib
       fetchzip
       autoPatchelfHook
-      glibc;
+      glibc
+      ;
   };
 in
 {

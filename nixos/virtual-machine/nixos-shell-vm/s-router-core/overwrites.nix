@@ -30,10 +30,10 @@
       hostPath = "/persist-state/var/lib/docker";
       isReadOnly = false;
     };
-      bindMounts."/run/secrets" = {
-        hostPath = "/run/secrets";
-        isReadOnly = true;
-      };
+    bindMounts."/run/secrets" = {
+      hostPath = "/run/secrets";
+      isReadOnly = true;
+    };
 
     # This is the key line:
     # Resolves to /nix/store/...-source/nixos/virtual-machine/nixos-shell-vm/{container-host}/container

@@ -1,11 +1,18 @@
-{ config, pkgs, lib, inputs, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
 
 let
   unstablePkgs = import inputs.nixpkgs-unstable {
     inherit (pkgs.stdenv) system;
     config.allowUnfree = true;
   };
-in {
+in
+{
   # Install Maestral with GUI and tray support
   home.packages = with pkgs; [
     maestral-gui

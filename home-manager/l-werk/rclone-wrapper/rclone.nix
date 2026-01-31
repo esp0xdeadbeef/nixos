@@ -89,9 +89,10 @@ in
   sops.secrets."rclone-drive_id" = { };
 
   # Expose wrapper so you can run it manually too
-  home.packages = [ rcloneWrapper backupScript ];
-
-
+  home.packages = [
+    rcloneWrapper
+    backupScript
+  ];
 
   # Systemd service
   systemd.user.services.pentest-backup = {
@@ -100,9 +101,9 @@ in
     };
 
     Service = {
-    Type = "oneshot";
-    ExecStart = "${lib.getExe backupScript}";
-  };
+      Type = "oneshot";
+      ExecStart = "${lib.getExe backupScript}";
+    };
   };
 
   systemd.user.timers.pentest-backup = {

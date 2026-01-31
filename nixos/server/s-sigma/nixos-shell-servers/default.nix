@@ -1,6 +1,6 @@
-{ pkgs,self, ... }:
+{ pkgs, self, ... }:
 {
-   imports = [
-     ./servers.nix
-   ];
- }
+  imports = [
+    ./servers.nix
+  ];
+}

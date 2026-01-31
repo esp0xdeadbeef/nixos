@@ -63,7 +63,7 @@
     autorandr
     gh
     sshpass
-    
+
     man
     man-pages
     sbctl
@@ -111,12 +111,9 @@
     # ventoy-full
     htop
 
-
-
-
     # browser
     chromium
-    
+
     # discord
     # google-chrome
     flameshot

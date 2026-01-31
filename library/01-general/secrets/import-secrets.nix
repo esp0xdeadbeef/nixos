@@ -1,4 +1,9 @@
-{ config, pkgs, sops, ... }:
+{
+  config,
+  pkgs,
+  sops,
+  ...
+}:
 {
   systemd.services.echoSecret = {
     description = "Echo secret for testing";

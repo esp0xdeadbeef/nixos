@@ -21,7 +21,7 @@
   # https://faq.i3wm.org/question/1367/anyway-to-include-in-config-file/
   # cat $HOME/.config/i3/config.base \
   #     $HOME/.config/i3/config.local > $HOME/.config/i3/config
-  # exec /usr/bin/i3 
+  # exec /usr/bin/i3
 
   # sops.templates.i3config = {
   #   content = ''
@@ -355,7 +355,7 @@
 
       # dropbox is whining about shit:
       #exec --no-startup-id ${pkgs.maestral-gui}/bin/maestral_qt
-      
+
       # exec_always --no-startup-id ${pkgs.dropbox}/bin/dropbox
       exec_always --no-startup-id ${pkgs.spotify}/bin/spotify
     '';

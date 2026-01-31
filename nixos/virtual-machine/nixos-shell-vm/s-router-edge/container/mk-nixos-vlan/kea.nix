@@ -28,8 +28,7 @@ let
       }
       {
         name = "domain-name-servers";
-        data =
-          lib.concatStringsSep "," ([ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4);
+        data = lib.concatStringsSep "," ([ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4);
       }
       {
         name = "domain-name";
@@ -73,4 +72,3 @@ in
     }) lans
   );
 }
-

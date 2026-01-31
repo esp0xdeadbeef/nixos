@@ -153,7 +153,7 @@
         ".config/obsidian" # Obsidian vault
 
         ".config/remmina" # remmina remote desktop profiles (state of the screen etc, i guess)
-        
+
         ".config/freerdp/server" # remmina ssl certs
 
         ".cache/remmina" # ffs, just remember shit remmina!

@@ -35,7 +35,7 @@
                 };
                 content = {
                   type = "btrfs";
-                  extraArgs = ["-f"];
+                  extraArgs = [ "-f" ];
                   subvolumes = {
                     "/root" = {
                       mountpoint = "/";
@@ -45,7 +45,10 @@
                     #   mountpoint = "/home/deadbeef";
                     # };
                     "/nix" = {
-                      mountOptions = ["compress=zstd" "noatime"];
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
                       mountpoint = "/nix";
                     };
                     # "/games" = {
@@ -53,7 +56,10 @@
                     #   mountpoint = "/games";
                     # };
                     "/persist" = {
-                      mountOptions = ["compress=zstd" "noatime"];
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
                       mountpoint = "/persist";
                     };
                     # "/swap" = {

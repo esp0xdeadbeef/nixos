@@ -12,9 +12,11 @@ let
   mkBridge = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix" {
     inherit lib pkgs;
   };
-  mkBridgeTrunk = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-trunk-networkd.nix" {
-    inherit lib pkgs;
-  };
+  mkBridgeTrunk =
+    import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-trunk-networkd.nix"
+      {
+        inherit lib pkgs;
+      };
 in
 {
   imports = [

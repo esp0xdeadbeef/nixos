@@ -2,7 +2,8 @@
   confid,
   pkgs,
   ...
-}: {
+}:
+{
   fonts = {
     enableDefaultPackages = true;
     packages = with pkgs; [
@@ -37,7 +38,7 @@
         "DejaVu Serif"
         "Liberation Serif"
       ];
-      emoji = ["Noto Color Emoji"];
+      emoji = [ "Noto Color Emoji" ];
     };
   };
 }

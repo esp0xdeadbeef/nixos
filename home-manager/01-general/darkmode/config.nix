@@ -28,7 +28,6 @@
     _JAVA_OPTIONS = "-Dswing.defaultlaf=com.formdev.flatlaf.FlatDarculaLaf";
   };
 
-
   # Set GSettings to prefer dark mode (important for some apps like Electron using portals)
   dconf.settings = {
     "org/gnome/desktop/interface" = {

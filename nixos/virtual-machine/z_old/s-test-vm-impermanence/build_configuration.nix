@@ -43,7 +43,6 @@
     inputs.sops-nix.nixosModules.sops
   ];
 
-
   sops.defaultSopsFile = ../../secrets/s-test-vm-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
@@ -52,7 +51,7 @@
   };
 
   time.timeZone = "Europe/Amsterdam";
-  
+
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
 
@@ -60,7 +59,6 @@
     sops
     age
   ];
-
 
   nixpkgs = {
     # You can add overlays here
@@ -146,8 +144,7 @@
       PasswordAuthentication = true;
     };
   };
-  
-  
+
   boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''

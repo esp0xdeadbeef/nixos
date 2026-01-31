@@ -28,7 +28,7 @@
     };
 
     unitConfig = {
-      StartLimitBurst = 10;        # RETRY = 10
+      StartLimitBurst = 10; # RETRY = 10
     };
   };
 
@@ -38,4 +38,3 @@
     "ixgbe"
   ];
 }
-

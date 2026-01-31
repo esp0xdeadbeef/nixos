@@ -1,7 +1,7 @@
 { pkgs, lib, ... }:
 
 let
-    neovim-with-tools = pkgs.symlinkJoin {
+  neovim-with-tools = pkgs.symlinkJoin {
     name = "neovim-with-tools";
     paths = [ pkgs.neovim ];
     buildInputs = [ pkgs.makeWrapper ];
@@ -15,7 +15,8 @@ let
     '';
   };
 
-in {
+in
+{
   programs.neovim = {
     enable = true;
     defaultEditor = true;

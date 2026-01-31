@@ -1,4 +1,4 @@
-{...}:
+{ ... }:
 {
   #### Secrets (activation-time, not evaluation-time)
   sops.secrets.pppoe-username = {

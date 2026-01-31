@@ -35,21 +35,27 @@
                 };
                 content = {
                   type = "btrfs";
-                  extraArgs = ["-f"];
+                  extraArgs = [ "-f" ];
                   subvolumes = {
                     "/root" = {
                       mountpoint = "/";
                     };
                     "/home/deadbeef" = {
-                      mountOptions = ["compress=zstd"];
+                      mountOptions = [ "compress=zstd" ];
                       mountpoint = "/home/deadbeef";
                     };
                     "/nix" = {
-                      mountOptions = ["compress=zstd" "noatime"];
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
                       mountpoint = "/nix";
                     };
                     "/persist" = {
-                      mountOptions = ["compress=zstd" "noatime"];
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
                       mountpoint = "/persist";
                     };
                   };

@@ -89,7 +89,7 @@
       # ipv6 - Looks up an on-link IPv6 node link-layer address (Neighbor Discovery)
       ndisc6
 
-      # flex tool 
+      # flex tool
       # neofetch (depricated)
       fastfetch
 
@@ -136,7 +136,7 @@
       tree
       # xxd hex dump:
       unixtools.xxd
-      
+
       # usb listing services like lsusb
       usbutils
       libusb1
@@ -147,7 +147,7 @@
       # curl / wget (http and simular tooling):
       wget
       curl
-      
+
       # formatting tools like:
       # mkfs.ext4 /dev/sdX1
       e2fsprogs

@@ -1,6 +1,6 @@
 { config, pkgs, ... }:
 {
-   services.ollama = {
+  services.ollama = {
     enable = true;
     loadModels = [
       "llama3.1:8b"

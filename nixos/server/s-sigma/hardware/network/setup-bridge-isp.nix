@@ -41,4 +41,3 @@
   ###### REQUIRED FOR BRIDGED TRAFFIC ######
   networking.firewall.checkReversePath = false;
 }
-

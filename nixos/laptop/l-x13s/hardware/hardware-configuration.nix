@@ -1,6 +1,6 @@
 { config, pkgs, ... }:
 {
-  
+
   boot.initrd.luks.devices = {
     root = {
       device = "/dev/nvme0n1p2";
@@ -22,7 +22,6 @@
       size = 16 * 1024;
     }
   ];
-
 
   system.stateVersion = "24.11";
   services.openssh.enable = true;

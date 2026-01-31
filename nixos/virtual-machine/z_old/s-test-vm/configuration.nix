@@ -21,7 +21,7 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
-    
+
     ./hardware/bootloader.nix
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
@@ -67,7 +67,6 @@
     ../01-general/virtualization-as-host/libvirt.nix
     ../01-general/virtualization-as-host/lxc.nix
     ../01-general/virtualization-as-host/podman.nix
-
 
     ../02-window-manager-i3/environment.nix
 
@@ -162,7 +161,6 @@
   # services.displayManager.sddm.enable = true;
   # services.desktopManager.plasma6.enable = true;
 
-  
   # Set systemd-boot configuration limit
   boot.loader.systemd-boot.configurationLimit = 2;
 

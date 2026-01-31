@@ -1,7 +1,20 @@
-{ config, lib, pkgs, inputs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
 
 let
-  inherit (lib) mkOption types mkEnableOption mapAttrsToList mkIf mkMerge;
+  inherit (lib)
+    mkOption
+    types
+    mkEnableOption
+    mapAttrsToList
+    mkIf
+    mkMerge
+    ;
 
   cfg = config.vpn.containers;
 in
@@ -16,34 +29,37 @@ in
     };
 
     instances = mkOption {
-      type = types.attrsOf (types.submodule {
-        options = {
-          vlan.wan = mkOption {
-            type = types.nullOr types.int;
-            default = null;
-            description = "WAN VLAN ID (optional)";
-          };
+      type = types.attrsOf (
+        types.submodule {
+          options = {
+            vlan.wan = mkOption {
+              type = types.nullOr types.int;
+              default = null;
+              description = "WAN VLAN ID (optional)";
+            };
 
-          uplinkInterface = mkOption {
-            type = types.nullOr types.str;
-            default = null;
-            description = "Uplink interface (optional)";
-          };
+            uplinkInterface = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = "Uplink interface (optional)";
+            };
 
-          lanBridge = mkOption {
-            type = types.str;
-            description = "LAN bridge to attach to";
+            lanBridge = mkOption {
+              type = types.str;
+              description = "LAN bridge to attach to";
+            };
           };
-        };
-      });
-      default = {};
+        }
+      );
+      default = { };
       description = "VPN container instance configurations";
     };
   };
 
   config = mkIf cfg.enable {
     containers = mkMerge (
-      mapAttrsToList (name: spec:
+      mapAttrsToList (
+        name: spec:
         let
           wanInterface =
             if spec.vlan.wan != null && cfg.trunkInterface != null then
@@ -61,7 +77,8 @@ in
           vpnIPv6WithMask = "fd90:dead:beef::1/64";
           vpnConfBasePath = "/etc/vpn";
           vpnConfPath = "${vpnConfBasePath}/${vpnInterface}.conf";
-        in {
+        in
+        {
           ${name} = {
             autoStart = true;
             privateNetwork = true;
@@ -76,21 +93,23 @@ in
               isReadOnly = true;
             };
 
-            config = { config, pkgs, ... }: {
-              imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
+            config =
+              { config, pkgs, ... }:
+              {
+                imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
 
-              services.router-vpn-gateway = {
-                enable = true;
-                wanInterface = wanInterfaceName;
-                lanInterface = lanInterface;
-                vpnInterface = vpnInterface;
-                vpnProfile = vpnConfPath;
-                subnets.ipv4 = vpnIPv4WithMask;
-                subnets.ipv6 = vpnIPv6WithMask;
-                dhcp4.enable = true;
-                ra.enable = true;
+                services.router-vpn-gateway = {
+                  enable = true;
+                  wanInterface = wanInterfaceName;
+                  lanInterface = lanInterface;
+                  vpnInterface = vpnInterface;
+                  vpnProfile = vpnConfPath;
+                  subnets.ipv4 = vpnIPv4WithMask;
+                  subnets.ipv6 = vpnIPv6WithMask;
+                  dhcp4.enable = true;
+                  ra.enable = true;
+                };
               };
-            };
           };
         }
       ) cfg.instances

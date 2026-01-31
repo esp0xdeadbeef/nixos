@@ -21,7 +21,7 @@
   # https://faq.i3wm.org/question/1367/anyway-to-include-in-config-file/
   # cat $HOME/.config/i3/config.base \
   #     $HOME/.config/i3/config.local > $HOME/.config/i3/config
-  # exec /usr/bin/i3 
+  # exec /usr/bin/i3
 
   # sops.templates.i3config = {
   #   content = ''
@@ -243,7 +243,7 @@
               status_command ${pkgs.i3status}/bin/i3status
               #font pango:DejaVu Sans Mono, FontAwesome 10
               font pango:BlexMono Nerd Font Mono Regular, BlexMono Nerd Font Mono Bold, 10
-      
+
               #status_command i3status-rs
       #colors {
       #        background #000000

@@ -12,9 +12,8 @@
   boot.initrd.enable = false;
 
   # Containers do not define filesystems
-  fileSystems = lib.mkForce {};
+  fileSystems = lib.mkForce { };
 
   # Silence assertions
-  assertions = [];
+  assertions = [ ];
 }
-

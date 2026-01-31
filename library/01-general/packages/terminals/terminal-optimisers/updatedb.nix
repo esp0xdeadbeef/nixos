@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   # 1) Grab the original users.users set so we can compute the list of normal-user names
@@ -8,12 +13,14 @@ let
   userNames = lib.attrNames (lib.filterAttrs (_: user: user.isNormalUser) allUsers);
 
   # 3) Build your userPrunes exactly as before
-  mkUserPaths = u: map (p: "/home/${u}/${p}") [
-    ".vscode"
-    ".config/Code"
-    ".local/share/lxc"
-    ".local/share/containers"
-  ];
+  mkUserPaths =
+    u:
+    map (p: "/home/${u}/${p}") [
+      ".vscode"
+      ".config/Code"
+      ".local/share/lxc"
+      ".local/share/containers"
+    ];
   userPrunes = lib.flatten (map mkUserPaths userNames);
 in
 {
@@ -31,14 +38,20 @@ in
   # B) Enable mlocate so that it writes its DB into /persist/var/cache/locatedb
   ######################################################################
   services.locate = {
-    enable     = true;
-    package    = pkgs.mlocate;
-    output     = "/persist/var/cache/locatedb";
+    enable = true;
+    package = pkgs.mlocate;
+    output = "/persist/var/cache/locatedb";
     prunePaths = lib.mkAfter (
-      [ "/partition-root" "/persist" "/mnt/nas" "/nix" "/var/lib/flatpak" ]
+      [
+        "/partition-root"
+        "/persist"
+        "/mnt/nas"
+        "/nix"
+        "/var/lib/flatpak"
+      ]
       ++ userPrunes
     );
-    interval   = "hourly";
+    interval = "hourly";
   };
 
   ######################################################################

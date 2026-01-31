@@ -1,20 +1,28 @@
 # vpn-containers.nix — recursion-free version
 
-{ lib, pkgs, inputs, config, ... }:
+{
+  lib,
+  pkgs,
+  inputs,
+  config,
+  ...
+}:
 
 let
   inherit (lib) mkMerge mapAttrsToList;
 
   # extract option value only when options are already available
-  instances = config.vpn.containers.instances or {};
+  instances = config.vpn.containers.instances or { };
 
-  perInstance = name: cfg:
+  perInstance =
+    name: cfg:
     let
       wanBridge = "br-${cfg.wanInterface}";
       lanBridge = "br-${cfg.lanInterface}";
       vpnConfBasePath = "/etc/vpn";
       vpnConfPath = "${vpnConfBasePath}/${cfg.vpnProfileName}.conf";
-    in mkMerge [
+    in
+    mkMerge [
       {
         boot.kernel.sysctl = {
           "net.ipv6.conf.${wanBridge}.accept_ra" = 0;
@@ -51,20 +59,22 @@ let
             hostPath = "/etc/vpn";
             isReadOnly = true;
           };
-          config = { pkgs, config, ... }: {
-            imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
-            services.router-vpn-gateway = {
-              enable = true;
-              wanInterface = "wan";
-              lanInterface = "lan";
-              vpnInterface = cfg.vpnInterface;
-              vpnProfile = vpnConfPath;
-              subnets.ipv4 = cfg.vpnIPv4;
-              subnets.ipv6 = cfg.vpnIPv6;
-              dhcp4.enable = true;
-              ra.enable = true;
+          config =
+            { pkgs, config, ... }:
+            {
+              imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
+              services.router-vpn-gateway = {
+                enable = true;
+                wanInterface = "wan";
+                lanInterface = "lan";
+                vpnInterface = cfg.vpnInterface;
+                vpnProfile = vpnConfPath;
+                subnets.ipv4 = cfg.vpnIPv4;
+                subnets.ipv6 = cfg.vpnIPv6;
+                dhcp4.enable = true;
+                ra.enable = true;
+              };
             };
-          };
         };
 
         systemd.services."container@${name}".serviceConfig.ConditionPathExists = vpnConfPath;
@@ -102,26 +112,27 @@ let
       }
     ];
 
-in {
+in
+{
   options.vpn.containers.instances = lib.mkOption {
-    type = lib.types.attrsOf (lib.types.submodule {
-      options = {
-        enable = lib.mkEnableOption "Enable VPN container";
-        wanInterface = lib.mkOption { type = lib.types.str; };
-        lanInterface = lib.mkOption { type = lib.types.str; };
-        vpnInterface = lib.mkOption { type = lib.types.str; };
-        vpnIPv4 = lib.mkOption { type = lib.types.str; };
-        vpnIPv6 = lib.mkOption { type = lib.types.str; };
-        vpnProfileName = lib.mkOption { type = lib.types.str; };
-      };
-    });
-    default = {};
+    type = lib.types.attrsOf (
+      lib.types.submodule {
+        options = {
+          enable = lib.mkEnableOption "Enable VPN container";
+          wanInterface = lib.mkOption { type = lib.types.str; };
+          lanInterface = lib.mkOption { type = lib.types.str; };
+          vpnInterface = lib.mkOption { type = lib.types.str; };
+          vpnIPv4 = lib.mkOption { type = lib.types.str; };
+          vpnIPv6 = lib.mkOption { type = lib.types.str; };
+          vpnProfileName = lib.mkOption { type = lib.types.str; };
+        };
+      }
+    );
+    default = { };
     description = "Map of VPN containers by instance name";
   };
 
   config = mkMerge (
-    mapAttrsToList (name: cfg:
-      if cfg.enable then perInstance name cfg else {}
-    ) instances
+    mapAttrsToList (name: cfg: if cfg.enable then perInstance name cfg else { }) instances
   );
 }

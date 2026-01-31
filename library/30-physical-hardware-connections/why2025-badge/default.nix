@@ -1,8 +1,16 @@
-{ config, pkgs, inputs, outputs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  outputs,
+  ...
+}:
 {
 
-  users.users.deadbeef.extraGroups = [ "dialout" "uucp" ];
-  
+  users.users.deadbeef.extraGroups = [
+    "dialout"
+    "uucp"
+  ];
 
   services.udev.extraRules = ''
     # Espressif WebUSB + Serial

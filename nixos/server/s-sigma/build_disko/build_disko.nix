@@ -35,12 +35,21 @@
                 content = {
                   type = "btrfs";
                   subvolumes = {
-                    "/root" = { mountpoint = "/"; };
-                    "/nix" = { mountpoint = "/nix"; };
-                    "/persist" = { mountpoint = "/persist"; };
+                    "/root" = {
+                      mountpoint = "/";
+                    };
+                    "/nix" = {
+                      mountpoint = "/nix";
+                    };
+                    "/persist" = {
+                      mountpoint = "/persist";
+                    };
                     "/vmstore" = {
                       mountpoint = "/vmstore";
-                      mountOptions = [ "nodatacow" "noatime" ];
+                      mountOptions = [
+                        "nodatacow"
+                        "noatime"
+                      ];
                     };
                   };
                 };
@@ -52,4 +61,3 @@
     };
   };
 }
-

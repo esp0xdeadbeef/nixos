@@ -15,7 +15,7 @@
   # Load nvidia driver for Xorg and Wayland
   #services.xserver.videoDrivers = ["nvidia"];
   services.supergfxd.enable = true;
-  
+
   hardware.nvidia.modesetting.enable = true;
   hardware.nvidia.powerManagement.enable = false;
   hardware.nvidia.powerManagement.finegrained = false;
@@ -34,11 +34,7 @@
     nvidiaBusId = "PCI:01:00:0"; # NVIDIA GPU Bus ID
   };
 
-
-
   # nixpkgs.config.cudaSupport = true;
-
-
 
   services.xserver.videoDrivers = [ "nvidia" ]; # if too much screen tearing, use this!
   #hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.beta; # this somehow works??!
@@ -48,7 +44,6 @@
   virtualisation.docker.daemon.settings.features.cdi = true;
   # Rootless
   virtualisation.docker.rootless.daemon.settings.features.cdi = true;
-
 
   # cuda runtime
   environment.systemPackages = [

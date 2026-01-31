@@ -21,7 +21,7 @@
     # You can also split up your configuration and import pieces of it here:
     # cd /home/deadbeef/github/nixos/nixos/l-werk ; ./generate-imports.sh
 
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
+    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     ../04-window-manager-other/environment.nix
 
@@ -39,11 +39,7 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 
-
-
-  
   programs.zsh.ohMyZsh.theme = "clean";
-
 
   home-manager = {
     sharedModules = [

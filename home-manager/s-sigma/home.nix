@@ -51,7 +51,6 @@
     homeDirectory = "/home/deadbeef";
   };
 
-
   home.packages = with pkgs; [
     htop
     # teams-for-linux

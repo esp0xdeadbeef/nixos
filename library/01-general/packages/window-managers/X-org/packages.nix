@@ -10,6 +10,6 @@
     podman-compose
 
     xorg.xkill
-    
+
   ];
 }

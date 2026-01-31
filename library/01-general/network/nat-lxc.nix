@@ -1,4 +1,5 @@
-{ config, pkgs, ... }: {  
+{ config, pkgs, ... }:
+{
   #############################
   # Firewall rules
   # TIP:
@@ -10,7 +11,10 @@
   # required for lxc network, no clue how this works:
   networking.nat = {
     enable = true;
-    internalInterfaces = ["lxcbr-+" "lxcbr-+"];
+    internalInterfaces = [
+      "lxcbr-+"
+      "lxcbr-+"
+    ];
     #externalInterfaces = ["wlp0s20f3" "enp0s13f0u4u2"];
     #externalInterface = "ens3";
     # Lazy IPv6 connectivity for the container

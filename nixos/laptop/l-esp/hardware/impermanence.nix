@@ -156,9 +156,9 @@
         "Pictures"
         "Documents"
         "Videos"
-    
+
         ".local/share/PrismLauncher"
-  
+
         ".local/share/lxc"
         ".local/share/containers"
         ".local/share/nvim/" # neovim, i lazy load everything, configs of nix are not working.
@@ -199,7 +199,7 @@
 
         # zap plugins:
         ".ZAP/plugin"
-	
+
         # lm studio (backends, models etc.):
         ".lmstudio"
 

@@ -21,9 +21,8 @@
     # You can also split up your configuration and import pieces of it here:
     # ./users.nix
     # Import your generated (nixos-generate-config) hardware configuration
-    
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
+    STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     ../02-window-manager-i3/environment.nix
 
@@ -118,7 +117,6 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
   # services.displayManager.sddm.enable = true;
   # services.desktopManager.plasma6.enable = true;
 
-  
   # Set systemd-boot configuration limit
   boot.loader.systemd-boot.configurationLimit = 2;
 

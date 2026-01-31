@@ -40,10 +40,6 @@
       hostPath = "/persist-state/var/lib/docker";
       isReadOnly = false;
     };
-    #bindMounts."/shared" = {
-    #  hostPath = "/etc/shared";
-    #  isReadOnly = true;
-    #};
 
     config = vmRoot + "/container";
 
@@ -56,11 +52,10 @@
     enableTun = true;
   };
   sops.secrets.subnet-ipv6 = { };
-sops.secrets.vlan2-hostnames-servers-json = {
-  sopsFile = "${outPath}/secrets/vlan2-hostnames-servers.json.age";
-  format = "binary";
-  path = "/run/secrets/vlan2-hostnames-servers.json";
-};
-
+  sops.secrets.vlan2-hostnames-servers-json = {
+    sopsFile = "${outPath}/secrets/vlan2-hostnames-servers.json.age";
+    format = "binary";
+    path = "/run/secrets/vlan2-hostnames-servers.json";
+  };
 
 }

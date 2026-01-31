@@ -9,7 +9,7 @@
         users = [ "deadbeef" ];
         commands = [
           #{
-#            command = "/run/current-system/sw/bin/umount /home/deadbeef/.local/share/lxc/osep-lxc/rootfs/mnt";
+          #            command = "/run/current-system/sw/bin/umount /home/deadbeef/.local/share/lxc/osep-lxc/rootfs/mnt";
           #  options = [ "NOPASSWD" ];
           #}
           #{

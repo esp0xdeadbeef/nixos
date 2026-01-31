@@ -13,11 +13,7 @@
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
-/* 
-STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH 
-*/
-
-
+    # STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
 
     ./hardware/force-update.nix
     ./hardware/hardware-configuration.nix
@@ -112,7 +108,6 @@ STRING_TO_REPLACE_WITH_GENERATE_IMPORT.SH
       extraGroups = [ "wheel" ];
     };
   };
-
 
   # This setups a SSH server. Very important if you're setting up a headless system.
   # Feel free to remove if you don't need it.

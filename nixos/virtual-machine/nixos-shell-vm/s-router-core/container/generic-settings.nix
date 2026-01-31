@@ -1,5 +1,6 @@
-{ pkgs, lib, ...}:
-{system.stateVersion = "25.11";
+{ pkgs, lib, ... }:
+{
+  system.stateVersion = "25.11";
 
   services.resolved.enable = false;
   services.dbus.enable = true;

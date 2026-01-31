@@ -14,7 +14,10 @@
   };
 
   # NVIDIA kernel modules for compute only
-  boot.kernelModules = [ "nvidia" "nvidia_uvm" ];
+  boot.kernelModules = [
+    "nvidia"
+    "nvidia_uvm"
+  ];
   boot.extraModulePackages = [ config.boot.kernelPackages.nvidia_x11 ];
 
   hardware.nvidia.open = true;
@@ -38,7 +41,7 @@
     "${config.boot.kernelPackages.nvidia_x11}/etc/OpenCL/vendors/nvidia.icd";
 
   environment.sessionVariables = {
-    __GLX_VENDOR_LIBRARY_NAME = "mesa";   # GL always Mesa
+    __GLX_VENDOR_LIBRARY_NAME = "mesa"; # GL always Mesa
     OCL_ICD_VENDORS = "/etc/OpenCL/vendors"; # picks up NVIDIA ICD above
   };
 }

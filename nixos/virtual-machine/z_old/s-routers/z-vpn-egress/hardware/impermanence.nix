@@ -16,14 +16,17 @@
   boot.initrd.systemd.enable = true;
 
   boot.initrd.systemd.initrdBin = with pkgs; [
-    util-linux btrfs-progs coreutils findutils
+    util-linux
+    btrfs-progs
+    coreutils
+    findutils
   ];
 
   boot.initrd.systemd.services.rotateBtrfsRoot = {
     description = "Rotate /root Btrfs subvolume and prune >1 day snapshots";
-    wantedBy    = [ "initrd.target" ];
-    after       = [ "systemd-cryptsetup@crypted.service" ];
-    before      = [ "sysroot.mount" ];
+    wantedBy = [ "initrd.target" ];
+    after = [ "systemd-cryptsetup@crypted.service" ];
+    before = [ "sysroot.mount" ];
     unitConfig.DefaultDependencies = false;
     serviceConfig.Type = "oneshot";
 
@@ -93,36 +96,36 @@
     users.deadbeef = {
       directories = [
         "github"
-    #     "Downloads"
-    #     "Music"
-    #     "Pictures"
-    #     "Documents"
-    #     "Videos"
-    #     {
-    #       directory = ".gnupg";
-    #       mode = "0700";
-    #     }
-    #     {
-    #       directory = ".ssh";
-    #       mode = "0700";
-    #     }
-    #     {
-    #       directory = ".nixops";
-    #       mode = "0700";
-    #     }
-    #     {
-    #       directory = ".local/share/keyrings";
-    #       mode = "0700";
-    #     }
-    #     {
-    #       directory = ".local/share/lxc";
-    #       mode = "0700";
-    #     }
-    #     ".local/share/direnv"
-    #   ];
-    #   files = [
-    #     ".screenrc"
-    #     # ".zsh_history" # why the fuck does this give errors?
+        #     "Downloads"
+        #     "Music"
+        #     "Pictures"
+        #     "Documents"
+        #     "Videos"
+        #     {
+        #       directory = ".gnupg";
+        #       mode = "0700";
+        #     }
+        #     {
+        #       directory = ".ssh";
+        #       mode = "0700";
+        #     }
+        #     {
+        #       directory = ".nixops";
+        #       mode = "0700";
+        #     }
+        #     {
+        #       directory = ".local/share/keyrings";
+        #       mode = "0700";
+        #     }
+        #     {
+        #       directory = ".local/share/lxc";
+        #       mode = "0700";
+        #     }
+        #     ".local/share/direnv"
+        #   ];
+        #   files = [
+        #     ".screenrc"
+        #     # ".zsh_history" # why the fuck does this give errors?
       ];
     };
   };

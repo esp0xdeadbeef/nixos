@@ -1,5 +1,10 @@
 # file: ./network-clean.nix
-{ config, pkgs, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 
 {
   networking.useNetworkd = true;
@@ -190,4 +195,3 @@
     };
   };
 }
-

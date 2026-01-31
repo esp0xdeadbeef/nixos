@@ -33,5 +33,4 @@
   boot.initrd.systemd.enable = true;
   # boot.initrd.systemd.enableTpm2 = true;
 
-  
 }

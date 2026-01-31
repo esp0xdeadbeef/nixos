@@ -48,7 +48,6 @@
     inputs.sops-nix.nixosModules.sops
   ];
 
-
   sops.defaultSopsFile = ../../secrets/s-router-vpn-impermanence-root.yaml;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
@@ -57,7 +56,7 @@
   };
 
   time.timeZone = "Europe/Amsterdam";
-  
+
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
 
@@ -65,7 +64,6 @@
     sops
     age
   ];
-
 
   nixpkgs = {
     # You can add overlays here
@@ -117,7 +115,6 @@
 
   # FIXME: Add the rest of your current configuration
 
-  
   networking.hostName = "s-router-vpn-impermanence";
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
@@ -152,8 +149,7 @@
       PasswordAuthentication = true;
     };
   };
-  
-  
+
   boot.loader.systemd-boot.configurationLimit = 2;
 
   environment.interactiveShellInit = ''

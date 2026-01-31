@@ -10,7 +10,6 @@
   # Bootloader and Kernel Options
   #############################
 
-
   # Force disable systemd-boot as Lanzaboote replaces it
   boot.loader.systemd-boot.enable = lib.mkForce false;
 

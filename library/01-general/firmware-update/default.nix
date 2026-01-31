@@ -1,5 +1,5 @@
 { config, pkgs, ... }:
 {
-    # enable firmware updates:
-    services.fwupd.enable = true;
+  # enable firmware updates:
+  services.fwupd.enable = true;
 }

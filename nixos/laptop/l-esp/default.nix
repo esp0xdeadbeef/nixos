@@ -6,7 +6,7 @@
   lib,
   config,
   pkgs,
-outPath,
+  outPath,
   ...
 }:
 {

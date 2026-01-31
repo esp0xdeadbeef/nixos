@@ -33,56 +33,59 @@
     wantedBy = [ "multi-user.target" ];
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    path = [ pkgs.ppp pkgs.coreutils ];
+    path = [
+      pkgs.ppp
+      pkgs.coreutils
+    ];
 
     serviceConfig = {
       Type = "simple";
 
       ExecStartPre = pkgs.writeShellScript "ppp-setup" ''
-        set -euo pipefail
-        umask 077
+                set -euo pipefail
+                umask 077
 
-        mkdir -p /run/ppp/peers
+                mkdir -p /run/ppp/peers
 
-        USERNAME="$(cat /run/secrets/pppoe-username)"
-        PASSWORD="$(cat /run/secrets/pppoe-password)"
+                USERNAME="$(cat /run/secrets/pppoe-username)"
+                PASSWORD="$(cat /run/secrets/pppoe-password)"
 
-        if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-          echo "ERROR: missing PPPoE credentials in /run/secrets" >&2
-          exit 1
-        fi
+                if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+                  echo "ERROR: missing PPPoE credentials in /run/secrets" >&2
+                  exit 1
+                fi
 
-        # pap-secrets is NOT a shell script
-        cat > /run/ppp/pap-secrets <<EOF
-"$USERNAME" * "$PASSWORD" *
-EOF
-        chmod 600 /run/ppp/pap-secrets
+                # pap-secrets is NOT a shell script
+                cat > /run/ppp/pap-secrets <<EOF
+        "$USERNAME" * "$PASSWORD" *
+        EOF
+                chmod 600 /run/ppp/pap-secrets
 
-        # Run PPPoE on the interface that actually sees the AC
-        # You verified this with: pppoe-discovery -I br-wan6
-        cat > /run/ppp/peers/pppoe-wan <<EOF
-plugin pppoe.so
-nic-br-wan6
+                # Run PPPoE on the interface that actually sees the AC
+                # You verified this with: pppoe-discovery -I br-wan6
+                cat > /run/ppp/peers/pppoe-wan <<EOF
+        plugin pppoe.so
+        nic-br-wan6
 
-user "$USERNAME"
-password "$PASSWORD"
+        user "$USERNAME"
+        password "$PASSWORD"
 
-noauth
-refuse-chap
-refuse-mschap
-refuse-mschap-v2
-refuse-eap
+        noauth
+        refuse-chap
+        refuse-mschap
+        refuse-mschap-v2
+        refuse-eap
 
-defaultroute
-persist
+        defaultroute
+        persist
 
-+ipv6
-ipv6cp-accept-local
-ipv6cp-accept-remote
+        +ipv6
+        ipv6cp-accept-local
+        ipv6cp-accept-remote
 
-mtu 1492
-mru 1492
-EOF
+        mtu 1492
+        mru 1492
+        EOF
       '';
 
       ExecStart = ''
@@ -136,4 +139,3 @@ EOF
     '';
   };
 }
-

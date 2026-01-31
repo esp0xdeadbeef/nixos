@@ -46,7 +46,7 @@ in
       ExecStartPre = [
         "${pkgs.coreutils}/bin/sleep 20"
       ];
-      
+
       ExecStart = "${pkgs.writeShellScript "osep-lxc-start-svc" ''
         #!${pkgs.bash}/bin/bash --noprofile --norc
         # this is added to the sudoers:

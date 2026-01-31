@@ -1,15 +1,23 @@
-{ config, lib, pkgs, inputs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
 
 let
   inherit (lib) mkMerge mapAttrsToList;
 
-  perInstance = name: cfg:
+  perInstance =
+    name: cfg:
     let
       wanBridge = "br-${cfg.wanInterface}";
       lanBridge = "br-${cfg.lanInterface}";
       vpnConfBasePath = "/etc/vpn";
       vpnConfPath = "${vpnConfBasePath}/${cfg.vpnProfileName}.conf";
-    in mkMerge [
+    in
+    mkMerge [
       {
         boot.kernel.sysctl = {
           "net.ipv6.conf.${wanBridge}.accept_ra" = 0;
@@ -49,21 +57,23 @@ let
             isReadOnly = true;
           };
 
-          config = { pkgs, config, ... }: {
-            imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
+          config =
+            { pkgs, config, ... }:
+            {
+              imports = [ inputs.nixos-router-vpn-gateway.nixosModules.default ];
 
-            services.router-vpn-gateway = {
-              enable = true;
-              wanInterface = "wan";
-              lanInterface = "lan";
-              vpnInterface = cfg.vpnInterface;
-              vpnProfile = vpnConfPath;
-              subnets.ipv4 = cfg.vpnIPv4;
-              subnets.ipv6 = cfg.vpnIPv6;
-              dhcp4.enable = true;
-              ra.enable = true;
+              services.router-vpn-gateway = {
+                enable = true;
+                wanInterface = "wan";
+                lanInterface = "lan";
+                vpnInterface = cfg.vpnInterface;
+                vpnProfile = vpnConfPath;
+                subnets.ipv4 = cfg.vpnIPv4;
+                subnets.ipv6 = cfg.vpnIPv6;
+                dhcp4.enable = true;
+                ra.enable = true;
+              };
             };
-          };
         };
 
         systemd.services."container@${name}".serviceConfig.ConditionPathExists = vpnConfPath;
@@ -101,10 +111,11 @@ let
       }
     ];
 
-in {
+in
+{
   config = mkMerge (
-    mapAttrsToList (name: cfg:
-      if cfg.enable then perInstance name cfg else {}
+    mapAttrsToList (
+      name: cfg: if cfg.enable then perInstance name cfg else { }
     ) config.vpn.containers.instances
   );
 }
