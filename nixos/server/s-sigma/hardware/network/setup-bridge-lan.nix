@@ -15,6 +15,7 @@
       Name = "vmbr4";
       Kind = "bridge";
     };
+
   };
 
   ###### PHYSICAL NIC -> BRIDGE ######
@@ -35,10 +36,12 @@
   ###### LIBVIRT ######
   virtualisation.libvirtd = {
     enable = true;
-    allowedBridges = [ "vmbr4" ];
+    allowedBridges = [
+      "vmbr4"
+      "vmbr1"
+    ];
   };
 
   ###### REQUIRED FOR BRIDGED TRAFFIC ######
   networking.firewall.checkReversePath = false;
 }
-
