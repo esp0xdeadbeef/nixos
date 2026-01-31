@@ -216,6 +216,8 @@
           mode = "0700";
         }
         ".local/share/direnv"
+        # used by legcord:
+        ".pki/nssdb"
       ];
       files = [
         ".local/state/wireplumber/default-nodes"
