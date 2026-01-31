@@ -1,7 +1,8 @@
-{ pkgs
-, lib
-, helpers
-, args
+{
+  pkgs,
+  lib,
+  helpers,
+  args,
 }:
 { ... }:
 
@@ -10,7 +11,6 @@ let
 
   keaPkg = pkgs.kea;
 
-  # Only LANs with DHCP enabled
   lans = lib.filter (l: l.dhcp4 or false) args.lans;
 
   upstreamV4 = onlyIPv4 (args.upstreamDns or [ ]);
@@ -30,9 +30,7 @@ let
       }
       {
         name = "domain-name-servers";
-        data = lib.concatStringsSep "," (
-          [ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4
-        );
+        data = lib.concatStringsSep "," ([ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4);
       }
       {
         name = "domain-name";
@@ -77,4 +75,3 @@ in
     }) lans
   );
 }
-

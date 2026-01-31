@@ -20,7 +20,8 @@ let
 
   # Paths in StateDirectory
   bindDir = "/var/lib/bind";
-  zoneFileFor = z:
+  zoneFileFor =
+    z:
     # keep filenames simple: lan. -> db.lan, 1.168.192.in-addr.arpa. -> db.1.168.192.in-addr.arpa
     let
       z2 = lib.removeSuffix "." z;
@@ -79,7 +80,10 @@ let
           {
             "name" = domain;
             "dns-servers" = [
-              { "ip-address" = "127.0.0.1"; "port" = bindPort; }
+              {
+                "ip-address" = "127.0.0.1";
+                "port" = bindPort;
+              }
             ];
           }
         ];
@@ -89,7 +93,10 @@ let
         "ddns-domains" = map (rz: {
           "name" = rz;
           "dns-servers" = [
-            { "ip-address" = "127.0.0.1"; "port" = bindPort; }
+            {
+              "ip-address" = "127.0.0.1";
+              "port" = bindPort;
+            }
           ];
         }) reverseZones;
       };
@@ -97,9 +104,16 @@ let
   };
 
   # Unbound stubs private zones to BIND and does recursion for everything else.
-  unboundStubZones =
-    [ { name = domain; "stub-addr" = "127.0.0.1@${toString bindPort}"; } ]
-    ++ map (rz: { name = rz; "stub-addr" = "127.0.0.1@${toString bindPort}"; }) reverseZones;
+  unboundStubZones = [
+    {
+      name = domain;
+      "stub-addr" = "127.0.0.1@${toString bindPort}";
+    }
+  ]
+  ++ map (rz: {
+    name = rz;
+    "stub-addr" = "127.0.0.1@${toString bindPort}";
+  }) reverseZones;
 
 in
 {
@@ -117,26 +131,28 @@ in
 
       # Create zone seeds if missing
       ExecStartPre = pkgs.writeShellScript "bind-zones-init" ''
-        set -euo pipefail
-        mkdir -p ${bindDir}
+                set -euo pipefail
+                mkdir -p ${bindDir}
 
-        ensure_zone() {
-          local zone="$1"
-          local file="$2"
-          if [ ! -e "$file" ]; then
-            umask 077
-            cat >"$file" <<'EOF'
-${mkZoneSeed "${domain}"}
-EOF
-            # The seed contains ns1.${domain}; that's fine for all zones as a bootstrap.
-          fi
-        }
+                ensure_zone() {
+                  local zone="$1"
+                  local file="$2"
+                  if [ ! -e "$file" ]; then
+                    umask 077
+                    cat >"$file" <<'EOF'
+        ${mkZoneSeed "${domain}"}
+        EOF
+                    # The seed contains ns1.${domain}; that's fine for all zones as a bootstrap.
+                  fi
+                }
 
-        ensure_zone "${domain}" "${zoneFileFor domain}"
+                ensure_zone "${domain}" "${zoneFileFor domain}"
 
-        ${lib.concatStringsSep "\n" (map (rz: ''
-          ensure_zone "${rz}" "${zoneFileFor rz}"
-        '') reverseZones)}
+                ${lib.concatStringsSep "\n" (
+                  map (rz: ''
+                    ensure_zone "${rz}" "${zoneFileFor rz}"
+                  '') reverseZones
+                )}
       '';
 
       ExecStart = "${pkgs.bind}/sbin/named -g -c /etc/bind/named.conf";
@@ -151,8 +167,14 @@ EOF
   systemd.services.kea-dhcp-ddns = {
     description = "Kea DHCP-DDNS (D2)";
     wantedBy = [ "multi-user.target" ];
-    after = [ "bind9.service" "systemd-networkd.service" ];
-    requires = [ "bind9.service" "systemd-networkd.service" ];
+    after = [
+      "bind9.service"
+      "systemd-networkd.service"
+    ];
+    requires = [
+      "bind9.service"
+      "systemd-networkd.service"
+    ];
     serviceConfig = {
       Type = "simple";
       ExecStart = "${pkgs.kea}/bin/kea-dhcp-ddns -d -c /etc/kea/dhcp-ddns.json";
@@ -207,4 +229,3 @@ EOF
     nameserver 127.0.0.1
   '';
 }
-

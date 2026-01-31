@@ -90,4 +90,3 @@ in
   boot.isContainer = true;
   networking.firewall.enable = false;
 }
-

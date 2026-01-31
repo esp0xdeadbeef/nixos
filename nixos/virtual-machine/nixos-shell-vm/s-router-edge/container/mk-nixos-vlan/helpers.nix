@@ -36,4 +36,3 @@
     else
       "${c}.${b}.${a}.in-addr.arpa.";
 }
-
