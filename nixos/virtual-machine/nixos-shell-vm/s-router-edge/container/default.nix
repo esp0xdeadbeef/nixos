@@ -55,17 +55,17 @@ let
           {
             hw-address = "aa:bb:cc:dd:ee:ff";
             ip-address = "10.13.37.10";
-            hostname = "nas";
+            hostname = "printer-1";
           }
           {
             hw-address = "11:22:33:44:55:66";
             ip-address = "10.13.37.20";
-            hostname = "printer1";
+            hostname = "printer-2";
           }
           {
             hw-address = "fa:1c:00:c9:f8:ad";
             ip-address = "10.13.37.21";
-            hostname = "printer2";
+            hostname = "printer-3";
           }
         ];
       }

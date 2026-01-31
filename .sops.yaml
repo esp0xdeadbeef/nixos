@@ -177,3 +177,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-core
+  - path_regex: 'isc_export_lan.csv.age'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-edge
