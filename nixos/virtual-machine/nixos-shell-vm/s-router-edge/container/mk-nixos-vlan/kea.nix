@@ -1,40 +1,48 @@
-{
-  pkgs,
-  lib,
-  helpers,
-  args,
+{ pkgs
+, lib
+, helpers
+, args
 }:
 { ... }:
 
 let
-  inherit (helpers) ipv4Base3 defaultPool4;
+  inherit (helpers) ipv4Base3 defaultPool4 onlyIPv4;
 
+  keaPkg = pkgs.kea;
+
+  # Only LANs with DHCP enabled
   lans = lib.filter (l: l.dhcp4 or false) args.lans;
 
+  upstreamV4 = onlyIPv4 (args.upstreamDns or [ ]);
+
   mkSubnet = l: {
-    id = l.id or (builtins.fromJSON (toString (builtins.length l.name)));
+    id = l.id;
     subnet = "${ipv4Base3 l.ip4}.0/${lib.last (lib.splitString "/" l.ip4)}";
-    pools = [ { pool = defaultPool4 l.ip4; } ];
+
+    pools = [
+      { pool = defaultPool4 l.ip4; }
+    ];
 
     option-data = [
-      # default gateway (DHCP option 3)
       {
         name = "routers";
         data = ipv4Base3 l.ip4 + ".1";
       }
-
-      # DNS
       {
         name = "domain-name-servers";
-        data = lib.concatStringsSep "," (args.upstreamDns or [ ]);
+        data = lib.concatStringsSep "," (
+          [ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4
+        );
       }
-
       {
         name = "domain-name";
         data = args.domain or "lan.";
       }
     ];
+
+    reservations = l.reservations or [ ];
   };
+
 in
 {
   environment.etc = lib.listToAttrs (
@@ -52,9 +60,21 @@ in
             name = "/var/lib/kea/${l.name}.leases";
           };
 
+          # DDNS handled by D2, no hooks in Kea 3.x
+          "ddns-qualifying-suffix" = args.domain or "lan.";
+          "ddns-override-client-update" = true;
+          "ddns-override-no-update" = true;
+
+          "dhcp-ddns" = {
+            "enable-updates" = true;
+            "server-ip" = "127.0.0.1";
+            "server-port" = 53001;
+          };
+
           subnet4 = [ (mkSubnet l) ];
         };
       };
     }) lans
   );
 }
+

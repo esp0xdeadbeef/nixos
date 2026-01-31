@@ -18,6 +18,8 @@ let
   raIfaces = args.raIfaces or map (l: l.iface) (lib.filter (l: l.ra6 or false) args.lans);
   raIfacesStr = lib.concatStringsSep " " raIfaces;
 
+  domain = args.domain or "lan.";
+
   genScript = pkgs.writeShellScript "v6-ra-generate" ''
         set -euo pipefail
 
@@ -64,7 +66,7 @@ let
           ${pkgs.iproute2}/bin/ip -6 addr replace "$PREFIX::1/64" dev "$IFACE"
           ${pkgs.iproute2}/bin/ip -6 route replace "$PREFIX::/64" dev "$IFACE" proto static metric 256
 
-          cat >> "$RADVD_CONF" <<EOF
+    cat >> "$RADVD_CONF" <<EOF
     interface $IFACE {
       AdvSendAdvert on;
       MinRtrAdvInterval 10;
@@ -77,8 +79,18 @@ let
         AdvOnLink on;
         AdvAutonomous on;
       };
+
+      # DNS via RA (IPv6)
+      RDNSS $PREFIX::1 {
+        AdvRDNSSLifetime 600;
+      };
+
+      DNSSL ${domain} {
+        AdvDNSSLLifetime 600;
+      };
     };
     EOF
+
         done
 
         ${pkgs.gnugrep}/bin/grep -q '^interface ' "$RADVD_CONF" || {
