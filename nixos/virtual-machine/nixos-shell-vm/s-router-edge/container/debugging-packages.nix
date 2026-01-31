@@ -16,6 +16,7 @@
     dig
     neovim
     nftables
+    unbound # for unbound-control
   ];
 
   environment.etc.hosts.enable = false;

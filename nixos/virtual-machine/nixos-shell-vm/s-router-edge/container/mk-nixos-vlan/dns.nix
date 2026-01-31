@@ -1,231 +1,107 @@
-{
-  pkgs,
-  lib,
-  helpers,
-  args,
-}:
-{ config, ... }:
+{ config, pkgs, lib, args, helpers, ... }:
 
 let
-  dhcpLans = lib.filter (l: l.dhcp4 or false) (args.lans or [ ]);
+  lans = args.lans or [ ];
 
-  domain = args.domain or "lan.";
+  # Normalize domain to FQDN with trailing dot
+  domainRaw = args.domain or "lan.";
+  domain =
+    if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
-  inherit (helpers) reverseZoneV4_24 ipv4Base3;
+  # IPv4 forward ACLs (assume /24 like your design)
+  v4Nets = map (l:
+    let base = helpers.ipv4Base3 l.ip4;
+    in "${base}.0/24"
+  ) lans;
 
-  reverseZones = map (l: reverseZoneV4_24 l.ip4) dhcpLans;
+  # Reverse zones derived from LAN IPv4 (/24 only)
+  reverseZonesV4 =
+    map (l: helpers.reverseZoneV4_24 l.ip4) lans;
 
-  bindPort = 5353;
-  d2Port = 53001;
+  # Upstream recursive resolvers
+  upstream = args.upstreamDns or [ ];
 
-  # Paths in StateDirectory
-  bindDir = "/var/lib/bind";
-  zoneFileFor =
-    z:
-    # keep filenames simple: lan. -> db.lan, 1.168.192.in-addr.arpa. -> db.1.168.192.in-addr.arpa
-    let
-      z2 = lib.removeSuffix "." z;
-    in
-    "${bindDir}/db.${z2}";
+  # Flatten all DHCP reservations from all LANs
+  reservations =
+    lib.flatten (map (l: l.reservations or [ ]) lans);
 
-  mkBindZoneStanza = z: ''
-    zone "${z}" {
-      type master;
-      file "${zoneFileFor z}";
-      allow-update { 127.0.0.1; ::1; };  // no TSIG, localhost only
-      allow-query { 127.0.0.1; ::1; };
-    };
-  '';
+  fqdn =
+    h:
+    if lib.hasSuffix "." h then h else "${h}.${domain}";
 
-  bindNamedConf = ''
-    options {
-      directory "${bindDir}";
-      pid-file "${bindDir}/named.pid";
+  # A records from reservations
+  #   local-data: "printer2.lan. A 10.13.37.21"
+localDataA =
+  map (r: "\"${fqdn r.hostname} A ${r.ip-address}\"") reservations;
 
-      recursion no;
 
-      listen-on port ${toString bindPort} { 127.0.0.1; };
-      listen-on-v6 port ${toString bindPort} { ::1; };
+  # PTR records from reservations
+  #   local-data-ptr: "10.13.37.21 printer2.lan."
+localDataPtr =
+  map (r: "\"${r.ip-address} ${fqdn r.hostname}\"") reservations;
 
-      allow-query { 127.0.0.1; ::1; };
-    };
-
-    ${mkBindZoneStanza domain}
-    ${lib.concatStringsSep "\n" (map mkBindZoneStanza reverseZones)}
-  '';
-
-  # Minimal SOA/NS seed; dynamic updates will add A/PTR.
-  mkZoneSeed = z: ''
-    $TTL 60
-    @   IN SOA ns1.${domain} hostmaster.${domain} (
-          1   ; serial
-          60  ; refresh
-          60  ; retry
-          3600; expire
-          60  ; minimum
-        )
-        IN NS  ns1.${domain}
-
-    ns1 IN A 127.0.0.1
-  '';
-
-  # Kea D2 config (no TSIG; updates BIND on localhost:5353)
-  d2Config = builtins.toJSON {
-    "DhcpDdns" = {
-      "ip-address" = "127.0.0.1";
-      "port" = d2Port;
-
-      "forward-ddns" = {
-        "ddns-domains" = [
-          {
-            "name" = domain;
-            "dns-servers" = [
-              {
-                "ip-address" = "127.0.0.1";
-                "port" = bindPort;
-              }
-            ];
-          }
-        ];
-      };
-
-      "reverse-ddns" = {
-        "ddns-domains" = map (rz: {
-          "name" = rz;
-          "dns-servers" = [
-            {
-              "ip-address" = "127.0.0.1";
-              "port" = bindPort;
-            }
-          ];
-        }) reverseZones;
-      };
-    };
-  };
-
-  # Unbound stubs private zones to BIND and does recursion for everything else.
-  unboundStubZones = [
-    {
-      name = domain;
-      "stub-addr" = "127.0.0.1@${toString bindPort}";
-    }
-  ]
-  ++ map (rz: {
-    name = rz;
-    "stub-addr" = "127.0.0.1@${toString bindPort}";
-  }) reverseZones;
 
 in
 {
-  #### Authoritative DNS (BIND) on localhost:5353 ####
-  environment.etc."bind/named.conf".text = bindNamedConf;
+  # Hard kill BIND if it ever sneaks in
+  services.bind.enable = lib.mkForce false;
 
-  systemd.services.bind9 = {
-    description = "BIND9 authoritative (local) for ${domain}";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
-    serviceConfig = {
-      Type = "simple";
-      StateDirectory = "bind";
-      StateDirectoryMode = "0755";
-
-      # Create zone seeds if missing
-      ExecStartPre = pkgs.writeShellScript "bind-zones-init" ''
-                set -euo pipefail
-                mkdir -p ${bindDir}
-
-                ensure_zone() {
-                  local zone="$1"
-                  local file="$2"
-                  if [ ! -e "$file" ]; then
-                    umask 077
-                    cat >"$file" <<'EOF'
-        ${mkZoneSeed "${domain}"}
-        EOF
-                    # The seed contains ns1.${domain}; that's fine for all zones as a bootstrap.
-                  fi
-                }
-
-                ensure_zone "${domain}" "${zoneFileFor domain}"
-
-                ${lib.concatStringsSep "\n" (
-                  map (rz: ''
-                    ensure_zone "${rz}" "${zoneFileFor rz}"
-                  '') reverseZones
-                )}
-      '';
-
-      ExecStart = "${pkgs.bind}/sbin/named -g -c /etc/bind/named.conf";
-      Restart = "always";
-      RestartSec = "2s";
-    };
-  };
-
-  #### Kea DHCP-DDNS (D2) ####
-  environment.etc."kea/dhcp-ddns.json".text = d2Config;
-
-  systemd.services.kea-dhcp-ddns = {
-    description = "Kea DHCP-DDNS (D2)";
-    wantedBy = [ "multi-user.target" ];
-    after = [
-      "bind9.service"
-      "systemd-networkd.service"
-    ];
-    requires = [
-      "bind9.service"
-      "systemd-networkd.service"
-    ];
-    serviceConfig = {
-      Type = "simple";
-      ExecStart = "${pkgs.kea}/bin/kea-dhcp-ddns -d -c /etc/kea/dhcp-ddns.json";
-      Restart = "always";
-      RestartSec = "2s";
-    };
-  };
-
-  #### Recursive resolver for clients (Unbound) on :53 ####
   services.unbound = {
     enable = true;
 
     settings = {
       server = {
-        interface = [
-          "0.0.0.0"
-          "::0"
-        ];
+        interface = [ "0.0.0.0" "::0" ];
+        port = 53;
 
-        access-control = [
-          "127.0.0.0/8 allow"
-          "::1 allow"
-          "10.0.0.0/8 allow"
-          "172.16.0.0/12 allow"
-          "192.168.0.0/16 allow"
-          "fd00::/8 allow"
-        ];
+        do-ip4 = true;
+        do-ip6 = true;
+        do-udp = true;
+        do-tcp = true;
 
-        # Optional sanity
-        hide-identity = "yes";
-        hide-version = "yes";
+        access-control =
+          [ "127.0.0.0/8 allow" ]
+          ++ map (n: "${n} allow") v4Nets;
+
+        # Authoritative local zones
+        local-zone =
+          [ "${domain} static" ]
+          ++ map (z: "${z} static") reverseZonesV4;
+
+        # Actual records (THIS WAS MISSING)
+        local-data = localDataA;
+        local-data-ptr = localDataPtr;
+
+        auto-trust-anchor-file = "/var/lib/unbound/root.key";
+
+        hide-identity = true;
+        hide-version = true;
+        harden-glue = true;
+        harden-dnssec-stripped = true;
+        qname-minimisation = true;
+
+        prefetch = true;
+        cache-min-ttl = 60;
+        cache-max-ttl = 86400;
       };
 
-      # Use Unbound's stub-zone mechanism for private authoritative data
-      "stub-zone" = unboundStubZones;
+      # Recursive for everything outside lan.
+      forward-zone = [
+        {
+          name = ".";
+          forward-addr = upstream;
+          forward-first = true;
+        }
+      ];
 
-      # Upstream recursion via your provided upstream DNS (optional; remove if you want full recursion)
-      # If you want forwarding instead of full recursion, uncomment below:
-      # "forward-zone" = [
-      #   {
-      #     name = ".";
-      #     "forward-addr" = (args.upstreamDns or [ ]);
-      #   }
-      # ];
+      remote-control = {
+        control-enable = true;
+        control-interface = "127.0.0.1";
+        control-port = 8953;
+      };
     };
   };
 
-  #### Make the router itself use Unbound ####
-  services.resolved.enable = false;
-  networking.useHostResolvConf = lib.mkForce false;
-  environment.etc."resolv.conf".text = ''
-    nameserver 127.0.0.1
-  '';
+  networking.nameservers = [ "127.0.0.1" ];
 }
+
