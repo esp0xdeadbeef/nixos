@@ -39,4 +39,3 @@ in
   services.resolved.enable = false;
   networking.useHostResolvConf = lib.mkForce false;
 }
-
