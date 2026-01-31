@@ -3,7 +3,7 @@
   pkgs,
   lib,
   vmRoot,
-outPath,
+  outPath,
   ...
 }:
 {
@@ -40,6 +40,10 @@ outPath,
       hostPath = "/persist-state/var/lib/docker";
       isReadOnly = false;
     };
+    #bindMounts."/shared" = {
+    #  hostPath = "/etc/shared";
+    #  isReadOnly = true;
+    #};
 
     config = vmRoot + "/container";
 
@@ -53,10 +57,10 @@ outPath,
   };
   sops.secrets.subnet-ipv6 = { };
 sops.secrets.vlan2-hostnames-servers-json = {
-sopsFile = "${outPath}/secrets/vlan2-hostnames-servers.json.age";
-format = "binary";
-
+  sopsFile = "${outPath}/secrets/vlan2-hostnames-servers.json.age";
+  format = "binary";
   path = "/run/secrets/vlan2-hostnames-servers.json";
 };
+
 
 }

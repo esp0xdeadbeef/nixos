@@ -83,6 +83,7 @@ in
 {
   imports = [
     ./debugging-packages.nix
+    ./gen-dns-dhcp.nix
     vlanModule
   ];
 

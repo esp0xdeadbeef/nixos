@@ -26,12 +26,18 @@
       hostPath = "/persist";
       isReadOnly = false;
     };
-    # podman
+
+    # <<< ONLY SHARED RUNTIME STATE >>>
+    bindMounts."/shared/dns-runtime" = {
+      hostPath = "/var/run/dns-runtime";
+      isReadOnly = true;
+    };
+
     bindMounts."/var/lib/containers" = {
       hostPath = "/persist-state/var/lib/containers";
       isReadOnly = false;
     };
-    # docker:
+
     bindMounts."/var/lib/docker" = {
       hostPath = "/persist-state/var/lib/docker";
       isReadOnly = false;
@@ -48,3 +54,4 @@
     enableTun = true;
   };
 }
+

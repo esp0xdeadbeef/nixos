@@ -29,19 +29,6 @@ let
   # Upstream recursive resolvers
   upstream = args.upstreamDns or [ ];
 
-  # Flatten all DHCP reservations from all LANs
-  reservations = lib.flatten (map (l: l.reservations or [ ]) lans);
-
-  fqdn = h: if lib.hasSuffix "." h then h else "${h}.${domain}";
-
-  # A records from reservations
-  #   local-data: "printer2.lan. A 10.13.37.21"
-  localDataA = map (r: "\"${fqdn r.hostname} A ${r.ip-address}\"") reservations;
-
-  # PTR records from reservations
-  #   local-data-ptr: "10.13.37.21 printer2.lan."
-  localDataPtr = map (r: "\"${r.ip-address} ${fqdn r.hostname}\"") reservations;
-
 in
 {
   # Hard kill BIND if it ever sneaks in
@@ -68,9 +55,10 @@ in
         # Authoritative local zones
         local-zone = [ "${domain} static" ] ++ map (z: "${z} static") reverseZonesV4;
 
-        # Actual records (THIS WAS MISSING)
-        local-data = localDataA;
-        local-data-ptr = localDataPtr;
+        # IMPORTANT:
+        # Unbound include files MUST exist, otherwise unbound hard-fails.
+        # We generate this file via gen-dns-dhcp.service.
+        include = [ "/run/unbound-local.conf" ];
 
         auto-trust-anchor-file = "/var/lib/unbound/root.key";
 
@@ -104,3 +92,4 @@ in
 
   networking.nameservers = [ "127.0.0.1" ];
 }
+
