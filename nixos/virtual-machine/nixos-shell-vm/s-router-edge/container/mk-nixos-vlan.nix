@@ -6,7 +6,6 @@ let
   helpers = import ./mk-nixos-vlan/helpers.nix { inherit lib; };
 in
 {
-  # <<< THIS IS THE ONLY REAL FIX >>>
   _module.args = {
     inherit args helpers;
   };
