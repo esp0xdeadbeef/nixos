@@ -1,5 +1,5 @@
 
-Still work in progress :)
+Still work in progress :). The old structure is vlan2 mgmt and will be patched, some are in vlan 7, and some vpn containers are in the lan-to-vpn-vlanX
 
 
 # Table
