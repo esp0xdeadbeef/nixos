@@ -139,7 +139,9 @@ in
       NEW_PATH="$(readlink -f "${candidateLink}")"
       OLD_PATH="$(readlink -f "${currentLink}" 2>/dev/null || true)"
       if [ "$NEW_PATH" = "$OLD_PATH" ]; then exit 0; fi
-
+      while ps auxww | grep -E '[n]ixos.*build' >/dev/null; do
+        sleep 1
+      done
       ln -sfn "$NEW_PATH" "${currentLink}"
       systemctl restart "${vmServiceName}.service" || true
     '';
