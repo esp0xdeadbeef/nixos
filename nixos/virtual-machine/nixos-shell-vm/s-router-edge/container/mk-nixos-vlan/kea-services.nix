@@ -95,7 +95,7 @@ in
           ];
 
           # SERVICE
-          ExecStart = "${keaPkg}/bin/kea-dhcp4 -d -c /etc/kea/${l.name}.json";
+          ExecStart = "${keaPkg}/bin/kea-dhcp4 -d -c /run/etc/kea/${l.name}.json";
 
           # POST: kernel socket truth
           ExecStartPost = [

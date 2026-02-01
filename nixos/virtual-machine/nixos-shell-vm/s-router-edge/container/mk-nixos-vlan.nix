@@ -20,14 +20,7 @@ in
         ;
     })
     (import ./mk-nixos-vlan/nftables.nix { inherit lib args; })
-    (import ./mk-nixos-vlan/kea.nix {
-      inherit
-        pkgs
-        lib
-        helpers
-        args
-        ;
-    })
+    ./mk-nixos-vlan/kea.nix
     (import ./mk-nixos-vlan/kea-services.nix { inherit pkgs lib args; })
     (import ./mk-nixos-vlan/radvd.nix { inherit pkgs lib args; })
 

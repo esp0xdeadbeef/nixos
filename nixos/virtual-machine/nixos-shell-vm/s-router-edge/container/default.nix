@@ -29,7 +29,9 @@ let
         ip4 = "192.168.1.1/24";
         ip6 = "fd42:1::1/64";
         dhcp4 = true;
-        ra6 = true;
+        ra6 = false;
+        
+        runtimeHostsFile = "/run/secrets/vlan2-hostnames-servers.json";
       }
 
       {
@@ -39,7 +41,7 @@ let
         ip4 = "10.10.3.1/24";
         ip6 = "fd42:dead:beef:3::1/64";
         dhcp4 = true;
-        ra6 = true;
+        ra6 = false;
       }
 
       {
@@ -65,7 +67,6 @@ in
 {
   imports = [
     ./debugging-packages.nix
-    ./gen-dns-dhcp.nix
     vlanModule
   ];
 

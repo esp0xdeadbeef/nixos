@@ -29,6 +29,41 @@ let
   # Upstream recursive resolvers
   upstream = args.upstreamDns or [ ];
 
+  # LANs that provide runtime host data
+  runtimeLans = lib.filter (l: l ? runtimeHostsFile) lans;
+
+  genScript = pkgs.writeShellScript "gen-unbound-runtime" ''
+    set -euo pipefail
+
+    OUT="/run/unbound-local.conf"
+    DOMAIN="${domain}"
+
+    echo "[dns] generating $OUT"
+
+    mkdir -p /run
+    : > "$OUT"
+
+    for IN in ${lib.concatStringsSep " " (map (l: l.runtimeHostsFile) runtimeLans)}; do
+      if [ ! -r "$IN" ]; then
+        echo "[dns] skipping missing $IN"
+        continue
+      fi
+
+      ${pkgs.jq}/bin/jq -r \
+        '.[] | select(.hostname != null and .["ip-address"] != null) |
+         "local-data: \"\(.hostname).'"$DOMAIN"' A \(.["ip-address"])\""' \
+        "$IN" >> "$OUT"
+
+      ${pkgs.jq}/bin/jq -r \
+        '.[] | select(.hostname != null and .["ip-address"] != null) |
+         "local-data-ptr: \"\(.["ip-address"]) \(.hostname).'"$DOMAIN"'\""' \
+        "$IN" >> "$OUT"
+    done
+
+    if ! ${pkgs.gnugrep}/bin/grep -q . "$OUT"; then
+      echo "[dns] WARNING: generated empty $OUT"
+    fi
+  '';
 in
 {
   # Hard kill BIND if it ever sneaks in
@@ -50,14 +85,16 @@ in
         do-udp = true;
         do-tcp = true;
 
-        access-control = [ "127.0.0.0/8 allow" ] ++ map (n: "${n} allow") v4Nets;
+        access-control =
+          [ "127.0.0.0/8 allow" ]
+          ++ map (n: "${n} allow") v4Nets;
 
         # Authoritative local zones
-        local-zone = [ "${domain} static" ] ++ map (z: "${z} static") reverseZonesV4;
+        local-zone =
+          [ "${domain} static" ]
+          ++ map (z: "${z} static") reverseZonesV4;
 
-        # IMPORTANT:
-        # Unbound include files MUST exist, otherwise unbound hard-fails.
-        # We generate this file via gen-dns-dhcp.service.
+        # Runtime-generated records
         include = [ "/run/unbound-local.conf" ];
 
         auto-trust-anchor-file = "/var/lib/unbound/root.key";
@@ -91,4 +128,24 @@ in
   };
 
   networking.nameservers = [ "127.0.0.1" ];
+
+  ############################################
+  # DNS runtime generator (control plane)
+  ############################################
+  systemd.services.gen-unbound-runtime = {
+    wantedBy = [ "multi-user.target" ];
+    before = [ "unbound.service" ];
+
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = genScript;
+      RemainAfterExit = true;
+    };
+  };
+
+  systemd.services.unbound = {
+    after = [ "gen-unbound-runtime.service" ];
+    requires = [ "gen-unbound-runtime.service" ];
+  };
 }
+

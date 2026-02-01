@@ -1,15 +1,8 @@
-{
-  pkgs,
-  lib,
-  helpers,
-  args,
-}:
-{ ... }:
+{ config, pkgs, lib, helpers, args, ... }:
 
 let
   inherit (helpers) ipv4Base3 defaultPool4 onlyIPv4;
 
-  keaPkg = pkgs.kea;
   lans = lib.filter (l: l.dhcp4 or false) args.lans;
   upstreamV4 = onlyIPv4 (args.upstreamDns or [ ]);
 
@@ -22,25 +15,106 @@ let
     ];
 
     option-data = [
+      # Default gateway
       {
         name = "routers";
         data = ipv4Base3 l.ip4 + ".1";
       }
+
+      # DNS advertisement (THIS WAS MISSING)
       {
         name = "domain-name-servers";
-        data = lib.concatStringsSep "," ([ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4);
+        data = lib.concatStringsSep "," (
+          [ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4
+        );
       }
+
+      # Domain search
       {
         name = "domain-name";
         data = args.domain or "lan.";
       }
     ];
-
-    reservations = l.reservations or [ ];
   };
+
+  genRuntimeService = l:
+    let
+      inFile = l.runtimeHostsFile;
+      outFile = "/run/etc/kea/${l.name}.json";
+      subnet = "${ipv4Base3 l.ip4}.0/24";
+      router = ipv4Base3 l.ip4 + ".1";
+      dns = lib.concatStringsSep "," (
+        [ router ] ++ upstreamV4
+      );
+      domain = args.domain or "lan.";
+    in
+    {
+      name = "gen-kea-${l.name}";
+      value = {
+        wantedBy = [ "multi-user.target" ];
+        after = [ "systemd-networkd.service" ];
+        requires = [ "systemd-networkd.service" ];
+
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = pkgs.writeShellScript "gen-kea-${l.name}" ''
+            set -euo pipefail
+            mkdir -p /run/etc/kea
+
+            ${pkgs.jq}/bin/jq \
+              --arg subnet "${subnet}" \
+              --arg router "${router}" \
+              --arg dns "${dns}" \
+              --arg domain "${domain}" '
+            {
+              Dhcp4: {
+                "interfaces-config": { interfaces: ["${l.iface}"] },
+                "lease-database": {
+                  type: "memfile",
+                  persist: true,
+                  name: "/var/lib/kea/${l.name}.leases"
+                },
+                subnet4: [
+                  {
+                    id: ${toString l.id},
+                    subnet: $subnet,
+                    pools: [
+                      { pool: "${defaultPool4 l.ip4}" }
+                    ],
+                    "option-data": [
+                      { name: "routers", data: $router },
+                      { name: "domain-name-servers", data: $dns },
+                      { name: "domain-name", data: $domain }
+                    ],
+                    reservations: (
+                      sort_by(."hw-address")
+                      | group_by(."hw-address")
+                      | map(.[0])
+                      | sort_by(."ip-address")
+                      | group_by(."ip-address")
+                      | map(.[0])
+                      | map({
+                          "ip-address": ."ip-address",
+                          "hw-address": ."hw-address",
+                          hostname: .hostname
+                        })
+                    )
+                  }
+                ]
+              }
+            }
+            ' "${inFile}" > "${outFile}"
+          '';
+          RemainAfterExit = true;
+        };
+      };
+    };
 
 in
 {
+  ############################################
+  # Static mode (no runtimeHostsFile)
+  ############################################
   environment.etc = lib.listToAttrs (
     map (l: {
       name = "kea/${l.name}.json";
@@ -49,26 +123,22 @@ in
           "interfaces-config" = {
             interfaces = [ l.iface ];
           };
-
           "lease-database" = {
             type = "memfile";
             persist = true;
             name = "/var/lib/kea/${l.name}.leases";
           };
-
-          "ddns-qualifying-suffix" = args.domain or "lan.";
-          "ddns-override-client-update" = true;
-          "ddns-override-no-update" = true;
-
-          "dhcp-ddns" = {
-            "enable-updates" = true;
-            "server-ip" = "127.0.0.1";
-            "server-port" = 53001;
-          };
-
           subnet4 = [ (mkSubnet l) ];
         };
       };
-    }) lans
+    }) (lib.filter (l: !(l ? runtimeHostsFile)) lans)
+  );
+
+  ############################################
+  # Runtime mode (runtimeHostsFile)
+  ############################################
+  systemd.services = lib.listToAttrs (
+    map genRuntimeService (lib.filter (l: l ? runtimeHostsFile) lans)
   );
 }
+
