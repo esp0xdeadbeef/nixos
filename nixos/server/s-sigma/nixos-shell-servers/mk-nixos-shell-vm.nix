@@ -111,6 +111,7 @@ in
       pkgs.nix
       pkgs.coreutils
       pkgs.systemd
+      pkgs.procps
     ];
     serviceConfig = {
       Type = "oneshot";
