@@ -15,21 +15,16 @@ let
     ];
 
     option-data = [
-      # Default gateway
       {
         name = "routers";
         data = ipv4Base3 l.ip4 + ".1";
       }
-
-      # DNS advertisement (THIS WAS MISSING)
       {
         name = "domain-name-servers";
         data = lib.concatStringsSep "," (
           [ (ipv4Base3 l.ip4 + ".1") ] ++ upstreamV4
         );
       }
-
-      # Domain search
       {
         name = "domain-name";
         data = args.domain or "lan.";
@@ -37,15 +32,14 @@ let
     ];
   };
 
+  # Runtime generator (with reservations)
   genRuntimeService = l:
     let
       inFile = l.runtimeHostsFile;
       outFile = "/run/etc/kea/${l.name}.json";
       subnet = "${ipv4Base3 l.ip4}.0/24";
       router = ipv4Base3 l.ip4 + ".1";
-      dns = lib.concatStringsSep "," (
-        [ router ] ++ upstreamV4
-      );
+      dns = lib.concatStringsSep "," ([ router ] ++ upstreamV4);
       domain = args.domain or "lan.";
     in
     {
@@ -60,6 +54,11 @@ let
           ExecStart = pkgs.writeShellScript "gen-kea-${l.name}" ''
             set -euo pipefail
             mkdir -p /run/etc/kea
+
+            if [ ! -r "${inFile}" ]; then
+              echo "[kea] WARNING: ${inFile} missing, generating empty reservations"
+              echo '{}' > "${inFile}"
+            fi
 
             ${pkgs.jq}/bin/jq \
               --arg subnet "${subnet}" \
@@ -110,35 +109,71 @@ let
       };
     };
 
-in
+  # Stub generator (no reservations)
+  genStubService = l:
+    let
+      outFile = "/run/etc/kea/${l.name}.json";
+      subnet = "${ipv4Base3 l.ip4}.0/24";
+      router = ipv4Base3 l.ip4 + ".1";
+      dns = lib.concatStringsSep "," ([ router ] ++ upstreamV4);
+      domain = args.domain or "lan.";
+    in
+    {
+      name = "gen-kea-${l.name}";
+      value = {
+        wantedBy = [ "multi-user.target" ];
+        after = [ "systemd-networkd.service" ];
+        requires = [ "systemd-networkd.service" ];
+
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = pkgs.writeShellScript "gen-kea-${l.name}" ''
+            set -euo pipefail
+            mkdir -p /run/etc/kea
+
+            cat > "${outFile}" <<EOF
 {
-  ############################################
-  # Static mode (no runtimeHostsFile)
-  ############################################
-  environment.etc = lib.listToAttrs (
-    map (l: {
-      name = "kea/${l.name}.json";
-      value.text = builtins.toJSON {
-        Dhcp4 = {
-          "interfaces-config" = {
-            interfaces = [ l.iface ];
-          };
-          "lease-database" = {
-            type = "memfile";
-            persist = true;
-            name = "/var/lib/kea/${l.name}.leases";
-          };
-          subnet4 = [ (mkSubnet l) ];
+  "Dhcp4": {
+    "interfaces-config": {
+      "interfaces": ["${l.iface}"]
+    },
+    "lease-database": {
+      "type": "memfile",
+      "persist": true,
+      "name": "/var/lib/kea/${l.name}.leases"
+    },
+    "subnet4": [
+      {
+        "id": ${toString l.id},
+        "subnet": "${subnet}",
+        "pools": [
+          { "pool": "${defaultPool4 l.ip4}" }
+        ],
+        "option-data": [
+          { "name": "routers", "data": "${router}" },
+          { "name": "domain-name-servers", "data": "${dns}" },
+          { "name": "domain-name", "data": "${domain}" }
+        ]
+      }
+    ]
+  }
+}
+EOF
+          '';
+          RemainAfterExit = true;
         };
       };
-    }) (lib.filter (l: !(l ? runtimeHostsFile)) lans)
-  );
+    };
 
-  ############################################
-  # Runtime mode (runtimeHostsFile)
-  ############################################
-  systemd.services = lib.listToAttrs (
-    map genRuntimeService (lib.filter (l: l ? runtimeHostsFile) lans)
-  );
+in
+{
+  systemd.services =
+    lib.listToAttrs (
+      map genRuntimeService (lib.filter (l: l ? runtimeHostsFile) lans)
+    )
+    //
+    lib.listToAttrs (
+      map genStubService (lib.filter (l: !(l ? runtimeHostsFile)) lans)
+    );
 }
 
