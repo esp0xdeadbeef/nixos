@@ -7,6 +7,7 @@
       "qwen2.5-coder:1.5b-base"
       "nomic-embed-text"
       "deepseek-r1:1.5b"
+      "deepseek-coder:33b"
     ];
   };
 }
