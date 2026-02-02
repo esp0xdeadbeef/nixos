@@ -36,6 +36,7 @@
     ./hardware/swap-and-tmpfs.nix
     ./llms/lmstudio.nix
     ./llms/ollama.nix
+    ./llms/web-ui-ollama.nix
     ./lxc/bind-to-lxc.nix
     ./neovim-on-steroids/neovim.nix
     ./unmount-pentest-directory/unmount-hook.nix
