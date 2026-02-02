@@ -19,6 +19,17 @@
 
         injectFullScript = pkgs.writeShellScript "inject-mitm-android-full" ''
                     set -euo pipefail
+                    export PATH=${
+                      pkgs.lib.makeBinPath [
+                        pkgs.android-tools # adb
+                        pkgs.iproute2 # ip
+                        pkgs.gawk # awk
+                        pkgs.openssl # openssl
+                        pkgs.coreutils # cp, mkdir, chmod, etc
+                        pkgs.gnugrep # grep
+                        pkgs.gnused # sed (just in case)
+                      ]
+                    }
                     PROXY_PORT=8082
 
                     # --- SMART LAPTOP IP DETECTION ---
