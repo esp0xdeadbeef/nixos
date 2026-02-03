@@ -8,6 +8,10 @@ virtualisation.oci-containers.containers.open-webui = {
   environment = {
     OLLAMA_BASE_URL = "http://host.containers.internal:11434";
   };
+  volumes = [
+    "/persist/var/lib/open-webui:/app/backend/data"
+  ];
+
 };
 
 }
