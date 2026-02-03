@@ -13,5 +13,11 @@ virtualisation.oci-containers.containers.open-webui = {
   ];
 
 };
+environment.persistence."/persist" = {
+  directories = [
+    "/var/lib/open-webui"
+  ];
+};
+
 
 }
