@@ -18,5 +18,5 @@
     nftables
   ];
 
-  environment.etc.hosts.enable = false;
+  environment.etc.hosts.enable = lib.mkDefault false;
 }

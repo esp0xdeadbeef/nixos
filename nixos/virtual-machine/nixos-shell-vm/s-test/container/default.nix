@@ -1,17 +1,15 @@
+# ./container/default.nix
 {
   lib,
-  pkgs,
+  outPath,
+  config,
   ...
 }:
 {
   imports = [
-    ./networking.nix
-    #./podman-hello-world.nix
-    ./debug-packages.nix
-    #./podman-fix.nix
+    "${outPath}/library/11-containers/nixos-container"
     ./containerlab.nix
+    ./podman-hello-world.nix
+    ./network.nix
   ];
-  networking.useHostResolvConf = false;
-
-  system.stateVersion = "25.11";
 }

@@ -3,6 +3,7 @@
   pkgs,
   lib,
   vmRoot,
+  outPath,
   ...
 }:
 {
@@ -36,10 +37,19 @@
       hostPath = "/persist-state/var/lib/docker";
       isReadOnly = false;
     };
+    specialArgs = {
+      inherit outPath;
+      # you can also pass inputs/self/outputs/etc if you want
+      # inherit inputs self outputs;
+    };
 
-    # This is the key line:
-    # Resolves to /nix/store/...-source/nixos/virtual-machine/nixos-shell-vm/{container-host}/container
-    config = vmRoot + "/container";
+    config =
+      { outPath, ... }:
+      {
+        imports = [
+          ./container
+        ];
+      };
 
     additionalCapabilities = [
       "CAP_BPF"
