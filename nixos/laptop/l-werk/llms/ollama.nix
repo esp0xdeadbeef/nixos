@@ -8,6 +8,11 @@
       "nomic-embed-text"
       "deepseek-r1:1.5b"
       "deepseek-coder:33b"
+      "dolphin-mixtral:8x7b"
+      "nous-hermes2:34b"
+      "wizardlm2:7b"
+      "llama3.1:13b"
     ];
+    host = "0.0.0.0";
   };
 }
