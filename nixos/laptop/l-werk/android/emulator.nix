@@ -24,6 +24,7 @@ in
   environment.systemPackages = [
     androidPkgs.androidsdk
     pkgs.qemu
+    pkgs.androidsdk
 
     # Force wrapper to override real emulator
     (lib.hiPrio (

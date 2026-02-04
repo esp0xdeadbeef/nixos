@@ -22,7 +22,7 @@ need xz
 need nc
 need python3
 
-# 1) Determine Frida version from our venv (this is the client version we must match)
+# 1) Determine Frida version from our venv
 FRIDA_VER="$(python3 - << 'EOF'
 import frida
 print(frida.__version__)
@@ -39,12 +39,32 @@ adb start-server >/dev/null 2>&1 || true
 log "Waiting for ADB device..."
 adb wait-for-device
 
-# 3) Ensure adbd root (your request: adb_root, no su)
+# 3) Ensure adbd root (no su yet)
 log "Ensuring adb is running as root..."
 adb root >/dev/null 2>&1 || true
 adb wait-for-device
 
-# 4) Detect ABI (minimal work in adb shell; just one getprop)
+# ------------------------------------------------------------
+# CRITICAL PART: probe remote scratch directory ONCE
+# ------------------------------------------------------------
+
+log "Probing remote writable exec directory..."
+
+if adb shell "ls /data/local/tmp >/dev/null 2>&1"; then
+  FRIDA_DST_DIR="/data/local/tmp"
+elif adb shell "ls /tmp >/dev/null 2>&1"; then
+  FRIDA_DST_DIR="/tmp"
+else
+  die "No usable temp directory found on device"
+fi
+
+ok "Using remote directory: $FRIDA_DST_DIR"
+FRIDA_REMOTE="$FRIDA_DST_DIR/frida-server"
+LOG_FILE="/data/local/tmp/frida-server.log"
+
+# ------------------------------------------------------------
+
+# 4) Detect ABI
 ABI="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
 ok "Detected ABI: $ABI"
 
@@ -65,61 +85,78 @@ curl -fsSL -o "$OUT_XZ" "$URL_SERVER"
 xz -df "$OUT_XZ"
 chmod +x "$OUT_BIN"
 
-# 6) Kill old server(s) + helpers, push new, start
-log "Killing old frida-server + helpers (best-effort)..."
+# 6) Kill old server(s)
+log "Killing old frida-server + helpers..."
 adb shell 'pkill -9 frida-server 2>/dev/null || true; pkill -9 re.frida.helper 2>/dev/null || true' >/dev/null 2>&1 || true
 
-log "Pushing fresh frida-server to /tmp/frida-server ..."
-adb push "$OUT_BIN" /tmp/frida-server >/dev/null
-adb shell 'chmod 755 /tmp/frida-server' >/dev/null
+# 7) Push new server
+log "Pushing fresh frida-server to $FRIDA_REMOTE ..."
+adb push "$OUT_BIN" "$FRIDA_REMOTE" >/dev/null
+adb shell "chmod 755 $FRIDA_REMOTE" >/dev/null
 
-# Optional: permissive SELinux (best-effort, don’t fail if not allowed)
+# Optional: permissive SELinux
 log "Best-effort: setenforce 0 (ignore failures)..."
 adb shell 'setenforce 0 2>/dev/null || true' >/dev/null 2>&1 || true
 
-# Start frida-server (DEFAULT: local-only on device; we use adb forward)
-# Capture logs so we can debug crashes deterministically.
-log "Starting frida-server (device-local) with log capture..."
-adb shell 'nohup /tmp/frida-server >/data/local/tmp/frida-server.log 2>&1 & disown || true' >/dev/null 2>&1 || true
+# 8) Start frida-server (direct first, then su fallback)
+have_su() { adb shell "command -v su >/dev/null 2>&1" >/dev/null 2>&1; }
+is_running() { adb shell "pidof frida-server >/dev/null 2>&1" >/dev/null 2>&1; }
 
-# 7) Set up ADB port forwarding (THIS is the stable part)
+log "Starting frida-server (direct)..."
+adb shell "nohup $FRIDA_REMOTE >$LOG_FILE 2>&1 &" >/dev/null 2>&1 || true
+sleep 0.8
+
+if ! is_running && have_su; then
+  log "Direct start failed, retrying via su..."
+  adb shell "su -c 'nohup $FRIDA_REMOTE >$LOG_FILE 2>&1 &'" >/dev/null 2>&1 || true
+  sleep 0.8
+fi
+
+if ! is_running; then
+  echo "[-] frida-server did not start. Dumping device log:"
+  adb shell "tail -n 200 $LOG_FILE 2>/dev/null || true"
+  die "frida-server failed to start"
+fi
+ok "frida-server is running"
+
+# 9) ADB forward
 log "Setting up adb forward localhost:27042 -> device:27042 ..."
 adb forward --remove tcp:27042 >/dev/null 2>&1 || true
 adb forward tcp:27042 tcp:27042 >/dev/null
 
-# 8) Verify port reachable locally, then verify Frida handshake via frida-ps -U
-log "Waiting for local port 27042 to accept connections..."
+# 10) Verify port
+log "Waiting for local port 27042..."
 for i in $(seq 1 30); do
   if nc -z 127.0.0.1 27042 >/dev/null 2>&1; then
-    ok "Local forward is up: 127.0.0.1:27042"
+    ok "Local forward is up"
     break
   fi
   sleep 0.2
 done
 
 if ! nc -z 127.0.0.1 27042 >/dev/null 2>&1; then
-  echo "[-] Port 27042 not reachable locally. Dumping device log:"
-  adb shell 'tail -n 200 /data/local/tmp/frida-server.log 2>/dev/null || true'
-  die "frida-server didn't come up (or forward failed)"
+  echo "[-] Port not reachable. Device log:"
+  adb shell "tail -n 200 $LOG_FILE 2>/dev/null || true"
+  die "ADB forward failed"
 fi
 
-# Check versions *from device binary* too (not network)
-SERVER_VER="$(adb shell '/tmp/frida-server --version 2>/dev/null' | tr -d '\r' || true)"
-ok "Server version (device binary): ${SERVER_VER:-unknown}"
+# 11) Version check
+SERVER_VER="$(adb shell "$FRIDA_REMOTE --version 2>/dev/null" | tr -d '\r' || true)"
+if [ -z "$SERVER_VER" ] && have_su; then
+  SERVER_VER="$(adb shell "su -c '$FRIDA_REMOTE --version 2>/dev/null'" | tr -d '\r' || true)"
+fi
+ok "Server version: ${SERVER_VER:-unknown}"
 
-log "Testing Frida handshake via: frida-ps -U"
+# 12) Handshake test
+log "Testing Frida handshake..."
 if ! frida-ps -U >/dev/null 2>&1; then
-  echo "[-] frida-ps -U failed. Dumping device log (last 200 lines):"
-  adb shell 'tail -n 200 /data/local/tmp/frida-server.log 2>/dev/null || true'
-  echo ""
-  echo "[-] Also show whether anything is listening on device 27042:"
-  adb shell 'netstat -lntp 2>/dev/null | grep 27042 || ss -lntp 2>/dev/null | grep 27042 || true' || true
-  die "Frida client could not speak to frida-server (even though TCP is up). Log above shows why."
+  echo "[-] frida-ps failed. Device log:"
+  adb shell "tail -n 200 $LOG_FILE 2>/dev/null || true"
+  die "Frida client cannot talk to server"
 fi
-ok "Frida works (frida-ps -U succeeded)."
+ok "Frida works"
 
-# 9) Download matching Frida Gadget locally (for jailed attach workflows)
-# (Not always needed on rooted devices, but you asked for automation.)
+# 13) Gadget
 URL_GADGET="https://github.com/frida/frida/releases/download/${FRIDA_VER}/frida-gadget-${FRIDA_VER}-android-${GADGET_ARCH}.so.xz"
 DL_DIR="/root/Downloads"
 mkdir -p "$DL_DIR" /root/.cache/frida
@@ -130,28 +167,12 @@ xz -df "${DL_DIR}/frida-gadget-${FRIDA_VER}-android-${GADGET_ARCH}.so.xz"
 cp -f "${DL_DIR}/frida-gadget-${FRIDA_VER}-android-${GADGET_ARCH}.so" "/root/.cache/frida/${GADGET_DST}"
 ok "Gadget installed: /root/.cache/frida/${GADGET_DST}"
 
-
 echo ""
 echo "================ READY ================="
-echo "Frida (stable):"
-echo "  frida-ps -U"
-echo ""
-echo "Objection:"
-#echo "  objection -g com.aurora.store explore"
-echo "  objection -n com.aurora.store start"
-echo "  # or: objection -g \"Aurora Store\" explore"
-echo ""
-echo "If you REALLY want remote mode later:"
-echo "  (Start server with --listen 0.0.0.0:27042 and then use frida-ps -H <ip>:27042)"
-echo "  But for you this has been flaky; -U + adb forward is stable."
+echo "frida-ps -U"
+echo "objection -n com.aurora.store start"
 echo "======================================="
-echo ""
-echo "A nice cheatsheet:"
-echo "https://github.com/ivan-sincek/android-penetration-testing-cheat-sheet?tab=readme-ov-file#decode"
-echo ""
 
-# 10) Drop into a clean shell that cannot auto-activate base image venv
-# - bash --noprofile --norc avoids sourcing anything that reactivates "mobile-setup-ubuntu"
 exec env -i \
   HOME=/root \
   USER=root \
