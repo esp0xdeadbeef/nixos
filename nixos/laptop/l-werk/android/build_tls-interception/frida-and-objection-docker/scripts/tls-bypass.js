@@ -27,6 +27,7 @@ Java.perform(function () {
 
   let trustAllTm = null;
   if (X509TM) {
+    // this should be a mitmproxy cert name:
     const TrustAll = Java.registerClass({
       name: "org.deadbeef.TrustAllX509TrustManager",
       implements: [X509TM],
