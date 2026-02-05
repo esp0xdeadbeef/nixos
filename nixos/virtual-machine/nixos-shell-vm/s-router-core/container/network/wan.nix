@@ -7,9 +7,7 @@
   systemd.network.enable = true;
 
   systemd.network.networks."10-ppp0" = {
-    matchConfig = {
-      Name = "ppp0";
-    };
+    matchConfig.Name = "ppp0";
 
     networkConfig = {
       ConfigureWithoutCarrier = true;
@@ -17,7 +15,7 @@
       # Accept RA from ISP, learn IPv6 default route
       IPv6AcceptRA = true;
 
-      # This container is a router
+      # Router
       IPv6Forwarding = true;
 
       DHCP = "no";
@@ -26,13 +24,14 @@
   };
 
   ############################################
-  # PPPoE daemon (runtime-generated config)
+  # PPPoE daemon
   ############################################
   systemd.services.pppoe-pap = {
     description = "PPPoE WAN (IPv4 + IPv6)";
     wantedBy = [ "multi-user.target" ];
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
+
     path = [
       pkgs.ppp
       pkgs.coreutils
@@ -51,18 +50,15 @@
                 PASSWORD="$(cat /run/secrets/pppoe-password)"
 
                 if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-                  echo "ERROR: missing PPPoE credentials in /run/secrets" >&2
+                  echo "ERROR: missing PPPoE credentials" >&2
                   exit 1
                 fi
 
-                # pap-secrets is NOT a shell script
                 cat > /run/ppp/pap-secrets <<EOF
         "$USERNAME" * "$PASSWORD" *
         EOF
                 chmod 600 /run/ppp/pap-secrets
 
-                # Run PPPoE on the interface that actually sees the AC
-                # You verified this with: pppoe-discovery -I br-wan6
                 cat > /run/ppp/peers/pppoe-wan <<EOF
         plugin pppoe.so
         nic-br-wan6
@@ -104,7 +100,7 @@
   # DHCPv6-PD client
   ############################################
   systemd.services.dhcpcd-ipv6 = {
-    description = "DHCPv6-PD client";
+    description = "DHCPv6 Prefix Delegation client";
     wantedBy = [ "multi-user.target" ];
     after = [ "pppoe-pap.service" ];
     wants = [ "pppoe-pap.service" ];
@@ -117,7 +113,7 @@
   };
 
   ############################################
-  # dhcpcd config
+  # dhcpcd configuration
   ############################################
   environment.etc."dhcpcd.conf" = {
     mode = "0644";
@@ -125,10 +121,7 @@
       duid
       persistent
 
-      # Prevent dhcpcd touching resolv.conf
       nohook resolv.conf
-
-      # Only PD, RA is handled by networkd
       noipv6rs
       noipv4
       ipv6only
@@ -138,10 +131,11 @@
         ia_pd 1
     '';
   };
+
   systemd.services.route-ipv6-pd-to-edge = {
     description = "Route delegated IPv6 prefix to s-router-edge";
-    wants = [ "dhcpcd-ipv6.service" ];
     wantedBy = [ "multi-user.target" ];
+
     after = [
       "systemd-networkd.service"
       "dhcpcd-ipv6.service"
@@ -149,22 +143,32 @@
 
     requires = [
       "systemd-networkd.service"
+      "dhcpcd-ipv6.service"
     ];
 
     path = [
       pkgs.iproute2
       pkgs.gawk
+      pkgs.coreutils
     ];
 
     serviceConfig = {
       Type = "oneshot";
+
+      Restart = "on-failure";
+      RestartSec = 2;
+
       ExecStart = pkgs.writeShellScript "route-pd" ''
         set -euo pipefail
 
         PD="$(${pkgs.iproute2}/bin/ip -6 route show proto dhcp \
-          | ${pkgs.gawk}/bin/awk '/unreachable/ {print $2; exit}')"
+          | ${pkgs.gawk}/bin/awk '/unreachable/ { print $2; exit }')"
 
-        [ -n "$PD" ] || exit 0
+        # HARD FAIL if PD is missing
+        if [ -z "$PD" ]; then
+          echo "ERROR: No delegated IPv6 prefix found (proto dhcp unreachable missing)" >&2
+          exit 1
+        fi
 
         ${pkgs.iproute2}/bin/ip -6 route replace "$PD" \
           via fd42:dead:beef:100::2 \
