@@ -12,6 +12,11 @@
     privateNetwork = true;
 
     extraVeths = {
+      # Full trunk in the container:
+      lan.hostBridge = "br-lan-trunk";
+      
+
+      # these are old vlan styles
       lan2.hostBridge = "vlan2";
       lan3.hostBridge = "vlan3";
       lan4.hostBridge = "vlan4";
