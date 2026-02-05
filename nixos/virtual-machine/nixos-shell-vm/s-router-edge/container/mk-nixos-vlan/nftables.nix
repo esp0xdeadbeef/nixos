@@ -1,6 +1,9 @@
-# mk-nixos-vlan/nftables.nix
-{ lib, args }:
-{ config, ... }:
+{
+  config,
+  lib,
+  args,
+  ...
+}:
 
 {
   networking.nftables.enable = true;

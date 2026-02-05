@@ -1,12 +1,12 @@
 {
+  config,
   pkgs,
   lib,
-  helpers,
   args,
+  ...
 }:
-{ config, ... }:
-
 let
+  helpers = import ./helpers.nix { inherit lib; };
   lans = args.lans or [ ];
 
   wans = if args ? wans then args.wans else abort "mk-nixos-vlan: args.wans mandatory";

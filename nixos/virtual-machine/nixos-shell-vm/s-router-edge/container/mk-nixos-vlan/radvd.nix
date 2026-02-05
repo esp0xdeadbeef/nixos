@@ -1,10 +1,11 @@
 # mk-nixos-vlan/radvd.nix
 {
+  config,
   pkgs,
   lib,
   args,
+  ...
 }:
-{ config, ... }:
 
 let
   wans =

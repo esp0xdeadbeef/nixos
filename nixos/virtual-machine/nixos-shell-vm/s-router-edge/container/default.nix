@@ -1,7 +1,7 @@
 { pkgs, lib, ... }:
 
 let
-  mk-nixos-vlan = import ./mk-nixos-vlan.nix { inherit pkgs lib; };
+  mk-nixos-vlan = import ./mk-nixos-vlan { inherit pkgs lib; };
 
   vlanModule = mk-nixos-vlan {
     wans = [
@@ -30,7 +30,7 @@ let
         ip6 = "fd42:1::1/64";
         dhcp4 = true;
         ra6 = false;
-        
+
         runtimeHostsFile = "/run/secrets/vlan2-hostnames-servers.json";
       }
 
@@ -69,6 +69,8 @@ in
     ./debugging-packages.nix
     vlanModule
   ];
+  services.resolved.enable = false;
+  networking.useHostResolvConf = false;
 
   system.stateVersion = "25.11";
   boot.isContainer = true;

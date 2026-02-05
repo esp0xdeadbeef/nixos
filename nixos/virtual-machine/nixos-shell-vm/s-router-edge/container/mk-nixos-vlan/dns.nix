@@ -3,18 +3,19 @@
   pkgs,
   lib,
   args,
-  helpers,
   ...
 }:
 
 let
+  helpers = import ./helpers.nix { inherit lib; };
+
   lans = args.lans or [ ];
 
   # Normalize domain to FQDN with trailing dot
   domainRaw = args.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
-  # IPv4 forward ACLs (assume /24 like your design)
+  # IPv4 forward ACLs (assume /24)
   v4Nets = map (
     l:
     let
@@ -85,16 +86,10 @@ in
         do-udp = true;
         do-tcp = true;
 
-        access-control =
-          [ "127.0.0.0/8 allow" ]
-          ++ map (n: "${n} allow") v4Nets;
+        access-control = [ "127.0.0.0/8 allow" ] ++ map (n: "${n} allow") v4Nets;
 
-        # Authoritative local zones
-        local-zone =
-          [ "${domain} static" ]
-          ++ map (z: "${z} static") reverseZonesV4;
+        local-zone = [ "${domain} static" ] ++ map (z: "${z} static") reverseZonesV4;
 
-        # Runtime-generated records
         include = [ "/run/unbound-local.conf" ];
 
         auto-trust-anchor-file = "/var/lib/unbound/root.key";
@@ -110,7 +105,6 @@ in
         cache-max-ttl = 86400;
       };
 
-      # Recursive for everything outside lan.
       forward-zone = [
         {
           name = ".";
@@ -129,9 +123,6 @@ in
 
   networking.nameservers = [ "127.0.0.1" ];
 
-  ############################################
-  # DNS runtime generator (control plane)
-  ############################################
   systemd.services.gen-unbound-runtime = {
     wantedBy = [ "multi-user.target" ];
     before = [ "unbound.service" ];
@@ -148,4 +139,3 @@ in
     requires = [ "gen-unbound-runtime.service" ];
   };
 }
-
