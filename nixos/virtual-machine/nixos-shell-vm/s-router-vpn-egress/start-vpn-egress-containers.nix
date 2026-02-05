@@ -62,7 +62,7 @@ in
           vpnInterface = "tun0";
           vpnProfile = "/etc/vpn/tun0.conf";
           subnets.ipv4 = "10.11.0.1/24";
-          subnets.ipv6 = "fd10:dead:beef::1/64";
+          subnets.ipv6 = "fd11:dead:beef::1/64";
           dhcp4.enable = true;
           ra.enable = true;
         };

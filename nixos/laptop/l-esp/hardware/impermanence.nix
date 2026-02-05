@@ -111,6 +111,7 @@
       "/var/lib/systemd/coredump"
       "/etc/NetworkManager/system-connections"
       "/var/lib/libvirt" # libvirt configurations
+      "/etc/nebula"
       {
         directory = "/var/lib/colord";
         user = "colord";

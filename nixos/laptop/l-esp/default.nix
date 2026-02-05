@@ -32,6 +32,7 @@
     ./signal
     ./torrents
     ./unmount-pentest-directory
+    ./nebula-node
 
     "${outPath}/library/01-general"
     "${outPath}/library/02-window-manager-i3"
