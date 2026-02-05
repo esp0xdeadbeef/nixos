@@ -135,7 +135,43 @@
 
       interface ppp0
         iaid 1
-        ia_pd 1 br-vlan1010/0/64
+        ia_pd 1
     '';
   };
+  systemd.services.route-ipv6-pd-to-edge = {
+    description = "Route delegated IPv6 prefix to s-router-edge";
+    wants = [ "dhcpcd-ipv6.service" ];
+    wantedBy = [ "multi-user.target" ];
+    after = [
+      "systemd-networkd.service"
+      "dhcpcd-ipv6.service"
+    ];
+
+    requires = [
+      "systemd-networkd.service"
+    ];
+
+    path = [
+      pkgs.iproute2
+      pkgs.gawk
+    ];
+
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = pkgs.writeShellScript "route-pd" ''
+        set -euo pipefail
+
+        PD="$(${pkgs.iproute2}/bin/ip -6 route show proto dhcp \
+          | ${pkgs.gawk}/bin/awk '/unreachable/ {print $2; exit}')"
+
+        [ -n "$PD" ] || exit 0
+
+        ${pkgs.iproute2}/bin/ip -6 route replace "$PD" \
+          via fd42:dead:beef:100::2 \
+          dev br-vlan1010 \
+          metric 256
+      '';
+    };
+  };
+
 }

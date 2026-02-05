@@ -12,10 +12,16 @@
     };
 
     addresses = [
-      { Address = "10.255.255.1/29"; }
+      {
+        Address = "10.255.255.1/29";
+      }
+      {
+        Address = "fd42:dead:beef:100::1/64";
+      }
     ];
     routes = [
       {
+
         routeConfig = {
           Destination = "10.13.37.0/24";
           Gateway = "10.255.255.2";
