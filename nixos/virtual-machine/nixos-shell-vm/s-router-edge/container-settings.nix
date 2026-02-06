@@ -14,7 +14,6 @@
     extraVeths = {
       # Full trunk in the container:
       lan.hostBridge = "br-lan-trunk";
-      
 
       # these are old vlan styles
       lan2.hostBridge = "vlan2";
@@ -22,7 +21,7 @@
       lan4.hostBridge = "vlan4";
       lan5.hostBridge = "vlan5";
       lan6.hostBridge = "vlan6";
-      lan7.hostBridge = "vlan7";
+      #lan7.hostBridge = "vlan7";
       lan8.hostBridge = "vlan8";
       lan9.hostBridge = "vlan9";
       lan1010.hostBridge = "vlan1010";
@@ -46,7 +45,17 @@
       isReadOnly = false;
     };
 
-    config = vmRoot + "/container";
+    specialArgs = {
+      inherit outPath;
+    };
+
+    config =
+      { outPath, ... }:
+      {
+        imports = [
+          ./container
+        ];
+      };
 
     additionalCapabilities = [
       "CAP_BPF"

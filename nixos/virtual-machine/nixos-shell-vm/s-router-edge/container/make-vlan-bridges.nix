@@ -1,0 +1,29 @@
+{
+  outPath,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  mkMgmt = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-management-networkd.nix" {
+    inherit lib pkgs;
+  };
+  mkBridge = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix" {
+    inherit lib pkgs;
+  };
+in
+{
+  imports = [
+    (mkBridge "lan" 7 { bridge = "lan7"; })
+    #(mkBridge "eth0" 3 { bridge = "vlan3"; })
+    #(mkBridge "eth0" 4 { bridge = "vlan4"; })
+    #(mkBridge "eth0" 5 { bridge = "vlan5"; })
+    #(mkBridge "eth0" 6 { bridge = "vlan6"; })
+    #(mkBridge "lan" 7 { bridge = "vlan7"; })
+    #(mkBridge "eth0" 8 { bridge = "vlan8"; })
+    #(mkBridge "eth0" 9 { bridge = "vlan9"; })
+    #(mkBridge "eth0" 1010 { bridge = "vlan1010"; })
+  ];
+
+}

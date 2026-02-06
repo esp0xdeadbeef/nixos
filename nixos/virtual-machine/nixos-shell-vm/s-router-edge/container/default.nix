@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, config, outPath, ... }:
 
 let
   mk-nixos-vlan = import ./mk-nixos-vlan { inherit pkgs lib; };
@@ -68,6 +68,7 @@ in
   imports = [
     ./debugging-packages.nix
     vlanModule
+    ./make-vlan-bridges.nix
   ];
   services.resolved.enable = false;
   networking.useHostResolvConf = false;
