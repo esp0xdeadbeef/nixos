@@ -39,6 +39,12 @@
           Gateway = "10.255.255.2";
         };
       }
+      {
+        routeConfig = {
+          Destination = "10.10.0.0/16";
+          Gateway = "10.255.255.2";
+        };
+      }
     ];
 
   };
