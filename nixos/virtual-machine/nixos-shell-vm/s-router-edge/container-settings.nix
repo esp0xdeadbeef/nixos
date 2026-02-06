@@ -16,15 +16,15 @@
       lan.hostBridge = "br-lan-trunk";
 
       # these are old vlan styles
-      lan2.hostBridge = "vlan2";
-      lan3.hostBridge = "vlan3";
-      lan4.hostBridge = "vlan4";
-      lan5.hostBridge = "vlan5";
-      lan6.hostBridge = "vlan6";
+      #lan2.hostBridge = "vlan2";
+      #lan3.hostBridge = "vlan3";
+      #lan4.hostBridge = "vlan4";
+      #lan5.hostBridge = "vlan5";
+      #lan6.hostBridge = "vlan6";
       #lan7.hostBridge = "vlan7";
-      lan8.hostBridge = "vlan8";
-      lan9.hostBridge = "vlan9";
-      lan1010.hostBridge = "vlan1010";
+      #lan8.hostBridge = "vlan8";
+      #lan9.hostBridge = "vlan9";
+      #lan1010.hostBridge = "vlan1010";
     };
 
     bindMounts."/persist" = {
