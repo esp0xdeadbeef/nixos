@@ -22,20 +22,20 @@
     routes = [
       {
 
-          Destination = "10.13.37.0/24";
-          Gateway = "10.255.255.2";
+        Destination = "10.13.37.0/24";
+        Gateway = "10.255.255.2";
       }
       {
-          Destination = "10.10.3.0/24";
-          Gateway = "10.255.255.2";
+        Destination = "10.10.3.0/24";
+        Gateway = "10.255.255.2";
       }
       {
-          Destination = "192.168.1.0/24";
-          Gateway = "10.255.255.2";
+        Destination = "192.168.1.0/24";
+        Gateway = "10.255.255.2";
       }
       {
-          Destination = "10.10.0.0/16";
-          Gateway = "10.255.255.2";
+        Destination = "10.10.0.0/16";
+        Gateway = "10.255.255.2";
       }
     ];
 
