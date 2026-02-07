@@ -1,13 +1,14 @@
 {
+  config,
   lib,
+  args,
   ...
 }:
 
 {
   networking.nftables.enable = true;
 
-  # Append; don't replace other modules' rulesets
-  networking.nftables.ruleset = lib.mkAfter ''
+  networking.nftables.ruleset = ''
     table inet filter {
       chain input {
         type filter hook input priority 0; policy accept;
@@ -25,4 +26,3 @@
     }
   '';
 }
-

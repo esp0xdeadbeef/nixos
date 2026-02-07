@@ -27,6 +27,10 @@ in
       description = "s-router-edge VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-edge"}";
     })
+    (mkVM "s-router-legacy-edge" {
+      description = "s-router-legacy-edge VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-legacy-edge"}";
+    })
 
     (mkVM "s-router-core" {
       description = "s-router-core VM (nixos-shell)";
@@ -36,6 +40,9 @@ in
       description = "s-router-access VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
     })
+
+
+
     (mkVM "s-gameserver" {
       description = "Gameserver VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";

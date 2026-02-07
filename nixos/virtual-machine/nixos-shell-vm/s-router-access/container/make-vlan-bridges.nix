@@ -15,38 +15,32 @@ let
 in
 {
   imports = [
-    # old config vlans:
-    (mkBridge "lan" 2 { bridge = "lan2"; })
-    (mkBridge "lan" 3 { bridge = "lan3"; })
-    (mkBridge "lan" 7 { bridge = "lan7"; })
-    (mkBridge "lan" 1010 { bridge = "lan1010"; })
-
-    # 10–19 Management / hypervisors
+    # 10-19 Management / hypervisors
     (mkBridge "lan" 10 { bridge = "lan10"; })
 
-    # 20–29 Servers / infra
+    # 20-29 Servers / infra
     (mkBridge "lan" 20 { bridge = "lan20"; })
 
-    # 30–39 User LAN
+    # 30-39 User LAN
     (mkBridge "lan" 30 { bridge = "lan30"; })
 
-    # 40–49 Work / corp-segmented
+    # 40-49 Work / corp-segmented
     (mkBridge "lan" 40 { bridge = "lan40"; })
 
-    # 50–59 IoT / untrusted
+    # 50-59 IoT / untrusted
     (mkBridge "lan" 50 { bridge = "lan50"; })
 
-    # 60–69 DMZ
+    # 60-69 DMZ
     (mkBridge "lan" 60 { bridge = "lan60"; })
 
-    # 70–79 Lab / exploit / test
+    # 70-79 Lab / exploit / test
     (mkBridge "lan" 70 { bridge = "lan70"; })
 
-    # 80–89 Observability / monitoring
+    # 80-89 Observability / monitoring
     (mkBridge "lan" 80 { bridge = "lan80"; })
 
-    # 90–99 Transit / router links
-    (mkBridge "lan" 90 { bridge = "lan90"; })
+    # 100-199 Transit / router links
+    (mkBridge "lan" 100 { bridge = "lan100"; })
 
     # 1000+ WAN / ISP / upstream
     (mkBridge "lan" 1000 { bridge = "lan1000"; })
