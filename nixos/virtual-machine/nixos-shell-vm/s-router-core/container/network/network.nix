@@ -1,15 +1,9 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
-}:
+{ config, pkgs, lib, ... }:
 
 let
   lanIf = "lan";
   wanIf = "wan";
-
-  natVlans = [ 1010 ]; # builtins.genList (i: i + 1010) 1; # 1010
+  natVlans = [ 1010 ];
   wanVlan = 6;
 in
 {
@@ -17,99 +11,84 @@ in
   networking.networkmanager.enable = false;
   systemd.network.enable = true;
 
-  systemd.network.netdevs =
-    lib.genAttrs (map (v: "10-${lanIf}-vlan${toString v}") natVlans) (
-      v:
-      let
-        id = lib.toInt (lib.last (lib.splitString "vlan" v));
-      in
-      {
-        netdevConfig = {
-          Name = "${lanIf}.${toString id}";
-          Kind = "vlan";
-        };
-        vlanConfig.Id = id;
-      }
-    )
-    // lib.genAttrs (map (v: "20-br-vlan${toString v}") natVlans) (
-      v:
-      let
-        id = lib.toInt (lib.last (lib.splitString "vlan" v));
-      in
-      {
-        netdevConfig = {
-          Name = "br-vlan${toString id}";
-          Kind = "bridge";
-        };
-      }
-    )
-    // {
-      "10-${wanIf}-vlan${toString wanVlan}" = {
-        netdevConfig = {
-          Name = "${wanIf}.${toString wanVlan}";
-          Kind = "vlan";
-        };
-        vlanConfig.Id = wanVlan;
+  systemd.network.netdevs = {
+    "10-lan-vlan1010" = {
+      netdevConfig = {
+        Name = "lan.1010";
+        Kind = "vlan";
       };
+      vlanConfig.Id = 1010;
+    };
 
-      "20-br-wan${toString wanVlan}" = {
-        netdevConfig = {
-          Name = "br-wan${toString wanVlan}";
-          Kind = "bridge";
-        };
+    "20-br-vlan1010" = {
+      netdevConfig = {
+        Name = "br-vlan1010";
+        Kind = "bridge";
       };
     };
+
+    "30-wan-vlan6" = {
+      netdevConfig = {
+        Name = "wan.6";
+        Kind = "vlan";
+      };
+      vlanConfig.Id = 6;
+    };
+
+    "40-br-wan6" = {
+      netdevConfig = {
+        Name = "br-wan6";
+        Kind = "bridge";
+      };
+    };
+  };
 
   systemd.network.networks = {
-    "20-${lanIf}" = {
-      matchConfig.Name = lanIf;
+    "10-lan" = {
+      matchConfig.Name = "lan";
       networkConfig = {
         DHCP = "no";
         IPv6AcceptRA = false;
-        LinkLocalAddressing = "no";
-        VLAN = map (v: "${lanIf}.${toString v}") natVlans;
+        LinkLocalAddressing = "ipv6";
+        VLAN = [ "lan.1010" ];
       };
     };
 
-    "40-${wanIf}" = {
-      matchConfig.Name = wanIf;
+    "20-lan1010" = {
+      matchConfig.Name = "lan.1010";
+      networkConfig = {
+        Bridge = "br-vlan1010";
+        IPv6AcceptRA = false;
+      };
+    };
+
+    "30-br-vlan1010" = {
+      matchConfig.Name = "br-vlan1010";
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+        IPv6AcceptRA = false;
+      };
+    };
+
+    "40-wan" = {
+      matchConfig.Name = "wan";
       networkConfig = {
         DHCP = "no";
         IPv6AcceptRA = false;
-        LinkLocalAddressing = "no";
-        VLAN = [ "${wanIf}.${toString wanVlan}" ];
+        LinkLocalAddressing = "ipv6";
+        VLAN = [ "wan.6" ];
       };
     };
 
-    "50-${wanIf}.${toString wanVlan}" = {
-      matchConfig.Name = "${wanIf}.${toString wanVlan}";
-      networkConfig.Bridge = "br-wan${toString wanVlan}";
+    "50-wan6" = {
+      matchConfig.Name = "wan.6";
+      networkConfig.Bridge = "br-wan6";
     };
-  }
-  // lib.genAttrs (map (v: "30-${lanIf}.${toString v}") natVlans) (
-    name:
-    let
-      v = lib.toInt (lib.last (lib.splitString "." name));
-    in
-    {
-      matchConfig.Name = "${lanIf}.${toString v}";
-      networkConfig.Bridge = "br-vlan${toString v}";
-    }
-  )
-  // lib.genAttrs (map (v: "60-br-vlan${toString v}") natVlans) (
-    name:
-    let
-      v = lib.toInt (lib.last (lib.splitString "vlan" name));
-    in
-    {
-      matchConfig.Name = "br-vlan${toString v}";
-      networkConfig.ConfigureWithoutCarrier = true;
-    }
-  )
-  // {
-    "60-br-wan${toString wanVlan}" = {
-      matchConfig.Name = "br-wan${toString wanVlan}";
+
+    "60-br-wan6" = {
+      matchConfig.Name = "br-wan6";
       networkConfig.ConfigureWithoutCarrier = true;
     };
   };
 }
+
