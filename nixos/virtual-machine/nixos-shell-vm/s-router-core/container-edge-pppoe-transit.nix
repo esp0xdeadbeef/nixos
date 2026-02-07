@@ -1,5 +1,6 @@
 {
   config,
+  outPath,
   pkgs,
   lib,
   ...
@@ -45,11 +46,18 @@ in
         modifier = "rw";
       }
     ];
+    specialArgs = {
+      inherit outPath;
+    };
 
     bindMounts = {
       "/dev/ppp" = {
         hostPath = "/dev/ppp";
         isReadOnly = false;
+      };
+      "/run/secrets/subnet-ipv6" = {
+        hostPath = config.sops.secrets.subnet-ipv6.path;
+        isReadOnly = true;
       };
 
       "/run/secrets/pppoe-username" = {
@@ -68,7 +76,6 @@ in
       "CAP_NET_RAW"
     ];
 
-    # Container does ALL routing now
     config = ./container;
   };
 }

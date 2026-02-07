@@ -11,23 +11,7 @@
       # you are routing on this box
       IPv6Forwarding = true;
 
-      # FIX: this is the valid [Network] switch for PD-on-downstream
-      DHCPPrefixDelegation = true;
-
-      # sane defaults for a routed L3 segment
       LinkLocalAddressing = "ipv6";
-    };
-
-    # FIX: the delegated prefix wiring lives here
-    # (NixOS: dhcpV6PrefixDelegationConfig -> dhcpPrefixDelegationConfig) :contentReference[oaicite:1]{index=1}
-    dhcpPrefixDelegationConfig = {
-      # upstream where the DHCPv6 client runs (your ISP side)
-      UplinkInterface = "ppp0";
-
-      # pick a stable subnet id (0..65535). 1 is fine for a single downstream.
-      SubnetId = 1;
-
-      # have networkd announce the delegated prefix on this downstream
     };
 
     addresses = [

@@ -7,14 +7,16 @@
 }:
 
 let
-  getAttrs = import ./lib/get-attrs.nix { inherit lib; };
+  getAttrs = import "${outPath}/library/100-fabric-routing/lib/get-attrs.nix" { inherit lib; };
 
   attrs = getAttrs {
     lans = [ 10 ];
     wans = [ 1010 ];
+
+    # 🔥 FIX: transit MUST match core (VLAN 100)
     transits = [
       {
-        vlanId = 190;
+        vlanId = 100;
         node = "edge";
       }
     ];

@@ -197,7 +197,7 @@ let
     }
 
     {
-      key = "upstream";
+      key = "legacy-upstream";
       range = {
         from = 1000;
         to = 4094;
