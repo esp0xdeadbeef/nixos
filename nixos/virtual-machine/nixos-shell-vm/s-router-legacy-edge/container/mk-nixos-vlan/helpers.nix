@@ -39,4 +39,3 @@
     in
     "${lib.elemAt oct 2}.${lib.elemAt oct 1}.${lib.elemAt oct 0}.in-addr.arpa.";
 }
-

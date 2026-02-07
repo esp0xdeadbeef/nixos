@@ -41,22 +41,27 @@ let
   # INTERNAL BYPASS RULES
   #
   internalBypassRules =
-    (lib.concatMap (l:
-      lib.optionals (l ? ip4) [{
-        Family = "ipv4";
-        To = "${helpers.ipv4Base3 l.ip4}.0/24";
-        Table = 254; # main
-        Priority = 500;
-      }]
+    (lib.concatMap (
+      l:
+      lib.optionals (l ? ip4) [
+        {
+          Family = "ipv4";
+          To = "${helpers.ipv4Base3 l.ip4}.0/24";
+          Table = 254; # main
+          Priority = 500;
+        }
+      ]
     ) allIfaces)
-    ++
-    (lib.concatMap (l:
-      lib.optionals (l ? ip6) [{
-        Family = "ipv6";
-        To = l.ip6;
-        Table = 254; # main
-        Priority = 500;
-      }]
+    ++ (lib.concatMap (
+      l:
+      lib.optionals (l ? ip6) [
+        {
+          Family = "ipv6";
+          To = l.ip6;
+          Table = 254; # main
+          Priority = 500;
+        }
+      ]
     ) allIfaces);
 
   #
@@ -95,52 +100,74 @@ in
   # LAN + TRANSIT interfaces
   #
   systemd.network.networks =
-    (lib.listToAttrs (map (l: {
-      name = "20-${l.name}";
-      value = {
-        matchConfig.Name = l.iface;
+    (lib.listToAttrs (
+      map (l: {
+        name = "20-${l.name}";
+        value = {
+          matchConfig.Name = l.iface;
 
-        networkConfig = {
-          Address = [ l.ip4 l.ip6 ];
-          DHCP = "no";
-          IPv6AcceptRA = false;
-          IPv6Forwarding = true;
+          networkConfig = {
+            Address = [
+              l.ip4
+              l.ip6
+            ];
+            DHCP = "no";
+            IPv6AcceptRA = false;
+            IPv6Forwarding = true;
+          };
+
+          routingPolicyRules = rpRules;
         };
-
-        routingPolicyRules = rpRules;
-      };
-    }) allIfaces))
+      }) allIfaces
+    ))
     //
-    #
-    # WAN interfaces
-    #
-    (lib.listToAttrs (lib.imap0 (i: w: {
-      name = "10-wan-${w.name}";
-      value = {
-        matchConfig.Name = w.iface;
+      #
+      # WAN interfaces
+      #
+      (lib.listToAttrs (
+        lib.imap0 (i: w: {
+          name = "10-wan-${w.name}";
+          value = {
+            matchConfig.Name = w.iface;
 
-        networkConfig = {
-          Address = [ w.ip4 w.ip6 ];
-          DHCP = "no";
-          IPv6AcceptRA = w.acceptRA;
-          IPv6Forwarding = true;
-        };
+            networkConfig = {
+              Address = [
+                w.ip4
+                w.ip6
+              ];
+              DHCP = "no";
+              IPv6AcceptRA = w.acceptRA;
+              IPv6Forwarding = true;
+            };
 
-        routes =
-          [
-            # Policy tables
-            { Destination = "0.0.0.0/0"; Gateway = w.gw4; Table = w.tableId; }
-            { Destination = "::/0";      Gateway = w.gw6; Table = w.tableId; }
-          ]
-          ++
-          # Main table (WAN0 only)
-          lib.optionals (i == 0) [
-            { Destination = "0.0.0.0/0"; Gateway = w.gw4; }
-            { Destination = "::/0";      Gateway = w.gw6; }
-          ];
+            routes = [
+              # Policy tables
+              {
+                Destination = "0.0.0.0/0";
+                Gateway = w.gw4;
+                Table = w.tableId;
+              }
+              {
+                Destination = "::/0";
+                Gateway = w.gw6;
+                Table = w.tableId;
+              }
+            ]
+            ++
+              # Main table (WAN0 only)
+              lib.optionals (i == 0) [
+                {
+                  Destination = "0.0.0.0/0";
+                  Gateway = w.gw4;
+                }
+                {
+                  Destination = "::/0";
+                  Gateway = w.gw6;
+                }
+              ];
 
-        routingPolicyRules = rpRules;
-      };
-    }) wanTables));
+            routingPolicyRules = rpRules;
+          };
+        }) wanTables
+      ));
 }
-

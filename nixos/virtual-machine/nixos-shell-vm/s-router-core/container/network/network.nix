@@ -1,4 +1,9 @@
-{ config, pkgs, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 
 let
   lanIf = "lan";
@@ -91,4 +96,3 @@ in
     };
   };
 }
-

@@ -1,7 +1,10 @@
 { lib, pkgs, ... }:
 
 {
-  environment.systemPackages = with pkgs; [ nebula tcpdump ];
+  environment.systemPackages = with pkgs; [
+    nebula
+    tcpdump
+  ];
 
   services.nebula.networks.mesh = {
     enable = true;

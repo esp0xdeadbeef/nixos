@@ -21,38 +21,41 @@
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
 
-    path = [ pkgs.ppp pkgs.coreutils ];
+    path = [
+      pkgs.ppp
+      pkgs.coreutils
+    ];
 
     serviceConfig = {
       Type = "simple";
 
       ExecStartPre = pkgs.writeShellScript "ppp-setup" ''
-        set -euo pipefail
-        umask 077
-        mkdir -p /run/ppp/peers
+                set -euo pipefail
+                umask 077
+                mkdir -p /run/ppp/peers
 
-        USERNAME="$(cat /run/secrets/pppoe-username)"
-        PASSWORD="$(cat /run/secrets/pppoe-password)"
+                USERNAME="$(cat /run/secrets/pppoe-username)"
+                PASSWORD="$(cat /run/secrets/pppoe-password)"
 
-        cat > /run/ppp/pap-secrets <<EOF
-"$USERNAME" * "$PASSWORD" *
-EOF
-        chmod 600 /run/ppp/pap-secrets
+                cat > /run/ppp/pap-secrets <<EOF
+        "$USERNAME" * "$PASSWORD" *
+        EOF
+                chmod 600 /run/ppp/pap-secrets
 
-        cat > /run/ppp/peers/pppoe-wan <<EOF
-plugin pppoe.so
-nic-br-wan6
-user "$USERNAME"
-password "$PASSWORD"
-noauth
-defaultroute
-persist
-+ipv6
-ipv6cp-accept-local
-ipv6cp-accept-remote
-mtu 1492
-mru 1492
-EOF
+                cat > /run/ppp/peers/pppoe-wan <<EOF
+        plugin pppoe.so
+        nic-br-wan6
+        user "$USERNAME"
+        password "$PASSWORD"
+        noauth
+        defaultroute
+        persist
+        +ipv6
+        ipv6cp-accept-local
+        ipv6cp-accept-remote
+        mtu 1492
+        mru 1492
+        EOF
       '';
 
       ExecStart = "${pkgs.ppp}/bin/pppd file /run/ppp/peers/pppoe-wan nodetach";
@@ -61,4 +64,3 @@ EOF
     };
   };
 }
-

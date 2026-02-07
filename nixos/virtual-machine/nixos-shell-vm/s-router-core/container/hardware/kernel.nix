@@ -24,4 +24,3 @@
     "net.bridge.bridge-nf-call-arptables" = 0;
   };
 }
-

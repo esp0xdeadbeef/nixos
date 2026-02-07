@@ -5,14 +5,19 @@ let
   #
   # Helper: generate inclusive VLAN list from range
   #
-  genVlanList = { from, to }:
-    builtins.genList (i: from + i) (to - from + 1);
+  genVlanList = { from, to }: builtins.genList (i: from + i) (to - from + 1);
 in
 {
   fabrics = {
     control = {
-      vlanRange = { from = 10; to = 19; };
-      vlans = genVlanList { from = 10; to = 19; };
+      vlanRange = {
+        from = 10;
+        to = 19;
+      };
+      vlans = genVlanList {
+        from = 10;
+        to = 19;
+      };
 
       plane = "control";
       trust = "absolute";
@@ -26,8 +31,14 @@ in
     };
 
     service = {
-      vlanRange = { from = 20; to = 29; };
-      vlans = genVlanList { from = 20; to = 29; };
+      vlanRange = {
+        from = 20;
+        to = 29;
+      };
+      vlans = genVlanList {
+        from = 20;
+        to = 29;
+      };
 
       plane = "service";
       trust = "limited";
@@ -41,8 +52,14 @@ in
     };
 
     endpoint = {
-      vlanRange = { from = 30; to = 39; };
-      vlans = genVlanList { from = 30; to = 39; };
+      vlanRange = {
+        from = 30;
+        to = 39;
+      };
+      vlans = genVlanList {
+        from = 30;
+        to = 39;
+      };
 
       plane = "endpoint";
       trust = "untrusted";
@@ -56,8 +73,14 @@ in
     };
 
     iot = {
-      vlanRange = { from = 50; to = 59; };
-      vlans = genVlanList { from = 50; to = 59; };
+      vlanRange = {
+        from = 50;
+        to = 59;
+      };
+      vlans = genVlanList {
+        from = 50;
+        to = 59;
+      };
 
       plane = "iot";
       trust = "hostile";
@@ -71,8 +94,14 @@ in
     };
 
     dmz = {
-      vlanRange = { from = 60; to = 69; };
-      vlans = genVlanList { from = 60; to = 69; };
+      vlanRange = {
+        from = 60;
+        to = 69;
+      };
+      vlans = genVlanList {
+        from = 60;
+        to = 69;
+      };
 
       plane = "dmz";
       trust = "exposed";
@@ -86,8 +115,14 @@ in
     };
 
     lab = {
-      vlanRange = { from = 70; to = 79; };
-      vlans = genVlanList { from = 70; to = 79; };
+      vlanRange = {
+        from = 70;
+        to = 79;
+      };
+      vlans = genVlanList {
+        from = 70;
+        to = 79;
+      };
 
       plane = "lab";
       trust = "actively-hostile";
@@ -101,8 +136,14 @@ in
     };
 
     observability = {
-      vlanRange = { from = 80; to = 89; };
-      vlans = genVlanList { from = 80; to = 89; };
+      vlanRange = {
+        from = 80;
+        to = 89;
+      };
+      vlans = genVlanList {
+        from = 80;
+        to = 89;
+      };
 
       plane = "observability";
       trust = "limited";
@@ -116,8 +157,14 @@ in
     };
 
     transit = {
-      vlanRange = { from = 100; to = 199; };
-      vlans = genVlanList { from = 100; to = 199; };
+      vlanRange = {
+        from = 100;
+        to = 199;
+      };
+      vlans = genVlanList {
+        from = 100;
+        to = 199;
+      };
 
       plane = "transit";
       trust = "neutral";
@@ -136,8 +183,14 @@ in
     };
 
     upstream = {
-      vlanRange = { from = 1000; to = 4094; };
-      vlans = genVlanList { from = 1000; to = 4094; };
+      vlanRange = {
+        from = 1000;
+        to = 4094;
+      };
+      vlans = genVlanList {
+        from = 1000;
+        to = 4094;
+      };
 
       plane = "upstream";
       trust = "unknown";
@@ -151,4 +204,3 @@ in
     };
   };
 }
-

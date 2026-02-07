@@ -41,8 +41,6 @@ in
       repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
     })
 
-
-
     (mkVM "s-gameserver" {
       description = "Gameserver VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";
