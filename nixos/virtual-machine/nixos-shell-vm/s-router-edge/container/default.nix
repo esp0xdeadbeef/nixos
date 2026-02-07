@@ -58,7 +58,7 @@ let
         ip4 = "10.13.37.1/24";
         ip6 = "fd42:dead:beef:7::1/64";
         dhcp4 = true;
-        ra6 = true;
+        ra6 = false;
       }
 
       # New configuration from here:
@@ -189,6 +189,7 @@ in
     ./debugging-packages.nix
     vlanModule
     ./make-vlan-bridges.nix
+    ./nftables.nix
   ];
   services.resolved.enable = false;
   networking.useHostResolvConf = false;

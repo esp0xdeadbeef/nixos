@@ -16,8 +16,9 @@ in
 
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config"
-    ./overwrites.nix
-    ./container-settings.nix
+    ./container
+    ./container-new
     ./nebula-node
+    ./network-host.nix
   ];
 }
