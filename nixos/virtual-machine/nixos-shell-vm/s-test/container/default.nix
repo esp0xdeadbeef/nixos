@@ -20,35 +20,6 @@
       veth7.hostBridge = "vlan7";
       veth8.hostBridge = "vlan8";
       veth9.hostBridge = "vlan9";
-
-      veth10.hostBridge = "vlan10";
-
-      # 20–29 Servers / infra
-      veth20.hostBridge = "vlan20";
-
-      # 30–39 User LAN
-      veth30.hostBridge = "vlan30";
-
-      # 40–49 Work / corp-segmented
-      veth40.hostBridge = "vlan40";
-
-      # 50–59 IoT / untrusted
-      veth50.hostBridge = "vlan50";
-
-      # 60–69 DMZ
-      veth60.hostBridge = "vlan60";
-
-      # 70–79 Lab / exploit / test
-      veth70.hostBridge = "vlan70";
-
-      # 80–89 Observability / monitoring
-      veth80.hostBridge = "vlan80";
-
-      # 90–99 Transit / router links
-      veth90.hostBridge = "vlan90";
-
-      # 1000+ WAN / ISP / upstream
-      veth1010.hostBridge = "vlan1010";
     };
 
     bindMounts."/persist" = {
