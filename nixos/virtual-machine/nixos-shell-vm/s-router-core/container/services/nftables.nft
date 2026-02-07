@@ -27,21 +27,15 @@ table inet filter {
       240.0.0.0/4
     } drop
 
-iifname != "ppp0" icmpv6 type {
-  router-advertisement,
-  router-solicitation
-} drop
+    # Drop RA / RS everywhere except WAN
+    iifname != "ppp0" meta l4proto ipv6-icmp icmpv6 type { 133, 134 } drop
 
     # ------------------------
     # WAN anti-spoof (IPv6)
     # ------------------------
-    # ULA from WAN is bogus
     iifname "ppp0" ip6 saddr fc00::/7 drop
 
-    # DO NOT DROP fe80:: on PPP (this is literally the control plane)
-    # DO NOT DROP ::/128 (PPP peer can legitimately use it during setup)
-
-    # Allow essential IPv6 control plane on WAN
+    # Allow IPv6 control plane on WAN (PPP needs this)
     iifname "ppp0" meta l4proto ipv6-icmp accept
 
     accept
@@ -71,7 +65,6 @@ iifname != "ppp0" icmpv6 type {
     type filter hook output priority 0;
     accept
   }
-  
 }
 
 ############################
@@ -81,7 +74,6 @@ table ip nat {
   chain postrouting {
     type nat hook postrouting priority 100;
 
-    # NAT *all* RFC1918 out of PPPoE
     ip saddr 10.0.0.0/8 oifname "ppp0" masquerade
     ip saddr 172.16.0.0/12 oifname "ppp0" masquerade
     ip saddr 192.168.0.0/16 oifname "ppp0" masquerade
@@ -90,14 +82,13 @@ table ip nat {
 
 ############################
 # MANGLE (PMTU / MSS FIX)
-# CORE WAN ONLY
 ############################
 table inet mangle {
   chain forward {
     type filter hook forward priority mangle;
     policy accept;
 
-    # Clamp TCP MSS to real path MTU on PPPoE
     oifname "ppp0" tcp flags syn tcp option maxseg size set rt mtu
   }
 }
+

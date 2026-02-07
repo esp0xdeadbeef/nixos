@@ -14,9 +14,9 @@
     "net.ipv6.conf.all.autoconf" = 0;
     "net.ipv6.conf.default.autoconf" = 0;
 
-    # Stable router addresses
-    "net.ipv6.conf.all.use_tempaddr" = 0;
-    "net.ipv6.conf.default.use_tempaddr" = 0;
+    # Stable router addresses (FORCE override container defaults)
+    "net.ipv6.conf.all.use_tempaddr" = lib.mkForce 0;
+    "net.ipv6.conf.default.use_tempaddr" = lib.mkForce 0;
 
     # Bridge safety (L2 stays L2)
     "net.bridge.bridge-nf-call-ip6tables" = 0;
