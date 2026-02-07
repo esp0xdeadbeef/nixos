@@ -48,7 +48,7 @@
       cnew-veth90.hostBridge = "vlan90";
 
       # 1000+ WAN / ISP / upstream
-      cnew-veth1010.hostBridge = "vlan1010";
+      #cnew-veth1010.hostBridge = "vlan1010";
     };
 
     bindMounts."/persist" = {
