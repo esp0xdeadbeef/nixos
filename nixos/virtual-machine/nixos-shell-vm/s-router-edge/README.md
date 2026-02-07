@@ -18,21 +18,8 @@ networkctl reload
 rsync --delete -va /home/deadbeef/github/nixos s-router-edge:~/github/
 nixos-container update s-router-edge-container --flake path:/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-edge/container#s-router-edge-container && nixos-container root-login s-router-edge-container
 ```
-
-# VLAN profiles:
-
-| Range | Purpose                  |
-| ----- | ------------------------ |
-| 10–19 | Management / hypervisors |
-| 20–29 | Servers / infra          |
-| 30–39 | User LAN                 |
-| 40–49 | Work / corp-segmented    |
-| 50–59 | IoT / untrusted          |
-| 60–69 | DMZ                      |
-| 70–79 | Lab / exploit / test     |
-| 90–99 | Transit / router links   |
-| 1000+ | WAN / ISP / upstream     |
-
+# vlan profiles
+Check ./ROUTING-POLICY.md
 
 # Router Architecture Overview
 

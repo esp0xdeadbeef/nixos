@@ -16,6 +16,8 @@ keys:
   - &s-nebula age1seqn6c56kxch7epv6dr3k43tx5eecj4aktlcg0njqg8ef3ewrvpq9vwsmw
   - &s-test age1n49y8n965sjwt6l8tk2nss5wcsww3qtg0rvqt974sz5npsvmpezs8pllr6
   - &s-router-core age16lrtp9fnvamca3g78pzr4jxcq0nzlj5vs4p5n5jerkxylnwh294syst0yh
+  - &s-router-access age16lrtp9fnvamca3g78pzr4jxcq0nzlj5vs4p5n5jerkxylnwh294syst0yh
+  
   
 
 creation_rules:
@@ -145,6 +147,14 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-edge
+  - path_regex: 'isc_export_lan.csv.age'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-edge
   - path_regex: '^(secrets/)*s-infra.*\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
@@ -177,11 +187,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-core
-  - path_regex: 'isc_export_lan.csv.age'
+  - path_regex: '^(secrets/)*s-router-access.*\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
     key_groups:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
-          - *s-router-edge
+          - *s-router-access
