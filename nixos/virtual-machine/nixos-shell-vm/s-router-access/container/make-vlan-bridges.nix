@@ -40,7 +40,8 @@ in
     (mkBridge "lan" 80 { bridge = "lan80"; })
 
     # 100-199 Transit / router links
-    (mkBridge "lan" 100 { bridge = "lan100"; })
+    #(mkBridge "lan" 100 { bridge = "lan100"; })
+    (mkBridge "lan" 190 { bridge = "lan100"; })
 
     # 1000+ WAN / ISP / upstream
     (mkBridge "lan" 1000 { bridge = "lan1000"; })

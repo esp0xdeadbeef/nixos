@@ -1,17 +1,34 @@
 { pkgs, lib, ... }:
-
 {
   systemd.network.enable = true;
 
+  # ppp0 is created by pppd; networkd can still manage it after it appears.
   systemd.network.networks."10-ppp0" = {
     matchConfig.Name = "ppp0";
 
     networkConfig = {
       ConfigureWithoutCarrier = true;
+
       IPv6AcceptRA = true;
+
       IPv6Forwarding = true;
       DHCP = "no";
       LinkLocalAddressing = "ipv6";
+    };
+
+    # Ask for a delegated prefix. /56 is common; adjust if your ISP only gives /64.
+    # This is standard networkd behavior. :contentReference[oaicite:2]{index=2}
+    dhcpV6Config = {
+      PrefixDelegationHint = "::/56";
+      UseDNS = false;
+      UseNTP = false;
+      UseHostname = false;
+    };
+
+    # If your upstream is weird about signalling DHCPv6 in RA, forcing the DHCPv6 client can matter. :contentReference[oaicite:3]{index=3}
+    ipv6AcceptRAConfig = {
+      UseDNS = false;
+      DHCPv6Client = "always";
     };
   };
 

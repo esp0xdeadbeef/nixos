@@ -14,7 +14,7 @@ let
     wans = [ 1010 ];
     transits = [
       {
-        vlanId = 100;
+        vlanId = 190;
         node = "edge";
       }
     ];

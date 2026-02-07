@@ -2,10 +2,8 @@
 { lib }:
 
 let
-  # inclusive range predicate
   inRange = r: vid: vid >= r.from && vid <= r.to;
 
-  # your table encoded
   fabrics = [
     {
       key = "legacy";
@@ -25,9 +23,9 @@ let
         dns = false;
         reverseDns = false;
         mtu = 1500;
-        note = "Never place new devices here.";
       };
     }
+
     {
       key = "control";
       range = {
@@ -39,7 +37,7 @@ let
       role = "authority+recovery";
       defaults = {
         kind = "lan";
-        dhcp4 = false; # control typically static
+        dhcp4 = false;
         ra6 = false;
         routable = true;
         transit = false;
@@ -48,6 +46,7 @@ let
         mtu = 1500;
       };
     }
+
     {
       key = "service";
       range = {
@@ -68,6 +67,7 @@ let
         mtu = 1500;
       };
     }
+
     {
       key = "endpoint";
       range = {
@@ -88,6 +88,7 @@ let
         mtu = 1500;
       };
     }
+
     {
       key = "corp";
       range = {
@@ -108,6 +109,7 @@ let
         mtu = 1500;
       };
     }
+
     {
       key = "iot";
       range = {
@@ -128,6 +130,7 @@ let
         mtu = 1500;
       };
     }
+
     {
       key = "dmz";
       range = {
@@ -148,6 +151,7 @@ let
         mtu = 1500;
       };
     }
+
     {
       key = "lab";
       range = {
@@ -168,26 +172,7 @@ let
         mtu = 1500;
       };
     }
-    {
-      key = "obs";
-      range = {
-        from = 80;
-        to = 89;
-      };
-      plane = "observability";
-      trust = "limited";
-      role = "telemetry";
-      defaults = {
-        kind = "lan";
-        dhcp4 = false;
-        ra6 = false;
-        routable = true;
-        transit = false;
-        dns = false;
-        reverseDns = false;
-        mtu = 1500;
-      };
-    }
+
     {
       key = "transit";
       range = {
@@ -206,12 +191,11 @@ let
         dns = false;
         reverseDns = false;
         mtu = 1500;
-
-        # enforced intent for adjacencies
-        ipv4PrefixLen = 31; # allow /30 via override if needed
+        ipv4PrefixLen = 31;
         ipv6PrefixLen = 127;
       };
     }
+
     {
       key = "upstream";
       range = {
@@ -241,7 +225,6 @@ in
 {
   inherit fabrics inRange;
 
-  # Returns the fabric record for a VLAN id, or throws if unknown
   fabricForVlan =
     vid:
     let
@@ -249,10 +232,8 @@ in
     in
     if f == null then throw "fabrics: VLAN ${toString vid} not in any defined range" else f;
 
-  # Convenience: key name for a VLAN id
-  fabricKeyForVlan = vid: (getFabric vid).key or (throw "fabrics: unknown vlan ${toString vid}");
+  fabricKeyForVlan = vid: (getFabric vid).key;
 
-  # Merge fabric defaults into attrs (caller can override)
   applyDefaults =
     vid: attrs:
     let
@@ -261,32 +242,11 @@ in
     if f == null then
       attrs
     else
-      (
-        f.defaults
-        // attrs
-        // {
-          fabric = f.key;
-          plane = f.plane;
-          trust = f.trust;
-        }
-      );
-
-  # Given a topology (list of VLAN IDs), return active VLAN IDs per fabric key
-  activeRanges =
-    activeVlanIds:
-    let
-      add =
-        acc: vid:
-        let
-          f = getFabric vid;
-        in
-        if f == null then
-          acc
-        else
-          acc
-          // {
-            "${f.key}" = (acc."${f.key}" or [ ]) ++ [ vid ];
-          };
-    in
-    lib.foldl' add { } activeVlanIds;
+      f.defaults
+      // attrs
+      // {
+        fabric = f.key;
+        plane = f.plane;
+        trust = f.trust;
+      };
 }

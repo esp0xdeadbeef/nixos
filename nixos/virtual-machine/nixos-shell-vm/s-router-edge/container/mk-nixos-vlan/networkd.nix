@@ -38,7 +38,12 @@ let
   }) wans;
 
   #
-  # INTERNAL BYPASS RULES
+  # INTERNAL BYPASS RULES (STRICT)
+  #
+  # Policy:
+  # - ONLY internal ULAs may bypass PBR
+  # - NEVER bypass for WAN-learned prefixes
+  # - Transit ULAs are allowed
   #
   internalBypassRules =
     (lib.concatMap (
@@ -54,7 +59,7 @@ let
     ) allIfaces)
     ++ (lib.concatMap (
       l:
-      lib.optionals (l ? ip6) [
+      lib.optionals (l ? ip6 && lib.hasPrefix "fd" l.ip6) [
         {
           Family = "ipv6";
           To = l.ip6;
@@ -141,7 +146,6 @@ in
             };
 
             routes = [
-              # Policy tables
               {
                 Destination = "0.0.0.0/0";
                 Gateway = w.gw4;
@@ -153,18 +157,16 @@ in
                 Table = w.tableId;
               }
             ]
-            ++
-              # Main table (WAN0 only)
-              lib.optionals (i == 0) [
-                {
-                  Destination = "0.0.0.0/0";
-                  Gateway = w.gw4;
-                }
-                {
-                  Destination = "::/0";
-                  Gateway = w.gw6;
-                }
-              ];
+            ++ lib.optionals (i == 0) [
+              {
+                Destination = "0.0.0.0/0";
+                Gateway = w.gw4;
+              }
+              {
+                Destination = "::/0";
+                Gateway = w.gw6;
+              }
+            ];
 
             routingPolicyRules = rpRules;
           };

@@ -13,22 +13,21 @@ let
     wans = [
       {
         name = "s-router-edge";
-        mark = "100";
-        iface = "lan100";
+        mark = "190";
+        iface = "lan190";
 
-        ip4 = "10.10.100.2/30";
-        gw4 = "10.10.100.1";
+        ip4 = "10.10.190.2/31";
+        gw4 = "10.10.190.1";
 
-        ip6 = "fd42:dead:beef:100::2/64";
-        gw6 = "fd42:dead:beef:100::1";
-        acceptRA = true;
+        ip6 = "fd42:dead:beef:190::2/127";
+        gw6 = "fd42:dead:beef:190::1/127";
 
+        acceptRA = false;
         publicPrefixFile = "/run/secrets/subnet-ipv6";
       }
     ];
 
     lans = [
-      # 10–19 Management / hypervisors
       {
         id = 10;
         name = "lan10";
@@ -56,6 +55,7 @@ in
     ./make-vlan-bridges.nix
     ./nftables.nix
   ];
+
   services.resolved.enable = false;
   networking.useHostResolvConf = false;
 

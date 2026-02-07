@@ -1,46 +1,50 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
-}:
+{ config, pkgs, lib, ... }:
 
 let
   lanIf = "lan";
   wanIf = "wan";
+
+  # LEGACY: do not touch
   natVlans = [ 1010 ];
+
+  # ISP VLAN
   wanVlan = 6;
+
+  mkVlanIf = base: vid: "${base}.${toString vid}";
 in
 {
   networking.useNetworkd = true;
   networking.networkmanager.enable = false;
   systemd.network.enable = true;
 
+  ############################
+  # Netdevs
+  ############################
   systemd.network.netdevs = {
-    "10-lan-vlan1010" = {
+    "lan-vlan1010" = {
       netdevConfig = {
-        Name = "lan.1010";
+        Name = mkVlanIf lanIf 1010;
         Kind = "vlan";
       };
       vlanConfig.Id = 1010;
     };
 
-    "20-br-vlan1010" = {
+    "br-vlan1010" = {
       netdevConfig = {
         Name = "br-vlan1010";
         Kind = "bridge";
       };
     };
 
-    "30-wan-vlan6" = {
+    "wan-vlan6" = {
       netdevConfig = {
-        Name = "wan.6";
+        Name = mkVlanIf wanIf 6;
         Kind = "vlan";
       };
       vlanConfig.Id = 6;
     };
 
-    "40-br-wan6" = {
+    "br-wan6" = {
       netdevConfig = {
         Name = "br-wan6";
         Kind = "bridge";
@@ -48,25 +52,27 @@ in
     };
   };
 
+  ############################
+  # Networks
+  ############################
   systemd.network.networks = {
+
+    # Physical LAN trunk
     "10-lan" = {
       matchConfig.Name = "lan";
       networkConfig = {
         DHCP = "no";
-        IPv6AcceptRA = false;
-        LinkLocalAddressing = "ipv6";
-        VLAN = [ "lan.1010" ];
+        VLAN = [ (mkVlanIf lanIf 1010) ];
       };
     };
 
+    # LAN VLAN → bridge
     "20-lan1010" = {
-      matchConfig.Name = "lan.1010";
-      networkConfig = {
-        Bridge = "br-vlan1010";
-        IPv6AcceptRA = false;
-      };
+      matchConfig.Name = mkVlanIf lanIf 1010;
+      networkConfig.Bridge = "br-vlan1010";
     };
 
+    # Legacy bridge (Kea lives here)
     "30-br-vlan1010" = {
       matchConfig.Name = "br-vlan1010";
       networkConfig = {
@@ -75,24 +81,31 @@ in
       };
     };
 
+    # Physical WAN trunk
     "40-wan" = {
       matchConfig.Name = "wan";
       networkConfig = {
         DHCP = "no";
-        IPv6AcceptRA = false;
-        LinkLocalAddressing = "ipv6";
-        VLAN = [ "wan.6" ];
+        VLAN = [ (mkVlanIf wanIf 6) ];
       };
     };
 
-    "50-wan6" = {
-      matchConfig.Name = "wan.6";
-      networkConfig.Bridge = "br-wan6";
+    # 🔥 THIS WAS MISSING 🔥
+    # VLAN MUST BE ENSLAVED INTO THE BRIDGE
+    "50-wan6-slave" = {
+      matchConfig.Name = mkVlanIf wanIf 6;
+      networkConfig = {
+        Bridge = "br-wan6";
+      };
     };
 
+    # WAN bridge (PPPoE attaches here)
     "60-br-wan6" = {
       matchConfig.Name = "br-wan6";
-      networkConfig.ConfigureWithoutCarrier = true;
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+      };
     };
   };
 }
+
