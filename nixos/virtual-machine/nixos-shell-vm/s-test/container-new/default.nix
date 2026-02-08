@@ -44,8 +44,8 @@
       # 80–89 Observability / monitoring
       cnew-veth80.hostBridge = "vlan80";
 
-      # 90–99 Transit / router links
-      cnew-veth90.hostBridge = "vlan90";
+      # 100-199 Transit / router links
+      cnew-veth100.hostBridge = "vlan100";
 
       # 1000+ WAN / ISP / upstream
       #cnew-veth1010.hostBridge = "vlan1010";

@@ -1,7 +1,7 @@
 { pkgs, lib, ... }:
 {
   systemd.network.networks."10-lan1010-uplink" = {
-    matchConfig.Name = "br-vlan1010";
+    matchConfig.Name = "br-gl-86d9";
 
     networkConfig = {
       ConfigureWithoutCarrier = true;
@@ -30,3 +30,4 @@
     ];
   };
 }
+

@@ -1,52 +1,81 @@
 {
   config,
+  outPath,
   pkgs,
   lib,
-  vmRoot,
   ...
 }:
+
+let
+  lanIf = "eth0"; # full LAN trunk
+  wanIf = "eth1"; # full WAN trunk
+in
 {
-  containers."${config.networking.hostName}-container" = {
+  ## Secrets
+  sops.secrets.pppoe-username = { };
+  sops.secrets.pppoe-password = { };
+
+  ## Host network backend (host only keeps management)
+  networking.useNetworkd = true;
+  networking.networkmanager.enable = false;
+  systemd.network.enable = true;
+
+  ##########################################################################
+  # NO VLANs, NO bridges, NO netdevs, NO networks for eth0/eth1
+  # They are passed RAW into the container.
+  ##########################################################################
+
+  ## Container = real router
+  containers."${config.networking.hostName}-isp" = {
     autoStart = true;
     privateNetwork = true;
 
+    # Pass raw trunks
+    #extraVeths = {
+    #  lan.hostInterface = lanIf;  # full LAN trunk
+    #  wan.hostInterface = wanIf;  # full WAN trunk
+    #};
     extraVeths = {
-      vmbr1-cont.hostBridge = "vm";
-      veth3.hostBridge = "vlan3";
-      veth4.hostBridge = "vlan4";
-      veth5.hostBridge = "vlan5";
-      veth6.hostBridge = "vlan6";
-      veth7.hostBridge = "vlan7";
-      veth8.hostBridge = "vlan8";
-      veth9.hostBridge = "vlan9";
-      veth1010.hostBridge = "vlan1010";
+      lan.hostBridge = "br-lan-trunk";
+      wan.hostBridge = "br-wan-trunk";
     };
 
-    bindMounts."/persist" = {
-      hostPath = "/persist";
-      isReadOnly = false;
-    };
-    # podman
-    bindMounts."/var/lib/containers" = {
-      hostPath = "/persist-state/var/lib/containers";
-      isReadOnly = false;
-    };
-    # docker:
-    bindMounts."/var/lib/docker" = {
-      hostPath = "/persist-state/var/lib/docker";
-      isReadOnly = false;
+    allowedDevices = [
+      {
+        node = "/dev/ppp";
+        modifier = "rw";
+      }
+    ];
+    specialArgs = {
+      inherit outPath;
     };
 
-    # This is the key line:
-    # Resolves to /nix/store/...-source/nixos/virtual-machine/nixos-shell-vm/{container-host}/container
-    config = vmRoot + "/container";
+    bindMounts = {
+      "/dev/ppp" = {
+        hostPath = "/dev/ppp";
+        isReadOnly = false;
+      };
+      "/run/secrets/subnet-ipv6" = {
+        hostPath = config.sops.secrets.subnet-ipv6.path;
+        isReadOnly = true;
+      };
+
+      "/run/secrets/pppoe-username" = {
+        hostPath = config.sops.secrets.pppoe-username.path;
+        isReadOnly = true;
+      };
+
+      "/run/secrets/pppoe-password" = {
+        hostPath = config.sops.secrets.pppoe-password.path;
+        isReadOnly = true;
+      };
+    };
 
     additionalCapabilities = [
-      "CAP_BPF"
-      "CAP_PERFMON"
       "CAP_NET_ADMIN"
-      "CAP_SYS_ADMIN"
+      "CAP_NET_RAW"
     ];
-    enableTun = true;
+
+    config = ./container;
   };
 }

@@ -24,6 +24,7 @@ in
     (mkBridge "eth0" 70 { bridge = "vlan70"; })
     (mkBridge "eth0" 80 { bridge = "vlan80"; })
     (mkBridge "eth0" 90 { bridge = "vlan90"; })
+    (mkBridge "eth0" 100 { bridge = "vlan100"; })
 
   ];
 

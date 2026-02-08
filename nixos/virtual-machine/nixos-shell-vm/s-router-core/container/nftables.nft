@@ -1,10 +1,6 @@
 flush ruleset
 
-############################
-# FILTER (EDGE SANITY)
-############################
 table inet filter {
-
   chain input {
     type filter hook input priority 0;
 
@@ -12,9 +8,6 @@ table inet filter {
     ct state { established, related } accept
     ct state invalid drop
 
-    # ------------------------
-    # WAN anti-spoof (IPv4)
-    # ------------------------
     iifname "ppp0" ip saddr {
       10.0.0.0/8,
       172.16.0.0/12,
@@ -27,15 +20,8 @@ table inet filter {
       240.0.0.0/4
     } drop
 
-    # Drop RA / RS everywhere except WAN
-    iifname != "ppp0" meta l4proto ipv6-icmp icmpv6 type { 133, 134 } drop
-
-    # ------------------------
-    # WAN anti-spoof (IPv6)
-    # ------------------------
+    iifname != "ppp0" icmpv6 type { 133, 134 } drop
     iifname "ppp0" ip6 saddr fc00::/7 drop
-
-    # Allow IPv6 control plane on WAN (PPP needs this)
     iifname "ppp0" meta l4proto ipv6-icmp accept
 
     accept
@@ -47,7 +33,6 @@ table inet filter {
     ct state { established, related } accept
     ct state invalid drop
 
-    # WAN anti-spoof (IPv4)
     iifname "ppp0" ip saddr {
       10.0.0.0/8,
       172.16.0.0/12,
@@ -55,9 +40,7 @@ table inet filter {
       100.64.0.0/10
     } drop
 
-    # WAN anti-spoof (IPv6)
     iifname "ppp0" ip6 saddr fc00::/7 drop
-
     accept
   }
 
@@ -67,9 +50,6 @@ table inet filter {
   }
 }
 
-############################
-# NAT (CORE ROUTER ONLY)
-############################
 table ip nat {
   chain postrouting {
     type nat hook postrouting priority 100;
@@ -80,9 +60,6 @@ table ip nat {
   }
 }
 
-############################
-# MANGLE (PMTU / MSS FIX)
-############################
 table inet mangle {
   chain forward {
     type filter hook forward priority mangle;

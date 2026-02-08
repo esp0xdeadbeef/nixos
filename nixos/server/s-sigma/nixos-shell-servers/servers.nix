@@ -23,9 +23,9 @@ in
       repository = "path:${self.lib.vmSourceForHost "s-nebula"}";
     })
 
-    (mkVM "s-router-edge" {
-      description = "s-router-edge VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-edge"}";
+    (mkVM "s-router-policy-only" {
+      description = "s-router-policy-only VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-policy-only"}";
     })
     (mkVM "s-router-legacy-edge" {
       description = "s-router-legacy-edge VM (nixos-shell)";
@@ -40,16 +40,16 @@ in
       description = "s-router-access VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
     })
+    (mkVM "s-router-vpn-egress" {
+      description = "VPN-egress VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-vpn-egress"}";
+    })
 
     (mkVM "s-gameserver" {
       description = "Gameserver VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";
     })
 
-    (mkVM "s-router-vpn-egress" {
-      description = "VPN-egress VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-vpn-egress"}";
-    })
 
     (mkVM "s-test" {
       description = "s-test (nixos-shell)";
