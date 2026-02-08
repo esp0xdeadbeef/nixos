@@ -1,4 +1,3 @@
-# lib/fabrics.nix
 { lib }:
 
 let
@@ -16,11 +15,11 @@ let
       role = "legacy/quarantine";
       defaults = {
         kind = "lan";
-        dhcp4 = false;
+        dhcp4 = true;
         ra6 = false;
         routable = true;
         transit = false;
-        dns = false;
+        dns = true;
         reverseDns = false;
         mtu = 1500;
       };
@@ -37,8 +36,8 @@ let
       role = "authority+recovery";
       defaults = {
         kind = "lan";
-        dhcp4 = false;
-        ra6 = false;
+        dhcp4 = true;
+        ra6 = true;
         routable = true;
         transit = false;
         dns = true;
@@ -172,12 +171,55 @@ let
         mtu = 1500;
       };
     }
+{
+  key = "observability";
+  range = {
+    from = 80;
+    to = 89;
+  };
+  plane = "observability";
+  trust = "limited";
+  role = "telemetry";
+  defaults = {
+    kind = "lan";
+    dhcp4 = false;      # usually static sensors, tweak as desired
+    ra6 = false;        # generally no SLAAC unless you want it
+    routable = true;
+    transit = false;
+    dns = true;
+    reverseDns = true;
+    mtu = 1500;
+  };
+}
+
 
     {
-      key = "transit";
+      key = "access-transit";
       range = {
         from = 100;
         to = 199;
+      };
+      plane = "transit";
+      trust = "neutral";
+      role = "router-links";
+      defaults = {
+        kind = "lan";
+        dhcp4 = false;
+        ra6 = false;
+        routable = true;
+        transit = true;
+        dns = false;
+        reverseDns = false;
+        mtu = 1500;
+        ipv4PrefixLen = 31;
+        ipv6PrefixLen = 127;
+      };
+    }
+    {
+      key = "core-transit";
+      range = {
+        from = 200;
+        to = 299;
       };
       plane = "transit";
       trust = "neutral";
@@ -232,7 +274,13 @@ in
     in
     if f == null then throw "fabrics: VLAN ${toString vid} not in any defined range" else f;
 
-  fabricKeyForVlan = vid: (getFabric vid).key;
+  fabricKeyForVlan =
+  vid:
+    let f = getFabric vid;
+    in if f == null
+       then throw "fabrics: VLAN ${toString vid} not in any defined range"
+       else f.key;
+
 
   applyDefaults =
     vid: attrs:
