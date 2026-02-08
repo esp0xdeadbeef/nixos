@@ -126,7 +126,7 @@ in
         : > "${pinLock}"
       ''}
 
-      if [ -f "${pinLock}" ]; then exit 0; fi
+      if [ -f "${pinLock}" ]; then echo "VM is locked, remove the ${pinLock} file to continue" ;  exit 0; fi
 
       if [ -n "''${NIXOS_VM_FLAKE:-}" ]; then
         FLAKE="path:''${NIXOS_VM_FLAKE}"
