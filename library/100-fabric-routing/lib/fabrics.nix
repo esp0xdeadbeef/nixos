@@ -171,27 +171,26 @@ let
         mtu = 1500;
       };
     }
-{
-  key = "observability";
-  range = {
-    from = 80;
-    to = 89;
-  };
-  plane = "observability";
-  trust = "limited";
-  role = "telemetry";
-  defaults = {
-    kind = "lan";
-    dhcp4 = false;      # usually static sensors, tweak as desired
-    ra6 = false;        # generally no SLAAC unless you want it
-    routable = true;
-    transit = false;
-    dns = true;
-    reverseDns = true;
-    mtu = 1500;
-  };
-}
-
+    {
+      key = "observability";
+      range = {
+        from = 80;
+        to = 89;
+      };
+      plane = "observability";
+      trust = "limited";
+      role = "telemetry";
+      defaults = {
+        kind = "lan";
+        dhcp4 = false; # usually static sensors, tweak as desired
+        ra6 = false; # generally no SLAAC unless you want it
+        routable = true;
+        transit = false;
+        dns = true;
+        reverseDns = true;
+        mtu = 1500;
+      };
+    }
 
     {
       key = "access-transit";
@@ -275,12 +274,11 @@ in
     if f == null then throw "fabrics: VLAN ${toString vid} not in any defined range" else f;
 
   fabricKeyForVlan =
-  vid:
-    let f = getFabric vid;
-    in if f == null
-       then throw "fabrics: VLAN ${toString vid} not in any defined range"
-       else f.key;
-
+    vid:
+    let
+      f = getFabric vid;
+    in
+    if f == null then throw "fabrics: VLAN ${toString vid} not in any defined range" else f.key;
 
   applyDefaults =
     vid: attrs:
@@ -298,4 +296,3 @@ in
         trust = f.trust;
       };
 }
-

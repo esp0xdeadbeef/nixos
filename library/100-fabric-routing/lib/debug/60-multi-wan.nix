@@ -1,58 +1,60 @@
 # lib/debug/60-multi-wan.nix
 let
-  pkgs = import <nixpkgs> {};
-  lib  = pkgs.lib;
+  pkgs = import <nixpkgs> { };
+  lib = pkgs.lib;
 
   routed = import ./30-routing.nix;
 
   sanitize =
     x:
-      let t = builtins.typeOf x;
-      in
-      if t == "lambda" || t == "primop" then "<function>"
-      else if builtins.isList x then map sanitize x
-      else if builtins.isAttrs x then lib.mapAttrs (_: v: sanitize v) x
-      else if t == "path" then toString x
-      else x;
+    let
+      t = builtins.typeOf x;
+    in
+    if t == "lambda" || t == "primop" then
+      "<function>"
+    else if builtins.isList x then
+      map sanitize x
+    else if builtins.isAttrs x then
+      lib.mapAttrs (_: v: sanitize v) x
+    else if t == "path" then
+      toString x
+    else
+      x;
 
-  wanLinks =
-    lib.filterAttrs (_: l: (l.kind or null) == "wan") routed.links;
+  wanLinks = lib.filterAttrs (_: l: (l.kind or null) == "wan") routed.links;
 
   nodes = builtins.attrNames routed.nodes;
 
   wanForNode =
     node:
-      lib.concatMap
-        (l:
-          if (l.endpoints or {}) ? "${node}" then
-            let ep = l.endpoints.${node};
-            in [
-              {
-                link    = l.name or null;
-                vlanId  = l.vlanId or null;
-                carrier = l.carrier or null;
+    lib.concatMap (
+      l:
+      if (l.endpoints or { }) ? "${node}" then
+        let
+          ep = l.endpoints.${node};
+        in
+        [
+          {
+            link = l.name or null;
+            vlanId = l.vlanId or null;
+            carrier = l.carrier or null;
 
-                addr4   = ep.addr4 or null;
-                addr6   = ep.addr6 or null;
-                routes4 = ep.routes4 or [];
-                routes6 = ep.routes6 or [];
-              }
-            ]
-          else
-            []
-        )
-        (lib.attrValues wanLinks);
+            addr4 = ep.addr4 or null;
+            addr6 = ep.addr6 or null;
+            routes4 = ep.routes4 or [ ];
+            routes6 = ep.routes6 or [ ];
+          }
+        ]
+      else
+        [ ]
+    ) (lib.attrValues wanLinks);
 
 in
 sanitize {
-  nodes =
-    lib.listToAttrs (
-      map
-        (n: {
-          name = n;
-          value = wanForNode n;
-        })
-        nodes
-    );
+  nodes = lib.listToAttrs (
+    map (n: {
+      name = n;
+      value = wanForNode n;
+    }) nodes
+  );
 }
-

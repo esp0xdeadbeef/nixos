@@ -39,14 +39,16 @@ let
     let
       # keep your old "edge vs other side" behavior, but remove hardcoded prefixes
       v4 =
-        if node == "edge"
-        then "${tenantV4Base}.${toString vlanId}.1/31"
-        else "${tenantV4Base}.${toString vlanId}.2/31";
+        if node == "edge" then
+          "${tenantV4Base}.${toString vlanId}.1/31"
+        else
+          "${tenantV4Base}.${toString vlanId}.2/31";
 
       v6 =
-        if node == "edge"
-        then "${ulaPrefix}:${toString vlanId}::1/127"
-        else "${ulaPrefix}:${toString vlanId}::2/127";
+        if node == "edge" then
+          "${ulaPrefix}:${toString vlanId}::1/127"
+        else
+          "${ulaPrefix}:${toString vlanId}::2/127";
     in
     fabricsLib.applyDefaults vlanId {
       id = vlanId;
@@ -66,16 +68,20 @@ let
         id = vlanId;
         name = "lan${toString vlanId}";
         iface = "lan${toString vlanId}";
-      } // mkLanAddrs vlanId
+      }
+      // mkLanAddrs vlanId
     );
 
   mkWan =
     vlanId:
-    fabricsLib.applyDefaults vlanId ({
-      name = "wanA";
-      mark = toString vlanId;
-      iface = "lan${toString vlanId}";
-    } // defaultWan);
+    fabricsLib.applyDefaults vlanId (
+      {
+        name = "wanA";
+        mark = toString vlanId;
+        iface = "lan${toString vlanId}";
+      }
+      // defaultWan
+    );
 
 in
 {
@@ -90,4 +96,3 @@ in
     transitFabrics = map (t: fabricsLib.fabricKeyForVlan t.vlanId) transits;
   };
 }
-

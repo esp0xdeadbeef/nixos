@@ -1,5 +1,9 @@
 # lib/routing/helpers.nix
-{ lib, ulaPrefix, tenantV4Base }:
+{
+  lib,
+  ulaPrefix,
+  tenantV4Base,
+}:
 
 let
   tenant4Dst = vid: "${tenantV4Base}.${toString vid}.0/24";
@@ -7,12 +11,9 @@ let
 
   getTenantVid =
     ep:
-      if ep ? tenant && builtins.isAttrs ep.tenant && ep.tenant ? vlanId
-      then ep.tenant.vlanId
-      else null;
+    if ep ? tenant && builtins.isAttrs ep.tenant && ep.tenant ? vlanId then ep.tenant.vlanId else null;
 
 in
 {
   inherit tenant4Dst tenant6DstUla getTenantVid;
 }
-

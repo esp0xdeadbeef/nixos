@@ -1,5 +1,9 @@
 # lib/routing-gen.nix
-{ lib, ulaPrefix, tenantV4Base }:
+{
+  lib,
+  ulaPrefix,
+  tenantV4Base,
+}:
 
 topoResolved:
 
@@ -18,6 +22,3 @@ let
 
 in
 step3
-
-
-
