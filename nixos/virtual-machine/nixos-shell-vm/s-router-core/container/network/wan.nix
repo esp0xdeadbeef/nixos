@@ -171,7 +171,7 @@
         fi
 
         ${pkgs.iproute2}/bin/ip -6 route replace "$PD" \
-          via fd42:dead:beef:100::2 \
+          via fd42:dead:beef:1010::2 \
           dev br-vlan1010 \
           metric 256
       '';

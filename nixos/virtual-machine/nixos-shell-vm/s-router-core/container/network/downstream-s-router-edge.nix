@@ -16,7 +16,7 @@
         Address = "10.255.255.1/29";
       }
       {
-        Address = "fd42:dead:beef:100::1/64";
+        Address = "fd42:dead:beef:1010::3/64";
       }
     ];
     routes = [
