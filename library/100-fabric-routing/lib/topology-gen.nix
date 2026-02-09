@@ -9,12 +9,14 @@
   policyIfs ? { lan = "lan"; },
   accessIfs ? { lan = "lan"; },
 
-  # Transit VLAN ranges / placement
-  # policy<->access: 100 + tenantVlan (so tenant 60 -> transit 160)
   policyAccessTransitBase ? 100,
-
-  # policy<->core transit VLAN
   corePolicyTransitVlan ? 200,
+
+  # NEW: default upstream selector for tenants
+  defaultTenantUpstream ? "core",
+
+  # Optional override: { "10" = "vpnA"; "70" = "core"; }
+  tenantUpstreamMap ? { },
 }:
 
 let
@@ -22,7 +24,13 @@ let
 
   accessNode = vid: "s-router-access-${toString vid}";
 
-  # transit VLAN is base + tenant VLAN id (tenant 60 -> transit 160)
+  tenantUpstreamFor =
+    vid:
+      let k = toString vid;
+      in if builtins.hasAttr k tenantUpstreamMap
+         then tenantUpstreamMap.${k}
+         else defaultTenantUpstream;
+
   transitVidForAccess =
     vid:
       let tvid = policyAccessTransitBase + vid;
@@ -51,75 +59,74 @@ in
       ++ map (vid: { name = accessNode vid; value = { ifs = accessIfs; }; }) vids
     );
 
-links =
-  lib.listToAttrs (
-    # core <-> policy
-    [
-      {
-        name = "policy-core";
-        value = {
-          kind = "p2p";
-          carrier = "lan";
-          vlanId = corePolicyTransitVlan;
-          name = "policy-core";
-          members = [
-            "s-router-policy-only"
-            "s-router-core-wan"
-          ];
-        };
-      }
-    ]
-
-    # policy <-> access transit
-    ++ map
-      (vid:
-        let
-          tvid = transitVidForAccess vid;
-        in
+  links =
+    lib.listToAttrs (
+      [
         {
-          name = "policy-access-${toString vid}";
+          name = "policy-core";
           value = {
             kind = "p2p";
             carrier = "lan";
-            vlanId = tvid;
-            name = "policy-access-${toString vid}";
+            vlanId = corePolicyTransitVlan;
+            name = "policy-core";
             members = [
               "s-router-policy-only"
-              (accessNode vid)
+              "s-router-core-wan"
             ];
-            endpoints = {
-              "${accessNode vid}" = {
-                tenant = { vlanId = vid; };
-                export = true;
-              };
-            };
           };
         }
-      )
-      vids
+      ]
 
-    # access tenant LANs (gateway ownership)
-    ++ map
-      (vid:
-        {
-          name = "access-tenant-${toString vid}";
-          value = {
-            kind = "lan";
-            carrier = "lan";
-            vlanId = vid;
+      ++ map
+        (vid:
+          let
+            tvid = transitVidForAccess vid;
+          in
+          {
+            name = "policy-access-${toString vid}";
+            value = {
+              kind = "p2p";
+              carrier = "lan";
+              vlanId = tvid;
+              name = "policy-access-${toString vid}";
+              members = [
+                "s-router-policy-only"
+                (accessNode vid)
+              ];
+              endpoints = {
+                "${accessNode vid}" = {
+                  tenant = { vlanId = vid; };
+                  export = true;
+
+                  # NEW: which upstream should provide the GUA /64 advertised for this tenant
+                  upstream = tenantUpstreamFor vid;
+                };
+              };
+            };
+          }
+        )
+        vids
+
+      ++ map
+        (vid:
+          {
             name = "access-tenant-${toString vid}";
-            members = [ (accessNode vid) ];
-            endpoints = {
-              "${accessNode vid}" = {
-                tenant = { vlanId = vid; };
-                gateway = true;
+            value = {
+              kind = "lan";
+              carrier = "lan";
+              vlanId = vid;
+              name = "access-tenant-${toString vid}";
+              members = [ (accessNode vid) ];
+              endpoints = {
+                "${accessNode vid}" = {
+                  tenant = { vlanId = vid; };
+                  gateway = true;
+                };
               };
             };
-          };
-        }
-      )
-      vids
-  );
-
+          }
+        )
+        vids
+    );
 }
 

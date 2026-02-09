@@ -1,5 +1,5 @@
 # lib/topology.nix
-{ }:
+{ ulaPrefix ? "fd42:dead:beef", tenantV4Base ? "10.10" }:
 
 let
   pkgs = import <nixpkgs> {};
@@ -12,6 +12,16 @@ let
       corePolicyTransitVlan = 200;
     };
 
+  resolved =
+    import ./topology-resolve.nix {
+      inherit lib ulaPrefix tenantV4Base;
+    } raw;
+
+  routed =
+    import ./routing-gen.nix {
+      inherit lib ulaPrefix tenantV4Base;
+    } resolved;
+
 in
-import ./topology-resolve.nix { inherit lib; } raw
+routed
 

@@ -1,48 +1,61 @@
 # lib/debug/view-node.nix
-{ lib, pkgs }:
+{ lib, pkgs, ulaPrefix, tenantV4Base }:
 
 nodeName: topo:
 
 let
-  fabrics = import ../fabrics.nix { inherit lib; };
-  site = import ../site-addressing.nix {};
-  addr = import ../addressing.nix { inherit lib site; };
-
-  linksAll = topo.links or {};
-
   links =
-    lib.filterAttrs (_: l: lib.elem nodeName (l.members or [])) linksAll;
+    lib.filterAttrs (_: l: lib.elem nodeName (l.members or [])) (topo.links or {});
 
-  endpoints =
+  # Deep JSON sanitizer: eliminate lambdas AND primops anywhere in the tree
+  sanitize =
+    x:
+      let t = builtins.typeOf x;
+      in
+      if t == "lambda" || t == "primop" then
+        "<function>"
+      else if builtins.isList x then
+        map sanitize x
+      else if builtins.isAttrs x then
+        lib.mapAttrs (_: v: sanitize v) x
+      else if t == "path" then
+        toString x
+      else
+        x;
+
+  getTenantVid = ep:
+    if ep ? tenant && builtins.isAttrs ep.tenant && ep.tenant ? vlanId
+    then ep.tenant.vlanId
+    else null;
+
+in
+sanitize {
+  node = nodeName;
+
+  interfaces =
     lib.mapAttrs
-      (_: l:
-        let ep = (l.endpoints or {}).${nodeName} or {};
-        in {
-          kind = l.kind;
-          vlanId = l.vlanId;
-          fabric = fabrics.fabricKeyForVlan l.vlanId;
-          addr4 =
-            ep.addr4 or (
-              if l.kind == "p2p"
-              then addr.mkP2P4 { vlanId = l.vlanId; node = nodeName; members = l.members; }
-              else null
-            );
-          addr6 =
-            ep.addr6 or (
-              if l.kind == "p2p"
-              then addr.mkP2P6 { vlanId = l.vlanId; node = nodeName; members = l.members; }
-              else null
-            );
-          routes4 = ep.routes4 or [];
-          routes6 = ep.routes6 or [];
-          export = ep.export or false;
+      (_lname: l:
+        let
+          ep = (l.endpoints or {}).${nodeName} or {};
+        in
+        {
+          kind        = l.kind or null;
+          vlanId      = l.vlanId or null;
+
+          tenantVlanId = getTenantVid ep;
+
+          addr4       = ep.addr4 or null;
+          addr6       = ep.addr6 or null;
+          addr6Public = ep.addr6Public or null;
+
+          routes4     = ep.routes4 or [];
+          routes6     = ep.routes6 or [];
+          ra6Prefixes = ep.ra6Prefixes or [];
+
+          export      = ep.export or false;
+          gateway     = ep.gateway or false;
         }
       )
       links;
-
-in
-{
-  node = nodeName;
-  interfaces = endpoints;
 }
 

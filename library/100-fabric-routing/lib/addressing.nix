@@ -1,7 +1,10 @@
 # lib/addressing.nix
-{ lib, site }:
+{ lib }:
 
 let
+  #
+  # Determine index of a node within a 2-member p2p link
+  #
   nodeIndex =
     node: members:
       let
@@ -13,58 +16,88 @@ let
       in
       go 0 sorted;
 
-  digits = [ "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "a" "b" "c" "d" "e" "f" ];
+  #
+  # Hex digit table
+  #
+  digits = [
+    "0" "1" "2" "3" "4" "5" "6" "7"
+    "8" "9" "a" "b" "c" "d" "e" "f"
+  ];
 
+  #
+  # Convert integer → lowercase hex string (STRING-SAFE)
+  #
   toHex =
     n:
       let
-        go = x:
-          if x < 16 then lib.elemAt digits x
-          else
-            (go (builtins.div x 16))
-            + (lib.elemAt digits (x - (builtins.div x 16) * 16));
+        go =
+          x:
+            if x < 16 then
+              [ (lib.elemAt digits x) ]
+            else
+              (go (builtins.div x 16))
+              ++ [ (lib.elemAt digits (x - (builtins.div x 16) * 16)) ];
       in
-      if n == 0 then "0" else go n;
+      builtins.concatStringsSep "" (go n);
 
+  #
+  # Zero-pad string to width w
+  #
   zpad =
     w: s:
       let
         len = builtins.stringLength s;
-        zeros = builtins.concatStringsSep "" (builtins.genList (_: "0") (lib.max 0 (w - len)));
+        zeros =
+          builtins.concatStringsSep ""
+            (builtins.genList (_: "0") (lib.max 0 (w - len)));
       in
       zeros + s;
 
-  # NEW RULE: transit IPv6 hextet = "ff" + hex2(vlanId)
-  # Requires vlanId 0..255 so we stay inside a single 16-bit hextet cleanly.
+  #
+  # Encode transit VLAN ID into IPv6 ffXX hextet
+  #
   transitHextet =
     tvid:
       if tvid < 0 || tvid > 255 then
-        throw "addressing: transit vlanId ${toString tvid} out of range (0..255) for ffXX encoding"
+        throw "addressing: transit vlanId ${toString tvid} out of range (0..255)"
       else
         "ff${zpad 2 (toHex tvid)}";
 
 in
 {
-  tenantV4 = vid:
-    "${site.tenant.v4Base}.${toString vid}.1/${toString site.tenant.v4PrefixLen}";
+  #
+  # Tenant LAN addressing
+  #
+  mkTenantV4 =
+    { v4Base, vlanId }:
+      "${v4Base}.${toString vlanId}.1/24";
 
-  tenantV6 = vid:
-    "${site.ula.prefix}:${toString vid}::1/${toString site.tenant.v6PrefixLen}";
+  mkTenantV6 =
+    { ulaPrefix, vlanId }:
+      "${ulaPrefix}:${toString vlanId}::1/64";
 
+  #
+  # Point-to-point IPv4 (/31 or /29 semantics handled upstream)
+  #
   mkP2P4 =
-    { vlanId, node, members }:
+    { v4Base, vlanId, node, members }:
       let idx = nodeIndex node members;
       in
-      if idx < 0 || idx > 1 then throw "p2p requires exactly 2 members"
+      if idx < 0 || idx > 1 then
+        throw "p2p requires exactly 2 members"
       else
-        "${site.transit.v4Base}.${toString vlanId}.${toString idx}/${toString site.transit.v4PrefixLen}";
+        "${v4Base}.${toString vlanId}.${toString (idx + 2)}/31";
 
+  #
+  # Point-to-point IPv6 using ffXX encoding
+  #
   mkP2P6 =
-    { vlanId, node, members }:
+    { ulaPrefix, vlanId, node, members }:
       let idx = nodeIndex node members;
       in
-      if idx < 0 || idx > 1 then throw "p2p requires exactly 2 members"
+      if idx < 0 || idx > 1 then
+        throw "p2p requires exactly 2 members"
       else
-        "${site.ula.prefix}:${transitHextet vlanId}::${toString idx}/${toString site.transit.v6PrefixLen}";
+        "${ulaPrefix}:${transitHextet vlanId}::${toString (idx + 2)}/127";
 }
 

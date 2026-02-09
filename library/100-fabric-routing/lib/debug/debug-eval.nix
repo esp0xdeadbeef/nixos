@@ -1,37 +1,57 @@
 # lib/debug/debug-eval.nix
-#
-# Canonical debug entrypoint.
-# Shows exactly what the renderers will see.
-# No topology interpretation here.
-
 let
   pkgs = import <nixpkgs> {};
   lib  = pkgs.lib;
 
-  topo = import ../topology.nix { };
+  ulaPrefix = "fd42:dead:beef";
+  tenantV4Base = "10.10";
 
-  viewNode =
-    node:
-      import ./view-node.nix {
-        inherit lib pkgs;
-      } node topo;
+  raw =
+    import ../topology-gen.nix { inherit lib; } {
+      tenantVlans = [ 10 20 30 40 50 60 70 80 ];
+      policyAccessTransitBase = 100;
+      corePolicyTransitVlan = 200;
+    };
 
-  nodes = lib.attrNames (topo.nodes or {});
+  resolved =
+    import ../topology-resolve.nix {
+      inherit lib ulaPrefix tenantV4Base;
+    } raw;
+
+  routed =
+    import ../routing-gen.nix {
+      inherit lib ulaPrefix tenantV4Base;
+    } (
+      resolved // {
+        links = resolved.links // {
+          fake-isp = {
+            kind = "wan";
+            carrier = "wan";
+            vlanId = 6;
+            name = "fake-isp";
+            members = [ "s-router-core-wan" ];
+            endpoints = {
+              "s-router-core-wan" = {
+                addr6 = "2001:db8::2/48";
+                routes6 = [ { dst = "::/0"; } ];
+              };
+            };
+          };
+        };
+      }
+    );
 
 in
 {
   topology = {
-    domain = topo.domain;
-    nodes  = nodes;
-    links  = lib.attrNames (topo.links or {});
+    domain = routed.domain;
+    nodes  = lib.attrNames routed.nodes;
+    links  = lib.attrNames routed.links;
   };
 
   nodes =
-    lib.listToAttrs (
-      map (n: {
-        name = n;
-        value = viewNode n;
-      }) nodes
-    );
+    lib.mapAttrs
+      (n: _: import ./view-node.nix { inherit lib pkgs ulaPrefix tenantV4Base; } n routed)
+      routed.nodes;
 }
 
