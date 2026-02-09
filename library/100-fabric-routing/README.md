@@ -341,3 +341,4 @@ It accepts that upstreams are imperfect — and **contains the damage**:
 
 If a route, NAT rule, or firewall decision cannot be explained by pointing to a **single file**, the design is incomplete.
 
+
