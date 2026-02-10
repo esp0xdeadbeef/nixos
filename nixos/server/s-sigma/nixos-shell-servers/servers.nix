@@ -50,7 +50,6 @@ in
       repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";
     })
 
-
     (mkVM "s-test" {
       description = "s-test (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-test"}";

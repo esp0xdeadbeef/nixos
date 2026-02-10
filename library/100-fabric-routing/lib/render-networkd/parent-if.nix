@@ -17,4 +17,3 @@ if resolved == null then
   throw "render-networkd: missing parent if for carrier='${carrier}' on node='${nodeName}'"
 else
   resolved
-

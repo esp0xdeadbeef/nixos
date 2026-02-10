@@ -1,66 +1,70 @@
-# FILE: ./host-config/network-tenant-vlans.nix
-{ lib, config, ... }:
+# /home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-access/host-config/network-tenant-vlans.nix
+# FILE: s-router-access/host-config/network-tenant-vlans.nix
+{
+  outPath,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
-  tenantVlans =
-    if config ? routerAccess && config.routerAccess ? tenantVlans then
-      config.routerAccess.tenantVlans
-    else if config ? fabricInputs && config.fabricInputs ? tenantVlans then
-      config.fabricInputs.tenantVlans
-    else
-      [ 10 20 30 40 50 60 70 80 ];
+  cfg = import "${outPath}/library/100-fabric-routing/inputs";
 
-  # FIX: VLAN trunk is eth0, not eth1
-  uplinkIf = "eth1";
+  tenantVlans = cfg.tenantVlans;
+  policyBase = cfg.policyAccessTransitBase or 100;
 
-  vlanIf = vid: "${uplinkIf}.${toString vid}";
-  bridge = vid: "lan${toString vid}";
-
-  mkVlan =
-    vid: {
-      netdevs = {
-        "${vlanIf vid}" = {
-          netdevConfig = {
-            Name = vlanIf vid;
-            Kind = "vlan";
-          };
-          vlanConfig.Id = vid;
-        };
-      };
-
-      networks = {
-        "10-${vlanIf vid}" = {
-          matchConfig.Name = vlanIf vid;
-          networkConfig = {
-            Bridge = lib.mkForce (bridge vid);
-            ConfigureWithoutCarrier = true;
-          };
-        };
-      };
-    };
-
-  vlanFragments = map mkVlan tenantVlans;
+  transitVidFor = vid: policyBase + vid;
 
 in
 {
-  # Attach VLAN subinterfaces to eth0
-  systemd.network.networks =
-    lib.mkMerge (
-      [
-        {
-          "05-${uplinkIf}-trunk" = {
-            matchConfig.Name = uplinkIf;
-            networkConfig = {
-              DHCP = "no";
-              VLAN = map (vid: vlanIf vid) tenantVlans;
-            };
-          };
-        }
-      ]
-      ++ map (f: f.networks) vlanFragments
-    );
+  networking.useNetworkd = true;
+  systemd.network.enable = true;
+  networking.useDHCP = false;
 
-  systemd.network.netdevs =
-    lib.mkMerge (map (f: f.netdevs) vlanFragments);
+  systemd.network.netdevs = lib.mkMerge (
+    [
+      {
+        "10-br-lan-trunk".netdevConfig = {
+          Name = "br-lan-trunk";
+          Kind = "bridge";
+        };
+      }
+    ]
+    ++ map (vid: {
+      "20-tr${toString (transitVidFor vid)}".netdevConfig = {
+        Name = "tr${toString (transitVidFor vid)}";
+        Kind = "bridge";
+      };
+    }) tenantVlans
+  );
+
+  systemd.network.networks = lib.mkMerge (
+    [
+      {
+        "10-trunk-port" = {
+          matchConfig.Name = "eth0";
+          networkConfig = {
+            Bridge = "br-lan-trunk";
+            DHCP = "no";
+            IPv6AcceptRA = false;
+            ConfigureWithoutCarrier = true;
+          };
+        };
+      }
+
+      {
+        "11-br-lan-trunk" = {
+          matchConfig.Name = "br-lan-trunk";
+          networkConfig.ConfigureWithoutCarrier = true;
+        };
+      }
+    ]
+    ++ map (vid: {
+      "30-tr${toString (transitVidFor vid)}" = {
+        matchConfig.Name = "tr${toString (transitVidFor vid)}";
+        networkConfig.ConfigureWithoutCarrier = true;
+      };
+    }) tenantVlans
+  );
 }
 

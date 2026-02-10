@@ -1,6 +1,12 @@
 # ./container-settings.nix
 # FILE: s-router-policy-only/container-settings.nix
-{ config, pkgs, lib, outPath, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  outPath,
+  ...
+}:
 
 {
   containers."${config.networking.hostName}-container" = {
@@ -36,23 +42,25 @@
       inherit outPath;
     };
 
-    config = { outPath, ... }: {
-      imports = [
-        ./container
-      ];
+    config =
+      { outPath, ... }:
+      {
+        imports = [
+          ./container
+        ];
 
-      networking.useNetworkd = true;
-      systemd.network.enable = true;
-      networking.useDHCP = false;
+        networking.useNetworkd = true;
+        systemd.network.enable = true;
+        networking.useDHCP = false;
 
-      boot.kernel.sysctl = {
-        "net.ipv4.ip_forward" = 1;
-        "net.ipv6.conf.all.forwarding" = 1;
-        "net.ipv6.conf.default.forwarding" = 1;
+        boot.kernel.sysctl = {
+          "net.ipv4.ip_forward" = 1;
+          "net.ipv6.conf.all.forwarding" = 1;
+          "net.ipv6.conf.default.forwarding" = 1;
+        };
+
+        system.stateVersion = "25.11";
       };
-
-      system.stateVersion = "25.11";
-    };
 
     additionalCapabilities = [
       "CAP_NET_ADMIN"
@@ -73,4 +81,3 @@
     path = "/run/secrets/vlan2-hostnames-servers.json";
   };
 }
-

@@ -23,8 +23,10 @@ let
   #
   v4Nets = map (
     l:
-    let base = helpers.ipv4Base3 l.ip4;
-    in "${base}.0/24"
+    let
+      base = helpers.ipv4Base3 l.ip4;
+    in
+    "${base}.0/24"
   ) (lib.filter (l: l ? ip4) lans);
 
   #
@@ -36,9 +38,7 @@ let
   #
   # Reverse zones
   #
-  reverseZonesV4 =
-    map (l: helpers.reverseZoneV4_24 l.ip4)
-        (lib.filter (l: l ? ip4) lans);
+  reverseZonesV4 = map (l: helpers.reverseZoneV4_24 l.ip4) (lib.filter (l: l ? ip4) lans);
 
   #
   # Upstream resolvers
@@ -84,13 +84,15 @@ let
     mkdir -p /run
     : > "$OUT"
 
-    ${lib.concatStringsSep "\n" (map (w: ''
-      if [ -r "${w.publicPrefixFile or ""}" ]; then
-        PREFIX="$(tr -d ' \t\n\r' < "${w.publicPrefixFile}")"
-        echo "access-control: $PREFIX allow" >> "$OUT"
-        echo "[dns] allowing WAN ${w.name} prefix $PREFIX"
-      fi
-    '') (lib.filter (w: w ? publicPrefixFile) wans))}
+    ${lib.concatStringsSep "\n" (
+      map (w: ''
+        if [ -r "${w.publicPrefixFile or ""}" ]; then
+          PREFIX="$(tr -d ' \t\n\r' < "${w.publicPrefixFile}")"
+          echo "access-control: $PREFIX allow" >> "$OUT"
+          echo "[dns] allowing WAN ${w.name} prefix $PREFIX"
+        fi
+      '') (lib.filter (w: w ? publicPrefixFile) wans)
+    )}
   '';
 
 in
@@ -102,7 +104,12 @@ in
 
     settings.server = {
       interface =
-        lanV4Addrs ++ lanV6Addrs ++ [ "127.0.0.1" "::1" ];
+        lanV4Addrs
+        ++ lanV6Addrs
+        ++ [
+          "127.0.0.1"
+          "::1"
+        ];
 
       outgoing-interface = lanV4Addrs ++ lanV6Addrs;
 
@@ -112,16 +119,13 @@ in
       do-udp = true;
       do-tcp = true;
 
-      access-control =
-        [
-          "127.0.0.0/8 allow"
-          "::1 allow"
-        ]
-        ++ map (n: "${n} allow") v4Nets;
+      access-control = [
+        "127.0.0.0/8 allow"
+        "::1 allow"
+      ]
+      ++ map (n: "${n} allow") v4Nets;
 
-      local-zone =
-        [ "${domain} static" ]
-        ++ map (z: "${z} static") reverseZonesV4;
+      local-zone = [ "${domain} static" ] ++ map (z: "${z} static") reverseZonesV4;
 
       include = [
         "/run/unbound-local.conf"
@@ -149,7 +153,10 @@ in
     ];
   };
 
-  networking.nameservers = [ "127.0.0.1" "::1" ];
+  networking.nameservers = [
+    "127.0.0.1"
+    "::1"
+  ];
 
   systemd.services.gen-unbound-runtime = {
     wantedBy = [ "multi-user.target" ];
@@ -182,4 +189,3 @@ in
     ];
   };
 }
-

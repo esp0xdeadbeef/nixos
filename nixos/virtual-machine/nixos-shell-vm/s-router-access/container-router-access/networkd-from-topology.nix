@@ -1,17 +1,23 @@
 # ./networkd-from-topology.nix
 # FILE: container-router-access/networkd-from-topology.nix
-{ config, lib, vlanId, policyAccessTransitBase, outPath, ... }:
+{
+  config,
+  lib,
+  vlanId,
+  policyAccessTransitBase,
+  outPath,
+  ...
+}:
 
 let
-  addr =
-    import "${outPath}/library/100-fabric-routing/lib/addressing.nix" {
-      inherit lib;
-    };
+  addr = import "${outPath}/library/100-fabric-routing/lib/addressing.nix" {
+    inherit lib;
+  };
 
-  v4Base    = "10.10";
+  v4Base = "10.10";
   ulaPrefix = "fd42:dead:beef";
 
-  tenantVlan  = vlanId;
+  tenantVlan = vlanId;
   transitVlan = policyAccessTransitBase + vlanId;
 
   # Access side addresses
@@ -67,10 +73,15 @@ in
         { Address = trAddr6; }
       ];
       routes = [
-        { Destination = "0.0.0.0/0"; Gateway = trGw4; }
-        { Destination = "::/0";      Gateway = trGw6; }
+        {
+          Destination = "0.0.0.0/0";
+          Gateway = trGw4;
+        }
+        {
+          Destination = "::/0";
+          Gateway = trGw6;
+        }
       ];
     };
   };
 }
-

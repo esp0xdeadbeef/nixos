@@ -69,6 +69,5 @@ in
   networking.networkmanager.enable = false;
   networking.useHostResolvConf = false;
 
-
   system.stateVersion = "25.11";
 }

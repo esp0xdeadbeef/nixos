@@ -1,6 +1,11 @@
 # ./default.nix
 # FILE: s-router-policy-only/default.nix
-{ outPath, lib, config, ... }:
+{
+  outPath,
+  lib,
+  config,
+  ...
+}:
 
 {
   imports = [
@@ -22,4 +27,3 @@
 
   system.stateVersion = "25.11";
 }
-

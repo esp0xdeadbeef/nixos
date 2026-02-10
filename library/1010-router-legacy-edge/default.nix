@@ -3,52 +3,44 @@
 
 let
   # === HARD CONSTANTS ===
-  vlanId        = 1010;
-  vlanIf        = "lan.${toString vlanId}";
-  bridgeIf      = "br-vlan${toString vlanId}";
-  legacyAddrV4  = "10.255.255.1/29";
+  vlanId = 1010;
+  vlanIf = "lan.${toString vlanId}";
+  bridgeIf = "br-vlan${toString vlanId}";
+  legacyAddrV4 = "10.255.255.1/29";
 
-  netdevs   = config.systemd.network.netdevs or {};
-  networks  = config.systemd.network.networks or {};
+  netdevs = config.systemd.network.netdevs or { };
+  networks = config.systemd.network.networks or { };
 
   # --- helpers ---
   any = lib.any;
   attrValues = builtins.attrValues;
 
   # VLAN interface exists
-  vlanIfExists =
-    any (d:
-      (d.netdevConfig.Kind or null) == "vlan"
-      && (d.netdevConfig.Name or null) == vlanIf
-      && (d.vlanConfig.Id or null) == vlanId
-    ) (attrValues netdevs);
+  vlanIfExists = any (
+    d:
+    (d.netdevConfig.Kind or null) == "vlan"
+    && (d.netdevConfig.Name or null) == vlanIf
+    && (d.vlanConfig.Id or null) == vlanId
+  ) (attrValues netdevs);
 
   # Bridge exists
-  bridgeExists =
-    any (d:
-      (d.netdevConfig.Kind or null) == "bridge"
-      && (d.netdevConfig.Name or null) == bridgeIf
-    ) (attrValues netdevs);
+  bridgeExists = any (
+    d: (d.netdevConfig.Kind or null) == "bridge" && (d.netdevConfig.Name or null) == bridgeIf
+  ) (attrValues netdevs);
 
   # VLAN enslaved into bridge
-  vlanEnslaved =
-    any (n:
-      (n.matchConfig.Name or null) == vlanIf
-      && (n.networkConfig.Bridge or null) == bridgeIf
-    ) (attrValues networks);
+  vlanEnslaved = any (
+    n: (n.matchConfig.Name or null) == vlanIf && (n.networkConfig.Bridge or null) == bridgeIf
+  ) (attrValues networks);
 
   # Bridge network exists
-  bridgeNetworkExists =
-    any (n:
-      (n.matchConfig.Name or null) == bridgeIf
-    ) (attrValues networks);
+  bridgeNetworkExists = any (n: (n.matchConfig.Name or null) == bridgeIf) (attrValues networks);
 
   # IPv4 /29 address assigned to bridge
-  ipv4AddrExists =
-    any (n:
-      (n.matchConfig.Name or null) == bridgeIf
-      && any (a: a.Address == legacyAddrV4) (n.addresses or [])
-    ) (attrValues networks);
+  ipv4AddrExists = any (
+    n:
+    (n.matchConfig.Name or null) == bridgeIf && any (a: a.Address == legacyAddrV4) (n.addresses or [ ])
+  ) (attrValues networks);
 
 in
 {
@@ -99,4 +91,3 @@ in
     }
   ];
 }
-

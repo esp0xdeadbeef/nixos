@@ -14,4 +14,3 @@ renderer.render {
   topologyRaw = topoRaw;
   nodeName = "s-router-access-10";
 }
-

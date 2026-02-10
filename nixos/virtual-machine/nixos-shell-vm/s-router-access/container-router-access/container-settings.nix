@@ -1,6 +1,11 @@
 # ./s-router-access/container-router-access/container-settings.nix
 # FILE: s-router-access/container-router-access/container-settings.nix
-{ config, lib, outPath, ... }:
+{
+  config,
+  lib,
+  outPath,
+  ...
+}:
 
 let
   fabric = import "${outPath}/library/100-fabric-routing/inputs";
@@ -30,19 +35,21 @@ let
           policyAccessTransitBase = policyBase;
         };
 
-        config = { ... }: {
-          imports = [
-            ./node-from-topology.nix
-            ./networkd-from-topology.nix
-            ../debugging-packages.nix
-          ];
+        config =
+          { ... }:
+          {
+            imports = [
+              ./node-from-topology.nix
+              ./networkd-from-topology.nix
+              ../debugging-packages.nix
+            ];
 
-          boot.isContainer = true;
-          system.stateVersion = "25.11";
+            boot.isContainer = true;
+            system.stateVersion = "25.11";
 
-          networking.hostName = name;
-          networking.useHostResolvConf = false;
-        };
+            networking.hostName = name;
+            networking.useHostResolvConf = false;
+          };
 
         additionalCapabilities = [
           "CAP_NET_ADMIN"
@@ -55,4 +62,3 @@ in
 {
   containers = lib.listToAttrs (map mkContainer tenantVlans);
 }
-

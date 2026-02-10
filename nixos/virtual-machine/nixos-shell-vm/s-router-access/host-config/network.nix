@@ -1,6 +1,11 @@
-# ./s-router-access/host-config/network.nix
+# /home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-access/host-config/network.nix
 # FILE: s-router-access/host-config/network.nix
-{ outPath, lib, pkgs, ... }:
+{
+  outPath,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = import "${outPath}/library/100-fabric-routing/inputs";
@@ -10,87 +15,139 @@ let
 
   transitVidFor = vid: policyBase + vid;
 
+  mgmtParent = "eth1";
+  mgmtVlanId = 2;
+  mgmtVlanIf = "${mgmtParent}.${toString mgmtVlanId}";
 in
 {
   networking.useNetworkd = true;
   systemd.network.enable = true;
   networking.useDHCP = false;
 
-  systemd.network.netdevs =
-    lib.mkMerge (
-      [
-        {
-          "05-br-mgmt".netdevConfig = {
-            Name = "br-mgmt";
-            Kind = "bridge";
+  ############################
+  # NETDEVS
+  ############################
+  systemd.network.netdevs = lib.mkMerge (
+    [
+      # mgmt VLAN subinterface
+      {
+        "04-${mgmtVlanIf}" = {
+          netdevConfig = {
+            Name = mgmtVlanIf;
+            Kind = "vlan";
           };
-        }
-        {
-          "10-br-lan-trunk".netdevConfig = {
-            Name = "br-lan-trunk";
-            Kind = "bridge";
-          };
-        }
-      ]
-      ++ map (vid: {
-        "20-tr${toString (transitVidFor vid)}".netdevConfig = {
-          Name = "tr${toString (transitVidFor vid)}";
+          vlanConfig.Id = mgmtVlanId;
+        };
+      }
+
+      {
+        "05-br-mgmt".netdevConfig = {
+          Name = "br-mgmt";
           Kind = "bridge";
         };
-      }) tenantVlans
-    );
+        "05-br-mgmt".bridgeConfig = {
+          STP = false;
+          ForwardDelaySec = 0;
+        };
+      }
 
-  systemd.network.networks =
-    lib.mkMerge (
-      [
-        {
-          "05-mgmt-port" = {
-            matchConfig.Name = "eth1";
-            networkConfig = {
-              Bridge = "br-mgmt";
-              DHCP = "no";
-              IPv6AcceptRA = false;
-              ConfigureWithoutCarrier = true;
-            };
-          };
-        }
+      {
+        "10-br-lan-trunk".netdevConfig = {
+          Name = "br-lan-trunk";
+          Kind = "bridge";
+        };
+      }
+    ]
+    ++ map (vid: {
+      "20-tr${toString (transitVidFor vid)}".netdevConfig = {
+        Name = "tr${toString (transitVidFor vid)}";
+        Kind = "bridge";
+      };
+    }) tenantVlans
+  );
 
-        {
-          "06-br-mgmt" = {
-            matchConfig.Name = "br-mgmt";
-            networkConfig = {
-              DHCP = "ipv4";
-              IPv6AcceptRA = true;
-              ConfigureWithoutCarrier = true;
-            };
-          };
-        }
+  ############################
+  # NETWORKS
+  ############################
+  systemd.network.networks = lib.mkMerge (
 
-        {
-          "10-trunk-port" = {
-            matchConfig.Name = "eth0";
-            networkConfig = {
-              Bridge = "br-lan-trunk";
-              DHCP = "no";
-              IPv6AcceptRA = false;
-              ConfigureWithoutCarrier = true;
-            };
+    [
+      #
+      # Parent mgmt NIC: instantiate VLAN(s) only
+      #
+      {
+        "04-mgmt-parent" = {
+          matchConfig.Name = mgmtParent;
+          networkConfig = {
+            DHCP = "no";
+            VLAN = [ mgmtVlanIf ];
+            ConfigureWithoutCarrier = true;
           };
-        }
+        };
+      }
 
-        {
-          "11-br-lan-trunk" = {
-            matchConfig.Name = "br-lan-trunk";
-            networkConfig.ConfigureWithoutCarrier = true;
+      #
+      # VLAN mgmt NIC → bridge ONLY
+      #
+      {
+        "05-mgmt-port" = {
+          matchConfig.Name = mgmtVlanIf;
+          networkConfig = {
+            Bridge = "br-mgmt";
+            DHCP = "no";
+            IPv6AcceptRA = false;
+            ConfigureWithoutCarrier = true;
           };
-        }
-      ]
-      ++ map (vid: {
-        "30-tr${toString (transitVidFor vid)}" = {
-          matchConfig.Name = "tr${toString (transitVidFor vid)}";
+        };
+      }
+
+      #
+      # Mgmt bridge = DHCPv4 CLIENT
+      #
+      {
+        "06-br-mgmt" = {
+          matchConfig.Name = "br-mgmt";
+          networkConfig = {
+            DHCP = "ipv4";
+            IPv6AcceptRA = false;
+            ConfigureWithoutCarrier = true;
+            BindCarrier = [ mgmtVlanIf ];
+          };
+          linkConfig = {
+            RequiredForOnline = false;
+          };
+        };
+      }
+
+      #
+      # Fabric trunk
+      #
+      {
+        "10-trunk-port" = {
+          matchConfig.Name = "eth0";
+          networkConfig = {
+            Bridge = "br-lan-trunk";
+            DHCP = "no";
+            IPv6AcceptRA = false;
+            ConfigureWithoutCarrier = true;
+          };
+        };
+      }
+
+      {
+        "11-br-lan-trunk" = {
+          matchConfig.Name = "br-lan-trunk";
           networkConfig.ConfigureWithoutCarrier = true;
         };
-      }) tenantVlans
-    );
+      }
+    ]
+
+    ++ map (vid: {
+      "30-tr${toString (transitVidFor vid)}" = {
+        matchConfig.Name = "tr${toString (transitVidFor vid)}";
+        networkConfig.ConfigureWithoutCarrier = true;
+      };
+    }) tenantVlans
+  );
 }
 

@@ -1,9 +1,13 @@
 # FILE: default.nix
-{ outPath, lib, config, ... }:
+{
+  outPath,
+  lib,
+  config,
+  ...
+}:
 
 let
-  fabricInputs =
-    import "${outPath}/library/100-fabric-routing/inputs";
+  fabricInputs = import "${outPath}/library/100-fabric-routing/inputs";
 in
 {
   imports = [
@@ -17,4 +21,3 @@ in
 
   _module.args.fabricInputs = fabricInputs;
 }
-

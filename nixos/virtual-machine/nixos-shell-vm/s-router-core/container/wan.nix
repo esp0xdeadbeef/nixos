@@ -1,4 +1,9 @@
-{ outPath, lib, pkgs, ... }:
+{
+  outPath,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   mkBridge = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix" {
@@ -67,41 +72,41 @@ in
       RestartSec = 2;
 
       ExecStartPre = pkgs.writeShellScript "ppp-setup" ''
-        set -euo pipefail
-        umask 077
+                set -euo pipefail
+                umask 077
 
-        mkdir -p /run/ppp/peers
+                mkdir -p /run/ppp/peers
 
-        USERNAME="$(cat /run/secrets/pppoe-username)"
-        PASSWORD="$(cat /run/secrets/pppoe-password)"
+                USERNAME="$(cat /run/secrets/pppoe-username)"
+                PASSWORD="$(cat /run/secrets/pppoe-password)"
 
-        # PAP / CHAP secrets (runtime only)
-        cat > /run/ppp/pap-secrets <<EOF
-"$USERNAME" * "$PASSWORD" *
-EOF
-        chmod 600 /run/ppp/pap-secrets
+                # PAP / CHAP secrets (runtime only)
+                cat > /run/ppp/pap-secrets <<EOF
+        "$USERNAME" * "$PASSWORD" *
+        EOF
+                chmod 600 /run/ppp/pap-secrets
 
-        cat > /run/ppp/peers/pppoe-wan <<EOF
-plugin pppoe.so
-nic-br-wan6
+                cat > /run/ppp/peers/pppoe-wan <<EOF
+        plugin pppoe.so
+        nic-br-wan6
 
-user "$USERNAME"
-password "$PASSWORD"
-noauth
+        user "$USERNAME"
+        password "$PASSWORD"
+        noauth
 
-# IMPORTANT:
-# We do NOT let pppd install default routes.
-# Policy routing is installed by our oneshot unit below.
-nodefaultroute
-persist
+        # IMPORTANT:
+        # We do NOT let pppd install default routes.
+        # Policy routing is installed by our oneshot unit below.
+        nodefaultroute
+        persist
 
-+ipv6
-ipv6cp-accept-local
-ipv6cp-accept-remote
+        +ipv6
+        ipv6cp-accept-local
+        ipv6cp-accept-remote
 
-mtu 1500
-mru 1500
-EOF
+        mtu 1500
+        mru 1500
+        EOF
       '';
 
       ExecStart = "${pkgs.ppp}/bin/pppd file /run/ppp/peers/pppoe-wan nodetach";
@@ -119,10 +124,16 @@ EOF
     wantedBy = [ "multi-user.target" ];
 
     # Order: pppd up first, then we program rules.
-    after = [ "pppoe-wan.service" "systemd-networkd.service" ];
+    after = [
+      "pppoe-wan.service"
+      "systemd-networkd.service"
+    ];
     requires = [ "pppoe-wan.service" ];
 
-    path = [ pkgs.iproute2 pkgs.coreutils ];
+    path = [
+      pkgs.iproute2
+      pkgs.coreutils
+    ];
 
     serviceConfig = {
       Type = "oneshot";
@@ -166,4 +177,3 @@ EOF
     };
   };
 }
-
