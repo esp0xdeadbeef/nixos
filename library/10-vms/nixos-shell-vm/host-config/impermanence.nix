@@ -19,6 +19,7 @@
       directories = [
         #"/var/lib"
         #"/var/log"
+        "/var/lib/nixos"
         {
           directory = "/root/.ssh";
           user = "root";

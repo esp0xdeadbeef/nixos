@@ -1,8 +1,8 @@
 # lib/debug/30-routing.nix
 let
-  pkgs = import <nixpkgs> { };
-  lib = pkgs.lib;
-  cfg = import ./00-inputs.nix;
+  pkgs = null;
+  lib = import <nixpkgs/lib>;
+  cfg = import ./inputs.nix;
 
   # Base topology with nebula WANs injected
   withNebula = import ./25-topology-with-nebula.nix;

@@ -1,7 +1,7 @@
 # lib/debug/90-all.nix
 let
-  pkgs = import <nixpkgs> { };
-  lib = pkgs.lib;
+  pkgs = null;
+  lib = import <nixpkgs/lib>;
 
   routed = import ./30-routing.nix;
 

@@ -1,7 +1,7 @@
 # lib/debug/debug-eval.nix
 let
-  pkgs = import <nixpkgs> { };
-  lib = pkgs.lib;
+  pkgs = null;
+  lib = import <nixpkgs/lib>;
 
   ulaPrefix = "fd42:dead:beef";
   tenantV4Base = "10.10";

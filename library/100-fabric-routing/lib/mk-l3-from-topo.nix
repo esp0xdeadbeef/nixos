@@ -9,9 +9,10 @@
 nodeName: topo:
 
 let
-  links = topo.links or { };
-  addr = import ./addressing.nix { inherit lib; };
+  links = topo.links or {};
+  addr  = import ./addressing.nix { inherit lib; };
 
+  # MUST match mk-links-from-topo.nix exactly
   shortHash = s: builtins.substring 0 4 (builtins.hashString "sha256" s);
 
   kernelBridgeName =
@@ -24,91 +25,143 @@ let
           "br-lg"
         else
           "br-x";
-      ident = l.name or (throw "link missing semantic name");
+
+      ident =
+        if l ? name then
+          l.name
+        else
+          throw "link missing semantic name";
     in
     "${base}-${shortHash ident}";
 
-  linkNames = lib.filter (
-    lname:
-    let
-      l = links.${lname};
-    in
-    lib.elem nodeName (l.members or [ ]) && builtins.hasAttr nodeName (l.endpoints or { })
-  ) (lib.attrNames links);
+  stripCidr =
+    s:
+    if s == null then null else builtins.elemAt (lib.splitString "/" s) 0;
+
+  linkNames =
+    lib.filter
+      (lname:
+        let l = links.${lname};
+        in
+        lib.elem nodeName (l.members or [])
+        && builtins.hasAttr nodeName (l.endpoints or {})
+      )
+      (lib.attrNames links);
 
   endpoint =
     l:
     let
-      ep = l.endpoints.${nodeName} or { };
+      ep       = l.endpoints.${nodeName} or {};
+      members  = l.members or [];
+      isGw     = ep.gateway or false;
     in
-    ep
-    // {
+    {
       addr4 =
-        ep.addr4 or (
-          if l.kind == "p2p" then
-            addr.mkP2P4 {
-              v4Base = tenantV4Base;
-              vlanId = l.vlanId;
-              node = nodeName;
-              members = l.members;
-            }
-          else
-            null
-        );
+        if ep ? addr4 then
+          ep.addr4
+        else if l.kind == "p2p" && l.vlanId <= 255 then
+          addr.mkP2P4 {
+            v4Base = tenantV4Base;
+            vlanId = l.vlanId;
+            node   = nodeName;
+            members = members;
+          }
+        else if l.kind == "lan" && isGw then
+          addr.mkTenantV4 {
+            v4Base = tenantV4Base;
+            vlanId = l.vlanId;
+          }
+        else
+          null;
 
       addr6 =
-        ep.addr6 or (
-          if l.kind == "p2p" then
-            addr.mkP2P6 {
-              ulaPrefix = ulaPrefix;
-              vlanId = l.vlanId;
-              node = nodeName;
-              members = l.members;
-            }
-          else
-            null
-        );
+        if ep ? addr6 then
+          ep.addr6
+        else if l.kind == "p2p" && l.vlanId <= 255 then
+          addr.mkP2P6 {
+            ulaPrefix = ulaPrefix;
+            vlanId    = l.vlanId;
+            node      = nodeName;
+            members   = members;
+          }
+        else if l.kind == "lan" && isGw then
+          addr.mkTenantV6 {
+            ulaPrefix = ulaPrefix;
+            vlanId    = l.vlanId;
+          }
+        else
+          null;
+
+      addr6Public = ep.addr6Public or null;
+
+      routes4 = ep.routes4 or [];
+      routes6 = ep.routes6 or [];
+
+      acceptRA = ep.acceptRA or false;
+      dhcp     = ep.dhcp or false;
     };
 
-  mkRoute4 = r: {
-    Destination = r.dst;
-    Gateway = r.via4;
-  };
-  mkRoute6 = r: {
-    Destination = r.dst;
-    Gateway = r.via6;
-  };
+  mkRoute4 =
+    r:
+    {
+      Destination = r.dst;
+    }
+    // lib.optionalAttrs (r ? via4 && r.via4 != null) {
+      Gateway = r.via4;
+    };
+
+  mkRoute6 =
+    r:
+    {
+      Destination = r.dst;
+    }
+    // lib.optionalAttrs (r ? via6 && r.via6 != null) {
+      Gateway = r.via6;
+    };
 
 in
 {
-  systemd.network.networks = lib.listToAttrs (
-    map (
-      lname:
-      let
-        l = links.${lname};
-        ep = endpoint l;
-      in
-      {
-        name = "50-l3-${lname}";
-        value = {
-          matchConfig.Name = kernelBridgeName l;
-          networkConfig = {
-            ConfigureWithoutCarrier = true;
-            DHCP = "no";
-            IPv6AcceptRA = false;
-            IPv4Forwarding = true;
-            IPv6Forwarding = true;
-            LinkLocalAddressing = "ipv6";
-          };
+  systemd.network.networks =
+    lib.listToAttrs (
+      map
+        (lname:
+          let
+            l  = links.${lname};
+            ep = endpoint l;
+            isWan = (l.kind or null) == "wan";
+          in
+          {
+            name = "50-l3-${lname}";
+            value = {
+              matchConfig.Name = kernelBridgeName l;
 
-          addresses =
-            (lib.optional (ep.addr4 != null) { Address = ep.addr4; })
-            ++ (lib.optional (ep.addr6 != null) { Address = ep.addr6; })
-            ++ (lib.optional (ep ? addr6Public && ep.addr6Public != null) { Address = ep.addr6Public; });
+              networkConfig = {
+                ConfigureWithoutCarrier = true;
 
-          routes = (map mkRoute4 (ep.routes4 or [ ])) ++ (map mkRoute6 (ep.routes6 or [ ]));
-        };
-      }
-    ) linkNames
-  );
+                DHCP =
+                  if isWan && ep.dhcp then "yes" else "no";
+
+                IPv6AcceptRA =
+                  if isWan then ep.acceptRA else false;
+
+                IPv4Forwarding = true;
+                IPv6Forwarding = true;
+
+                LinkLocalAddressing = "ipv6";
+              };
+
+              addresses =
+                (lib.optional (ep.addr4 != null) { Address = ep.addr4; })
+                ++ (lib.optional (ep.addr6 != null) { Address = ep.addr6; })
+                ++ (lib.optional (ep.addr6Public != null) { Address = ep.addr6Public; });
+
+              routes =
+                (map mkRoute4 ep.routes4)
+                ++ (map mkRoute6 ep.routes6);
+            };
+          }
+        )
+        linkNames
+    );
 }
+

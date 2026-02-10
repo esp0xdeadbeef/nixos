@@ -1,7 +1,7 @@
 # lib/debug/25-topology-with-nebula.nix
 let
-  pkgs = import <nixpkgs> { };
-  lib = pkgs.lib;
+  pkgs = null;
+  lib = import <nixpkgs/lib>;
 
   base = import ./20-topology-resolved.nix;
 

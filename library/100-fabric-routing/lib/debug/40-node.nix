@@ -1,8 +1,8 @@
 # lib/debug/40-node.nix
 let
-  pkgs = import <nixpkgs> { };
-  lib = pkgs.lib;
-  cfg = import ./00-inputs.nix;
+  pkgs = null;
+  lib = import <nixpkgs/lib>;
+  cfg = import ./inputs.nix;
 
   node = "s-router-access-10";
 

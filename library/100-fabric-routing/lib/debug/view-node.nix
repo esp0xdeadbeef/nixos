@@ -1,4 +1,3 @@
-# lib/debug/view-node.nix
 {
   lib,
   pkgs,
