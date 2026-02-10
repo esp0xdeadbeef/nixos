@@ -18,6 +18,12 @@ let
   mgmtParent = "eth1";
   mgmtVlanId = 2;
   mgmtVlanIf = "${mgmtParent}.${toString mgmtVlanId}";
+
+  trunkBridge = "br-lan-trunk";
+  trunkParent = "eth0";
+
+  # FIX: transit VLANs live on the PHYSICAL trunk NIC, not on the bridge
+  trunkTransitVlanIf = tvid: "${trunkParent}.${toString tvid}";
 in
 {
   networking.useNetworkd = true;
@@ -29,7 +35,9 @@ in
   ############################
   systemd.network.netdevs = lib.mkMerge (
     [
-      # mgmt VLAN subinterface
+      #
+      # Mgmt VLAN (correct, keep as-is)
+      #
       {
         "04-${mgmtVlanIf}" = {
           netdevConfig = {
@@ -51,17 +59,37 @@ in
         };
       }
 
+      #
+      # Fabric trunk bridge
+      #
       {
         "10-br-lan-trunk".netdevConfig = {
-          Name = "br-lan-trunk";
+          Name = trunkBridge;
           Kind = "bridge";
         };
       }
     ]
+
+    #
+    # Per-tenant transit bridges (containers attach here)
+    #
     ++ map (vid: {
       "20-tr${toString (transitVidFor vid)}".netdevConfig = {
         Name = "tr${toString (transitVidFor vid)}";
         Kind = "bridge";
+      };
+    }) tenantVlans
+
+    #
+    # FIX: VLAN subinterfaces on *eth0* (eth0.<VID>)
+    #
+    ++ map (vid: {
+      "21-${trunkTransitVlanIf (transitVidFor vid)}" = {
+        netdevConfig = {
+          Name = trunkTransitVlanIf (transitVidFor vid);
+          Kind = "vlan";
+        };
+        vlanConfig.Id = transitVidFor vid;
       };
     }) tenantVlans
   );
@@ -73,7 +101,7 @@ in
 
     [
       #
-      # Parent mgmt NIC: instantiate VLAN(s) only
+      # Mgmt parent NIC
       #
       {
         "04-mgmt-parent" = {
@@ -87,7 +115,7 @@ in
       }
 
       #
-      # VLAN mgmt NIC → bridge ONLY
+      # Mgmt VLAN → bridge
       #
       {
         "05-mgmt-port" = {
@@ -102,7 +130,7 @@ in
       }
 
       #
-      # Mgmt bridge = DHCPv4 CLIENT
+      # Mgmt bridge = DHCP client
       #
       {
         "06-br-mgmt" = {
@@ -113,39 +141,58 @@ in
             ConfigureWithoutCarrier = true;
             BindCarrier = [ mgmtVlanIf ];
           };
-          linkConfig = {
-            RequiredForOnline = false;
-          };
+          linkConfig.RequiredForOnline = false;
         };
       }
 
       #
-      # Fabric trunk
+      # Fabric trunk physical port
+      # FIX: instantiate ALL transit VLANs here
       #
       {
         "10-trunk-port" = {
-          matchConfig.Name = "eth0";
+          matchConfig.Name = trunkParent;
           networkConfig = {
-            Bridge = "br-lan-trunk";
+            Bridge = trunkBridge;
             DHCP = "no";
             IPv6AcceptRA = false;
             ConfigureWithoutCarrier = true;
+
+            VLAN = map (vid: trunkTransitVlanIf (transitVidFor vid)) tenantVlans;
           };
         };
       }
 
       {
         "11-br-lan-trunk" = {
-          matchConfig.Name = "br-lan-trunk";
+          matchConfig.Name = trunkBridge;
           networkConfig.ConfigureWithoutCarrier = true;
         };
       }
     ]
 
+    #
+    # Bring up each per-tenant transit bridge
+    #
     ++ map (vid: {
       "30-tr${toString (transitVidFor vid)}" = {
         matchConfig.Name = "tr${toString (transitVidFor vid)}";
         networkConfig.ConfigureWithoutCarrier = true;
+      };
+    }) tenantVlans
+
+    #
+    # FIX: bridge eth0.<VID> into tr<VID>
+    #
+    ++ map (vid: {
+      "41-port-${trunkTransitVlanIf (transitVidFor vid)}" = {
+        matchConfig.Name = trunkTransitVlanIf (transitVidFor vid);
+        networkConfig = {
+          Bridge = "tr${toString (transitVidFor vid)}";
+          DHCP = "no";
+          IPv6AcceptRA = false;
+          ConfigureWithoutCarrier = true;
+        };
       };
     }) tenantVlans
   );
