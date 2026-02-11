@@ -27,7 +27,6 @@
     "${outPath}/library/01-general/desktop/shell-env.nix"
     ./vm-settings.nix
     ./restart-container.nix
-    ./network.nix
     ./ssh.nix
     ./impermanence.nix
     ./persist-state-disk.nix

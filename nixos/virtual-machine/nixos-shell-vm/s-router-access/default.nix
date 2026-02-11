@@ -11,7 +11,8 @@ let
 in
 {
   imports = [
-    ./host-config
+    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    ./host-network.nix
     ./mount-utils.nix
     ./container-router-access/container-settings.nix
     ./debugging-packages.nix
