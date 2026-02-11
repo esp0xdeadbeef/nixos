@@ -140,6 +140,22 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-gameserver
+  - path_regex: '^(secrets/)*s-routers.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-vpn-impermanence-root
+          - *s-router-impermanence-root
+          - *s-router-edge
+          - *s-router-legacy-edge
+          - *s-router-infra
+          - *s-router-core
+          - *s-router-access
+
+
   - path_regex: '^(secrets/)*s-router-edge.*\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
