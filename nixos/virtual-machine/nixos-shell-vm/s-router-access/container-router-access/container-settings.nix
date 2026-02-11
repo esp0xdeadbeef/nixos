@@ -1,5 +1,5 @@
+# /home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-access/container-router-access/container-settings.nix
 # ./container-router-access/container-settings.nix
-# ./s-router-access/container-router-access/container-settings.nix
 # FILE: s-router-access/container-router-access/container-settings.nix
 {
   config,
@@ -28,7 +28,7 @@ let
         privateNetwork = true;
 
         extraVeths = {
-          # FIX: unique downlink bridge per tenant LAN
+          # unique downlink bridge per tenant LAN
           "lan-${toString vid}".hostBridge = lanBridgeFor vid;
 
           # transit stays per-tenant
@@ -47,6 +47,13 @@ let
             imports = [
               ./node-from-topology.nix
               ./networkd-from-topology.nix
+
+              # NEW STYLE: services driven by vlanId + fabric inputs
+              ./kea.nix
+              ./kea-services.nix
+              ./dns.nix
+              ./radvd.nix
+
               ../debugging-packages.nix
             ];
 
@@ -55,11 +62,17 @@ let
 
             networking.hostName = name;
             networking.useHostResolvConf = false;
+
+            # keep it explicit; policy lives elsewhere
+            networking.firewall.enable = false;
+            services.resolved.enable = false;
           };
 
         additionalCapabilities = [
           "CAP_NET_ADMIN"
           "CAP_SYS_ADMIN"
+          "CAP_NET_BIND_SERVICE"
+          "CAP_NET_RAW"
         ];
       };
     };
@@ -68,3 +81,4 @@ in
 {
   containers = lib.listToAttrs (map mkContainer tenantVlans);
 }
+
