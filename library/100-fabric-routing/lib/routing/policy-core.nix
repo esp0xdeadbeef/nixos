@@ -1,4 +1,4 @@
-# lib/routing/policy-core.nix
+# FILE: ./lib/routing/policy-core.nix
 {
   lib,
   ulaPrefix,
@@ -32,13 +32,6 @@ let
   getTenantVid =
     ep:
     if ep ? tenant && builtins.isAttrs ep.tenant && ep.tenant ? vlanId then ep.tenant.vlanId else null;
-
-  #
-  # Detect explicit upstream on policy (WAN, not p2p)
-  #
-  policyHasExplicitUpstream = lib.any (
-    l: (l.kind or null) == "wan" && lib.elem policyNode (l.members or [ ])
-  ) (lib.attrValues links);
 
   #
   # Collect tenant VLANs behind policy
@@ -92,18 +85,21 @@ topo
         }) tenantVids;
 
         #
-        # Policy default route:
-        # ONLY if no explicit upstream exists
+        # Policy ALWAYS defaults to core for internet egress
         #
-        policyDefaults4 = lib.optional (!policyHasExplicitUpstream) {
-          dst = "0.0.0.0/0";
-          via4 = stripCidr epCore.addr4;
-        };
+        policyDefaults4 = [
+          {
+            dst = "0.0.0.0/0";
+            via4 = stripCidr epCore.addr4;
+          }
+        ];
 
-        policyDefaults6 = lib.optional (!policyHasExplicitUpstream) {
-          dst = "::/0";
-          via6 = stripCidr epCore.addr6;
-        };
+        policyDefaults6 = [
+          {
+            dst = "::/0";
+            via6 = stripCidr epCore.addr6;
+          }
+        ];
 
       in
       setEp
