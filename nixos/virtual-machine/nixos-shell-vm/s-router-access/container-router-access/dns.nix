@@ -27,12 +27,13 @@ let
   v4Net = "${v4Base}.${toString vlanId}.0/24";
   v6Net = "${ulaPrefix}:${toString vlanId}::/64";
 
-  upstream = site.defaultWanDns or [
-    "1.1.1.1"
-    "9.9.9.9"
-    "2606:4700:4700::1111"
-    "2606:4700:4700::1001"
-  ];
+  upstream =
+    site.defaultWanDns or [
+      "1.1.1.1"
+      "9.9.9.9"
+      "2606:4700:4700::1111"
+      "2606:4700:4700::1001"
+    ];
 in
 {
   services.bind.enable = lib.mkForce false;
@@ -94,4 +95,3 @@ in
     "::1"
   ];
 }
-

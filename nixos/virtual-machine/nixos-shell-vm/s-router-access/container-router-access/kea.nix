@@ -21,8 +21,7 @@ let
 
   pool = "${v4Base}.${toString vlanId}.100 - ${v4Base}.${toString vlanId}.200";
 
-  domainRaw =
-    (import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix").domain or "lan.";
+  domainRaw = (import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix").domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
   outFile = "/run/etc/kea/${lanName}.json";
@@ -62,7 +61,13 @@ let
   '';
 in
 {
-  environment.systemPackages = [ pkgs.kea pkgs.iproute2 pkgs.gnugrep pkgs.gawk pkgs.coreutils ];
+  environment.systemPackages = [
+    pkgs.kea
+    pkgs.iproute2
+    pkgs.gnugrep
+    pkgs.gawk
+    pkgs.coreutils
+  ];
 
   systemd.services."gen-kea-${lanName}" = {
     wantedBy = [ "multi-user.target" ];
@@ -74,4 +79,3 @@ in
     };
   };
 }
-

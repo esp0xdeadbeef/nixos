@@ -25,8 +25,7 @@ let
 
   # Find the tenant LAN link and endpoint for this node
   lanLinkName = "access-tenant-${toString vlanId}";
-  ep =
-    (((routed.links or { }).${lanLinkName} or { }).endpoints or { }).${nodeName} or { };
+  ep = (((routed.links or { }).${lanLinkName} or { }).endpoints or { }).${nodeName} or { };
 
   prefixes =
     let
@@ -86,7 +85,10 @@ let
   '';
 in
 {
-  environment.systemPackages = [ pkgs.radvd pkgs.iproute2 ];
+  environment.systemPackages = [
+    pkgs.radvd
+    pkgs.iproute2
+  ];
 
   systemd.services."radvd-generate-${toString vlanId}" = {
     wantedBy = [ "multi-user.target" ];
@@ -110,4 +112,3 @@ in
     };
   };
 }
-

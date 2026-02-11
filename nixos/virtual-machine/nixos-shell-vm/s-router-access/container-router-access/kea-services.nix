@@ -64,8 +64,14 @@ in
   systemd.services."kea-dhcp4-${lanName}" = {
     description = "Kea DHCPv4 on ${lanIf}";
     wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-networkd.service" "gen-kea-${lanName}.service" ];
-    requires = [ "systemd-networkd.service" "gen-kea-${lanName}.service" ];
+    after = [
+      "systemd-networkd.service"
+      "gen-kea-${lanName}.service"
+    ];
+    requires = [
+      "systemd-networkd.service"
+      "gen-kea-${lanName}.service"
+    ];
 
     path = [
       pkgs.coreutils
@@ -106,4 +112,3 @@ in
     };
   };
 }
-
