@@ -1,3 +1,4 @@
+# ./container-router-access/container-settings.nix
 # ./s-router-access/container-router-access/container-settings.nix
 # FILE: s-router-access/container-router-access/container-settings.nix
 {
@@ -12,6 +13,8 @@ let
   tenantVlans = fabric.tenantVlans;
   policyBase = fabric.policyAccessTransitBase or 100;
 
+  lanBridgeFor = vid: "br-lan-${toString vid}";
+
   mkContainer =
     vid:
     let
@@ -25,7 +28,10 @@ let
         privateNetwork = true;
 
         extraVeths = {
-          "lan-${toString vid}".hostBridge = "br-lan-trunk";
+          # FIX: unique downlink bridge per tenant LAN
+          "lan-${toString vid}".hostBridge = lanBridgeFor vid;
+
+          # transit stays per-tenant
           "tr-${toString vid}".hostBridge = "tr${toString transitVid}";
         };
 

@@ -1,4 +1,4 @@
-# FILE: default.nix
+# ./default.nix
 {
   outPath,
   lib,
@@ -13,7 +13,6 @@ in
   imports = [
     ./host-config
     ./mount-utils.nix
-    ./host-config/network.nix
     ./container-router-access/container-settings.nix
     ./debugging-packages.nix
     ./sops.nix

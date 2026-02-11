@@ -1,4 +1,4 @@
-# /home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-access/host-config/network.nix
+# ./host-config/network.nix
 # FILE: s-router-access/host-config/network.nix
 {
   outPath,
@@ -19,11 +19,17 @@ let
   mgmtVlanId = 2;
   mgmtVlanIf = "${mgmtParent}.${toString mgmtVlanId}";
 
-  trunkBridge = "br-lan-trunk";
   trunkParent = "eth0";
 
-  # FIX: transit VLANs live on the PHYSICAL trunk NIC, not on the bridge
-  trunkTransitVlanIf = tvid: "${trunkParent}.${toString tvid}";
+  uplinkBridge = "br-lan-trunk";
+
+  lanBridgeFor = vid: "br-lan-${toString vid}";
+  lanVlanIfFor = vid: "${trunkParent}.${toString vid}";
+
+  transitBridgeFor = vid: "tr${toString (transitVidFor vid)}";
+  transitVlanIfFor = vid: "${trunkParent}.${toString (transitVidFor vid)}";
+
+  allVlansOnTrunk = (map lanVlanIfFor tenantVlans) ++ (map transitVlanIfFor tenantVlans);
 in
 {
   networking.useNetworkd = true;
@@ -36,7 +42,7 @@ in
   systemd.network.netdevs = lib.mkMerge (
     [
       #
-      # Mgmt VLAN (correct, keep as-is)
+      # Mgmt VLAN
       #
       {
         "04-${mgmtVlanIf}" = {
@@ -48,45 +54,91 @@ in
         };
       }
 
+      #
+      # Mgmt bridge
+      #
       {
-        "05-br-mgmt".netdevConfig = {
-          Name = "br-mgmt";
-          Kind = "bridge";
-        };
-        "05-br-mgmt".bridgeConfig = {
-          STP = false;
-          ForwardDelaySec = 0;
+        "05-br-mgmt" = {
+          netdevConfig = {
+            Name = "br-mgmt";
+            Kind = "bridge";
+          };
+          bridgeConfig = {
+            STP = false;
+            ForwardDelaySec = 0;
+          };
         };
       }
 
       #
-      # Fabric trunk bridge
+      # Uplink trunk bridge
       #
       {
-        "10-br-lan-trunk".netdevConfig = {
-          Name = trunkBridge;
-          Kind = "bridge";
+        "10-${uplinkBridge}" = {
+          netdevConfig = {
+            Name = uplinkBridge;
+            Kind = "bridge";
+          };
+          bridgeConfig = {
+            STP = false;
+            ForwardDelaySec = 0;
+          };
         };
       }
     ]
 
     #
-    # Per-tenant transit bridges (containers attach here)
+    # Per-tenant LAN bridges
     #
     ++ map (vid: {
-      "20-tr${toString (transitVidFor vid)}".netdevConfig = {
-        Name = "tr${toString (transitVidFor vid)}";
-        Kind = "bridge";
+      "12-${lanBridgeFor vid}" = {
+        netdevConfig = {
+          Name = lanBridgeFor vid;
+          Kind = "bridge";
+        };
+        bridgeConfig = {
+          STP = false;
+          ForwardDelaySec = 0;
+        };
       };
     }) tenantVlans
 
     #
-    # FIX: VLAN subinterfaces on *eth0* (eth0.<VID>)
+    # Per-tenant transit bridges
     #
     ++ map (vid: {
-      "21-${trunkTransitVlanIf (transitVidFor vid)}" = {
+      "20-${transitBridgeFor vid}" = {
         netdevConfig = {
-          Name = trunkTransitVlanIf (transitVidFor vid);
+          Name = transitBridgeFor vid;
+          Kind = "bridge";
+        };
+        bridgeConfig = {
+          STP = false;
+          ForwardDelaySec = 0;
+        };
+      };
+    }) tenantVlans
+
+    #
+    # Tenant LAN VLAN subinterfaces on eth0
+    #
+    ++ map (vid: {
+      "30-${lanVlanIfFor vid}" = {
+        netdevConfig = {
+          Name = lanVlanIfFor vid;
+          Kind = "vlan";
+        };
+        vlanConfig.Id = vid;
+      };
+    }) tenantVlans
+
+    #
+    # Transit VLAN subinterfaces on eth0
+    #
+    ++ map (vid: {
+      "31-${transitVlanIfFor vid}" = {
+        netdevConfig = {
+          Name = transitVlanIfFor vid;
           Kind = "vlan";
         };
         vlanConfig.Id = transitVidFor vid;
@@ -115,7 +167,7 @@ in
       }
 
       #
-      # Mgmt VLAN → bridge
+      # Mgmt VLAN → br-mgmt
       #
       {
         "05-mgmt-port" = {
@@ -130,7 +182,7 @@ in
       }
 
       #
-      # Mgmt bridge = DHCP client
+      # br-mgmt = DHCP client
       #
       {
         "06-br-mgmt" = {
@@ -147,48 +199,75 @@ in
 
       #
       # Fabric trunk physical port
-      # FIX: instantiate ALL transit VLANs here
       #
       {
         "10-trunk-port" = {
           matchConfig.Name = trunkParent;
           networkConfig = {
-            Bridge = trunkBridge;
+            Bridge = uplinkBridge;
             DHCP = "no";
             IPv6AcceptRA = false;
             ConfigureWithoutCarrier = true;
 
-            VLAN = map (vid: trunkTransitVlanIf (transitVidFor vid)) tenantVlans;
+            VLAN = allVlansOnTrunk;
           };
         };
       }
 
+      #
+      # Uplink bridge
+      #
       {
-        "11-br-lan-trunk" = {
-          matchConfig.Name = trunkBridge;
+        "11-uplink-bridge" = {
+          matchConfig.Name = uplinkBridge;
           networkConfig.ConfigureWithoutCarrier = true;
         };
       }
     ]
 
     #
-    # Bring up each per-tenant transit bridge
+    # Bring up each LAN bridge
     #
     ++ map (vid: {
-      "30-tr${toString (transitVidFor vid)}" = {
-        matchConfig.Name = "tr${toString (transitVidFor vid)}";
+      "12-${lanBridgeFor vid}" = {
+        matchConfig.Name = lanBridgeFor vid;
         networkConfig.ConfigureWithoutCarrier = true;
       };
     }) tenantVlans
 
     #
-    # FIX: bridge eth0.<VID> into tr<VID>
+    # Bring up each transit bridge
     #
     ++ map (vid: {
-      "41-port-${trunkTransitVlanIf (transitVidFor vid)}" = {
-        matchConfig.Name = trunkTransitVlanIf (transitVidFor vid);
+      "20-${transitBridgeFor vid}" = {
+        matchConfig.Name = transitBridgeFor vid;
+        networkConfig.ConfigureWithoutCarrier = true;
+      };
+    }) tenantVlans
+
+    #
+    # Bridge eth0.<LANVID> → br-lan-<LANVID>
+    #
+    ++ map (vid: {
+      "30-port-${lanVlanIfFor vid}" = {
+        matchConfig.Name = lanVlanIfFor vid;
         networkConfig = {
-          Bridge = "tr${toString (transitVidFor vid)}";
+          Bridge = lanBridgeFor vid;
+          DHCP = "no";
+          IPv6AcceptRA = false;
+          ConfigureWithoutCarrier = true;
+        };
+      };
+    }) tenantVlans
+
+    #
+    # Bridge eth0.<TRANSITVID> → tr<TRANSITVID>
+    #
+    ++ map (vid: {
+      "31-port-${transitVlanIfFor vid}" = {
+        matchConfig.Name = transitVlanIfFor vid;
+        networkConfig = {
+          Bridge = transitBridgeFor vid;
           DHCP = "no";
           IPv6AcceptRA = false;
           ConfigureWithoutCarrier = true;
@@ -197,4 +276,3 @@ in
     }) tenantVlans
   );
 }
-
