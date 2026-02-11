@@ -19,6 +19,6 @@ in
     ./host-config
     ./mount-utils.nix
     ./sops.nix
-    #./container-settings.nix
+    ./container-settings.nix
   ];
 }

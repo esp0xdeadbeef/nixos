@@ -1,0 +1,71 @@
+flush ruleset
+
+table inet filter {
+  chain input {
+    type filter hook input priority 0;
+
+    iif lo accept
+    ct state { established, related } accept
+    ct state invalid drop
+
+    iifname "ppp0" ip saddr {
+      10.0.0.0/8,
+      172.16.0.0/12,
+      192.168.0.0/16,
+      100.64.0.0/10,
+      169.254.0.0/16,
+      0.0.0.0/8,
+      127.0.0.0/8,
+      224.0.0.0/4,
+      240.0.0.0/4
+    } drop
+
+    iifname != "ppp0" icmpv6 type { 133, 134 } drop
+    iifname "ppp0" ip6 saddr fc00::/7 drop
+    iifname "ppp0" meta l4proto ipv6-icmp accept
+
+    accept
+  }
+
+  chain forward {
+    type filter hook forward priority 0;
+
+    ct state { established, related } accept
+    ct state invalid drop
+
+    iifname "ppp0" ip saddr {
+      10.0.0.0/8,
+      172.16.0.0/12,
+      192.168.0.0/16,
+      100.64.0.0/10
+    } drop
+
+    iifname "ppp0" ip6 saddr fc00::/7 drop
+    accept
+  }
+
+  chain output {
+    type filter hook output priority 0;
+    accept
+  }
+}
+
+table ip nat {
+  chain postrouting {
+    type nat hook postrouting priority 100;
+
+    ip saddr 10.0.0.0/8 oifname "ppp0" masquerade
+    ip saddr 172.16.0.0/12 oifname "ppp0" masquerade
+    ip saddr 192.168.0.0/16 oifname "ppp0" masquerade
+  }
+}
+
+table inet mangle {
+  chain forward {
+    type filter hook forward priority mangle;
+    policy accept;
+
+    oifname "ppp0" tcp flags syn tcp option maxseg size set rt mtu
+  }
+}
+

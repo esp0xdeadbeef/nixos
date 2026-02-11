@@ -36,6 +36,10 @@ in
       description = "s-router-core VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
     })
+    (mkVM "s-router-legacy-core" {
+      description = "s-router-core VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-legacy-core"}";
+    })
     (mkVM "s-router-access" {
       description = "s-router-access VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
