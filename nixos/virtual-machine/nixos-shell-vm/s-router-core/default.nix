@@ -1,24 +1,25 @@
+# FILE: ./s-router-core/default.nix
+# ./default.nix
 {
   outPath,
   lib,
   config,
-  vmRoot,
   ...
 }:
+
 let
-  vmRoot =
-    let
-      file = __curPos.file;
-    in
-    builtins.dirOf file;
+  fabricInputs = import "${outPath}/library/100-fabric-routing/inputs";
 in
 {
-  _module.args.vmRoot = vmRoot;
-
   imports = [
-    ./host-config
+    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    ./host-network.nix
     ./mount-utils.nix
+    ./container-settings.nix
+    ./debugging-packages.nix
     ./sops.nix
-    #./container-settings.nix
   ];
+
+  _module.args.fabricInputs = fabricInputs;
 }
+
