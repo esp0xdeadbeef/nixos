@@ -24,17 +24,9 @@ let
   mkWanLink =
     name: wan:
     let
-      ip4 =
-        if builtins.hasAttr "ip4" wan then
-          "${stripCidr wan.ip4}/32"
-        else
-          null;
+      ip4 = if builtins.hasAttr "ip4" wan then "${stripCidr wan.ip4}/32" else null;
 
-      ip6 =
-        if builtins.hasAttr "ip6" wan then
-          "${stripCidr wan.ip6}/128"
-        else
-          null;
+      ip6 = if builtins.hasAttr "ip6" wan then "${stripCidr wan.ip6}/128" else null;
     in
     {
       kind = "wan";
@@ -43,18 +35,17 @@ let
       name = "wan-${name}";
       members = [ "s-router-core-wan" ];
       endpoints = {
-        "s-router-core-wan" =
-          {
-            routes4 = lib.optional (ip4 != null) {
-              dst = "0.0.0.0/0";
-            };
+        "s-router-core-wan" = {
+          routes4 = lib.optional (ip4 != null) {
+            dst = "0.0.0.0/0";
+          };
 
-            routes6 = lib.optional (ip6 != null) {
-              dst = "::/0";
-            };
-          }
-          // lib.optionalAttrs (ip4 != null) { addr4 = ip4; }
-          // lib.optionalAttrs (ip6 != null) { addr6 = ip6; };
+          routes6 = lib.optional (ip6 != null) {
+            dst = "::/0";
+          };
+        }
+        // lib.optionalAttrs (ip4 != null) { addr4 = ip4; }
+        // lib.optionalAttrs (ip6 != null) { addr6 = ip6; };
       };
     };
 
@@ -71,4 +62,3 @@ import ../routing-gen.nix {
   inherit lib;
   inherit (cfg) ulaPrefix tenantV4Base;
 } withWan
-

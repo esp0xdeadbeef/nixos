@@ -1,4 +1,6 @@
-{ lib ? null }:
+{
+  lib ? null,
+}:
 
 let
   outPath = builtins.getEnv "outPath";
@@ -6,10 +8,7 @@ let
   secretsFile = "${outPath}/secrets/s-routers-public-ips.yaml";
 
   sopsData =
-    if builtins.pathExists secretsFile then
-      builtins.fromJSON (builtins.readFile secretsFile)
-    else
-      { };
+    if builtins.pathExists secretsFile then builtins.fromJSON (builtins.readFile secretsFile) else { };
 
   base = import ../inputs;
 
@@ -21,4 +20,3 @@ let
 
 in
 merged
-

@@ -1,5 +1,13 @@
 # FILE: ./s-router-core/container/default.nix
-{ config, pkgs, lib, outPath, vid, guestIf, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  outPath,
+  vid,
+  guestIf,
+  ...
+}:
 
 let
   lanIf = guestIf;
@@ -47,4 +55,3 @@ in
   networking.firewall.enable = false;
   services.resolved.enable = true;
 }
-

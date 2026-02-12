@@ -8,7 +8,11 @@
 
 let
   fabric = import "${outPath}/library/100-fabric-routing/inputs";
-  upstreamVlans = fabric.upstreamVlans or [ 4 5 ];
+  upstreamVlans =
+    fabric.upstreamVlans or [
+      4
+      5
+    ];
 
   lanBridge = "br-lan-trunk";
 
@@ -50,4 +54,3 @@ in
 {
   containers = lib.listToAttrs (map mkContainer upstreamVlans);
 }
-
