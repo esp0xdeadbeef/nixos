@@ -1,20 +1,18 @@
-# FILE: ./s-router-core/container-settings.nix
+# ./s-router-core/container-settings.nix
 {
   config,
   lib,
-  outPath,
+  fabricInputs,
   ...
 }:
 
 let
-  fabric = import "${outPath}/library/100-fabric-routing/inputs";
-  upstreamVlans =
-    fabric.upstreamVlans or [
-      4
-      5
-    ];
+  # For "core VPN containers per tenant", use tenantVlans (10..80)
+  tenantVlans = fabricInputs.tenantVlans;
 
-  lanBridge = "br-lan-trunk";
+  policyBase = fabricInputs.policyAccessTransitBase or 100;
+  transitVidFor = vid: policyBase + vid;
+  transitBridgeFor = vid: "tr${toString (transitVidFor vid)}";
 
   mkContainer =
     vid:
@@ -28,15 +26,14 @@ let
         autoStart = true;
         privateNetwork = true;
 
-        # Unique guest interface name per container
         extraVeths = {
           "${guestIf}" = {
-            hostBridge = lanBridge;
+            # IMPORTANT: attach to transit bridge, not tenant LAN bridge
+            hostBridge = transitBridgeFor vid;
           };
         };
 
         specialArgs = {
-          inherit outPath;
           vid = vid;
           guestIf = guestIf;
         };
@@ -52,5 +49,6 @@ let
 
 in
 {
-  containers = lib.listToAttrs (map mkContainer upstreamVlans);
+  containers = lib.listToAttrs (map mkContainer tenantVlans);
 }
+

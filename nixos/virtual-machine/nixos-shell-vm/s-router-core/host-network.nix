@@ -1,44 +1,39 @@
-# ./host-config/network.nix
-# FILE: s-router-access/host-config/network.nix
+# ./host-network.nix
+# FILE: s-router-core/host-network.nix
 {
-  outPath,
+  fabricInputs,
   lib,
   pkgs,
   ...
 }:
 
 let
-  cfg = import "${outPath}/library/100-fabric-routing/inputs";
+  cfg = fabricInputs;
 
   tenantVlans = cfg.tenantVlans;
-  policyBase = cfg.policyAccessTransitBase or 100;
 
-  transitVidFor = vid: policyBase + vid;
+  # Core router does NOT use access transit offsets
+  trunkParent = "eth0";
 
   mgmtParent = "eth1";
   mgmtVlanId = 2;
   mgmtVlanIf = "${mgmtParent}.${toString mgmtVlanId}";
-
-  trunkParent = "eth0";
 
   uplinkBridge = "br-lan-trunk";
 
   lanBridgeFor = vid: "br-lan-${toString vid}";
   lanVlanIfFor = vid: "${trunkParent}.${toString vid}";
 
-  transitBridgeFor = vid: "tr${toString (transitVidFor vid)}";
-  transitVlanIfFor = vid: "${trunkParent}.${toString (transitVidFor vid)}";
-
-  allVlansOnTrunk = (map lanVlanIfFor tenantVlans) ++ (map transitVlanIfFor tenantVlans);
+  allVlansOnTrunk = map lanVlanIfFor tenantVlans;
 in
 {
   networking.useNetworkd = true;
   systemd.network.enable = true;
   networking.useDHCP = false;
 
-  ############################
+  ############################################################
   # NETDEVS
-  ############################
+  ############################################################
   systemd.network.netdevs = lib.mkMerge (
     [
       #
@@ -71,7 +66,7 @@ in
       }
 
       #
-      # Uplink trunk bridge
+      # Fabric trunk bridge
       #
       {
         "10-${uplinkBridge}" = {
@@ -88,28 +83,12 @@ in
     ]
 
     #
-    # Per-tenant LAN bridges
+    # Per-tenant LAN bridges ONLY (no transit bridges on core)
     #
     ++ map (vid: {
       "12-${lanBridgeFor vid}" = {
         netdevConfig = {
           Name = lanBridgeFor vid;
-          Kind = "bridge";
-        };
-        bridgeConfig = {
-          STP = false;
-          ForwardDelaySec = 0;
-        };
-      };
-    }) tenantVlans
-
-    #
-    # Per-tenant transit bridges
-    #
-    ++ map (vid: {
-      "20-${transitBridgeFor vid}" = {
-        netdevConfig = {
-          Name = transitBridgeFor vid;
           Kind = "bridge";
         };
         bridgeConfig = {
@@ -131,24 +110,11 @@ in
         vlanConfig.Id = vid;
       };
     }) tenantVlans
-
-    #
-    # Transit VLAN subinterfaces on eth0
-    #
-    ++ map (vid: {
-      "31-${transitVlanIfFor vid}" = {
-        netdevConfig = {
-          Name = transitVlanIfFor vid;
-          Kind = "vlan";
-        };
-        vlanConfig.Id = transitVidFor vid;
-      };
-    }) tenantVlans
   );
 
-  ############################
+  ############################################################
   # NETWORKS
-  ############################
+  ############################################################
   systemd.network.networks = lib.mkMerge (
 
     [
@@ -208,7 +174,6 @@ in
             DHCP = "no";
             IPv6AcceptRA = false;
             ConfigureWithoutCarrier = true;
-
             VLAN = allVlansOnTrunk;
           };
         };
@@ -236,17 +201,7 @@ in
     }) tenantVlans
 
     #
-    # Bring up each transit bridge
-    #
-    ++ map (vid: {
-      "20-${transitBridgeFor vid}" = {
-        matchConfig.Name = transitBridgeFor vid;
-        networkConfig.ConfigureWithoutCarrier = true;
-      };
-    }) tenantVlans
-
-    #
-    # Bridge eth0.<LANVID> → br-lan-<LANVID>
+    # Bridge eth0.<VID> → br-lan-<VID>
     #
     ++ map (vid: {
       "30-port-${lanVlanIfFor vid}" = {
@@ -259,20 +214,6 @@ in
         };
       };
     }) tenantVlans
-
-    #
-    # Bridge eth0.<TRANSITVID> → tr<TRANSITVID>
-    #
-    ++ map (vid: {
-      "31-port-${transitVlanIfFor vid}" = {
-        matchConfig.Name = transitVlanIfFor vid;
-        networkConfig = {
-          Bridge = transitBridgeFor vid;
-          DHCP = "no";
-          IPv6AcceptRA = false;
-          ConfigureWithoutCarrier = true;
-        };
-      };
-    }) tenantVlans
   );
 }
+

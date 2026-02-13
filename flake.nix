@@ -186,14 +186,7 @@
 
       formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
 
-      overlays =
-        (if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { })
-        // {
-          router = final: prev: {
-            vpn-gateway = inputs.nixos-router-vpn-gateway.packages.${prev.system}.default;
-          };
-        };
-
+      overlays = if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { };
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
 
       homeManagerModules =
@@ -216,14 +209,6 @@
             outPath = self.outPath;
           };
           modules = [
-            (
-              { ... }:
-              {
-                nixpkgs.overlays = lib.optional (
-                  lib.hasPrefix "s-router-" name && !(lib.hasInfix "legacy" name)
-                ) self.overlays.router;
-              }
-            )
             (./. + "/${path}")
           ];
         }
