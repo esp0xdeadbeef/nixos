@@ -26,6 +26,9 @@
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
+    nixos-network-compiler = {
+      url = "github:esp0xdeadbeef/nixos-network-compiler";
+    };
     nixvim = {
       url = "github:nix-community/nixvim";
     };
@@ -33,32 +36,10 @@
       url = "github:khaneliman/khanelivim";
     };
 
-    # This doesn't work:
-    # obsidian-nvim = {
-    #   url = "github:epwalsh/obsidian.nvim";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
-
-    # Required, nvf works best and only directly supports flakes
     nvf = {
       url = "github:NotAShelf/nvf";
-      # You can override the input nixpkgs to follow your system's
-      # instance of nixpkgs. This is safe to do as nvf does not depend
-      # on a binary cache.
       inputs.nixpkgs.follows = "nixpkgs";
-      # Optionally, you can also override individual plugins
-      # for example:
-      # inputs.obsidian-nvim.follows = "obsidian-nvim"; # <- this will use the obsidian-nvim from your inputs
     };
-
-    # zen-browser = {
-    #   url = "github:0xc000022070/zen-browser-flake";
-    #   # IMPORTANT: we're using "libgbm" and is only available in unstable so ensure
-    #   # to have it up-to-date or simply don't specify the nixpkgs input
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
-    # You can access packages and modules from different nixpkgs revs
-    # Also see the 'unstable-packages' overlay at 'overlays/default.nix'.
 
     lanzaboote = {
       url = "github:nix-community/lanzaboote";
@@ -205,7 +186,13 @@
 
       formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
 
-      overlays = if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { };
+      overlays =
+        (if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { })
+        // {
+          router = final: prev: {
+            vpn-gateway = inputs.nixos-router-vpn-gateway.packages.${prev.system}.default;
+          };
+        };
 
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
 
@@ -229,6 +216,14 @@
             outPath = self.outPath;
           };
           modules = [
+            (
+              { ... }:
+              {
+                nixpkgs.overlays = lib.optional (
+                  lib.hasPrefix "s-router-" name && !(lib.hasInfix "legacy" name)
+                ) self.overlays.router;
+              }
+            )
             (./. + "/${path}")
           ];
         }
