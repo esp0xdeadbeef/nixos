@@ -93,9 +93,9 @@ in
     let
       stable = with pkgs; [
         htop
-        teams-for-linux
+        # need this because screenshareing is fcked because microslob is doing its thing:
+        #teams-for-linux
         intune-portal
-        #microsoft-edge
         xdotool
         azure-cli
         i3status-rust
@@ -116,6 +116,8 @@ in
         exploitdb
         netexec
         #certipy
+        teams-for-linux
+slack
         (burpsuite.override { proEdition = true; })
         gh
       ];
