@@ -41,7 +41,6 @@
     ./neovim-on-steroids/neovim.nix
     ./unmount-pentest-directory/unmount-hook.nix
     ./work-packages/wordlists/packages.nix
-    ./work-packages/work/packages.nix
 
     "${outPath}/library/01-general"
 
