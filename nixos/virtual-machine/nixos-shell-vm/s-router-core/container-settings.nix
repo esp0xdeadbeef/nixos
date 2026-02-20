@@ -1,54 +1,59 @@
-# ./s-router-core/container-settings.nix
 {
   config,
+  outPath,
+  pkgs,
   lib,
-  fabricInputs,
   ...
 }:
 
 let
-  # For "core VPN containers per tenant", use tenantVlans (10..80)
-  tenantVlans = fabricInputs.tenantVlans;
-
-  policyBase = fabricInputs.policyAccessTransitBase or 100;
-  transitVidFor = vid: policyBase + vid;
-  transitBridgeFor = vid: "tr${toString (transitVidFor vid)}";
-
-  mkContainer =
-    vid:
-    let
-      name = "s-router-core-vpn-${toString vid}";
-      guestIf = "uplink-${toString vid}";
-    in
-    {
-      inherit name;
-      value = {
-        autoStart = true;
-        privateNetwork = true;
-
-        extraVeths = {
-          "${guestIf}" = {
-            # IMPORTANT: attach to transit bridge, not tenant LAN bridge
-            hostBridge = transitBridgeFor vid;
-          };
-        };
-
-        specialArgs = {
-          vid = vid;
-          guestIf = guestIf;
-        };
-
-        config = ./container;
-
-        additionalCapabilities = [
-          "CAP_NET_ADMIN"
-          "CAP_NET_RAW"
-        ];
-      };
-    };
-
+  lanIf = "eth0"; # full LAN trunk
+  wanIf = "eth1"; # full WAN trunk
 in
 {
-  containers = lib.listToAttrs (map mkContainer tenantVlans);
-}
+  ## Secrets
+  sops.secrets.pppoe-username = { };
+  sops.secrets.pppoe-password = { };
 
+  ## Host network backend (host only keeps management)
+  networking.useNetworkd = true;
+  networking.networkmanager.enable = false;
+  systemd.network.enable = true;
+
+  ##########################################################################
+  # NO VLANs, NO bridges, NO netdevs, NO networks for eth0/eth1
+  # They are passed RAW into the container.
+  ##########################################################################
+
+  ## Container = real router
+  containers."${config.networking.hostName}-isp" = {
+    autoStart = true;
+    privateNetwork = true;
+
+    # Pass raw trunks
+    #extraVeths = {
+    #  lan.hostInterface = lanIf;  # full LAN trunk
+    #  wan.hostInterface = wanIf;  # full WAN trunk
+    #};
+    #extraVeths = {
+    #  lan.hostBridge = "br-lan-trunk";
+    #  wan.hostBridge = "br-wan-trunk";
+    #};
+    extraVeths = {
+  wan.hostBridge = "br-upstream";
+  lan.hostBridge = "br-fabric";
+};
+
+
+    specialArgs = {
+      inherit outPath;
+    };
+
+    additionalCapabilities = [
+      "CAP_NET_ADMIN"
+      "CAP_NET_RAW"
+    ];
+
+    config = ./container;
+  };
+}

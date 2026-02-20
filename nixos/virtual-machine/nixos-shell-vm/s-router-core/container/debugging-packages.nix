@@ -1,23 +1,21 @@
 { pkgs, lib, ... }:
 {
+  programs.neovim = {
+    enable = true;
+    defaultEditor = true;
+  };
 
   environment.systemPackages = with pkgs; [
-    conntrack-tools
     traceroute
     nmap
     dnsutils
+    radvd
+    dhcpcd
+    networkmanager
     ppp
     iproute2
     tcpdump
     tmux
     kea
-    dhcpcd
-    networkmanager
-    dig
-    neovim
-    nftables
-    unbound # for unbound-control
   ];
-
-  environment.etc.hosts.enable = false;
 }

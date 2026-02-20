@@ -1,84 +1,67 @@
-# ~/github/nixos/library/100-fabric-routing/inputs/default.nix
+{
+  site-a = {
+    fabric = {
+      name = "single-wan";
+      ulaPrefix = "fd42:dead:beef";
+    };
 
-let
-  base = rec {
-    tenantVlans = [
-      10
-      20
-      30
-      40
-      50
-      60
-      70
-      80
-    ];
+    p2p-pool = {
+      ipv4 = "10.10.0.0/24";
+      ipv6 = "fd42:dead:beef:1000::/118";
+    };
 
-    ulaPrefix = "fd42:dead:beef";
-    tenantV4Base = "10.10";
+    nodes = {
+      s-router-core.role = "core";
+      s-router-policy.role = "policy";
 
-    policyAccessTransitBase = 100;
-    policyAccessOffset = 0;
-
-    corePolicyTransitVlan = 200;
-
-    defaultRouteMode = "default";
-
-    links = {
-      isp-1 = {
-        kind = "wan";
-        carrier = "wan";
-        vlanId = 4;
-        name = "isp-1";
-        members = [ "s-router-core-wan" ];
-        endpoints = {
-          "s-router-core-wan" = {
-            addr4 = "10.11.0.50/24";
-            addr6 = "fd11:dead:beef:0:7464:55fe:8745:d98c/64";
-
-            routes4 = [
-              { dst = "0.0.0.0/0"; via4 = "10.11.0.1"; }
-            ];
-
-            routes6 = [
-              { dst = "::/0"; }
-            ];
-          };
+      s-router-access-mgmt = {
+        role = "access";
+        networks = {
+          ipv4 = "10.20.10.128/24";
+          ipv6 = "fd42:dead:beef:10::/64";
+          kind = "client";
         };
       };
+    };
 
-      isp-2 = {
-        kind = "wan";
-        carrier = "wan";
-        vlanId = 5;
-        name = "isp-2";
-        members = [ "s-router-core-wan" ];
-        endpoints = {
-          "s-router-core-wan" = {
-            addr6 = "2001:db8:2::2/48";
+    links = [
+      [
+        "s-router-core"
+        "s-router-policy"
+      ]
+      [
+        "s-router-policy"
+        "s-router-access-mgmt"
+      ]
+    ];
+  };
+  site-b = {
+    p2p-pool = {
+      ipv4 = "10.11.0.0/24";
+      ipv6 = "fd42:dead:beef:1100::/118";
+    };
+    links = [
+      [
+        "s-router-core"
+        "s-router-policy"
+      ]
+      [
+        "s-router-policy"
+        "s-router-access-mgmt"
+      ]
+    ];
+    nodes = {
+      s-router-core.role = "core";
+      s-router-policy.role = "policy";
 
-            routes6 =
-              if defaultRouteMode == "default" then
-                [
-                  { dst = "::/0"; }
-                ]
-              else
-                [ ];
-          };
+      s-router-access-mgmt = {
+        role = "access";
+        networks = {
+          ipv4 = "10.30.10.0/24";
+          ipv6 = "fd42:dead:beef:11::/64";
+          kind = "client";
         };
       };
     };
   };
-in
-base
-// {
-  sopsData = { };
-
-  __functor =
-    _self: { sopsData ? { } }:
-    base
-    // sopsData
-    // {
-      inherit sopsData;
-    };
 }
-
