@@ -3,7 +3,7 @@
   networking.useNetworkd = true;
   systemd.network.enable = true;
   systemd.services.systemd-networkd.enable = true;
-  networking.useDHCP = false;
+  #networking.useDHCP = false;
   networking.useHostResolvConf = lib.mkForce false;
 
   services.resolved.enable = true;
