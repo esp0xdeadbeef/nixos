@@ -1,4 +1,9 @@
-{ lib, fabricNodeContext, containerName, ... }:
+{
+  lib,
+  fabricNodeContext,
+  containerName,
+  ...
+}:
 
 let
   ifName = "${containerName}-lan";
@@ -14,15 +19,16 @@ let
         ${builtins.toJSON fabricNodeContext}
       '';
 
-  candidates =
-    lib.filterAttrs
-      (_: v: builtins.isAttrs v && (v.kind or null) == "p2p" && (v.peer or null) == "s-router-policy")
-      ifaces;
+  candidates = lib.filterAttrs (
+    _: v: builtins.isAttrs v && (v.kind or null) == "p2p" && (v.peer or null) == "s-router-policy"
+  ) ifaces;
 
   names = builtins.attrNames candidates;
 
   _one =
-    if builtins.length names == 1 then true else
+    if builtins.length names == 1 then
+      true
+    else
       throw ''
         container: expected exactly 1 p2p interface to s-router-policy
 
@@ -39,7 +45,9 @@ let
   iface = candidates.${ifaceName};
 
   addr4 =
-    if iface ? addr4 && iface.addr4 != null then iface.addr4 else
+    if iface ? addr4 && iface.addr4 != null then
+      iface.addr4
+    else
       throw ''
         container: p2p iface '${ifaceName}' missing addr4
 
@@ -48,7 +56,9 @@ let
       '';
 
   addr6 =
-    if iface ? addr6 && iface.addr6 != null then iface.addr6 else
+    if iface ? addr6 && iface.addr6 != null then
+      iface.addr6
+    else
       throw ''
         container: p2p iface '${ifaceName}' missing addr6
 

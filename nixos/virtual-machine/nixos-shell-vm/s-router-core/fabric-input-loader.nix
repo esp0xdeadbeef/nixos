@@ -26,17 +26,16 @@ let
   };
 
   debugScript = ''
-    mkdir -p /tmp
-    cat > ${debugFile} <<'EOF'
-${debugPayload}
-EOF
+        mkdir -p /tmp
+        cat > ${debugFile} <<'EOF'
+    ${debugPayload}
+    EOF
   '';
 in
 {
   _module.args.fabricCompiled = compiled;
 
-  system.activationScripts.fabricDebug =
-    lib.mkIf fabricDebug {
-      text = debugScript;
-    };
+  system.activationScripts.fabricDebug = lib.mkIf fabricDebug {
+    text = debugScript;
+  };
 }

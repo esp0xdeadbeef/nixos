@@ -9,20 +9,14 @@
 let
   hostname = config.networking.hostName;
 
-  siteKey =
-    lib.findFirst
-      (site:
-        builtins.hasAttr hostname fabricCompiled.${site}.nodes
-      )
-      (throw ''
-        container-settings:
+  siteKey = lib.findFirst (site: builtins.hasAttr hostname fabricCompiled.${site}.nodes) (throw ''
+    container-settings:
 
-        Host '${hostname}' does not exist in compiled fabric.
+    Host '${hostname}' does not exist in compiled fabric.
 
-        Available sites:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames fabricCompiled)}
-      '')
-      (builtins.attrNames fabricCompiled);
+    Available sites:
+    ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames fabricCompiled)}
+  '') (builtins.attrNames fabricCompiled);
 
   site = fabricCompiled.${siteKey};
 
@@ -38,7 +32,8 @@ let
 
   isBoxAttr =
     name: v:
-    builtins.isAttrs v && !(lib.elem name [
+    builtins.isAttrs v
+    && !(lib.elem name [
       "role"
       "networks"
       "interfaces"
@@ -60,8 +55,12 @@ let
         privateNetwork = true;
 
         extraVeths = {
-          "${cname}-wan" = { hostBridge = "br-upstream"; };
-          "${cname}-lan" = { hostBridge = "br-fabric"; };
+          "${cname}-wan" = {
+            hostBridge = "br-upstream";
+          };
+          "${cname}-lan" = {
+            hostBridge = "br-fabric";
+          };
         };
 
         specialArgs = {
@@ -78,8 +77,7 @@ let
       };
     };
 
-  containersGenerated =
-    builtins.listToAttrs (map mkContainer boxes);
+  containersGenerated = builtins.listToAttrs (map mkContainer boxes);
 
 in
 {

@@ -117,7 +117,7 @@ in
         netexec
         #certipy
         teams-for-linux
-slack
+        slack
         (burpsuite.override { proEdition = true; })
         gh
       ];

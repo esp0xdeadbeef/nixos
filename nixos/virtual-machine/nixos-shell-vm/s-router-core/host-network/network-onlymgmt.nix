@@ -23,7 +23,7 @@ in
 {
 
   environment.systemPackages = with pkgs; [
-    dnsutils 
+    dnsutils
     openvpn
     wireguard-tools
     tcpdump
@@ -41,7 +41,7 @@ in
     routingPolicyRules = [
       {
         Priority = 100;
-        From = "192.168.1.0/24"; 
+        From = "192.168.1.0/24";
         Table = "main";
       }
     ];
