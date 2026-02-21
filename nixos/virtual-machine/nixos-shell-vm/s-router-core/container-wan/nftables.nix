@@ -1,4 +1,3 @@
-# ./nftables.nix
 { lib, ... }:
 {
   networking.nftables.enable = true;

@@ -9,9 +9,6 @@
 let
   hostname = config.networking.hostName;
 
-  # --------------------------------------------------
-  # Find which site this machine belongs to
-  # --------------------------------------------------
   siteKey =
     lib.findFirst
       (site:
@@ -29,9 +26,6 @@ let
 
   site = fabricCompiled.${siteKey};
 
-  # --------------------------------------------------
-  # Extract THIS node from compiled topology
-  # --------------------------------------------------
   node =
     if site.nodes ? ${hostname} then
       site.nodes.${hostname}
@@ -42,9 +36,6 @@ let
         Node '${hostname}' missing inside site '${siteKey}'
       '';
 
-  # --------------------------------------------------
-  # execution contexts (boxes)
-  # --------------------------------------------------
   isBoxAttr =
     name: v:
     builtins.isAttrs v && !(lib.elem name [
@@ -55,14 +46,12 @@ let
 
   boxes = builtins.attrNames (lib.filterAttrs isBoxAttr node);
 
-  # --------------------------------------------------
-  # create one container per box
-  # --------------------------------------------------
   mkContainer =
     boxName:
     let
       fabricNodeContext = node.${boxName};
       containerPath = ./. + "/container-${boxName}";
+      cname = boxName;
     in
     {
       name = "${hostname}-${boxName}";
@@ -70,14 +59,14 @@ let
         autoStart = true;
         privateNetwork = true;
 
-        # host bridges trunked into router
         extraVeths = {
-          wan.hostBridge = "br-upstream";
-          lan.hostBridge = "br-fabric";
+          "${cname}-wan" = { hostBridge = "br-upstream"; };
+          "${cname}-lan" = { hostBridge = "br-fabric"; };
         };
 
         specialArgs = {
           inherit fabricNodeContext;
+          containerName = cname;
         };
 
         additionalCapabilities = [

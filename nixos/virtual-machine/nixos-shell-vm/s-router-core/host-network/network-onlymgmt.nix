@@ -16,7 +16,6 @@ let
   vpnIPv4WithMask = "10.90.0.1/24";
   vpnIPv6WithMask = "fd90:dead:beef::100/64";
 
-  # ignore this
   vrf_table_vpn = 10;
   vrf_name_vpn = "vrf-vpn";
 
@@ -24,10 +23,7 @@ in
 {
 
   environment.systemPackages = with pkgs; [
-    # coreutils
-    # python3
-    # coreutils
-    dnsutils # dig
+    dnsutils 
     openvpn
     wireguard-tools
     tcpdump
@@ -45,7 +41,7 @@ in
     routingPolicyRules = [
       {
         Priority = 100;
-        From = "192.168.1.0/24"; # or just your mgmt IP /32
+        From = "192.168.1.0/24"; 
         Table = "main";
       }
     ];
@@ -53,6 +49,5 @@ in
 
   networking.useNetworkd = true;
 
-  # Disable networkd-wait-online
   systemd.services.systemd-networkd-wait-online.enable = pkgs.lib.mkForce false;
 }

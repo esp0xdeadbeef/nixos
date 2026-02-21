@@ -1,9 +1,14 @@
+{ containerName, ... }:
+
+let
+  ifName = "${containerName}-wan";
+in
 {
-  systemd.network.networks."10-wan" = {
-    matchConfig.Name = "wan";
+  systemd.network.networks."10-${ifName}" = {
+    matchConfig.Name = ifName;
 
     networkConfig = {
-      DHCP = "yes";
+      DHCP = "ipv4";
       IPv6AcceptRA = true;
 
       IPv4Forwarding = true;
@@ -13,4 +18,3 @@
     };
   };
 }
-

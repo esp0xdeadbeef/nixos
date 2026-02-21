@@ -33,7 +33,6 @@ EOF
   '';
 in
 {
-  # ← THIS is the important part
   _module.args.fabricCompiled = compiled;
 
   system.activationScripts.fabricDebug =

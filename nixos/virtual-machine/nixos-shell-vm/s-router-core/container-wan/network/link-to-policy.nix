@@ -1,7 +1,8 @@
-# ./container-isp/network/link-to-policy.nix
-{ lib, fabricNodeContext, ... }:
+{ lib, fabricNodeContext, containerName, ... }:
 
 let
+  ifName = "${containerName}-lan";
+
   ifaces =
     if fabricNodeContext ? interfaces && builtins.isAttrs fabricNodeContext.interfaces then
       fabricNodeContext.interfaces
@@ -13,7 +14,6 @@ let
         ${builtins.toJSON fabricNodeContext}
       '';
 
-  # pick the p2p iface whose peer is the policy node
   candidates =
     lib.filterAttrs
       (_: v: builtins.isAttrs v && (v.kind or null) == "p2p" && (v.peer or null) == "s-router-policy")
@@ -57,9 +57,8 @@ let
       '';
 in
 {
-  # Container only configures the unique `lan` interface.
-  systemd.network.networks."20-fabric" = {
-    matchConfig.Name = "lan";
+  systemd.network.networks."20-${ifName}" = {
+    matchConfig.Name = ifName;
 
     addresses = [
       { Address = addr4; }

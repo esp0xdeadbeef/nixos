@@ -8,10 +8,8 @@ in
   imports = [
     (mkMgmt "eth0" 2 { bridge = "vlan2"; })
 
-    # Upstream network (real LAN gateway lives here)
     (mkBridge "eth0" 6 { bridge = "br-upstream"; })
 
-    # Fabric transit network (ONLY routers live here)
     (mkBridge "eth0" 200 { bridge = "br-fabric"; })
   ];
 }
