@@ -83,7 +83,6 @@
     autotiling
     lshw
     neofetch
-    hashcat
 
     # virtualization:
     podman

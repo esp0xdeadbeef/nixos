@@ -11,6 +11,7 @@
     ./network/firewall.nix
     ./network/nat-lxc.nix
     ./network/nmcli.nix
+    ./password-cracking
     ./packages/1-general/archive-tools.nix
     ./packages/1-general/tooling.nix
     ./packages/audio/packages.nix
