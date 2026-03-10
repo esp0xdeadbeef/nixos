@@ -15,4 +15,5 @@
     ];
     host = "0.0.0.0";
   };
+  networking.firewall.interfaces.podman0.allowedTCPPorts = [ 11434 ];
 }
