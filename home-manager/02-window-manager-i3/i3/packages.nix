@@ -360,7 +360,7 @@
       exec_always --no-startup-id ${pkgs.spotify}/bin/spotify
       
       # write gh token to ~/.config/nix/nix.conf
-      exec --no-startup-id bash -c "echo \"access-tokens = github.com=$(${gh}/bin/gh auth token)\" >> ~/.config/nix/nix.conf"
+      exec --no-startup-id bash -c "echo \"access-tokens = github.com=$(${pkgs.gh}/bin/gh auth token)\" >> ~/.config/nix/nix.conf"
     '';
     # path = "${config.home.homeDirectory}/.config/i3/config";
   };
