@@ -29,6 +29,12 @@
     nixos-network-compiler = {
       url = "github:esp0xdeadbeef/nixos-network-compiler";
     };
+    network-forwarding-model = {
+      url = "github:esp0xdeadbeef/network-forwarding-model";
+    };
+    network-renderer-nixos = {
+      url = "github:esp0xdeadbeef/network-renderer-nixos";
+    };
     nixvim = {
       url = "github:nix-community/nixvim";
     };
