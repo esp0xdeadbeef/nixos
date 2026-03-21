@@ -13,8 +13,8 @@
       "--impure"
       "--no-write-lock-file"
     ];
-    dates = "17:30";
-    randomizedDelaySec = "45min";
+    dates = "4:30";
+    randomizedDelaySec = "15min";
     operation = "boot";
     allowReboot = false;
   };
