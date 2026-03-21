@@ -17,7 +17,7 @@ in
   imports = [
     (mkMgmt "eth0" 2 { bridge = "vlan2"; })
 
-    (mkBridge "eth0" 6 { bridge = "br-upstream"; })
+    (mkBridge "eth0" 5 { bridge = "br-upstream"; })
 
     (mkBridge "eth0" 200 { bridge = "br-fabric"; })
   ];

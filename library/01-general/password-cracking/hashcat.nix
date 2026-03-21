@@ -2,7 +2,7 @@
 
 let
   pkgsCuda = import pkgs.path {
-    system = pkgs.system;
+    system = pkgs.stdenv.hostPlatform.system;
     config = {
       allowUnfree = true;
       cudaSupport = true;
