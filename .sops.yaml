@@ -13,7 +13,7 @@ keys:
   - &s-gameserver age16kxdq47yrc0hzapje3tsplrw6eerdxxzwqzj6emg8yyk6r5dzfcs9xelvd
   - &s-router-edge age1ceu4u9ujawzxctc7kf0f39cwjv7gnv250gnya60muqxa9qxfp5lscvjxj6
   - &s-router-legacy-edge age10n4xywtw8n3xjf6u5zp67hcc5s7htvpetkq0ndvvtyju88uued3s4r686d
-  - &s-router-infra age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
+  - &s-infra age1866sg8w2ex2ylc2aec5r7xc9uhvgny6v0x8rcmcm6s06jv2gc3jsdjzfmq
   - &s-nebula age1seqn6c56kxch7epv6dr3k43tx5eecj4aktlcg0njqg8ef3ewrvpq9vwsmw
   - &s-test age1n49y8n965sjwt6l8tk2nss5wcsww3qtg0rvqt974sz5npsvmpezs8pllr6
   - &s-router-core age16lrtp9fnvamca3g78pzr4jxcq0nzlj5vs4p5n5jerkxylnwh294syst0yh
@@ -150,7 +150,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-edge
-          - *s-router-infra
+          - *s-infra
           - *s-router-core
           - *s-router-access
 
@@ -211,7 +211,7 @@ creation_rules:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
-          - *s-router-infra
+          - *s-infra
   - path_regex: '^(secrets/)*s-nebula.*\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: '.*'
