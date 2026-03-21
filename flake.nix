@@ -26,15 +26,22 @@
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
-    nixos-network-compiler = {
-      url = "github:esp0xdeadbeef/nixos-network-compiler";
-    };
-    network-forwarding-model = {
-      url = "github:esp0xdeadbeef/network-forwarding-model";
-    };
-    network-renderer-nixos = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos";
-    };
+nixos-network-compiler = {
+  url = "github:esp0xdeadbeef/nixos-network-compiler";
+};
+
+network-forwarding-model = {
+  url = "github:esp0xdeadbeef/network-forwarding-model";
+};
+
+network-control-plane-model = {
+  url = "github:esp0xdeadbeef/network-control-plane-model";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+
+network-renderer-nixos = {
+  url = "github:esp0xdeadbeef/network-renderer-nixos";
+};
     nixvim = {
       url = "github:nix-community/nixvim";
     };

@@ -22,24 +22,28 @@ in
       description = "Nebula VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-nebula"}";
     })
-
-    (mkVM "s-router-policy-only" {
-      description = "s-router-policy-only VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-policy-only"}";
-    })
     (mkVM "s-router-legacy-edge" {
       description = "s-router-legacy-edge VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-legacy-edge"}";
-    })
-
-    (mkVM "s-router-core" {
-      description = "s-router-core VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
     })
     (mkVM "s-router-legacy-core" {
       description = "s-router-core VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-legacy-core"}";
     })
+    (mkVM "s-router-core" {
+      description = "s-router-core VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
+    })
+    (mkVM "s-router-upstream-selector" {
+      description = "s-router-upstream-selector VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
+    })
+
+    (mkVM "s-router-policy-only" {
+      description = "s-router-policy-only VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-policy-only"}";
+    })
+
     (mkVM "s-router-access" {
       description = "s-router-access VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-access"}";

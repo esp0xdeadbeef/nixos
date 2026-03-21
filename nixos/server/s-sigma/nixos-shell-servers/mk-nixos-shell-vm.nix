@@ -148,14 +148,17 @@ in
     '';
   };
 
-  systemd.timers.${imageServiceName} = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "${toString buildDelaySec}s";
-      OnUnitActiveSec = "${toString buildIntervalSec}s";
-      Unit = "${imageServiceName}.service";
-    };
-  };
+  systemd.services.nixos-upgrade.onSuccess = lib.mkAfter [ "${imageServiceName}.service" ];
+
+  # old configuration, based on time:
+  #systemd.timers.${imageServiceName} = {
+  #  wantedBy = [ "timers.target" ];
+  #  timerConfig = {
+  #    OnBootSec = "${toString buildDelaySec}s";
+  #    OnUnitActiveSec = "${toString buildIntervalSec}s";
+  #    Unit = "${imageServiceName}.service";
+  #  };
+  #};
 
   systemd.services.${vmServiceName} = {
     inherit description;

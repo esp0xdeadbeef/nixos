@@ -23,7 +23,8 @@ let
       '';
 
   enterpriseName =
-    let names = builtins.attrNames enterprises;
+    let
+      names = builtins.attrNames enterprises;
     in
     if builtins.length names == 1 then
       builtins.head names
@@ -53,7 +54,8 @@ let
       '';
 
   siteName =
-    let names = builtins.attrNames sites;
+    let
+      names = builtins.attrNames sites;
     in
     if builtins.length names == 1 then
       builtins.head names
@@ -148,13 +150,13 @@ let
           '';
 
       containerTemplate =
-        if role == "core" then
-          "wan"
+        if role == "upstream-selector" then
+          "upstream-selector"
         else
           throw ''
             container-settings:
 
-            Host '${hostname}' only supports core-role units right now.
+            Host '${hostname}' only supports upstream-selector-role units right now.
 
             Unit '${unitName}' has role '${role}'.
           '';
@@ -169,10 +171,10 @@ let
         privateNetwork = true;
 
         extraVeths = {
-          "${containerName}-wan" = {
+          "upstream-core" = {
             hostBridge = "br-upstream";
           };
-          "${containerName}-lan" = {
+          "upstream-policy" = {
             hostBridge = "br-fabric";
           };
         };
