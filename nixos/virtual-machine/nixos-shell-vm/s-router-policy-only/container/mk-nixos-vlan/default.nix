@@ -7,16 +7,14 @@ args@{ ... }:
     inherit args;
   };
 
+  networking.nftables.enable = true;
+
   networking.nftables.ruleset =
     let
-      # LANs with id >= 10
       markedLans = lib.filter (
         l:
         (l ? id)
         && (l.id >= 10)
-        &&
-          # explicitly exclude WAN 1010
-          !(l.iface == "lan1010")
       ) (args.lans or [ ]);
     in
     lib.mkMerge [

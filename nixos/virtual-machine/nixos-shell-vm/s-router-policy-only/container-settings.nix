@@ -3,28 +3,43 @@
   pkgs,
   lib,
   outPath,
+  controlPlaneOut,
   ...
 }:
 
 let
   hostname = config.networking.hostName;
-
   containerName = "${hostname}-container";
+
+  inventory = import ./inventory.nix { inherit lib outPath; };
+
+  nodeName =
+    let
+      nodeNames = builtins.attrNames inventory.realization.nodes;
+      matches = lib.filter (n: inventory.realization.nodes.${n}.host == hostname) nodeNames;
+    in
+    if matches == [ ] then
+      abort "container-settings.nix: no realization node found for host '${hostname}'"
+    else if builtins.length matches > 1 then
+      abort "container-settings.nix: multiple realization nodes found for host '${hostname}': ${lib.concatStringsSep ", " matches}"
+    else
+      builtins.head matches;
+
+  renderedContainer = import ./lib/renderer/render-containers.nix {
+    inherit lib inventory;
+    inherit nodeName;
+    hostName = hostname;
+    cpm = controlPlaneOut;
+  };
 in
 {
   containers.${containerName} = {
     autoStart = true;
 
-    # FIX: match working upstream-selector behavior
     privateNetwork = true;
     hostBridge = null;
 
-    # SINGLE trunk stays
-    extraVeths = {
-      "lan" = {
-        hostBridge = "br-lan-trunk";
-      };
-    };
+    extraVeths = renderedContainer.extraVeths;
 
     bindMounts."/persist" = {
       hostPath = "/persist";
@@ -47,23 +62,21 @@ in
     };
 
     specialArgs = {
-      inherit outPath;
+      inherit outPath controlPlaneOut;
     };
 
-    config = { outPath, ... }: {
+    config = { outPath, controlPlaneOut, ... }: {
       imports = [
         ./container
       ];
 
+      _module.args = {
+        inherit controlPlaneOut;
+      };
+
       networking.useNetworkd = true;
       systemd.network.enable = true;
       networking.useDHCP = false;
-
-      boot.kernel.sysctl = {
-        "net.ipv4.ip_forward" = 1;
-        "net.ipv6.conf.all.forwarding" = 1;
-        "net.ipv6.conf.default.forwarding" = 1;
-      };
 
       system.stateVersion = "25.11";
     };
@@ -80,10 +93,4 @@ in
   };
 
   sops.secrets.subnet-ipv6 = { };
-
-  sops.secrets.vlan2-hostnames-servers-json = {
-    sopsFile = "${outPath}/secrets/vlan2-hostnames-servers.json.age";
-    format = "binary";
-    path = "/run/secrets/vlan2-hostnames-servers.json";
-  };
 }

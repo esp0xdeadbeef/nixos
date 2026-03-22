@@ -1,4 +1,3 @@
-# FILE: ./container-settings.nix
 {
   config,
   pkgs,
@@ -10,34 +9,27 @@
 let
   hostname = config.networking.hostName;
 
+  inventoryImported = import ./inventory.nix;
+  inventory =
+    if builtins.isFunction inventoryImported then
+      inventoryImported { inherit lib; }
+    else
+      inventoryImported;
+
+  fabricInventory =
+    if inventory ? fabric then inventory.fabric else { };
+
   enterprises =
     if fabricCompiled ? enterprise && builtins.isAttrs fabricCompiled.enterprise then
       fabricCompiled.enterprise
     else
-      throw ''
-        container-settings:
-
-        fabricCompiled.enterprise missing.
-
-        Top-level keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames fabricCompiled)}
-      '';
+      throw "fabricCompiled.enterprise missing";
 
   enterpriseName =
-    let
-      names = builtins.attrNames enterprises;
+    let names = builtins.attrNames enterprises;
     in
-    if builtins.length names == 1 then
-      builtins.head names
-    else
-      throw ''
-        container-settings:
-
-        Expected exactly 1 enterprise.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
-      '';
+    if builtins.length names == 1 then builtins.head names
+    else throw "expected exactly 1 enterprise";
 
   enterprise = enterprises.${enterpriseName};
 
@@ -45,30 +37,13 @@ let
     if enterprise ? site && builtins.isAttrs enterprise.site then
       enterprise.site
     else
-      throw ''
-        container-settings:
-
-        enterprise.site missing for '${enterpriseName}'.
-
-        Enterprise keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames enterprise)}
-      '';
+      throw "enterprise.site missing";
 
   siteName =
-    let
-      names = builtins.attrNames sites;
+    let names = builtins.attrNames sites;
     in
-    if builtins.length names == 1 then
-      builtins.head names
-    else
-      throw ''
-        container-settings:
-
-        Expected exactly 1 site for enterprise '${enterpriseName}'.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
-      '';
+    if builtins.length names == 1 then builtins.head names
+    else throw "expected exactly 1 site";
 
   site = sites.${siteName};
 
@@ -76,27 +51,13 @@ let
     if site ? units && builtins.isAttrs site.units then
       site.units
     else
-      throw ''
-        container-settings:
-
-        site.units missing for ${enterpriseName}.${siteName}
-
-        Site keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames site)}
-      '';
+      throw "site.units missing";
 
   nodes =
     if site ? nodes && builtins.isAttrs site.nodes then
       site.nodes
     else
-      throw ''
-        container-settings:
-
-        site.nodes missing for ${enterpriseName}.${siteName}
-
-        Site keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames site)}
-      '';
+      throw "site.nodes missing";
 
   allUnitNames = builtins.attrNames units;
 
@@ -108,21 +69,8 @@ let
   selectedUnits = lib.filter unitBelongsToHost allUnitNames;
 
   _selectedNonEmpty =
-    if selectedUnits != [ ] then
-      true
-    else
-      throw ''
-        container-settings:
-
-        No units matched physical host '${hostname}'.
-
-        Expected:
-          ${hostname}
-          ${hostname}-*
-
-        Available units:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ allUnitNames)}
-      '';
+    if selectedUnits != [ ] then true
+    else throw "no units matched host";
 
   mkContainer =
     unitName:
@@ -131,63 +79,44 @@ let
         if builtins.hasAttr unitName nodes then
           nodes.${unitName}
         else
-          throw ''
-            container-settings:
-
-            Missing node context for unit '${unitName}'.
-
-            Available node keys:
-            ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames nodes)}
-          '';
+          throw "missing node context";
 
       role =
         if fabricNodeContext ? role then
           fabricNodeContext.role
         else
-          throw ''
-            container-settings:
-
-            Node '${unitName}' missing role.
-
-            Node keys:
-            ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames fabricNodeContext)}
-          '';
+          throw "missing role";
 
       containerTemplate =
         if role == "upstream-selector" then
           "upstream-selector"
         else
-          throw ''
-            container-settings:
-
-            Host '${hostname}' only supports upstream-selector-role units right now.
-
-            Unit '${unitName}' has role '${role}'.
-          '';
+          throw "unsupported role";
 
       containerPath = ./. + "/container-${containerTemplate}";
       containerName = containerTemplate;
+
+      fabricSpec =
+        if builtins.hasAttr unitName fabricInventory then
+          fabricInventory.${unitName}
+        else
+          throw "missing fabric inventory for unit";
     in
     {
       name = unitName;
       value = {
         autoStart = true;
 
-        # FIX: remove unwanted default interface
         privateNetwork = true;
         hostBridge = null;
 
         extraVeths = {
-          "upstream-core" = {
-            hostBridge = "br-upstream";
-          };
-          "upstream-policy" = {
-            hostBridge = "br-fabric";
-          };
+          "core" = { hostBridge = "br-upstream"; };
+          "policy" = { hostBridge = "br-fabric"; };
         };
 
         specialArgs = {
-          inherit fabricNodeContext containerName;
+          inherit fabricNodeContext containerName fabricSpec;
         };
 
         additionalCapabilities = [

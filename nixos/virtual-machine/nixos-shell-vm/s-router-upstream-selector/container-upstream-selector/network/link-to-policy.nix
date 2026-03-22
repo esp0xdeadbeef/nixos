@@ -1,119 +1,44 @@
 {
   lib,
   fabricNodeContext,
+  fabricSpec,
   ...
 }:
 
 let
-  ifName = "upstream-policy";
+  port =
+    if fabricSpec ? ports && fabricSpec.ports ? policy then
+      fabricSpec.ports.policy
+    else
+      throw "missing fabricSpec.ports.policy";
+
+  linkName =
+    if port ? link then port.link else throw "missing link";
 
   ifaces =
-    if fabricNodeContext ? interfaces && builtins.isAttrs fabricNodeContext.interfaces then
+    if fabricNodeContext ? interfaces then
       fabricNodeContext.interfaces
     else
-      throw ''
-        container: fabricNodeContext missing `interfaces` attrset
+      throw "missing interfaces";
 
-        fabricNodeContext:
-        ${builtins.toJSON fabricNodeContext}
-      '';
-
-  candidates = lib.filterAttrs (
-    _: v:
-    builtins.isAttrs v
-    && (v.kind or null) == "p2p"
-    && (v.carrier or null) == "lan"
-    && (
-      let
-        linkName = v.link or "";
-      in
-      lib.hasInfix "s-router-policy" linkName
-    )
-  ) ifaces;
-
-  names = builtins.attrNames candidates;
-
-  _one =
-    if builtins.length names == 1 then
-      true
+  iface =
+    if builtins.hasAttr linkName ifaces then
+      ifaces.${linkName}
     else
-      throw ''
-        container: expected exactly 1 policy-facing p2p interface
+      throw "link not found";
 
-        found: ${toString (builtins.length names)}
-
-        candidates:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
-
-        all interfaces:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames ifaces)}
-      '';
-
-  ifaceName = builtins.head names;
-  iface = candidates.${ifaceName};
-
-  addr4 =
-    if iface ? addr4 && iface.addr4 != null then
-      iface.addr4
-    else
-      throw ''
-        container: p2p iface '${ifaceName}' missing addr4
-
-        iface:
-        ${builtins.toJSON iface}
-      '';
-
-  addr6 =
-    if iface ? addr6 && iface.addr6 != null then
-      iface.addr6
-    else
-      throw ''
-        container: p2p iface '${ifaceName}' missing addr6
-
-        iface:
-        ${builtins.toJSON iface}
-      '';
-
-  routeList4 =
-    if iface ? routes && iface.routes ? ipv4 && builtins.isList iface.routes.ipv4 then
-      iface.routes.ipv4
-    else
-      [ ];
-
-  routeList6 =
-    if iface ? routes && iface.routes ? ipv6 && builtins.isList iface.routes.ipv6 then
-      iface.routes.ipv6
-    else
-      [ ];
-
-  mkRoute =
-    r:
-    lib.filterAttrs (_: v: v != null) {
-      Destination = r.dst or null;
-      Gateway =
-        if r ? via4 && r.via4 != null then
-          r.via4
-        else if r ? via6 && r.via6 != null then
-          r.via6
-        else
-          null;
-    };
-
-  routes =
-    map mkRoute (lib.filter (r: r ? via4 && r.via4 != null) routeList4)
-    ++ map mkRoute (lib.filter (r: r ? via6 && r.via6 != null) routeList6);
+  addr4 = iface.addr4 or (throw "missing addr4");
+  addr6 = iface.addr6 or (throw "missing addr6");
 
 in
 {
-  systemd.network.networks."20-${ifName}" = {
-    matchConfig.Name = ifName;
+  systemd.network.networks."20-policy" = {
+    matchConfig.Name = "policy";
 
     addresses = [
       { Address = addr4; }
       { Address = addr6; }
     ];
-
-    routes = routes;
 
     networkConfig = {
       IPv4Forwarding = true;

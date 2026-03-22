@@ -9,12 +9,80 @@
 let
   hostname = config.networking.hostName;
 
-  inventoryImported = import ../inventory.nix;
+  inventoryImported = import ./inventory.nix;
   inventory =
     if builtins.isFunction inventoryImported then
       inventoryImported { inherit lib; }
     else
       inventoryImported;
+
+  deploymentHosts =
+    if inventory ? deployment
+       && builtins.isAttrs inventory.deployment
+       && inventory.deployment ? host
+       && builtins.isAttrs inventory.deployment.host
+    then
+      inventory.deployment.host
+    else
+      throw ''
+        container-settings:
+
+        inventory.deployment.host missing.
+
+        inventory:
+        ${builtins.toJSON inventory}
+      '';
+
+  hostConfig =
+    if builtins.hasAttr hostname deploymentHosts then
+      deploymentHosts.${hostname}
+    else
+      throw ''
+        container-settings:
+
+        inventory.deployment.host.${hostname} missing.
+
+        Known deployment hosts:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames deploymentHosts)}
+      '';
+
+  uplink =
+    if hostConfig ? uplink && builtins.isAttrs hostConfig.uplink then
+      hostConfig.uplink
+    else
+      throw ''
+        container-settings:
+
+        inventory.deployment.host.${hostname}.uplink missing.
+
+        host config:
+        ${builtins.toJSON hostConfig}
+      '';
+
+  wanConfig =
+    if uplink ? wan && builtins.isAttrs uplink.wan then
+      uplink.wan
+    else
+      throw ''
+        container-settings:
+
+        inventory.deployment.host.${hostname}.uplink.wan missing.
+
+        uplink config:
+        ${builtins.toJSON uplink}
+      '';
+
+  pppoeConfig =
+    if wanConfig ? pppoe && builtins.isAttrs wanConfig.pppoe then
+      wanConfig.pppoe
+    else
+      { enable = false; };
+
+  pppoeEnabled =
+    if pppoeConfig ? enable then
+      pppoeConfig.enable
+    else
+      false;
 
   enterprises =
     if fabricCompiled ? enterprise && builtins.isAttrs fabricCompiled.enterprise then
@@ -124,6 +192,27 @@ let
         ${builtins.concatStringsSep "\n  - " ([ "" ] ++ allUnitNames)}
       '';
 
+  pppoeBindMounts =
+    if pppoeEnabled then
+      {
+        "/dev/ppp" = {
+          hostPath = "/dev/ppp";
+          isReadOnly = false;
+        };
+
+        "/run/secrets/pppoe-username" = {
+          hostPath = config.sops.secrets.pppoe-username.path;
+          isReadOnly = true;
+        };
+
+        "/run/secrets/pppoe-password" = {
+          hostPath = config.sops.secrets.pppoe-password.path;
+          isReadOnly = true;
+        };
+      }
+    else
+      { };
+
   mkContainer =
     unitName:
     let
@@ -184,8 +273,18 @@ let
         };
 
         specialArgs = {
-          inherit fabricNodeContext containerName;
+          inherit fabricNodeContext containerName pppoeConfig;
         };
+
+        bindMounts = pppoeBindMounts;
+
+        allowedDevices =
+          lib.optionals pppoeEnabled [
+            {
+              node = "/dev/ppp";
+              modifier = "rw";
+            }
+          ];
 
         additionalCapabilities = [
           "CAP_NET_ADMIN"

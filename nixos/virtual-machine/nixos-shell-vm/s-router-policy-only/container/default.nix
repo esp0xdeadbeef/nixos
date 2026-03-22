@@ -2,61 +2,165 @@
   outPath,
   lib,
   pkgs,
+  controlPlaneOut,
   ...
 }:
 
 let
-  nodeName = "s-router-policy-only";
+  inventory = import ../inventory.nix { inherit lib outPath; };
 
-  fabricInputs = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+  hostName = "s-router-policy-only";
 
-  ulaPrefix = "fd42:dead:beef";
-  tenantV4Base = "10.10";
+  nodeName =
+    let
+      nodeNames = builtins.attrNames inventory.realization.nodes;
+      matches = lib.filter (n: inventory.realization.nodes.${n}.host == hostName) nodeNames;
+    in
+    if matches == [ ] then
+      abort "container/default.nix: no realization node found for host '${hostName}'"
+    else if builtins.length matches > 1 then
+      abort "container/default.nix: multiple realization nodes found for host '${hostName}': ${lib.concatStringsSep ", " matches}"
+    else
+      builtins.head matches;
 
-  raw =
-    import "${outPath}/library/100-fabric-routing/lib/topology-gen.nix"
-      { inherit lib; }
-      {
-        tenantVlans = fabricInputs.tenantVlans or [ 10 20 30 40 50 60 70 80 ];
-        policyAccessTransitBase = fabricInputs.policyAccessTransitBase or 100;
-        corePolicyTransitVlan = fabricInputs.corePolicyTransitVlan or 200;
+  cpm = controlPlaneOut;
+
+  enterpriseNames = builtins.attrNames cpm.enterprise;
+  enterpriseName =
+    if enterpriseNames == [ ] then
+      abort "container/default.nix: controlPlaneOut.enterprise is empty"
+    else if builtins.length enterpriseNames > 1 then
+      abort "container/default.nix: multiple enterprises in controlPlaneOut: ${lib.concatStringsSep ", " enterpriseNames}"
+    else
+      builtins.head enterpriseNames;
+
+  siteNames = builtins.attrNames cpm.enterprise.${enterpriseName}.site;
+  siteName =
+    if siteNames == [ ] then
+      abort "container/default.nix: controlPlaneOut.enterprise.${enterpriseName}.site is empty"
+    else if builtins.length siteNames > 1 then
+      abort "container/default.nix: multiple sites in controlPlaneOut.enterprise.${enterpriseName}.site: ${lib.concatStringsSep ", " siteNames}"
+    else
+      builtins.head siteNames;
+
+  site = cpm.enterprise.${enterpriseName}.site.${siteName};
+
+  node =
+    if site ? nodes && builtins.hasAttr nodeName site.nodes then
+      site.nodes.${nodeName}
+    else
+      abort "container/default.nix: controlPlaneOut.enterprise.${enterpriseName}.site.${siteName}.nodes.${nodeName} is missing";
+
+  realizedPorts = inventory.realization.nodes.${nodeName}.ports;
+
+  topoIfForPort =
+    port:
+    let
+      matches = lib.filterAttrs (_: v: (v.link or null) == port.link) node.interfaces;
+      names = builtins.attrNames matches;
+    in
+    if names == [ ] then
+      abort "container/default.nix: no topology interface for port link '${port.link}'"
+    else if builtins.length names > 1 then
+      abort "container/default.nix: multiple topology interfaces for port link '${port.link}': ${lib.concatStringsSep ", " names}"
+    else
+      builtins.head names;
+
+  routesFor =
+    family: rs:
+    map (
+      r:
+      let
+        dst =
+          if family == "ipv4" then
+            (r.dst or null)
+          else if (r.dst or null) == "0000:0000:0000:0000:0000:0000:0000:0000/0" then
+            "::/0"
+          else
+            (r.dst or null);
+      in
+      { Destination = dst; }
+      // lib.optionalAttrs (r ? via4) { Gateway = r.via4; }
+      // lib.optionalAttrs (r ? via6) { Gateway = r.via6; }
+    ) (
+      lib.filter (
+        r:
+        let
+          proto = r.proto or "";
+          dst =
+            if family == "ipv4" then
+              (r.dst or null)
+            else if (r.dst or null) == "0000:0000:0000:0000:0000:0000:0000:0000/0" then
+              "::/0"
+            else
+              (r.dst or null);
+        in
+        dst != null && !(builtins.elem proto [ "connected" "internal" ])
+      ) rs
+    );
+
+  networkForPort =
+    portName:
+    let
+      port = realizedPorts.${portName};
+      topoIfName = topoIfForPort port;
+      topoIf = node.interfaces.${topoIfName};
+
+      v4Routes = routesFor "ipv4" (topoIf.routes.ipv4 or [ ]);
+      v6Routes = routesFor "ipv6" (topoIf.routes.ipv6 or [ ]);
+    in
+    {
+      matchConfig.Name = port.interface.name;
+
+      networkConfig = {
+        DHCP = "no";
+        IPv6AcceptRA = false;
+        IPv4Forwarding = true;
+        IPv6Forwarding = true;
+        ConfigureWithoutCarrier = true;
       };
 
-  resolved0 = import "${outPath}/library/100-fabric-routing/lib/topology-resolve.nix" {
-    inherit lib ulaPrefix tenantV4Base;
-  } raw;
+      linkConfig.RequiredForOnline = false;
 
-  resolved =
-    resolved0
-    // {
-      wans = lib.filter (w: (w.iface or "") != "lan1010") (resolved0.wans or [ ]);
-      lans = lib.filter (l: (l.iface or "") != "lan1010") (resolved0.lans or [ ]);
+      addresses =
+        (lib.optional (topoIf ? addr4) { Address = topoIf.addr4; })
+        ++ (lib.optional (topoIf ? addr6) { Address = topoIf.addr6; });
+
+      routes = v4Routes ++ v6Routes;
     };
 
-  routed = import "${outPath}/library/100-fabric-routing/lib/routing-gen.nix" {
-    inherit lib ulaPrefix tenantV4Base;
-  } resolved;
-
-  mkLinks = import "${outPath}/library/100-fabric-routing/lib/mk-links-from-topo.nix" {
-    inherit lib;
-  };
-
-  mkL3 = import "${outPath}/library/100-fabric-routing/lib/mk-l3-from-topo.nix" {
-    inherit lib pkgs ulaPrefix tenantV4Base;
-  };
-
+  renderedNetworks = builtins.listToAttrs (
+    map (portName: {
+      name = "10-${portName}";
+      value = networkForPort portName;
+    }) (builtins.attrNames realizedPorts)
+  );
 in
 {
   imports = [
-    (mkLinks nodeName routed)
-    (mkL3 nodeName routed)
     ./debugging-packages.nix
   ];
 
+  networking.hostName = nodeName;
+
   networking.useNetworkd = true;
   systemd.network.enable = true;
+  networking.useDHCP = false;
   networking.networkmanager.enable = false;
   networking.useHostResolvConf = false;
+
+  networking.firewall.enable = false;
+  services.resolved.enable = false;
+
+  boot.isContainer = true;
+
+  boot.kernel.sysctl = {
+    "net.ipv4.ip_forward" = lib.mkDefault 1;
+    "net.ipv6.conf.all.forwarding" = lib.mkDefault 1;
+    "net.ipv6.conf.default.forwarding" = lib.mkDefault 1;
+  };
+
+  systemd.network.networks = lib.mkForce renderedNetworks;
 
   system.stateVersion = "25.11";
 }
