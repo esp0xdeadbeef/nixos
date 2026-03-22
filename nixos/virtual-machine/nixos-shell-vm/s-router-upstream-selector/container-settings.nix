@@ -1,3 +1,4 @@
+# FILE: ./container-settings.nix
 {
   config,
   pkgs,
@@ -100,7 +101,9 @@ let
   allUnitNames = builtins.attrNames units;
 
   unitBelongsToHost =
-    unitName: lib.hasPrefix "${hostname}-" unitName;
+    unitName:
+      unitName == hostname
+      || lib.hasPrefix "${hostname}-" unitName;
 
   selectedUnits = lib.filter unitBelongsToHost allUnitNames;
 
@@ -113,8 +116,9 @@ let
 
         No units matched physical host '${hostname}'.
 
-        Expected prefix:
-          ${hostname}-
+        Expected:
+          ${hostname}
+          ${hostname}-*
 
         Available units:
         ${builtins.concatStringsSep "\n  - " ([ "" ] ++ allUnitNames)}
@@ -168,7 +172,10 @@ let
       name = unitName;
       value = {
         autoStart = true;
+
+        # FIX: remove unwanted default interface
         privateNetwork = true;
+        hostBridge = null;
 
         extraVeths = {
           "upstream-core" = {

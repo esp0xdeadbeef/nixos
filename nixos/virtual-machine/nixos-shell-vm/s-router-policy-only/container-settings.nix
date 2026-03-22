@@ -1,5 +1,3 @@
-# ./container-settings.nix
-# FILE: s-router-policy-only/container-settings.nix
 {
   config,
   pkgs,
@@ -8,14 +6,24 @@
   ...
 }:
 
-{
-  containers."${config.networking.hostName}-container" = {
-    autoStart = true;
-    privateNetwork = true;
+let
+  hostname = config.networking.hostName;
 
-    # SINGLE, STABLE trunk into policy container
+  containerName = "${hostname}-container";
+in
+{
+  containers.${containerName} = {
+    autoStart = true;
+
+    # FIX: match working upstream-selector behavior
+    privateNetwork = true;
+    hostBridge = null;
+
+    # SINGLE trunk stays
     extraVeths = {
-      lan.hostBridge = "br-lan-trunk";
+      "lan" = {
+        hostBridge = "br-lan-trunk";
+      };
     };
 
     bindMounts."/persist" = {
@@ -42,25 +50,23 @@
       inherit outPath;
     };
 
-    config =
-      { outPath, ... }:
-      {
-        imports = [
-          ./container
-        ];
+    config = { outPath, ... }: {
+      imports = [
+        ./container
+      ];
 
-        networking.useNetworkd = true;
-        systemd.network.enable = true;
-        networking.useDHCP = false;
+      networking.useNetworkd = true;
+      systemd.network.enable = true;
+      networking.useDHCP = false;
 
-        boot.kernel.sysctl = {
-          "net.ipv4.ip_forward" = 1;
-          "net.ipv6.conf.all.forwarding" = 1;
-          "net.ipv6.conf.default.forwarding" = 1;
-        };
-
-        system.stateVersion = "25.11";
+      boot.kernel.sysctl = {
+        "net.ipv4.ip_forward" = 1;
+        "net.ipv6.conf.all.forwarding" = 1;
+        "net.ipv6.conf.default.forwarding" = 1;
       };
+
+      system.stateVersion = "25.11";
+    };
 
     additionalCapabilities = [
       "CAP_NET_ADMIN"

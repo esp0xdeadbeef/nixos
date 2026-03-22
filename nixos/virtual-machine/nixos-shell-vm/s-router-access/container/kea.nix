@@ -1,5 +1,3 @@
-# /home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-access/container-router-access/kea.nix
-# FILE: container-router-access/kea.nix
 {
   config,
   pkgs,
@@ -10,7 +8,13 @@
 }:
 
 let
-  fabric = import "${outPath}/library/100-fabric-routing/inputs";
+  fabricImported = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+  fabric =
+    if builtins.isFunction fabricImported then
+      fabricImported { inherit lib; }
+    else
+      fabricImported;
+
   v4Base = fabric.tenantV4Base or "10.10";
 
   lanIf = "lan-${toString vlanId}";
@@ -21,7 +25,14 @@ let
 
   pool = "${v4Base}.${toString vlanId}.100 - ${v4Base}.${toString vlanId}.200";
 
-  domainRaw = (import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix").domain or "lan.";
+  siteImported = import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix";
+  site =
+    if builtins.isFunction siteImported then
+      siteImported { inherit lib; }
+    else
+      siteImported;
+
+  domainRaw = site.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
   outFile = "/run/etc/kea/${lanName}.json";

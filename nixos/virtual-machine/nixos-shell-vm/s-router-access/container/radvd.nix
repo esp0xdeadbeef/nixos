@@ -1,41 +1,79 @@
-# /home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-access/container-router-access/radvd.nix
-# FILE: container-router-access/radvd.nix
 {
   config,
   pkgs,
   lib,
   vlanId,
   outPath,
+  fabricNodeContext,
   ...
 }:
 
 let
-  fabric = import "${outPath}/library/100-fabric-routing/inputs";
+  fabricImported = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+  fabric =
+    if builtins.isFunction fabricImported then
+      fabricImported { inherit lib; }
+    else
+      fabricImported;
+
+  inventoryImported = import ../inventory.nix;
+  inventory =
+    if builtins.isFunction inventoryImported then
+      inventoryImported { inherit lib; }
+    else
+      inventoryImported;
+
   ulaPrefix = fabric.ulaPrefix or "fd42:dead:beef";
 
-  site = import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix";
+  siteImported = import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix";
+  site =
+    if builtins.isFunction siteImported then
+      siteImported { inherit lib; }
+    else
+      siteImported;
+
   domainRaw = site.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
-  nodeName = "s-router-access-${toString vlanId}";
   lanIf = "lan-${toString vlanId}";
 
-  # Pull synthesized prefixes from the library (ULA + optional GUA)
-  routed = import "${outPath}/library/100-fabric-routing/generated/30-routing.nix" { inherit lib; };
+  attachments =
+    if fabricNodeContext ? attachments && builtins.isList fabricNodeContext.attachments then
+      fabricNodeContext.attachments
+    else
+      [ ];
 
-  # Find the tenant LAN link and endpoint for this node
-  lanLinkName = "access-tenant-${toString vlanId}";
-  ep = (((routed.links or { }).${lanLinkName} or { }).endpoints or { }).${nodeName} or { };
+  tenantAttachments =
+    builtins.filter (
+      a:
+        builtins.isAttrs a
+        && (a.kind or null) == "tenant"
+        && (a ? name)
+    ) attachments;
+
+  tenantName =
+    if builtins.length tenantAttachments == 1 then
+      (builtins.head tenantAttachments).name
+    else
+      null;
+
+  tenantPrefixMap =
+    if inventory ? tenantPrefixMap && builtins.isAttrs inventory.tenantPrefixMap then
+      inventory.tenantPrefixMap
+    else
+      { };
+
+  explicitPrefixes =
+    if tenantName != null && builtins.hasAttr tenantName tenantPrefixMap then
+      tenantPrefixMap.${tenantName}
+    else
+      [ ];
 
   prefixes =
-    let
-      xs = ep.ra6Prefixes or [ ];
-    in
-    if xs == [ ] then
-      # fallback: always advertise ULA /64
-      [ "${ulaPrefix}:${toString vlanId}::/64" ]
+    if explicitPrefixes != [ ] then
+      explicitPrefixes
     else
-      xs;
+      [ "${ulaPrefix}:${toString vlanId}::/64" ];
 
   rdnss = "${ulaPrefix}:${toString vlanId}::1";
   radvdConf = "/run/radvd.conf";

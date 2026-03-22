@@ -1,18 +1,32 @@
-# ./default.nix
-# FILE: s-router-policy-only/default.nix
 {
   outPath,
   lib,
   config,
+  inputs,
   ...
 }:
 
+let
+  fabricPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+
+  fabricImported =
+    if builtins.pathExists fabricPath then
+      import fabricPath
+    else
+      { };
+
+  fabricInputs =
+    if builtins.isFunction fabricImported then
+      fabricImported { inherit lib; }
+    else
+      fabricImported;
+in
 {
+  _module.args.fabricInputs = fabricInputs;
+
   imports = [
-    # Host-side router base (provides vm + networkd baseline)
-    #"${outPath}/library/10-vms/nixos-shell-vm/host-config-router"
     ./host-config
-    # Local overrides / wiring
+    ./fabric-input-loader.nix
     ./mount-utils.nix
     ./container-settings.nix
     ./nftables.nix

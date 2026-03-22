@@ -1,4 +1,3 @@
-# default.nix — s-router-policy-only (debug-style wiring)
 {
   outPath,
   lib,
@@ -9,51 +8,41 @@
 let
   nodeName = "s-router-policy-only";
 
-  # === Addressing inputs (EXPLICIT, SAME AS DEBUG) ===
+  fabricInputs = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+
   ulaPrefix = "fd42:dead:beef";
   tenantV4Base = "10.10";
 
-  # === Topology pipeline (IDENTICAL to debug) ===
   raw =
     import "${outPath}/library/100-fabric-routing/lib/topology-gen.nix"
+      { inherit lib; }
       {
-        inherit lib;
-      }
-      {
-        tenantVlans = [
-          10
-          20
-          30
-          40
-          50
-          60
-          70
-          80
-        ];
-        policyAccessTransitBase = 100;
-        corePolicyTransitVlan = 200;
+        tenantVlans = fabricInputs.tenantVlans or [ 10 20 30 40 50 60 70 80 ];
+        policyAccessTransitBase = fabricInputs.policyAccessTransitBase or 100;
+        corePolicyTransitVlan = fabricInputs.corePolicyTransitVlan or 200;
       };
 
-  resolved = import "${outPath}/library/100-fabric-routing/lib/topology-resolve.nix" {
+  resolved0 = import "${outPath}/library/100-fabric-routing/lib/topology-resolve.nix" {
     inherit lib ulaPrefix tenantV4Base;
   } raw;
+
+  resolved =
+    resolved0
+    // {
+      wans = lib.filter (w: (w.iface or "") != "lan1010") (resolved0.wans or [ ]);
+      lans = lib.filter (l: (l.iface or "") != "lan1010") (resolved0.lans or [ ]);
+    };
 
   routed = import "${outPath}/library/100-fabric-routing/lib/routing-gen.nix" {
     inherit lib ulaPrefix tenantV4Base;
   } resolved;
 
-  # === Renderers (now receive full context) ===
   mkLinks = import "${outPath}/library/100-fabric-routing/lib/mk-links-from-topo.nix" {
     inherit lib;
   };
 
   mkL3 = import "${outPath}/library/100-fabric-routing/lib/mk-l3-from-topo.nix" {
-    inherit
-      lib
-      pkgs
-      ulaPrefix
-      tenantV4Base
-      ;
+    inherit lib pkgs ulaPrefix tenantV4Base;
   };
 
 in

@@ -1,5 +1,3 @@
-# ./s-router-access/host-config/network.nix
-# FILE: s-router-access/host-config/network.nix
 {
   outPath,
   lib,
@@ -8,10 +6,19 @@
 }:
 
 let
-  cfg = import "${outPath}/library/100-fabric-routing/inputs";
+  cfg = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
 
-  tenantVlans = cfg.tenantVlans;
-  policyBase = cfg.policyAccessTransitBase or 100;
+  tenantVlans =
+    if cfg ? tenantVlans then
+      cfg.tenantVlans
+    else
+      [ 10 20 30 40 50 60 70 80 ];
+
+  policyBase =
+    if cfg ? policyAccessTransitBase then
+      cfg.policyAccessTransitBase
+    else
+      100;
 
   transitVidFor = vid: policyBase + vid;
 

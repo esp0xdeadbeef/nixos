@@ -16,10 +16,7 @@
   policyAccessTransitBase ? 100,
   corePolicyTransitVlan ? 200,
 
-  # default upstream selector
   defaultTenantUpstream ? "core",
-
-  # optional per-tenant override
   tenantUpstreamMap ? { },
 }:
 
@@ -32,9 +29,6 @@ let
 
   tenantUpstreamFor = vid: tenantUpstreamMap.${toString vid} or defaultTenantUpstream;
 
-  #
-  # Transit VLAN calculator (hard invariant: <=255)
-  #
   transitVidForAccess =
     vid:
     let
@@ -50,11 +44,7 @@ let
     else
       tvid;
 
-  #
-  # LEGACY ESCAPE HATCH
-  # VLAN 1010 must exist as LAN but must NEVER become a p2p transit
-  #
-  p2pVids = lib.filter (vid: vid != 1010) vids;
+  p2pVids = vids;
 
 in
 {
@@ -92,9 +82,6 @@ in
 
   links = lib.listToAttrs (
 
-    #
-    # core ↔ policy (fixed transit)
-    #
     [
       {
         name = "policy-core";
@@ -111,49 +98,6 @@ in
       }
     ]
 
-    #
-    # legacy / transitional upstream (VLAN 1010)
-    #
-    ++ [
-      {
-        name = "policy-upstream-1010";
-        value = {
-          kind = "wan";
-          carrier = "lan";
-          vlanId = 1010;
-          name = "policy-upstream-1010";
-          members = [
-            policyNode
-            coreNode
-          ];
-
-          endpoints = {
-            "${policyNode}" = {
-              addr4 = "10.255.255.2/29";
-              addr6 = "fd42:dead:beef:1010::2/64";
-
-              routes4 = [
-                {
-                  dst = "0.0.0.0/0";
-                  via4 = "10.255.255.1";
-                }
-              ];
-
-              routes6 = [
-                {
-                  dst = "::/0";
-                  via6 = "fd42:dead:beef:1010::3";
-                }
-              ];
-            };
-          };
-        };
-      }
-    ]
-
-    #
-    # policy ↔ access (ONLY non-legacy VLANs)
-    #
     ++ map (
       vid:
       let
@@ -183,9 +127,6 @@ in
       }
     ) p2pVids
 
-    #
-    # access ↔ tenant LANs (ALL VLANs, INCLUDING 1010)
-    #
     ++ map (vid: {
       name = "access-tenant-${toString vid}";
       value = {

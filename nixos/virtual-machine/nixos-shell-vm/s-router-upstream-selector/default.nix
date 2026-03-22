@@ -2,6 +2,7 @@
   outPath,
   lib,
   config,
+  pkgs,
   ...
 }:
 
@@ -19,4 +20,5 @@ in
   ];
 
   _module.args.fabricInputs = fabricInputs;
+
 }
