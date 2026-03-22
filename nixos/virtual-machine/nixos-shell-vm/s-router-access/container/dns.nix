@@ -4,20 +4,11 @@
   lib,
   vlanId,
   outPath,
+  fabricNodeContext,
   ...
 }:
 
 let
-  fabricImported = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
-  fabric =
-    if builtins.isFunction fabricImported then
-      fabricImported { inherit lib; }
-    else
-      fabricImported;
-
-  v4Base = fabric.tenantV4Base or "10.10";
-  ulaPrefix = fabric.ulaPrefix or "fd42:dead:beef";
-
   siteImported = import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix";
   site =
     if builtins.isFunction siteImported then
@@ -25,16 +16,78 @@ let
     else
       siteImported;
 
+  splitCIDR =
+    cidr:
+      let
+        parts = lib.splitString "/" cidr;
+      in
+      if builtins.length parts == 2 then
+        {
+          address = builtins.elemAt parts 0;
+          prefix = builtins.elemAt parts 1;
+        }
+      else
+        throw ''
+          dns:
+
+          Invalid CIDR '${cidr}'.
+        '';
+
+  firstIPv4InSubnet =
+    cidr:
+      let
+        ip = (splitCIDR cidr).address;
+        octets = lib.splitString "." ip;
+      in
+      if builtins.length octets == 4 then
+        "${builtins.elemAt octets 0}.${builtins.elemAt octets 1}.${builtins.elemAt octets 2}.1"
+      else
+        throw ''
+          dns:
+
+          Cannot derive router IPv4 from subnet '${cidr}'.
+        '';
+
+  firstIPv6InSubnet =
+    cidr:
+      let
+        base = (splitCIDR cidr).address;
+      in
+      if lib.hasSuffix "::" base then
+        "${base}1"
+      else
+        "${base}::1";
+
+  tenantNetworks =
+    if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
+      fabricNodeContext.networks
+    else
+      { };
+
+  tenantNetworkNames =
+    builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+
+  tenantNetwork =
+    if builtins.length tenantNetworkNames == 1 then
+      tenantNetworks.${builtins.head tenantNetworkNames}
+    else
+      throw ''
+        dns:
+
+        Expected exactly 1 tenant network for access node.
+
+        Found:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
+      '';
+
   domainRaw = site.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
-  lanIf = "lan-${toString vlanId}";
+  lan4 = firstIPv4InSubnet tenantNetwork.ipv4;
+  lan6 = firstIPv6InSubnet tenantNetwork.ipv6;
 
-  lan4 = "${v4Base}.${toString vlanId}.1";
-  lan6 = "${ulaPrefix}:${toString vlanId}::1";
-
-  v4Net = "${v4Base}.${toString vlanId}.0/24";
-  v6Net = "${ulaPrefix}:${toString vlanId}::/64";
+  v4Net = tenantNetwork.ipv4;
+  v6Net = tenantNetwork.ipv6;
 
   upstream =
     site.defaultWanDns or [

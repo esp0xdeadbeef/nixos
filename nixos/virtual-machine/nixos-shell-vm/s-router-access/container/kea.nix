@@ -4,33 +4,93 @@
   lib,
   vlanId,
   outPath,
+  fabricNodeContext,
   ...
 }:
 
 let
-  fabricImported = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
-  fabric =
-    if builtins.isFunction fabricImported then
-      fabricImported { inherit lib; }
-    else
-      fabricImported;
-
-  v4Base = fabric.tenantV4Base or "10.10";
-
-  lanIf = "lan-${toString vlanId}";
-  lanName = "lan${toString vlanId}";
-
-  subnet = "${v4Base}.${toString vlanId}.0/24";
-  router4 = "${v4Base}.${toString vlanId}.1";
-
-  pool = "${v4Base}.${toString vlanId}.100 - ${v4Base}.${toString vlanId}.200";
-
   siteImported = import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix";
   site =
     if builtins.isFunction siteImported then
       siteImported { inherit lib; }
     else
       siteImported;
+
+  splitCIDR =
+    cidr:
+      let
+        parts = lib.splitString "/" cidr;
+      in
+      if builtins.length parts == 2 then
+        {
+          address = builtins.elemAt parts 0;
+          prefix = builtins.elemAt parts 1;
+        }
+      else
+        throw ''
+          kea:
+
+          Invalid CIDR '${cidr}'.
+        '';
+
+  firstIPv4InSubnet =
+    cidr:
+      let
+        ip = (splitCIDR cidr).address;
+        octets = lib.splitString "." ip;
+      in
+      if builtins.length octets == 4 then
+        "${builtins.elemAt octets 0}.${builtins.elemAt octets 1}.${builtins.elemAt octets 2}.1"
+      else
+        throw ''
+          kea:
+
+          Cannot derive router IPv4 from subnet '${cidr}'.
+        '';
+
+  poolForSubnet =
+    cidr:
+      let
+        ip = (splitCIDR cidr).address;
+        octets = lib.splitString "." ip;
+      in
+      if builtins.length octets == 4 then
+        "${builtins.elemAt octets 0}.${builtins.elemAt octets 1}.${builtins.elemAt octets 2}.100 - ${builtins.elemAt octets 0}.${builtins.elemAt octets 1}.${builtins.elemAt octets 2}.200"
+      else
+        throw ''
+          kea:
+
+          Cannot derive DHCP pool from subnet '${cidr}'.
+        '';
+
+  tenantNetworks =
+    if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
+      fabricNodeContext.networks
+    else
+      { };
+
+  tenantNetworkNames =
+    builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+
+  tenantNetwork =
+    if builtins.length tenantNetworkNames == 1 then
+      tenantNetworks.${builtins.head tenantNetworkNames}
+    else
+      throw ''
+        kea:
+
+        Expected exactly 1 tenant network for access node.
+
+        Found:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
+      '';
+
+  lanIf = "lan-${toString vlanId}";
+  lanName = "lan${toString vlanId}";
+
+  subnet = tenantNetwork.ipv4;
+  router4 = firstIPv4InSubnet tenantNetwork.ipv4;
+  pool = poolForSubnet tenantNetwork.ipv4;
 
   domainRaw = site.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";

@@ -23,12 +23,12 @@ in
 {
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    ./fabric-input-loader.nix
     ./host-network.nix
     ./mount-utils.nix
     ./container/container-settings.nix
     ./debugging-packages.nix
     ./sops.nix
-    ./fabric-input-loader.nix
   ];
 
   _module.args.fabricInputs = fabricInputs;

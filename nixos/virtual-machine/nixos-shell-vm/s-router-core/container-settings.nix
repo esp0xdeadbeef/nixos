@@ -9,6 +9,13 @@
 let
   hostname = config.networking.hostName;
 
+  inventoryImported = import ../inventory.nix;
+  inventory =
+    if builtins.isFunction inventoryImported then
+      inventoryImported { inherit lib; }
+    else
+      inventoryImported;
+
   enterprises =
     if fabricCompiled ? enterprise && builtins.isAttrs fabricCompiled.enterprise then
       fabricCompiled.enterprise
@@ -97,8 +104,7 @@ let
 
   allUnitNames = builtins.attrNames units;
 
-  unitBelongsToHost =
-    unitName: lib.hasPrefix "${hostname}-" unitName;
+  unitBelongsToHost = unitName: lib.hasPrefix "${hostname}-" unitName;
 
   selectedUnits = lib.filter unitBelongsToHost allUnitNames;
 

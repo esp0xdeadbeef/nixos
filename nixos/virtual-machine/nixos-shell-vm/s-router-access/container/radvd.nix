@@ -9,22 +9,6 @@
 }:
 
 let
-  fabricImported = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
-  fabric =
-    if builtins.isFunction fabricImported then
-      fabricImported { inherit lib; }
-    else
-      fabricImported;
-
-  inventoryImported = import ../inventory.nix;
-  inventory =
-    if builtins.isFunction inventoryImported then
-      inventoryImported { inherit lib; }
-    else
-      inventoryImported;
-
-  ulaPrefix = fabric.ulaPrefix or "fd42:dead:beef";
-
   siteImported = import "${outPath}/library/100-fabric-routing/lib/site-defaults.nix";
   site =
     if builtins.isFunction siteImported then
@@ -32,50 +16,62 @@ let
     else
       siteImported;
 
+  tenantNetworks =
+    if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
+      fabricNodeContext.networks
+    else
+      { };
+
+  tenantNetworkNames =
+    builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+
+  tenantNetwork =
+    if builtins.length tenantNetworkNames == 1 then
+      tenantNetworks.${builtins.head tenantNetworkNames}
+    else
+      throw ''
+        radvd:
+
+        Expected exactly 1 tenant network for access node.
+
+        Found:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
+      '';
+
+  splitCIDR =
+    cidr:
+      let
+        parts = lib.splitString "/" cidr;
+      in
+      if builtins.length parts == 2 then
+        {
+          address = builtins.elemAt parts 0;
+          prefix = builtins.elemAt parts 1;
+        }
+      else
+        throw ''
+          radvd:
+
+          Invalid CIDR '${cidr}'.
+        '';
+
+  firstIPv6InSubnet =
+    cidr:
+      let
+        base = (splitCIDR cidr).address;
+      in
+      if lib.hasSuffix "::" base then
+        "${base}1"
+      else
+        "${base}::1";
+
   domainRaw = site.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
   lanIf = "lan-${toString vlanId}";
+  prefixes = [ tenantNetwork.ipv6 ];
 
-  attachments =
-    if fabricNodeContext ? attachments && builtins.isList fabricNodeContext.attachments then
-      fabricNodeContext.attachments
-    else
-      [ ];
-
-  tenantAttachments =
-    builtins.filter (
-      a:
-        builtins.isAttrs a
-        && (a.kind or null) == "tenant"
-        && (a ? name)
-    ) attachments;
-
-  tenantName =
-    if builtins.length tenantAttachments == 1 then
-      (builtins.head tenantAttachments).name
-    else
-      null;
-
-  tenantPrefixMap =
-    if inventory ? tenantPrefixMap && builtins.isAttrs inventory.tenantPrefixMap then
-      inventory.tenantPrefixMap
-    else
-      { };
-
-  explicitPrefixes =
-    if tenantName != null && builtins.hasAttr tenantName tenantPrefixMap then
-      tenantPrefixMap.${tenantName}
-    else
-      [ ];
-
-  prefixes =
-    if explicitPrefixes != [ ] then
-      explicitPrefixes
-    else
-      [ "${ulaPrefix}:${toString vlanId}::/64" ];
-
-  rdnss = "${ulaPrefix}:${toString vlanId}::1";
+  rdnss = firstIPv6InSubnet tenantNetwork.ipv6;
   radvdConf = "/run/radvd.conf";
 
   gen = pkgs.writeShellScript "gen-radvd-${toString vlanId}" ''

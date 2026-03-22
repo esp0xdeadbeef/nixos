@@ -1,3 +1,4 @@
+# ./default.nix
 {
   outPath,
   lib,
@@ -11,11 +12,11 @@ in
 {
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    ./fabric-input-loader.nix
     ./host-network
     ./mount-utils.nix
     ./sops.nix
     ./container-settings.nix
-    ./fabric-input-loader.nix
   ];
 
   _module.args.fabricInputs = fabricInputs;

@@ -2,42 +2,172 @@
   config,
   lib,
   vlanId,
+  transitVlanId ? (policyAccessTransitBase + vlanId),
   policyAccessTransitBase,
   outPath,
+  fabricNodeContext,
   ...
 }:
 
 let
-  addrImported = import "${outPath}/library/100-fabric-routing/lib/addressing.nix";
-  addr =
-    if builtins.isFunction addrImported then
-      addrImported { inherit lib; }
-    else
-      addrImported;
+  splitCIDR =
+    cidr:
+      let
+        parts = lib.splitString "/" cidr;
+      in
+      if builtins.length parts == 2 then
+        {
+          address = builtins.elemAt parts 0;
+          prefix = builtins.elemAt parts 1;
+        }
+      else
+        throw ''
+          networkd-from-topology:
 
-  v4Base = "10.10";
-  ulaPrefix = "fd42:dead:beef";
+          Invalid CIDR '${cidr}'.
+        '';
+
+  firstIPv4InSubnet =
+    cidr:
+      let
+        ip = (splitCIDR cidr).address;
+        octets = lib.splitString "." ip;
+        prefix = (splitCIDR cidr).prefix;
+      in
+      if builtins.length octets == 4 then
+        "${builtins.elemAt octets 0}.${builtins.elemAt octets 1}.${builtins.elemAt octets 2}.1/${prefix}"
+      else
+        throw ''
+          networkd-from-topology:
+
+          Cannot derive router IPv4 from subnet '${cidr}'.
+        '';
+
+  firstIPv6InSubnet =
+    cidr:
+      let
+        base = (splitCIDR cidr).address;
+        prefix = (splitCIDR cidr).prefix;
+        addr =
+          if lib.hasSuffix "::" base then
+            "${base}1"
+          else
+            "${base}::1";
+      in
+      "${addr}/${prefix}";
+
+  defaultVia4FromRoutes =
+    routes:
+      let
+        defaults =
+          builtins.filter (r: (r.dst or null) == "0.0.0.0/0" && r ? via4) routes;
+      in
+      if defaults != [ ] then
+        (builtins.head defaults).via4
+      else
+        throw ''
+          networkd-from-topology:
+
+          No IPv4 default route found in transit interface routes.
+        '';
+
+  defaultVia6FromRoutes =
+    routes:
+      let
+        defaults =
+          builtins.filter (
+            r:
+              (
+                (r.dst or null) == "::/0"
+                || (r.dst or null) == "0000:0000:0000:0000:0000:0000:0000:0000/0"
+              )
+              && r ? via6
+          ) routes;
+      in
+      if defaults != [ ] then
+        (builtins.head defaults).via6
+      else
+        throw ''
+          networkd-from-topology:
+
+          No IPv6 default route found in transit interface routes.
+        '';
+
+  tenantNetworks =
+    if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
+      fabricNodeContext.networks
+    else
+      { };
+
+  tenantNetworkNames =
+    builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+
+  tenantNetwork =
+    if builtins.length tenantNetworkNames == 1 then
+      tenantNetworks.${builtins.head tenantNetworkNames}
+    else
+      throw ''
+        networkd-from-topology:
+
+        Expected exactly 1 tenant network for access node.
+
+        Found:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
+      '';
+
+  interfaces =
+    if fabricNodeContext ? interfaces && builtins.isAttrs fabricNodeContext.interfaces then
+      fabricNodeContext.interfaces
+    else
+      { };
+
+  interfaceNames = builtins.attrNames interfaces;
+
+  transitIfName =
+    let
+      matches =
+        builtins.filter (
+          ifName:
+            let
+              iface = interfaces.${ifName};
+            in
+            builtins.isAttrs iface
+            && (iface.kind or null) == "p2p"
+        ) interfaceNames;
+    in
+    if builtins.length matches == 1 then
+      builtins.head matches
+    else
+      throw ''
+        networkd-from-topology:
+
+        Expected exactly 1 p2p transit interface.
+
+        Found:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ matches)}
+      '';
+
+  transitIf = interfaces.${transitIfName};
 
   tenantVlan = vlanId;
-  transitVlan = policyAccessTransitBase + vlanId;
+  transitVlan = transitVlanId;
 
-  lanAddr4 = "${v4Base}.${toString tenantVlan}.1/24";
-  lanAddr6 = "${ulaPrefix}:${toString tenantVlan}::1/64";
+  lanAddr4 = firstIPv4InSubnet tenantNetwork.ipv4;
+  lanAddr6 = firstIPv6InSubnet tenantNetwork.ipv6;
 
-  trAddr4 = "${v4Base}.${toString transitVlan}.3/31";
-  trAddr6 = "${ulaPrefix}:${addr.transitHextet transitVlan}::3/127";
+  trAddr4 = transitIf.addr4;
+  trAddr6 = transitIf.addr6;
 
-  trGw4 = "${v4Base}.${toString transitVlan}.2";
-  trGw6 = "${ulaPrefix}:${addr.transitHextet transitVlan}::2";
+  trGw4 = defaultVia4FromRoutes (transitIf.routes.ipv4 or [ ]);
+  trGw6 = defaultVia6FromRoutes (transitIf.routes.ipv6 or [ ]);
 in
 {
   networking.useNetworkd = true;
   systemd.network.enable = true;
 
   systemd.network.networks = {
-
     "10-lan" = {
-      matchConfig.Name = "lan-*";
+      matchConfig.Name = "lan-${toString tenantVlan}";
 
       networkConfig = {
         DHCP = "no";
@@ -56,7 +186,7 @@ in
     };
 
     "20-transit" = {
-      matchConfig.Name = "tr-*";
+      matchConfig.Name = "tr-${toString transitVlan}";
 
       networkConfig = {
         DHCP = "no";
