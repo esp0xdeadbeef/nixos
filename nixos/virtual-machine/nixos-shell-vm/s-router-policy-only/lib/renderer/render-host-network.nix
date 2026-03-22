@@ -6,7 +6,7 @@
 }:
 
 let
-  validated = import ./validate-realization.nix {
+  validated = import ../inventory/validate.nix {
     inherit
       lib
       inventory
@@ -14,6 +14,8 @@ let
       cpm
       ;
   };
+
+  transitBridgeHelpers = import ../fabric/transit-bridges.nix { inherit lib; };
 
   host = validated.deployment.hosts.${hostName};
 
@@ -27,31 +29,9 @@ let
     else
       { ConfigureWithoutCarrier = true; };
 
-  vlanIfNameFor =
-    uplink:
-    "${uplink.parent}.${toString uplink.vlan}";
-
-  transitBridges =
-    if host ? transitBridges && builtins.isAttrs host.transitBridges then
-      host.transitBridges
-    else
-      { };
-
-  transitNames = builtins.attrNames transitBridges;
-
-  transitNamesForUplink =
-    uplinkName:
-    lib.filter (
-      transitName:
-      let
-        transit = transitBridges.${transitName};
-      in
-      (transit.parentUplink or null) == uplinkName
-    ) transitNames;
-
-  transitVlanIfNameFor =
-    uplinkName: transit:
-    "${uplinks.${uplinkName}.bridge}.${toString transit.vlan}";
+  transitBridges = transitBridgeHelpers.load host;
+  transitNames = transitBridgeHelpers.names transitBridges;
+  transitNamesForUplink = transitBridgeHelpers.namesForUplink transitBridges;
 
   uplinkNetdevs = builtins.listToAttrs (
     lib.concatMap (
@@ -59,6 +39,7 @@ let
       let
         uplink = uplinks.${uplinkName};
         transitNamesOnUplink = transitNamesForUplink uplinkName;
+        vlanIfName = "${uplink.parent}.${toString uplink.vlan}";
       in
       [
         {
@@ -71,10 +52,10 @@ let
       ]
       ++ lib.optionals (uplink.mode == "vlan") [
         {
-          name = "11-${vlanIfNameFor uplink}";
+          name = "11-${vlanIfName}";
           value = {
             netdevConfig = {
-              Name = vlanIfNameFor uplink;
+              Name = vlanIfName;
               Kind = "vlan";
             };
             vlanConfig.Id = uplink.vlan;
@@ -86,12 +67,13 @@ let
           transitName:
           let
             transit = transitBridges.${transitName};
+            transitVlanIfName = "${uplink.bridge}.${toString transit.vlan}";
           in
           {
-            name = "12-${transitVlanIfNameFor uplinkName transit}";
+            name = "12-${transitVlanIfName}";
             value = {
               netdevConfig = {
-                Name = transitVlanIfNameFor uplinkName transit;
+                Name = transitVlanIfName;
                 Kind = "vlan";
               };
               vlanConfig.Id = transit.vlan;
@@ -107,6 +89,7 @@ let
       uplinkName:
       let
         uplink = uplinks.${uplinkName};
+        vlanIfName = "${uplink.parent}.${toString uplink.vlan}";
       in
       if uplink.mode == "vlan" then
         [
@@ -115,7 +98,7 @@ let
             value = {
               matchConfig.Name = uplink.parent;
               networkConfig = {
-                VLAN = [ (vlanIfNameFor uplink) ];
+                VLAN = [ vlanIfName ];
                 DHCP = "no";
                 IPv6AcceptRA = false;
                 ConfigureWithoutCarrier = true;
@@ -123,9 +106,9 @@ let
             };
           }
           {
-            name = "05-${vlanIfNameFor uplink}";
+            name = "05-${vlanIfName}";
             value = {
-              matchConfig.Name = vlanIfNameFor uplink;
+              matchConfig.Name = vlanIfName;
               networkConfig = {
                 Bridge = uplink.bridge;
                 DHCP = "no";
@@ -173,7 +156,7 @@ let
                 let
                   transit = transitBridges.${transitName};
                 in
-                transitVlanIfNameFor uplinkName transit
+                "${uplink.bridge}.${toString transit.vlan}"
               ) transitNamesOnUplink;
             };
         };
@@ -204,6 +187,7 @@ let
         transit = transitBridges.${transitName};
         uplinkName = transit.parentUplink;
         uplink = uplinks.${uplinkName};
+        transitVlanIfName = "${uplink.bridge}.${toString transit.vlan}";
       in
       [
         {
@@ -216,9 +200,9 @@ let
       ]
       ++ lib.optionals (uplink.mode == "trunk") [
         {
-          name = "31-${transitVlanIfNameFor uplinkName transit}";
+          name = "31-${transitVlanIfName}";
           value = {
-            matchConfig.Name = transitVlanIfNameFor uplinkName transit;
+            matchConfig.Name = transitVlanIfName;
             networkConfig = {
               Bridge = transit.name;
               DHCP = "no";

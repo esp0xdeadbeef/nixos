@@ -7,7 +7,7 @@
 }:
 
 let
-  _inventory = import ./load-inventory.nix { inherit inventory; };
+  _inventory = import ./load.nix { inherit inventory; };
 
   hostNames = builtins.attrNames _inventory.deployment.hosts;
   nodeNames = builtins.attrNames _inventory.realization.nodes;

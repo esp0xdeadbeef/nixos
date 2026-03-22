@@ -51,7 +51,7 @@ let
   enterpriseNames = builtins.attrNames (controlPlaneOut.enterprise or { });
   enterpriseName =
     if builtins.length enterpriseNames == 1 then
-      builtins.head enterpriseNames
+      builtins.elemAt enterpriseNames 0
     else
       abort ''
         container/default.nix: expected exactly one enterprise, got: ${lib.concatStringsSep ", " enterpriseNames}
@@ -63,7 +63,7 @@ let
   siteNames = builtins.attrNames (controlPlaneOut.enterprise.${enterpriseName}.site or { });
   siteName =
     if builtins.length siteNames == 1 then
-      builtins.head siteNames
+      builtins.elemAt siteNames 0
     else
       abort ''
         container/default.nix: expected exactly one site under enterprise '${enterpriseName}', got: ${lib.concatStringsSep ", " siteNames}
@@ -116,154 +116,26 @@ let
     else
       null;
 
-  topoIfaceForRuntime =
-    runtimeIfName: runtimeIf:
-    let
-      linkName =
-        if runtimeIf ? link then
-          runtimeIf.link
-        else
-          abort ''
-            container/default.nix: runtime interface '${runtimeIfName}' has no link
+  topoIfaceForRuntime = import ../lib/renderer/topology.nix {
+    inherit
+      lib
+      hostname
+      runtimeTarget
+      backingNodeName
+      backingNode
+      realizedPorts
+      runtimePorts
+      siteLinks
+      controlPlaneOut
+      ;
+  };
 
-            runtime interface:
-            ${builtins.toJSON runtimeIf}
+  topoDetails =
+    map
+      (name: topoIfaceForRuntime name runtimeIfaces.${name})
+      (lib.sort builtins.lessThan (builtins.attrNames runtimeIfaces));
 
-            runtime target:
-            ${builtins.toJSON runtimeTarget}
-          '';
-
-      backingMatches =
-        lib.filterAttrs (_: v: (v.link or null) == linkName) (backingNode.interfaces or { });
-
-      backingIfaceNames = builtins.attrNames backingMatches;
-
-      backingIfaceName =
-        if builtins.length backingIfaceNames == 1 then
-          builtins.head backingIfaceNames
-        else
-          abort ''
-            container/default.nix: expected exactly one interface on backing topology node '${backingNodeName}' for link '${linkName}', got: ${lib.concatStringsSep ", " backingIfaceNames}
-
-            runtime interface:
-            ${builtins.toJSON runtimeIf}
-
-            runtime target:
-            ${builtins.toJSON runtimeTarget}
-
-            backing node:
-            ${builtins.toJSON backingNode}
-
-            site links:
-            ${builtins.toJSON siteLinks}
-
-            full controlPlaneOut:
-            ${builtins.toJSON controlPlaneOut}
-          '';
-
-      backingIface = backingMatches.${backingIfaceName};
-
-      realizedPortNames =
-        builtins.attrNames (lib.filterAttrs (_: p: (p.link or null) == linkName) realizedPorts);
-
-      realizedPortName =
-        if builtins.length realizedPortNames == 1 then
-          builtins.head realizedPortNames
-        else
-          abort ''
-            container/default.nix: expected exactly one realized port on '${hostname}' for link '${linkName}', got: ${lib.concatStringsSep ", " realizedPortNames}
-
-            runtime interface:
-            ${builtins.toJSON runtimeIf}
-
-            runtime ports:
-            ${builtins.toJSON runtimePorts}
-
-            realized ports:
-            ${builtins.toJSON realizedPorts}
-
-            runtime target:
-            ${builtins.toJSON runtimeTarget}
-          '';
-
-      realizedPort = realizedPorts.${realizedPortName};
-
-      renderedIfName =
-        if realizedPort ? interface && realizedPort.interface ? name then
-          realizedPort.interface.name
-        else if runtimeIf ? runtimeInterface then
-          runtimeIf.runtimeInterface
-        else
-          runtimeIfName;
-    in
-    {
-      inherit
-        runtimeIfName
-        renderedIfName
-        linkName
-        backingIfaceName
-        backingIface
-        realizedPortName
-        realizedPort
-        ;
-    };
-
-  topoDetails = builtins.attrValues (lib.mapAttrs topoIfaceForRuntime runtimeIfaces);
-
-  normalizeDst =
-    dst:
-    if dst == "0000:0000:0000:0000:0000:0000:0000:0000/0" then "::/0" else dst;
-
-  routeKeep =
-    r:
-    let
-      dst = r.dst or null;
-      proto = r.proto or "";
-    in
-    dst != null && !(builtins.elem proto [ "connected" ]);
-
-  mkRoute =
-    r:
-    {
-      Destination = normalizeDst r.dst;
-    }
-    // lib.optionalAttrs (r ? via4) { Gateway = r.via4; }
-    // lib.optionalAttrs (r ? via6) { Gateway = r.via6; };
-
-  routesFor =
-    iface:
-    lib.unique (
-      map mkRoute (
-        lib.filter routeKeep ((iface.routes.ipv4 or [ ]) ++ (iface.routes.ipv6 or [ ])
-      ))
-    );
-
-  mkNetwork =
-    d: {
-      name = "20-${d.renderedIfName}";
-      value = {
-        matchConfig.Name = d.renderedIfName;
-
-        linkConfig = {
-          ActivationPolicy = "always-up";
-          RequiredForOnline = false;
-        };
-
-        networkConfig = {
-          DHCP = "no";
-          IPv6AcceptRA = false;
-          IPv4Forwarding = true;
-          IPv6Forwarding = true;
-          ConfigureWithoutCarrier = true;
-        };
-
-        addresses =
-          (lib.optional (d.backingIface ? addr4) { Address = d.backingIface.addr4; })
-          ++ (lib.optional (d.backingIface ? addr6) { Address = d.backingIface.addr6; });
-
-        routes = routesFor d.backingIface;
-      };
-    };
+  mkNetwork = import ../lib/renderer/network.nix { inherit lib; };
 
   renderedNetworks = builtins.listToAttrs (map mkNetwork topoDetails);
 
