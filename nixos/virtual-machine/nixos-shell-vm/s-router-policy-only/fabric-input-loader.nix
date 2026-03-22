@@ -2,7 +2,7 @@
 
 let
   system = pkgs.stdenv.hostPlatform.system;
-  fabricInventory = import ./inventory.nix { inherit lib outPath; };
+  fabricInventory = import ./inventory.nix;
 
   compilerOut =
     (inputs.nixos-network-compiler.lib.compile system) fabricInputs;

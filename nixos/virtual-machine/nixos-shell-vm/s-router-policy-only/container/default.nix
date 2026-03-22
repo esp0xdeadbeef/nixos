@@ -1,5 +1,4 @@
 {
-  outPath,
   lib,
   pkgs,
   controlPlaneOut,
@@ -7,141 +6,326 @@
 }:
 
 let
-  inventory = import ../inventory.nix { inherit lib outPath; };
+  hostname = "s-router-policy-only";
 
-  hostName = "s-router-policy-only";
+  runtimeTargets = controlPlaneOut.control_plane_model.runtime.targets or { };
 
-  nodeName =
-    let
-      nodeNames = builtins.attrNames inventory.realization.nodes;
-      matches = lib.filter (n: inventory.realization.nodes.${n}.host == hostName) nodeNames;
-    in
-    if matches == [ ] then
-      abort "container/default.nix: no realization node found for host '${hostName}'"
-    else if builtins.length matches > 1 then
-      abort "container/default.nix: multiple realization nodes found for host '${hostName}': ${lib.concatStringsSep ", " matches}"
+  runtimeTarget =
+    if builtins.hasAttr hostname runtimeTargets then
+      runtimeTargets.${hostname}
     else
-      builtins.head matches;
+      abort ''
+        container/default.nix: runtime target '${hostname}' missing
 
-  cpm = controlPlaneOut;
+        available runtime targets:
+        ${builtins.toJSON (builtins.attrNames runtimeTargets)}
 
-  enterpriseNames = builtins.attrNames cpm.enterprise;
+        full controlPlaneOut:
+        ${builtins.toJSON controlPlaneOut}
+      '';
+
+  runtimeIfaces = runtimeTarget.effectiveRuntimeRealization.interfaces or { };
+  runtimePorts = runtimeTarget.effectiveRuntimeRealization.runtimePorts or [ ];
+  runtimeLogicalNode = runtimeTarget.logicalNode or { };
+
+  endpointInventory = controlPlaneOut.endpointInventory or { };
+  realization = endpointInventory.realization or { };
+  realizationNodes = realization.nodes or { };
+
+  realizedNode =
+    if builtins.hasAttr hostname realizationNodes then
+      realizationNodes.${hostname}
+    else
+      abort ''
+        container/default.nix: realization node '${hostname}' missing
+
+        available realization nodes:
+        ${builtins.toJSON (builtins.attrNames realizationNodes)}
+
+        endpointInventory:
+        ${builtins.toJSON endpointInventory}
+      '';
+
+  realizedPorts = realizedNode.ports or { };
+
+  enterpriseNames = builtins.attrNames (controlPlaneOut.enterprise or { });
   enterpriseName =
-    if enterpriseNames == [ ] then
-      abort "container/default.nix: controlPlaneOut.enterprise is empty"
-    else if builtins.length enterpriseNames > 1 then
-      abort "container/default.nix: multiple enterprises in controlPlaneOut: ${lib.concatStringsSep ", " enterpriseNames}"
+    if builtins.length enterpriseNames == 1 then
+      builtins.head enterpriseNames
     else
-      builtins.head enterpriseNames;
+      abort ''
+        container/default.nix: expected exactly one enterprise, got: ${lib.concatStringsSep ", " enterpriseNames}
 
-  siteNames = builtins.attrNames cpm.enterprise.${enterpriseName}.site;
+        full controlPlaneOut:
+        ${builtins.toJSON controlPlaneOut}
+      '';
+
+  siteNames = builtins.attrNames (controlPlaneOut.enterprise.${enterpriseName}.site or { });
   siteName =
-    if siteNames == [ ] then
-      abort "container/default.nix: controlPlaneOut.enterprise.${enterpriseName}.site is empty"
-    else if builtins.length siteNames > 1 then
-      abort "container/default.nix: multiple sites in controlPlaneOut.enterprise.${enterpriseName}.site: ${lib.concatStringsSep ", " siteNames}"
+    if builtins.length siteNames == 1 then
+      builtins.head siteNames
     else
-      builtins.head siteNames;
+      abort ''
+        container/default.nix: expected exactly one site under enterprise '${enterpriseName}', got: ${lib.concatStringsSep ", " siteNames}
 
-  site = cpm.enterprise.${enterpriseName}.site.${siteName};
+        enterprise subtree:
+        ${builtins.toJSON controlPlaneOut.enterprise.${enterpriseName}}
+      '';
 
-  node =
-    if site ? nodes && builtins.hasAttr nodeName site.nodes then
-      site.nodes.${nodeName}
+  site = controlPlaneOut.enterprise.${enterpriseName}.site.${siteName};
+  siteNodes = site.nodes or { };
+  siteLinks = site.links or { };
+
+  backingNodeName =
+    if site ? policyNodeName then
+      site.policyNodeName
     else
-      abort "container/default.nix: controlPlaneOut.enterprise.${enterpriseName}.site.${siteName}.nodes.${nodeName} is missing";
+      abort ''
+        container/default.nix: site.policyNodeName missing
 
-  realizedPorts = inventory.realization.nodes.${nodeName}.ports;
+        site:
+        ${builtins.toJSON site}
 
-  topoIfForPort =
-    port:
+        full controlPlaneOut:
+        ${builtins.toJSON controlPlaneOut}
+      '';
+
+  backingNode =
+    if builtins.hasAttr backingNodeName siteNodes then
+      siteNodes.${backingNodeName}
+    else
+      abort ''
+        container/default.nix: backing topology node '${backingNodeName}' missing from site.nodes
+
+        site.nodes:
+        ${builtins.toJSON siteNodes}
+
+        site:
+        ${builtins.toJSON site}
+      '';
+
+  upstreamSelectorNodeName =
+    if site ? upstreamSelectorNodeName then
+      site.upstreamSelectorNodeName
+    else
+      null;
+
+  upstreamSelectorNode =
+    if upstreamSelectorNodeName != null && builtins.hasAttr upstreamSelectorNodeName siteNodes then
+      siteNodes.${upstreamSelectorNodeName}
+    else
+      null;
+
+  topoIfaceForRuntime =
+    runtimeIfName: runtimeIf:
     let
-      matches = lib.filterAttrs (_: v: (v.link or null) == port.link) node.interfaces;
-      names = builtins.attrNames matches;
-    in
-    if names == [ ] then
-      abort "container/default.nix: no topology interface for port link '${port.link}'"
-    else if builtins.length names > 1 then
-      abort "container/default.nix: multiple topology interfaces for port link '${port.link}': ${lib.concatStringsSep ", " names}"
-    else
-      builtins.head names;
+      linkName =
+        if runtimeIf ? link then
+          runtimeIf.link
+        else
+          abort ''
+            container/default.nix: runtime interface '${runtimeIfName}' has no link
 
-  routesFor =
-    family: rs:
-    map (
-      r:
-      let
-        dst =
-          if family == "ipv4" then
-            (r.dst or null)
-          else if (r.dst or null) == "0000:0000:0000:0000:0000:0000:0000:0000/0" then
-            "::/0"
-          else
-            (r.dst or null);
-      in
-      { Destination = dst; }
-      // lib.optionalAttrs (r ? via4) { Gateway = r.via4; }
-      // lib.optionalAttrs (r ? via6) { Gateway = r.via6; }
-    ) (
-      lib.filter (
-        r:
-        let
-          proto = r.proto or "";
-          dst =
-            if family == "ipv4" then
-              (r.dst or null)
-            else if (r.dst or null) == "0000:0000:0000:0000:0000:0000:0000:0000/0" then
-              "::/0"
-            else
-              (r.dst or null);
-        in
-        dst != null && !(builtins.elem proto [ "connected" "internal" ])
-      ) rs
-    );
+            runtime interface:
+            ${builtins.toJSON runtimeIf}
 
-  networkForPort =
-    portName:
-    let
-      port = realizedPorts.${portName};
-      topoIfName = topoIfForPort port;
-      topoIf = node.interfaces.${topoIfName};
+            runtime target:
+            ${builtins.toJSON runtimeTarget}
+          '';
 
-      v4Routes = routesFor "ipv4" (topoIf.routes.ipv4 or [ ]);
-      v6Routes = routesFor "ipv6" (topoIf.routes.ipv6 or [ ]);
+      backingMatches =
+        lib.filterAttrs (_: v: (v.link or null) == linkName) (backingNode.interfaces or { });
+
+      backingIfaceNames = builtins.attrNames backingMatches;
+
+      backingIfaceName =
+        if builtins.length backingIfaceNames == 1 then
+          builtins.head backingIfaceNames
+        else
+          abort ''
+            container/default.nix: expected exactly one interface on backing topology node '${backingNodeName}' for link '${linkName}', got: ${lib.concatStringsSep ", " backingIfaceNames}
+
+            runtime interface:
+            ${builtins.toJSON runtimeIf}
+
+            runtime target:
+            ${builtins.toJSON runtimeTarget}
+
+            backing node:
+            ${builtins.toJSON backingNode}
+
+            site links:
+            ${builtins.toJSON siteLinks}
+
+            full controlPlaneOut:
+            ${builtins.toJSON controlPlaneOut}
+          '';
+
+      backingIface = backingMatches.${backingIfaceName};
+
+      realizedPortNames =
+        builtins.attrNames (lib.filterAttrs (_: p: (p.link or null) == linkName) realizedPorts);
+
+      realizedPortName =
+        if builtins.length realizedPortNames == 1 then
+          builtins.head realizedPortNames
+        else
+          abort ''
+            container/default.nix: expected exactly one realized port on '${hostname}' for link '${linkName}', got: ${lib.concatStringsSep ", " realizedPortNames}
+
+            runtime interface:
+            ${builtins.toJSON runtimeIf}
+
+            runtime ports:
+            ${builtins.toJSON runtimePorts}
+
+            realized ports:
+            ${builtins.toJSON realizedPorts}
+
+            runtime target:
+            ${builtins.toJSON runtimeTarget}
+          '';
+
+      realizedPort = realizedPorts.${realizedPortName};
+
+      renderedIfName =
+        if realizedPort ? interface && realizedPort.interface ? name then
+          realizedPort.interface.name
+        else if runtimeIf ? runtimeInterface then
+          runtimeIf.runtimeInterface
+        else
+          runtimeIfName;
     in
     {
-      matchConfig.Name = port.interface.name;
-
-      networkConfig = {
-        DHCP = "no";
-        IPv6AcceptRA = false;
-        IPv4Forwarding = true;
-        IPv6Forwarding = true;
-        ConfigureWithoutCarrier = true;
-      };
-
-      linkConfig.RequiredForOnline = false;
-
-      addresses =
-        (lib.optional (topoIf ? addr4) { Address = topoIf.addr4; })
-        ++ (lib.optional (topoIf ? addr6) { Address = topoIf.addr6; });
-
-      routes = v4Routes ++ v6Routes;
+      inherit
+        runtimeIfName
+        renderedIfName
+        linkName
+        backingIfaceName
+        backingIface
+        realizedPortName
+        realizedPort
+        ;
     };
 
-  renderedNetworks = builtins.listToAttrs (
-    map (portName: {
-      name = "10-${portName}";
-      value = networkForPort portName;
-    }) (builtins.attrNames realizedPorts)
-  );
+  topoDetails = builtins.attrValues (lib.mapAttrs topoIfaceForRuntime runtimeIfaces);
+
+  normalizeDst =
+    dst:
+    if dst == "0000:0000:0000:0000:0000:0000:0000:0000/0" then "::/0" else dst;
+
+  routeKeep =
+    r:
+    let
+      dst = r.dst or null;
+      proto = r.proto or "";
+    in
+    dst != null && !(builtins.elem proto [ "connected" ]);
+
+  mkRoute =
+    r:
+    {
+      Destination = normalizeDst r.dst;
+    }
+    // lib.optionalAttrs (r ? via4) { Gateway = r.via4; }
+    // lib.optionalAttrs (r ? via6) { Gateway = r.via6; };
+
+  routesFor =
+    iface:
+    lib.unique (
+      map mkRoute (
+        lib.filter routeKeep ((iface.routes.ipv4 or [ ]) ++ (iface.routes.ipv6 or [ ])
+      ))
+    );
+
+  mkNetwork =
+    d: {
+      name = "20-${d.renderedIfName}";
+      value = {
+        matchConfig.Name = d.renderedIfName;
+
+        linkConfig = {
+          ActivationPolicy = "always-up";
+          RequiredForOnline = false;
+        };
+
+        networkConfig = {
+          DHCP = "no";
+          IPv6AcceptRA = false;
+          IPv4Forwarding = true;
+          IPv6Forwarding = true;
+          ConfigureWithoutCarrier = true;
+        };
+
+        addresses =
+          (lib.optional (d.backingIface ? addr4) { Address = d.backingIface.addr4; })
+          ++ (lib.optional (d.backingIface ? addr6) { Address = d.backingIface.addr6; });
+
+        routes = routesFor d.backingIface;
+      };
+    };
+
+  renderedNetworks = builtins.listToAttrs (map mkNetwork topoDetails);
+
+  debugArtifacts = {
+    "network-artifacts/container-control-plane-out.json".text =
+      builtins.toJSON controlPlaneOut;
+
+    "network-artifacts/container-endpoint-inventory.json".text =
+      builtins.toJSON endpointInventory;
+
+    "network-artifacts/container-runtime-target.json".text =
+      builtins.toJSON runtimeTarget;
+
+    "network-artifacts/container-runtime-logical-node.json".text =
+      builtins.toJSON runtimeLogicalNode;
+
+    "network-artifacts/container-runtime-interfaces.json".text =
+      builtins.toJSON runtimeIfaces;
+
+    "network-artifacts/container-runtime-ports.json".text =
+      builtins.toJSON runtimePorts;
+
+    "network-artifacts/container-realized-node.json".text =
+      builtins.toJSON realizedNode;
+
+    "network-artifacts/container-realized-ports.json".text =
+      builtins.toJSON realizedPorts;
+
+    "network-artifacts/container-site.json".text =
+      builtins.toJSON site;
+
+    "network-artifacts/container-site-nodes.json".text =
+      builtins.toJSON siteNodes;
+
+    "network-artifacts/container-site-links.json".text =
+      builtins.toJSON siteLinks;
+
+    "network-artifacts/container-backing-node-name".text =
+      backingNodeName;
+
+    "network-artifacts/container-backing-node.json".text =
+      builtins.toJSON backingNode;
+
+    "network-artifacts/container-upstream-selector-node-name".text =
+      if upstreamSelectorNodeName == null then "" else upstreamSelectorNodeName;
+
+    "network-artifacts/container-upstream-selector-node.json".text =
+      builtins.toJSON upstreamSelectorNode;
+
+    "network-artifacts/container-topology-details.json".text =
+      builtins.toJSON topoDetails;
+
+    "network-artifacts/container-rendered-networks.json".text =
+      builtins.toJSON renderedNetworks;
+  };
 in
 {
   imports = [
     ./debugging-packages.nix
   ];
 
-  networking.hostName = nodeName;
+  networking.hostName = hostname;
 
   networking.useNetworkd = true;
   systemd.network.enable = true;
@@ -161,6 +345,31 @@ in
   };
 
   systemd.network.networks = lib.mkForce renderedNetworks;
+
+  environment.etc = lib.mkMerge [
+    debugArtifacts
+  ];
+
+  system.activationScripts.networkArtifactsDebug = lib.stringAfter [ "etc" ] ''
+    mkdir -p /etc/network-artifacts
+    cp -f ${pkgs.writeText "container-control-plane-out.json" (builtins.toJSON controlPlaneOut)} /etc/network-artifacts/container-control-plane-out.json
+    cp -f ${pkgs.writeText "container-endpoint-inventory.json" (builtins.toJSON endpointInventory)} /etc/network-artifacts/container-endpoint-inventory.json
+    cp -f ${pkgs.writeText "container-runtime-target.json" (builtins.toJSON runtimeTarget)} /etc/network-artifacts/container-runtime-target.json
+    cp -f ${pkgs.writeText "container-runtime-logical-node.json" (builtins.toJSON runtimeLogicalNode)} /etc/network-artifacts/container-runtime-logical-node.json
+    cp -f ${pkgs.writeText "container-runtime-interfaces.json" (builtins.toJSON runtimeIfaces)} /etc/network-artifacts/container-runtime-interfaces.json
+    cp -f ${pkgs.writeText "container-runtime-ports.json" (builtins.toJSON runtimePorts)} /etc/network-artifacts/container-runtime-ports.json
+    cp -f ${pkgs.writeText "container-realized-node.json" (builtins.toJSON realizedNode)} /etc/network-artifacts/container-realized-node.json
+    cp -f ${pkgs.writeText "container-realized-ports.json" (builtins.toJSON realizedPorts)} /etc/network-artifacts/container-realized-ports.json
+    cp -f ${pkgs.writeText "container-site.json" (builtins.toJSON site)} /etc/network-artifacts/container-site.json
+    cp -f ${pkgs.writeText "container-site-nodes.json" (builtins.toJSON siteNodes)} /etc/network-artifacts/container-site-nodes.json
+    cp -f ${pkgs.writeText "container-site-links.json" (builtins.toJSON siteLinks)} /etc/network-artifacts/container-site-links.json
+    cp -f ${pkgs.writeText "container-backing-node-name" backingNodeName} /etc/network-artifacts/container-backing-node-name
+    cp -f ${pkgs.writeText "container-backing-node.json" (builtins.toJSON backingNode)} /etc/network-artifacts/container-backing-node.json
+    cp -f ${pkgs.writeText "container-upstream-selector-node-name" (if upstreamSelectorNodeName == null then "" else upstreamSelectorNodeName)} /etc/network-artifacts/container-upstream-selector-node-name
+    cp -f ${pkgs.writeText "container-upstream-selector-node.json" (builtins.toJSON upstreamSelectorNode)} /etc/network-artifacts/container-upstream-selector-node.json
+    cp -f ${pkgs.writeText "container-topology-details.json" (builtins.toJSON topoDetails)} /etc/network-artifacts/container-topology-details.json
+    cp -f ${pkgs.writeText "container-rendered-networks.json" (builtins.toJSON renderedNetworks)} /etc/network-artifacts/container-rendered-networks.json
+  '';
 
   system.stateVersion = "25.11";
 }

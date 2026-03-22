@@ -1,12 +1,7 @@
-{
-  outPath,
-  lib,
-  config,
-  ...
-}:
+{ lib, outPath, config, ... }:
 
 let
-  inventory = import ../inventory.nix { inherit lib outPath; };
+  inventory = import ../inventory.nix;
 
   rendered = import ../lib/renderer/render-host-network.nix {
     inherit lib inventory;

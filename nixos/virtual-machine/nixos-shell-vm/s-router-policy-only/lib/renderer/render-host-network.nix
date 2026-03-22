@@ -31,11 +31,34 @@ let
     uplink:
     "${uplink.parent}.${toString uplink.vlan}";
 
+  transitBridges =
+    if host ? transitBridges && builtins.isAttrs host.transitBridges then
+      host.transitBridges
+    else
+      { };
+
+  transitNames = builtins.attrNames transitBridges;
+
+  transitNamesForUplink =
+    uplinkName:
+    lib.filter (
+      transitName:
+      let
+        transit = transitBridges.${transitName};
+      in
+      (transit.parentUplink or null) == uplinkName
+    ) transitNames;
+
+  transitVlanIfNameFor =
+    uplinkName: transit:
+    "${uplinks.${uplinkName}.bridge}.${toString transit.vlan}";
+
   uplinkNetdevs = builtins.listToAttrs (
     lib.concatMap (
       uplinkName:
       let
         uplink = uplinks.${uplinkName};
+        transitNamesOnUplink = transitNamesForUplink uplinkName;
       in
       [
         {
@@ -58,6 +81,24 @@ let
           };
         }
       ]
+      ++ lib.optionals (uplink.mode == "trunk") (
+        map (
+          transitName:
+          let
+            transit = transitBridges.${transitName};
+          in
+          {
+            name = "12-${transitVlanIfNameFor uplinkName transit}";
+            value = {
+              netdevConfig = {
+                Name = transitVlanIfNameFor uplinkName transit;
+                Kind = "vlan";
+              };
+              vlanConfig.Id = transit.vlan;
+            };
+          }
+        ) transitNamesOnUplink
+      )
     ) uplinkNames
   );
 
@@ -118,24 +159,27 @@ let
       let
         uplink = uplinks.${uplinkName};
         bridgeNetwork = bridgeNetworkFor uplink.bridge;
+        transitNamesOnUplink = transitNamesForUplink uplinkName;
       in
       {
         name = "06-${uplink.bridge}";
         value = {
           matchConfig.Name = uplink.bridge;
-          networkConfig = bridgeNetwork;
+          networkConfig =
+            bridgeNetwork
+            // lib.optionalAttrs (uplink.mode == "trunk" && transitNamesOnUplink != [ ]) {
+              VLAN = map (
+                transitName:
+                let
+                  transit = transitBridges.${transitName};
+                in
+                transitVlanIfNameFor uplinkName transit
+              ) transitNamesOnUplink;
+            };
         };
       }
     ) uplinkNames
   );
-
-  transitBridges =
-    if host ? transitBridges && builtins.isAttrs host.transitBridges then
-      host.transitBridges
-    else
-      { };
-
-  transitNames = builtins.attrNames transitBridges;
 
   transitNetdevs = builtins.listToAttrs (
     map (
@@ -154,18 +198,36 @@ let
   );
 
   transitNetworks = builtins.listToAttrs (
-    map (
+    lib.concatMap (
       transitName:
       let
         transit = transitBridges.${transitName};
+        uplinkName = transit.parentUplink;
+        uplink = uplinks.${uplinkName};
       in
-      {
-        name = "30-${transit.name}";
-        value = {
-          matchConfig.Name = transit.name;
-          networkConfig.ConfigureWithoutCarrier = true;
-        };
-      }
+      [
+        {
+          name = "30-${transit.name}";
+          value = {
+            matchConfig.Name = transit.name;
+            networkConfig.ConfigureWithoutCarrier = true;
+          };
+        }
+      ]
+      ++ lib.optionals (uplink.mode == "trunk") [
+        {
+          name = "31-${transitVlanIfNameFor uplinkName transit}";
+          value = {
+            matchConfig.Name = transitVlanIfNameFor uplinkName transit;
+            networkConfig = {
+              Bridge = transit.name;
+              DHCP = "no";
+              IPv6AcceptRA = false;
+              ConfigureWithoutCarrier = true;
+            };
+          };
+        }
+      ]
     ) transitNames
   );
 in

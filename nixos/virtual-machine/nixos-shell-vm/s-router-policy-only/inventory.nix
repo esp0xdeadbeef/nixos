@@ -1,129 +1,250 @@
-{ lib, outPath ? null }:
-
-let
-  fabricPath =
-    if outPath == null then
-      null
-    else
-      "${outPath}/library/100-fabric-routing/inputs/intent.nix";
-
-  fabricImported =
-    if fabricPath != null && builtins.pathExists fabricPath then
-      import fabricPath
-    else
-      { };
-
-  fabricInputs =
-    if builtins.isFunction fabricImported then
-      fabricImported { inherit lib; }
-    else
-      fabricImported;
-
-  policyBase =
-    if fabricInputs ? policyAccessTransitBase then
-      fabricInputs.policyAccessTransitBase
-    else
-      100;
-
-  corePolicyTransitVlan =
-    if fabricInputs ? corePolicyTransitVlan then
-      fabricInputs.corePolicyTransitVlan
-    else
-      null;
-
-  mkTransitBridge = name: vlan: {
-    inherit name vlan;
-    parentUplink = "trunk";
-  };
-
-  upstreamTransitVlan =
-    if corePolicyTransitVlan != null then
-      corePolicyTransitVlan
-    else
-      policyBase + 3;
-
-  transitBridges =
-    {
-      tr100 = mkTransitBridge "tr100" policyBase;
-      tr101 = mkTransitBridge "tr101" (policyBase + 1);
-      tr102 = mkTransitBridge "tr102" (policyBase + 2);
-      "tr${toString upstreamTransitVlan}" =
-        mkTransitBridge "tr${toString upstreamTransitVlan}" upstreamTransitVlan;
-    };
-in
 {
   schemaVersion = 1;
 
-  deployment.hosts.s-router-policy-only = {
-    uplinks = {
-      management = {
-        parent = "eth0";
-        bridge = "vlan2";
-        mode = "vlan";
-        vlan = 2;
+  deployment.hosts = {
+    s-router-policy-only = {
+      uplinks = {
+        upstream-core = {
+          parent = "eth0";
+          bridge = "br-upstream";
+          mode = "vlan";
+          vlan = 5;
+        };
+
+        trunk = {
+          parent = "eth0";
+          bridge = "br-fabric";
+          mode = "trunk";
+        };
       };
 
-      trunk = {
-        parent = "eth0";
-        bridge = "br-lan-trunk";
-        mode = "trunk";
+      bridgeNetworks = {
+        br-upstream = {
+          ConfigureWithoutCarrier = true;
+        };
+        br-fabric = {
+          ConfigureWithoutCarrier = true;
+        };
+      };
+
+      transitBridges = {
+        tr100 = {
+          name = "tr100";
+          vlan = 100;
+          parentUplink = "trunk";
+        };
+
+        tr101 = {
+          name = "tr101";
+          vlan = 101;
+          parentUplink = "trunk";
+        };
+
+        tr102 = {
+          name = "tr102";
+          vlan = 102;
+          parentUplink = "trunk";
+        };
+
+        tr200 = {
+          name = "tr200";
+          vlan = 200;
+          parentUplink = "trunk";
+        };
+
+        tr201 = {
+          name = "tr201";
+          vlan = 201;
+          parentUplink = "trunk";
+        };
       };
     };
 
-    bridgeNetworks = {
-      vlan2 = {
-        DHCP = "ipv4";
-        IPv6AcceptRA = true;
-        ConfigureWithoutCarrier = true;
+    s-router-policy = {
+      uplinks = {
+        trunk = {
+          parent = "eth0";
+          bridge = "br-fabric";
+          mode = "trunk";
+        };
       };
 
-      br-lan-trunk = {
-        ConfigureWithoutCarrier = true;
+      transitBridges = {
+        tr100 = {
+          name = "tr100";
+          vlan = 100;
+          parentUplink = "trunk";
+        };
+
+        tr101 = {
+          name = "tr101";
+          vlan = 101;
+          parentUplink = "trunk";
+        };
+
+        tr102 = {
+          name = "tr102";
+          vlan = 102;
+          parentUplink = "trunk";
+        };
+
+        tr201 = {
+          name = "tr201";
+          vlan = 201;
+          parentUplink = "trunk";
+        };
       };
     };
 
-    transitBridges = transitBridges;
+    s-router-core-wan = {
+      uplinks = {
+        trunk = {
+          parent = "eth0";
+          bridge = "br-fabric";
+          mode = "trunk";
+        };
+      };
+
+      transitBridges = {
+        tr200 = {
+          name = "tr200";
+          vlan = 200;
+          parentUplink = "trunk";
+        };
+      };
+    };
   };
 
-  realization.nodes.s-router-policy = {
-    host = "s-router-policy-only";
-    platform = "nixos-container";
+  realization.nodes = {
+    s-router-policy-only = {
+      host = "s-router-policy-only";
+      platform = "nixos-container";
 
-    ports = {
-      lan = {
-        link = "p2p-s-router-policy-s-router-upstream-selector";
-        attach = {
-          kind = "bridge";
-          bridge = "tr${toString upstreamTransitVlan}";
+      ports = {
+        transit-admin = {
+          link = "p2p-s-router-access-admin-s-router-policy";
+          attach = {
+            kind = "bridge";
+            bridge = "tr100";
+          };
+          interface.name = "transit-admin";
         };
-        interface.name = "lan";
+
+        transit-mgmt = {
+          link = "p2p-s-router-access-mgmt-s-router-policy";
+          attach = {
+            kind = "bridge";
+            bridge = "tr101";
+          };
+          interface.name = "transit-mgmt";
+        };
+
+        transit-client = {
+          link = "p2p-s-router-access-client-s-router-policy";
+          attach = {
+            kind = "bridge";
+            bridge = "tr102";
+          };
+          interface.name = "transit-client";
+        };
+
+        upstream-selector = {
+          link = "p2p-s-router-policy-s-router-upstream-selector";
+          attach = {
+            kind = "bridge";
+            bridge = "tr201";
+          };
+          interface.name = "upstream";
+        };
       };
+    };
 
-      transit-admin = {
-        link = "p2p-s-router-access-admin-s-router-policy";
-        attach = {
-          kind = "bridge";
-          bridge = "tr100";
+    s-router-upstream-selector = {
+      host = "s-router-policy-only";
+      platform = "linux";
+
+      ports = {
+        policy = {
+          link = "p2p-s-router-policy-s-router-upstream-selector";
+          attach = {
+            kind = "bridge";
+            bridge = "tr201";
+          };
+          interface.name = "policy";
         };
-        interface.name = "transit-admin";
+
+        core = {
+          link = "p2p-s-router-core-wan-s-router-upstream-selector";
+          attach = {
+            kind = "bridge";
+            bridge = "tr200";
+          };
+          interface.name = "core";
+        };
       };
+    };
 
-      transit-mgmt = {
-        link = "p2p-s-router-access-mgmt-s-router-policy";
-        attach = {
-          kind = "bridge";
-          bridge = "tr101";
+    s-router-core-wan = {
+      host = "s-router-core-wan";
+      platform = "linux";
+
+      ports = {
+        upstream-selector = {
+          link = "p2p-s-router-core-wan-s-router-upstream-selector";
+          attach = {
+            kind = "bridge";
+            bridge = "tr200";
+          };
+          interface.name = "upstream";
         };
-        interface.name = "transit-mgmt";
       };
+    };
 
-      transit-client = {
-        link = "p2p-s-router-access-client-s-router-policy";
-        attach = {
-          kind = "bridge";
-          bridge = "tr102";
+    s-router-access-admin = {
+      host = "s-router-policy";
+      platform = "linux";
+
+      ports = {
+        transit-policy = {
+          link = "p2p-s-router-access-admin-s-router-policy";
+          attach = {
+            kind = "bridge";
+            bridge = "tr100";
+          };
+          interface.name = "access-admin";
         };
-        interface.name = "transit-client";
+      };
+    };
+
+    s-router-access-client = {
+      host = "s-router-policy";
+      platform = "linux";
+
+      ports = {
+        transit-policy = {
+          link = "p2p-s-router-access-client-s-router-policy";
+          attach = {
+            kind = "bridge";
+            bridge = "tr102";
+          };
+          interface.name = "access-client";
+        };
+      };
+    };
+
+    s-router-access-mgmt = {
+      host = "s-router-policy";
+      platform = "linux";
+
+      ports = {
+        transit-policy = {
+          link = "p2p-s-router-access-mgmt-s-router-policy";
+          attach = {
+            kind = "bridge";
+            bridge = "tr101";
+          };
+          interface.name = "access-mgmt";
+        };
       };
     };
   };

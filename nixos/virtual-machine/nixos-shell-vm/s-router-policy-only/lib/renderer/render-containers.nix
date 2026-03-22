@@ -1,4 +1,4 @@
-# ./lib/renderer/render-containers.nix
+# FILE: ./lib/renderer/render-containers.nix
 {
   lib,
   inventory,
@@ -8,30 +8,23 @@
 }:
 
 let
-  validated = import ./validate-realization.nix {
-    inherit
-      lib
-      inventory
-      nodeName
-      hostName
-      cpm
-      ;
-  };
+  runtimeTargets = inventory.control_plane_model.runtime.targets or { };
 
-  node = validated.realization.nodes.${nodeName};
-
-  _hostMatch =
-    if node.host != hostName then
-      abort "renderer: node '${nodeName}' is assigned to host '${node.host}', not '${hostName}'"
+  nodeRuntime =
+    if lib.hasAttr nodeName runtimeTargets then
+      runtimeTargets.${nodeName}.effectiveRuntimeRealization
     else
-      true;
+      abort "renderer: missing runtime target for node '${nodeName}'";
 
-  ports = node.ports;
+  interfaces = nodeRuntime.interfaces or { };
 
-  bridgePorts = lib.filterAttrs (_: p: p.attach.kind == "bridge") ports;
+  bridgeIfs = lib.filterAttrs (_: v: (v.attachment.kind or null) == "bridge") interfaces;
 in
 {
-  extraVeths = builtins.mapAttrs (_: p: {
-    hostBridge = p.attach.bridge;
-  }) bridgePorts;
+  extraVeths = lib.mapAttrs' (
+    ifName: v:
+    lib.nameValuePair ifName {
+      hostBridge = v.attachment.bridge;
+    }
+  ) bridgeIfs;
 }

@@ -9,26 +9,22 @@
 
 let
   hostname = config.networking.hostName;
+  hostName = hostname;
   containerName = "${hostname}-container";
 
-  inventory = import ./inventory.nix { inherit lib outPath; };
+  runtimeTargets =
+    controlPlaneOut.control_plane_model.runtime.targets or { };
 
   nodeName =
-    let
-      nodeNames = builtins.attrNames inventory.realization.nodes;
-      matches = lib.filter (n: inventory.realization.nodes.${n}.host == hostname) nodeNames;
-    in
-    if matches == [ ] then
-      abort "container-settings.nix: no realization node found for host '${hostname}'"
-    else if builtins.length matches > 1 then
-      abort "container-settings.nix: multiple realization nodes found for host '${hostname}': ${lib.concatStringsSep ", " matches}"
+    if lib.hasAttr hostname runtimeTargets then
+      hostname
     else
-      builtins.head matches;
+      abort "container-settings.nix: runtime target '${hostname}' missing";
 
   renderedContainer = import ./lib/renderer/render-containers.nix {
-    inherit lib inventory;
-    inherit nodeName;
-    hostName = hostname;
+    inherit lib;
+    inventory = controlPlaneOut;
+    inherit nodeName hostName;
     cpm = controlPlaneOut;
   };
 in
@@ -65,7 +61,7 @@ in
       inherit outPath controlPlaneOut;
     };
 
-    config = { outPath, controlPlaneOut, ... }: {
+    config = { controlPlaneOut, ... }: {
       imports = [
         ./container
       ];
@@ -77,6 +73,8 @@ in
       networking.useNetworkd = true;
       systemd.network.enable = true;
       networking.useDHCP = false;
+      networking.useHostResolvConf = false;
+      services.resolved.enable = lib.mkForce false;
 
       system.stateVersion = "25.11";
     };
