@@ -401,11 +401,11 @@
         "pkgs-by-name-for-flake-parts": "pkgs-by-name-for-flake-parts"
       },
       "locked": {
-        "lastModified": 1774191270,
-        "narHash": "sha256-YgGi9sYd4VpZV5gpcgkFdAwfO4HG01nb6EW2AIy4y4Y=",
+        "lastModified": 1774214266,
+        "narHash": "sha256-CG/GKfdauvYVWNDEQP2Gt4ly2hHYkfgplk/Krk6u+iQ=",
         "owner": "khaneliman",
         "repo": "khanelivim",
-        "rev": "8985ffcd0ea15c93933188587ff132300d64e05e",
+        "rev": "c20482766a440c1baf9ef506017131911685b01d",
         "type": "github"
       },
       "original": {
@@ -648,11 +648,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774213523,
-        "narHash": "sha256-USsApI9sAE1t6wcADnp6qkWZA5XZxJDgk0+iXERgSO8=",
+        "lastModified": 1774217732,
+        "narHash": "sha256-gCenTw90YWzZhPIdHaNZmV8on3m3TnMmhrVcVrCy2IY=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "3c0ca0fa94cb51938bca462a7d3ab72f2dea40c9",
+        "rev": "e2e8c76605851413ff4be4ce522287bdc07707c3",
         "type": "github"
       },
       "original": {
@@ -997,11 +997,11 @@
     },
     "nixpkgs-master": {
       "locked": {
-        "lastModified": 1774189642,
-        "narHash": "sha256-fiWVdfpjokj8CHNQyUBkg0B1DVsxCfC9bstx88gKuVc=",
+        "lastModified": 1774213692,
+        "narHash": "sha256-Ua+F0Uqv8OAwVfmzByE56LKk4jjn9yXIuiK8eiLI6Sw=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "cf87881886182975bef15495007d6580c4aa6450",
+        "rev": "99ff70ac8eff9bdec124cbbf6a8faf4f8207e685",
         "type": "github"
       },
       "original": {
