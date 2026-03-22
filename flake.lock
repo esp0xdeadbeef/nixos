@@ -338,11 +338,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774201162,
-        "narHash": "sha256-th4i3X3P3yikPk3qu1A5DQ40tIztZKvAKPaa9hjXF+U=",
+        "lastModified": 1774210133,
+        "narHash": "sha256-yeiWCY9aAUUJ3ebMVjs0UZXRnT5x90MCtpbpOWiXrvM=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "932ca46013acabbedd13c27dc278e3d043707e46",
+        "rev": "c6fe2944ad9f2444b2d767c4a5edee7c166e8a95",
         "type": "github"
       },
       "original": {
@@ -648,11 +648,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774206387,
-        "narHash": "sha256-KtfaTg6azeD4XijFtDcAPnAyHZmAW4/9X+sJTJfkbwc=",
+        "lastModified": 1774213523,
+        "narHash": "sha256-USsApI9sAE1t6wcADnp6qkWZA5XZxJDgk0+iXERgSO8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "a2f784dc06dc4d0999ad2d0152b3aced027cfc74",
+        "rev": "3c0ca0fa94cb51938bca462a7d3ab72f2dea40c9",
         "type": "github"
       },
       "original": {
