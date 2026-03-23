@@ -135,9 +135,8 @@ in
     mutableExtensionsDir = true;
   };
 
-  # Enable home-manager and git
+  # Enable home-manager 
   programs.home-manager.enable = true;
-  # programs.git.enable = true;
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";

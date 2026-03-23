@@ -15,9 +15,10 @@ in
   home.packages =
     let
       stable = with pkgs; [
-        koodo-reader
+        # koodo-reader # old version of electron
       ];
       unstable = with unstablePkgs; [
+        koodo-reader # old version of electron
       ];
     in
     stable ++ unstable;
