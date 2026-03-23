@@ -1,43 +1,56 @@
-# ./lib/renderer/routes.nix
 { lib }:
 
-let
-  normalizeDst =
-    dst:
-    if dst == "0000:0000:0000:0000:0000:0000:0000:0000/0" then "::/0" else dst;
-
-  routeKeep =
-    r:
-    let
-      dst = r.dst or null;
-      proto = r.proto or "";
-    in
-    dst != null && !(builtins.elem proto [ "connected" ]);
-
-  mkRoute =
-    r:
-    {
-      Destination = normalizeDst r.dst;
-    }
-    // lib.optionalAttrs (r ? via4) { Gateway = r.via4; }
-    // lib.optionalAttrs (r ? via6) { Gateway = r.via6; };
-
+{
   routesFor =
     iface:
-    lib.unique (
-      map mkRoute (
-        lib.filter routeKeep (
-          (iface.routes.ipv4 or [ ])
-          ++ (iface.routes.ipv6 or [ ])
-        )
-      )
-    );
-in
-{
-  inherit
-    normalizeDst
-    routeKeep
-    mkRoute
-    routesFor
-    ;
+    if !(iface ? routes) then
+      abort ''
+        renderer/routes.nix: iface.routes is missing
+
+        iface:
+        ${builtins.toJSON iface}
+      ''
+    else if !(builtins.isList iface.routes) then
+      abort ''
+        renderer/routes.nix: iface.routes must be a list
+
+        iface:
+        ${builtins.toJSON iface}
+      ''
+    else
+      map (
+        route:
+        if !(builtins.isAttrs route) then
+          abort ''
+            renderer/routes.nix: route entry must be an attribute set
+
+            route:
+            ${builtins.toJSON route}
+
+            iface:
+            ${builtins.toJSON iface}
+          ''
+        else if !(route ? Destination) || !(builtins.isString route.Destination) || route.Destination == "" then
+          abort ''
+            renderer/routes.nix: route entry missing Destination
+
+            route:
+            ${builtins.toJSON route}
+
+            iface:
+            ${builtins.toJSON iface}
+          ''
+        else if route ? Gateway && (!(builtins.isString route.Gateway) || route.Gateway == "") then
+          abort ''
+            renderer/routes.nix: route entry has invalid Gateway
+
+            route:
+            ${builtins.toJSON route}
+
+            iface:
+            ${builtins.toJSON iface}
+          ''
+        else
+          route
+      ) iface.routes;
 }

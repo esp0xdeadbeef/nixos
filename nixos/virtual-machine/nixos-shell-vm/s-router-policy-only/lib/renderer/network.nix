@@ -1,9 +1,5 @@
 { lib }:
 
-let
-  routeHelpers = import ./routes.nix { inherit lib; };
-  inherit (routeHelpers) routesFor;
-in
 d: {
   name = "20-${d.renderedIfName}";
   value = {
@@ -22,10 +18,7 @@ d: {
       ConfigureWithoutCarrier = true;
     };
 
-    addresses =
-      (lib.optional (d.backingIface ? addr4) { Address = d.backingIface.addr4; })
-      ++ (lib.optional (d.backingIface ? addr6) { Address = d.backingIface.addr6; });
-
-    routes = routesFor d.backingIface;
+    addresses = d.addresses;
+    routes = d.routes;
   };
 }

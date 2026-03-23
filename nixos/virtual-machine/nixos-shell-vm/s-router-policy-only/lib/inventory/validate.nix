@@ -9,20 +9,11 @@
 let
   _inventory = import ./load.nix { inherit inventory; };
 
+  listInvariants = import ../list-invariants.nix { inherit lib; };
+  inherit (listInvariants) duplicates;
+
   hostNames = builtins.attrNames _inventory.deployment.hosts;
   nodeNames = builtins.attrNames _inventory.realization.nodes;
-
-  duplicates =
-    xs:
-    let
-      counts = builtins.listToAttrs (
-        map (x: {
-          name = x;
-          value = lib.length (lib.filter (y: y == x) xs);
-        }) xs
-      );
-    in
-    lib.filter (x: (counts.${x} or 0) > 1) (lib.unique xs);
 
   cpmNodeNames =
     if cpm == null then
