@@ -17,6 +17,8 @@
     neovim
     nftables
     unbound # for unbound-control
+    gron
+    jq
   ];
 
   environment.etc.hosts.enable = false;

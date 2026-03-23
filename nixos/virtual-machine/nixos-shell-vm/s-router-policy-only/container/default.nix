@@ -8,22 +8,102 @@
 let
   hostname = "s-router-policy-only";
 
+  inventory = import ../inventory.nix;
+
   listInvariants = import ../lib/list-invariants.nix { inherit lib; };
   inherit (listInvariants) duplicates;
 
-  runtimeTargets = controlPlaneOut.control_plane_model.runtime.targets or { };
-
-  runtimeTarget =
-    if builtins.hasAttr hostname runtimeTargets then
-      runtimeTargets.${hostname}
+  containerNode =
+    if inventory ? realization && inventory.realization ? nodes && lib.hasAttr hostname inventory.realization.nodes then
+      inventory.realization.nodes.${hostname}
     else
       abort ''
         renderer/container/default.nix
         hostname: ${hostname}
         runtimeIfName: n/a
         linkName: n/a
-        error: runtime target missing
+        error: realization node missing in inventory.nix
       '';
+
+  containerNodePorts =
+    if containerNode ? ports && builtins.isAttrs containerNode.ports then
+      containerNode.ports
+    else
+      abort ''
+        renderer/container/default.nix
+        hostname: ${hostname}
+        runtimeIfName: n/a
+        linkName: n/a
+        error: realization node ports missing
+      '';
+
+  containerLinks = lib.sort builtins.lessThan (map (p: containerNodePorts.${p}.link) (builtins.attrNames containerNodePorts));
+
+  cpmData = controlPlaneOut.control_plane_model.data or { };
+
+  siteEntries =
+    lib.concatMap (
+      enterpriseName:
+      let
+        enterprise = cpmData.${enterpriseName};
+      in
+      map (siteName: enterprise.${siteName}) (lib.sort builtins.lessThan (builtins.attrNames enterprise))
+    ) (lib.sort builtins.lessThan (builtins.attrNames cpmData));
+
+  runtimeTargets =
+    lib.foldl' (acc: site: acc // (site.runtimeTargets or { })) { } siteEntries;
+
+  runtimeTargetNames = lib.sort builtins.lessThan (builtins.attrNames runtimeTargets);
+
+  linkNamesForTarget =
+    target:
+    let
+      interfaces = target.effectiveRuntimeRealization.interfaces or { };
+    in
+    lib.sort builtins.lessThan (
+      lib.filter (x: x != null) (
+        map (
+          ifName:
+          let
+            iface = interfaces.${ifName};
+            backingRef = iface.backingRef or { };
+          in
+          if (backingRef.kind or null) == "link" then backingRef.name else null
+        ) (builtins.attrNames interfaces)
+      )
+    );
+
+  matchingRuntimeTargets = lib.filter (
+    targetName:
+    let
+      target = runtimeTargets.${targetName};
+    in
+    builtins.toJSON (linkNamesForTarget target) == builtins.toJSON containerLinks
+  ) runtimeTargetNames;
+
+  runtimeTargetName =
+    if builtins.length matchingRuntimeTargets == 1 then
+      builtins.elemAt matchingRuntimeTargets 0
+    else if builtins.length matchingRuntimeTargets == 0 then
+      abort ''
+        renderer/container/default.nix
+        hostname: ${hostname}
+        runtimeIfName: n/a
+        linkName: n/a
+        error: no runtime target matches container link set
+        containerLinks: ${builtins.toJSON containerLinks}
+      ''
+    else
+      abort ''
+        renderer/container/default.nix
+        hostname: ${hostname}
+        runtimeIfName: n/a
+        linkName: n/a
+        error: multiple runtime targets match container link set
+        matches: ${builtins.toJSON matchingRuntimeTargets}
+      '';
+
+  runtimeTarget = runtimeTargets.${runtimeTargetName};
 
   runtimeRealization =
     if runtimeTarget ? effectiveRuntimeRealization then
@@ -49,39 +129,8 @@ let
         error: runtime interfaces missing
       '';
 
-  runtimePorts =
-    if runtimeRealization ? runtimePorts then
-      runtimeRealization.runtimePorts
-    else
-      abort ''
-        renderer/container/default.nix
-        hostname: ${hostname}
-        runtimeIfName: n/a
-        linkName: n/a
-        error: runtimePorts missing
-      '';
-
-  runtimePortLinks = map (
-    port:
-    if port ? link then
-      port.link
-    else
-      abort ''
-        renderer/container/default.nix
-        hostname: ${hostname}
-        runtimeIfName: n/a
-        linkName: n/a
-        error: runtime port link missing
-      ''
-  ) runtimePorts;
-
   topoIfaceForRuntime = import ../lib/renderer/topology.nix {
-    inherit
-      lib
-      hostname
-      runtimeTarget
-      runtimePorts
-      ;
+    inherit lib hostname;
   };
 
   topoDetails =
@@ -89,7 +138,7 @@ let
       (name: topoIfaceForRuntime name runtimeIfaces.${name})
       (lib.sort builtins.lessThan (builtins.attrNames runtimeIfaces));
 
-  ifaceLinks = map (d: d.linkName) topoDetails;
+  ifaceLinks = map (d: d.linkName) (lib.filter (d: d.linkName != null) topoDetails);
   ifaceNames = map (d: d.renderedIfName) topoDetails;
 
   _uniqueRuntimeInterfaceLinks =
@@ -124,26 +173,10 @@ let
     else
       true;
 
-  _uniqueRuntimePortLinks =
-    let
-      dup = duplicates runtimePortLinks;
-    in
-    if dup != [ ] then
-      abort ''
-        renderer/container/default.nix
-        hostname: ${hostname}
-        runtimeIfName: n/a
-        linkName: n/a
-        error: duplicate runtime port links
-        duplicateLinks: ${builtins.toJSON dup}
-      ''
-    else
-      true;
-
   _linkCoverage =
     let
-      missingLinks = lib.filter (linkName: !(builtins.elem linkName runtimePortLinks)) ifaceLinks;
-      extraLinks = lib.filter (linkName: !(builtins.elem linkName ifaceLinks)) runtimePortLinks;
+      missingLinks = lib.filter (linkName: !(builtins.elem linkName containerLinks)) ifaceLinks;
+      extraLinks = lib.filter (linkName: !(builtins.elem linkName ifaceLinks)) containerLinks;
     in
     if missingLinks != [ ] || extraLinks != [ ] then
       abort ''
@@ -151,7 +184,7 @@ let
         hostname: ${hostname}
         runtimeIfName: n/a
         linkName: n/a
-        error: runtime interface to runtime port link coverage mismatch
+        error: runtime interface to realization node link coverage mismatch
         missingLinks: ${builtins.toJSON missingLinks}
         extraLinks: ${builtins.toJSON extraLinks}
       ''
@@ -162,29 +195,23 @@ let
 
   renderedNetworks = builtins.listToAttrs (map mkNetwork topoDetails);
 
-  rendererDebug = controlPlaneOut.rendererDebug or false;
+  debugArtifacts = {
+    "network-artifacts/container-runtime-target-name.txt".text = runtimeTargetName;
 
-  debugArtifacts = lib.mkMerge [
-    {
-      "network-artifacts/container-runtime-realization.json".text =
-        builtins.toJSON runtimeRealization;
+    "network-artifacts/container-runtime-realization.json".text =
+      builtins.toJSON runtimeRealization;
 
-      "network-artifacts/container-rendered-networks.json".text =
-        builtins.toJSON renderedNetworks;
-    }
+    "network-artifacts/container-rendered-networks.json".text =
+      builtins.toJSON renderedNetworks;
 
-    (lib.optionalAttrs rendererDebug {
-      "network-artifacts/container-control-plane-out.json".text =
-        builtins.toJSON controlPlaneOut;
-
-      "network-artifacts/container-topology-details.json".text =
-        builtins.toJSON topoDetails;
-    })
-  ];
+    "network-artifacts/control-plane.json".text =
+      builtins.toJSON controlPlaneOut;
+  };
 in
 {
   imports = [
     ./debugging-packages.nix
+    ./nftables.nix
   ];
 
   networking.hostName = hostname;
@@ -208,18 +235,14 @@ in
 
   systemd.network.networks = lib.mkForce renderedNetworks;
 
-  environment.etc = lib.mkMerge [
-    debugArtifacts
-  ];
+  environment.etc = debugArtifacts;
 
   system.activationScripts.networkArtifactsDebug = lib.stringAfter [ "etc" ] ''
     mkdir -p /etc/network-artifacts
+    printf '%s\n' '${runtimeTargetName}' > /etc/network-artifacts/container-runtime-target-name.txt
     cp -f ${pkgs.writeText "container-runtime-realization.json" (builtins.toJSON runtimeRealization)} /etc/network-artifacts/container-runtime-realization.json
     cp -f ${pkgs.writeText "container-rendered-networks.json" (builtins.toJSON renderedNetworks)} /etc/network-artifacts/container-rendered-networks.json
-    ${lib.optionalString rendererDebug ''
-      cp -f ${pkgs.writeText "container-control-plane-out.json" (builtins.toJSON controlPlaneOut)} /etc/network-artifacts/container-control-plane-out.json
-      cp -f ${pkgs.writeText "container-topology-details.json" (builtins.toJSON topoDetails)} /etc/network-artifacts/container-topology-details.json
-    ''}
+    cp -f ${pkgs.writeText "control-plane.json" (builtins.toJSON controlPlaneOut)} /etc/network-artifacts/control-plane.json
   '';
 
   system.stateVersion = "25.11";

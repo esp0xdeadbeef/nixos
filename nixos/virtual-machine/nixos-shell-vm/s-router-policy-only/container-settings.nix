@@ -12,20 +12,82 @@ let
   hostName = hostname;
   containerName = "${hostname}-container";
 
+  inventory = import ./inventory.nix;
+
+  containerNode =
+    if inventory ? realization && inventory.realization ? nodes && lib.hasAttr hostname inventory.realization.nodes then
+      inventory.realization.nodes.${hostname}
+    else
+      abort "container-settings.nix: realization node '${hostname}' missing in inventory.nix";
+
+  containerNodePorts =
+    if containerNode ? ports && builtins.isAttrs containerNode.ports then
+      containerNode.ports
+    else
+      abort "container-settings.nix: realization node '${hostname}' is missing ports";
+
+  containerLinks = lib.sort builtins.lessThan (map (p: containerNodePorts.${p}.link) (builtins.attrNames containerNodePorts));
+
+  cpmData = controlPlaneOut.control_plane_model.data or { };
+
+  siteEntries =
+    lib.concatMap (
+      enterpriseName:
+      let
+        enterprise = cpmData.${enterpriseName};
+      in
+      map (siteName: enterprise.${siteName}) (lib.sort builtins.lessThan (builtins.attrNames enterprise))
+    ) (lib.sort builtins.lessThan (builtins.attrNames cpmData));
+
   runtimeTargets =
-    controlPlaneOut.control_plane_model.runtime.targets or { };
+    lib.foldl' (acc: site: acc // (site.runtimeTargets or { })) { } siteEntries;
+
+  runtimeTargetNames = lib.sort builtins.lessThan (builtins.attrNames runtimeTargets);
+
+  linkNamesForTarget =
+    target:
+    let
+      interfaces = target.effectiveRuntimeRealization.interfaces or { };
+    in
+    lib.sort builtins.lessThan (
+      lib.filter (x: x != null) (
+        map (
+          ifName:
+          let
+            iface = interfaces.${ifName};
+            backingRef = iface.backingRef or { };
+          in
+          if (backingRef.kind or null) == "link" then backingRef.name else null
+        ) (builtins.attrNames interfaces)
+      )
+    );
+
+  matchingRuntimeTargets = lib.filter (
+    targetName:
+    let
+      target = runtimeTargets.${targetName};
+    in
+    builtins.toJSON (linkNamesForTarget target) == builtins.toJSON containerLinks
+  ) runtimeTargetNames;
 
   nodeName =
-    if lib.hasAttr hostname runtimeTargets then
-      hostname
+    if builtins.length matchingRuntimeTargets == 1 then
+      builtins.elemAt matchingRuntimeTargets 0
+    else if builtins.length matchingRuntimeTargets == 0 then
+      abort ''
+        container-settings.nix: no runtime target matches container '${hostname}'
+        containerLinks: ${builtins.toJSON containerLinks}
+      ''
     else
-      abort "container-settings.nix: runtime target '${hostname}' missing";
+      abort ''
+        container-settings.nix: multiple runtime targets match container '${hostname}'
+        matches: ${builtins.toJSON matchingRuntimeTargets}
+      '';
 
   renderedContainer = import ./lib/renderer/render-containers.nix {
-    inherit lib;
-    inventory = controlPlaneOut;
-    inherit nodeName hostName;
+    inherit lib inventory;
     cpm = controlPlaneOut;
+    inherit nodeName hostName;
   };
 in
 {

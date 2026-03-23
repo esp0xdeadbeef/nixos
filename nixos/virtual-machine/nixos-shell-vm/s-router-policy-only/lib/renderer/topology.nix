@@ -1,66 +1,68 @@
 {
   lib,
   hostname,
-  runtimeTarget,
-  runtimePorts,
 }:
 
 let
+  asList =
+    value:
+    if value == null then
+      [ ]
+    else if builtins.isList value then
+      value
+    else
+      [ value ];
+
+  shortenIfName =
+    name:
+    if lib.stringLength name <= 15 then
+      name
+    else
+      "if${builtins.substring 0 13 (builtins.hashString "sha256" name)}";
+
   mkRoute =
     route:
-    {
-      Destination = route.dst;
-    }
-    // lib.optionalAttrs (route ? via4) { Gateway = route.via4; }
-    // lib.optionalAttrs (route ? via6) { Gateway = route.via6; };
+    if !(builtins.isAttrs route) || !(route ? dst) then
+      abort ''
+        renderer/lib/renderer/topology.nix
+        hostname: ${hostname}
+        runtimeIfName: n/a
+        linkName: n/a
+        error: invalid route in runtime interface
+        route: ${builtins.toJSON route}
+      ''
+    else
+      {
+        Destination = route.dst;
+      }
+      // lib.optionalAttrs (route ? via4) { Gateway = route.via4; }
+      // lib.optionalAttrs (route ? via6) { Gateway = route.via6; };
 in
 runtimeIfName: runtimeIf:
 let
-  linkName =
-    if runtimeIf ? link then
-      runtimeIf.link
+  sourceRenderedIfName =
+    if runtimeIf ? renderedIfName && runtimeIf.renderedIfName != "" then
+      runtimeIf.renderedIfName
     else
       abort ''
         renderer/lib/renderer/topology.nix
         hostname: ${hostname}
         runtimeIfName: ${runtimeIfName}
         linkName: n/a
-        error: runtime interface link missing
+        error: renderedIfName missing
       '';
 
-  portMatches = lib.filter (port: (port.link or null) == linkName) runtimePorts;
+  backingRef = runtimeIf.backingRef or { };
 
-  runtimePort =
-    if builtins.length portMatches == 1 then
-      builtins.elemAt portMatches 0
-    else if builtins.length portMatches == 0 then
-      abort ''
-        renderer/lib/renderer/topology.nix
-        hostname: ${hostname}
-        runtimeIfName: ${runtimeIfName}
-        linkName: ${linkName}
-        error: runtime interface link not covered by runtime port
-      ''
+  linkName =
+    if (backingRef.kind or null) == "link" && (backingRef.name or "") != "" then
+      backingRef.name
     else
-      abort ''
-        renderer/lib/renderer/topology.nix
-        hostname: ${hostname}
-        runtimeIfName: ${runtimeIfName}
-        linkName: ${linkName}
-        error: runtime interface link covered by multiple runtime ports
-      '';
-
-  renderedIfName =
-    if runtimeIf ? interface then
-      runtimeIf.interface
-    else if runtimeIf ? name then
-      runtimeIf.name
-    else
-      runtimeIfName;
+      null;
 
   addresses =
-    (lib.optional (runtimeIf ? addr4) { Address = runtimeIf.addr4; })
-    ++ (lib.optional (runtimeIf ? addr6) { Address = runtimeIf.addr6; });
+    (map (addr: { Address = addr; }) (asList (runtimeIf.addr4 or null)))
+    ++ (map (addr: { Address = addr; }) (asList (runtimeIf.addr6 or null)));
 
   routes =
     map mkRoute (
@@ -69,14 +71,10 @@ let
     );
 in
 {
-  inherit
-    runtimeIfName
-    renderedIfName
-    linkName
-    runtimePort
-    addresses
-    routes
-    ;
+  inherit runtimeIfName linkName addresses routes;
+
+  renderedIfName = shortenIfName sourceRenderedIfName;
+  sourceRenderedIfName = sourceRenderedIfName;
 
   runtimeIf = runtimeIf;
 }
