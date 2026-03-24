@@ -6,41 +6,77 @@
 }:
 
 let
+  asList =
+    value:
+      if value == null then
+        [ ]
+      else if builtins.isList value then
+        value
+      else
+        [ value ];
+
+  mkRoute =
+    route:
+      if !(builtins.isAttrs route) || !(route ? dst) then
+        throw ''
+          container-upstream-selector/network/p2p-to-core.nix: invalid route
+          ${builtins.toJSON route}
+        ''
+      else
+        {
+          Destination = route.dst;
+        }
+        // lib.optionalAttrs (route ? via4) { Gateway = route.via4; }
+        // lib.optionalAttrs (route ? via6) { Gateway = route.via6; };
+
   port =
     if fabricSpec ? ports && fabricSpec.ports ? core then
       fabricSpec.ports.core
     else
-      throw "missing fabricSpec.ports.core";
+      throw "container-upstream-selector/network/p2p-to-core.nix: missing fabricSpec.ports.core";
 
   linkName =
-    if port ? link then port.link else throw "missing link";
+    if port ? link then
+      port.link
+    else
+      throw "container-upstream-selector/network/p2p-to-core.nix: missing core link";
 
   ifaces =
-    if fabricNodeContext ? interfaces then
+    if fabricNodeContext ? interfaces && builtins.isAttrs fabricNodeContext.interfaces then
       fabricNodeContext.interfaces
     else
-      throw "missing interfaces";
+      throw "container-upstream-selector/network/p2p-to-core.nix: missing node interfaces";
 
   iface =
     if builtins.hasAttr linkName ifaces then
       ifaces.${linkName}
     else
-      throw "link not found";
+      throw "container-upstream-selector/network/p2p-to-core.nix: link '${linkName}' not found";
 
-  addr4 = iface.addr4 or (throw "missing addr4");
-  addr6 = iface.addr6 or (throw "missing addr6");
+  addresses =
+    (map (addr: { Address = addr; }) (asList (iface.addr4 or null)))
+    ++ (map (addr: { Address = addr; }) (asList (iface.addr6 or null)));
 
+  routes =
+    map mkRoute (
+      (iface.routes.ipv4 or [ ])
+      ++ (iface.routes.ipv6 or [ ])
+    );
 in
 {
   systemd.network.networks."10-core" = {
     matchConfig.Name = "core";
 
-    addresses = [
-      { Address = addr4; }
-      { Address = addr6; }
-    ];
+    linkConfig = {
+      ActivationPolicy = "always-up";
+      RequiredForOnline = false;
+    };
+
+    inherit addresses routes;
 
     networkConfig = {
+      DHCP = "no";
+      IPv6AcceptRA = false;
       IPv4Forwarding = true;
       IPv6Forwarding = true;
       ConfigureWithoutCarrier = true;

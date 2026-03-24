@@ -1,8 +1,8 @@
+# ./fabric-input-loader.nix
 { pkgs, inputs, fabricInputs, ... }:
 
 let
   system = pkgs.stdenv.hostPlatform.system;
-  fabricInventory = import ./inventory.nix;
 
   compilerOut =
     (inputs.nixos-network-compiler.lib.compile system) fabricInputs;
@@ -13,9 +13,8 @@ let
     };
 
   controlPlaneOut =
-    inputs.network-control-plane-model.lib.controlPlaneModel {
+    inputs.network-control-plane-model.lib.${system}.build {
       input = forwardingOut;
-      inventory = fabricInventory;
     };
 in
 {

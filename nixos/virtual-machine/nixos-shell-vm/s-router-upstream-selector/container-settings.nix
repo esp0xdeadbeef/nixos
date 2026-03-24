@@ -1,8 +1,7 @@
 {
   config,
-  pkgs,
   lib,
-  fabricCompiled,
+  controlPlaneOut,
   ...
 }:
 
@@ -17,90 +16,115 @@ let
       inventoryImported;
 
   fabricInventory =
-    if inventory ? fabric then inventory.fabric else { };
-
-  enterprises =
-    if fabricCompiled ? enterprise && builtins.isAttrs fabricCompiled.enterprise then
-      fabricCompiled.enterprise
+    if inventory ? fabric && builtins.isAttrs inventory.fabric then
+      inventory.fabric
     else
-      throw "fabricCompiled.enterprise missing";
+      throw "container-settings.nix: inventory.fabric missing";
 
-  enterpriseName =
-    let names = builtins.attrNames enterprises;
-    in
-    if builtins.length names == 1 then builtins.head names
-    else throw "expected exactly 1 enterprise";
-
-  enterprise = enterprises.${enterpriseName};
-
-  sites =
-    if enterprise ? site && builtins.isAttrs enterprise.site then
-      enterprise.site
-    else
-      throw "enterprise.site missing";
-
-  siteName =
-    let names = builtins.attrNames sites;
-    in
-    if builtins.length names == 1 then builtins.head names
-    else throw "expected exactly 1 site";
-
-  site = sites.${siteName};
-
-  units =
-    if site ? units && builtins.isAttrs site.units then
-      site.units
-    else
-      throw "site.units missing";
-
-  nodes =
-    if site ? nodes && builtins.isAttrs site.nodes then
-      site.nodes
-    else
-      throw "site.nodes missing";
-
-  allUnitNames = builtins.attrNames units;
+  sortedAttrNames = attrs: lib.sort builtins.lessThan (builtins.attrNames attrs);
 
   unitBelongsToHost =
     unitName:
       unitName == hostname
       || lib.hasPrefix "${hostname}-" unitName;
 
-  selectedUnits = lib.filter unitBelongsToHost allUnitNames;
+  inventoryUnitNames = sortedAttrNames fabricInventory;
+
+  selectedUnits =
+    let
+      matched = lib.filter unitBelongsToHost inventoryUnitNames;
+    in
+    if matched != [ ] then
+      matched
+    else
+      inventoryUnitNames;
 
   _selectedNonEmpty =
-    if selectedUnits != [ ] then true
-    else throw "no units matched host";
+    if selectedUnits != [ ] then
+      true
+    else
+      throw "container-settings.nix: no units found in inventory.fabric";
+
+  collectNodeMatches =
+    unitName: value:
+      if builtins.isAttrs value then
+        let
+          direct =
+            if value ? nodes && builtins.isAttrs value.nodes && builtins.hasAttr unitName value.nodes then
+              [ value.nodes.${unitName} ]
+            else
+              [ ];
+
+          nested =
+            lib.concatMap
+              (name: collectNodeMatches unitName value.${name})
+              (lib.filter (name: name != "nodes") (sortedAttrNames value));
+        in
+        direct ++ nested
+      else if builtins.isList value then
+        lib.concatMap (x: collectNodeMatches unitName x) value
+      else
+        [ ];
+
+  mkHostBridge =
+    portName: portSpec:
+      if portSpec ? vlan then
+        "tr${toString portSpec.vlan}"
+      else
+        throw "container-settings.nix: missing vlan for fabric port '${portName}'";
 
   mkContainer =
     unitName:
     let
-      fabricNodeContext =
-        if builtins.hasAttr unitName nodes then
-          nodes.${unitName}
+      fabricSpec =
+        if builtins.hasAttr unitName fabricInventory then
+          fabricInventory.${unitName}
         else
-          throw "missing node context";
+          throw "container-settings.nix: missing fabric inventory for unit '${unitName}'";
+
+      fabricNodeContextMatches = collectNodeMatches unitName controlPlaneOut;
+
+      fabricNodeContext =
+        if fabricNodeContextMatches != [ ] then
+          builtins.head fabricNodeContextMatches
+        else
+          throw "container-settings.nix: no control-plane node matched unit '${unitName}'";
 
       role =
         if fabricNodeContext ? role then
           fabricNodeContext.role
         else
-          throw "missing role";
+          throw "container-settings.nix: missing role for unit '${unitName}'";
 
       containerTemplate =
         if role == "upstream-selector" then
           "upstream-selector"
         else
-          throw "unsupported role";
+          throw "container-settings.nix: unsupported role '${role}' for unit '${unitName}'";
 
-      containerPath = ./. + "/container-${containerTemplate}";
-      containerName = containerTemplate;
-
-      fabricSpec =
-        if builtins.hasAttr unitName fabricInventory then
-          fabricInventory.${unitName}
+      portNames =
+        if fabricSpec ? ports && builtins.isAttrs fabricSpec.ports then
+          sortedAttrNames fabricSpec.ports
         else
-          throw "missing fabric inventory for unit";
+          throw "container-settings.nix: missing ports for unit '${unitName}'";
+
+      extraVeths =
+        builtins.listToAttrs (
+          map
+            (
+              portName:
+              let
+                portSpec = fabricSpec.ports.${portName};
+              in
+              {
+                name = portName;
+                value = {
+                  hostBridge = mkHostBridge portName portSpec;
+                };
+              }
+            )
+            portNames
+        );
     in
     {
       name = unitName;
@@ -110,13 +134,10 @@ let
         privateNetwork = true;
         hostBridge = null;
 
-        extraVeths = {
-          "core" = { hostBridge = "br-upstream"; };
-          "policy" = { hostBridge = "br-fabric"; };
-        };
+        inherit extraVeths;
 
         specialArgs = {
-          inherit fabricNodeContext containerName fabricSpec;
+          inherit controlPlaneOut fabricSpec fabricNodeContext;
         };
 
         additionalCapabilities = [
@@ -124,12 +145,21 @@ let
           "CAP_NET_RAW"
         ];
 
-        config = containerPath;
+        config = { controlPlaneOut, fabricSpec, fabricNodeContext, ... }: {
+          imports = [
+            ./container-upstream-selector
+          ];
+
+          _module.args = {
+            inherit controlPlaneOut fabricSpec fabricNodeContext;
+          };
+
+          networking.hostName = unitName;
+        };
       };
     };
 
   containersGenerated = builtins.listToAttrs (map mkContainer selectedUnits);
-
 in
 {
   networking.useNetworkd = true;

@@ -19,6 +19,19 @@ d: {
     };
 
     addresses = d.addresses;
-    routes = d.routes;
+
+    routes = map (
+      route:
+      route
+      // lib.optionalAttrs (route ? Gateway) {
+        GatewayOnLink = true;
+      }
+      // lib.optionalAttrs (
+        (d.preferredSource4 or null) != null
+        && (route.Destination or "") == "0.0.0.0/0"
+      ) {
+        PreferredSource = d.preferredSource4;
+      }
+    ) d.routes;
   };
 }

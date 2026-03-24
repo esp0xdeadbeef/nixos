@@ -13,6 +13,16 @@ let
   listInvariants = import ../lib/list-invariants.nix { inherit lib; };
   inherit (listInvariants) duplicates;
 
+  stripPrefix =
+    addr:
+    let
+      parts = lib.splitString "/" addr;
+    in
+    if parts == [ ] then
+      addr
+    else
+      builtins.head parts;
+
   containerNode =
     if inventory ? realization && inventory.realization ? nodes && lib.hasAttr hostname inventory.realization.nodes then
       inventory.realization.nodes.${hostname}
@@ -105,6 +115,36 @@ let
 
   runtimeTarget = runtimeTargets.${runtimeTargetName};
 
+  selectedSiteMatches = lib.filter (site: builtins.hasAttr runtimeTargetName (site.runtimeTargets or { })) siteEntries;
+
+  selectedSite =
+    if builtins.length selectedSiteMatches == 1 then
+      builtins.head selectedSiteMatches
+    else if selectedSiteMatches == [ ] then
+      null
+    else
+      abort ''
+        renderer/container/default.nix
+        hostname: ${hostname}
+        runtimeIfName: n/a
+        linkName: n/a
+        error: multiple site entries contain runtime target
+        runtimeTargetName: ${runtimeTargetName}
+      '';
+
+  preferredSource4 =
+    if selectedSite != null
+      && selectedSite ? topology
+      && selectedSite.topology ? nodes
+      && builtins.isAttrs selectedSite.topology.nodes
+      && builtins.hasAttr runtimeTargetName selectedSite.topology.nodes
+      && selectedSite.topology.nodes.${runtimeTargetName} ? loopback
+      && selectedSite.topology.nodes.${runtimeTargetName}.loopback ? ipv4
+    then
+      stripPrefix selectedSite.topology.nodes.${runtimeTargetName}.loopback.ipv4
+    else
+      null;
+
   runtimeRealization =
     if runtimeTarget ? effectiveRuntimeRealization then
       runtimeTarget.effectiveRuntimeRealization
@@ -135,7 +175,12 @@ let
 
   topoDetails =
     map
-      (name: topoIfaceForRuntime name runtimeIfaces.${name})
+      (name:
+        (topoIfaceForRuntime name runtimeIfaces.${name})
+        // {
+          inherit preferredSource4;
+        }
+      )
       (lib.sort builtins.lessThan (builtins.attrNames runtimeIfaces));
 
   ifaceLinks = map (d: d.linkName) (lib.filter (d: d.linkName != null) topoDetails);
@@ -231,6 +276,8 @@ in
     "net.ipv4.ip_forward" = lib.mkDefault 1;
     "net.ipv6.conf.all.forwarding" = lib.mkDefault 1;
     "net.ipv6.conf.default.forwarding" = lib.mkDefault 1;
+    "net.ipv4.conf.all.rp_filter" = lib.mkDefault 0;
+    "net.ipv4.conf.default.rp_filter" = lib.mkDefault 0;
   };
 
   systemd.network.networks = lib.mkForce renderedNetworks;

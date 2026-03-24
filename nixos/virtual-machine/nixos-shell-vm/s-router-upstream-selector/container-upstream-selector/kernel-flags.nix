@@ -1,7 +1,7 @@
 { ... }:
 
 let
-  coreIf = "upstream-core";
+  coreIf = "core";
 in
 {
   boot.kernel.sysctl = {
