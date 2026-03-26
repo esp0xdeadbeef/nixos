@@ -1,3 +1,5 @@
+# ./container-settings.nix
+# ./s-router-core/container-settings.nix
 {
   config,
   pkgs,
@@ -19,57 +21,83 @@ let
   deploymentHosts =
     if inventory ? deployment
        && builtins.isAttrs inventory.deployment
-       && inventory.deployment ? host
-       && builtins.isAttrs inventory.deployment.host
+       && inventory.deployment ? hosts
+       && builtins.isAttrs inventory.deployment.hosts
     then
-      inventory.deployment.host
+      inventory.deployment.hosts
     else
       throw ''
         container-settings:
 
-        inventory.deployment.host missing.
+        inventory.deployment.hosts missing.
 
         inventory:
         ${builtins.toJSON inventory}
       '';
 
-  hostConfig =
+  deploymentHostNames = lib.sort builtins.lessThan (builtins.attrNames deploymentHosts);
+
+  deploymentHostName =
     if builtins.hasAttr hostname deploymentHosts then
-      deploymentHosts.${hostname}
+      hostname
+    else if builtins.length deploymentHostNames == 1 then
+      builtins.head deploymentHostNames
     else
       throw ''
         container-settings:
 
-        inventory.deployment.host.${hostname} missing.
+        inventory.deployment.hosts.${hostname} missing, and hostname fallback is ambiguous.
+
+        Current hostname:
+        ${hostname}
 
         Known deployment hosts:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames deploymentHosts)}
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ deploymentHostNames)}
       '';
 
-  uplink =
-    if hostConfig ? uplink && builtins.isAttrs hostConfig.uplink then
-      hostConfig.uplink
+  hostConfig = deploymentHosts.${deploymentHostName};
+
+  uplinks =
+    if hostConfig ? uplinks && builtins.isAttrs hostConfig.uplinks then
+      hostConfig.uplinks
     else
       throw ''
         container-settings:
 
-        inventory.deployment.host.${hostname}.uplink missing.
+        inventory.deployment.hosts.${deploymentHostName}.uplinks missing.
 
         host config:
         ${builtins.toJSON hostConfig}
       '';
 
+  uplinkNames = lib.sort builtins.lessThan (builtins.attrNames uplinks);
+
   wanConfig =
-    if uplink ? wan && builtins.isAttrs uplink.wan then
-      uplink.wan
+    if uplinks ? upstream-core && builtins.isAttrs uplinks.upstream-core then
+      uplinks.upstream-core
+    else if builtins.length uplinkNames == 1 then
+      uplinks.${builtins.head uplinkNames}
     else
       throw ''
         container-settings:
 
-        inventory.deployment.host.${hostname}.uplink.wan missing.
+        inventory.deployment.hosts.${deploymentHostName}.uplinks.upstream-core missing and fallback is ambiguous.
 
-        uplink config:
-        ${builtins.toJSON uplink}
+        Known uplinks:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ uplinkNames)}
+      '';
+
+  _wanBridgePresent =
+    if wanConfig ? bridge && builtins.isString wanConfig.bridge then
+      true
+    else
+      throw ''
+        container-settings:
+
+        Selected WAN uplink has no bridge.
+
+        wan config:
+        ${builtins.toJSON wanConfig}
       '';
 
   pppoeConfig =
@@ -84,14 +112,43 @@ let
     else
       false;
 
-  enterprises =
-    if fabricCompiled ? enterprise && builtins.isAttrs fabricCompiled.enterprise then
-      fabricCompiled.enterprise
+  realizationNodes =
+    if inventory ? realization
+      && builtins.isAttrs inventory.realization
+      && inventory.realization ? nodes
+      && builtins.isAttrs inventory.realization.nodes
+    then
+      inventory.realization.nodes
     else
       throw ''
         container-settings:
 
-        fabricCompiled.enterprise missing.
+        inventory.realization.nodes missing.
+
+        inventory:
+        ${builtins.toJSON inventory}
+      '';
+
+  cpmModel =
+    if fabricCompiled ? control_plane_model && builtins.isAttrs fabricCompiled.control_plane_model then
+      fabricCompiled.control_plane_model
+    else
+      { };
+
+  cpmData =
+    if cpmModel ? data && builtins.isAttrs cpmModel.data then
+      cpmModel.data
+    else
+      { };
+
+  enterprises =
+    if cpmData != { } then
+      cpmData
+    else
+      throw ''
+        container-settings:
+
+        fabricCompiled.control_plane_model.data missing.
 
         Top-level keys:
         ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames fabricCompiled)}
@@ -114,21 +171,8 @@ let
 
   enterprise = enterprises.${enterpriseName};
 
-  sites =
-    if enterprise ? site && builtins.isAttrs enterprise.site then
-      enterprise.site
-    else
-      throw ''
-        container-settings:
-
-        enterprise.site missing for '${enterpriseName}'.
-
-        Enterprise keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames enterprise)}
-      '';
-
   siteName =
-    let names = builtins.attrNames sites;
+    let names = builtins.attrNames enterprise;
     in
     if builtins.length names == 1 then
       builtins.head names
@@ -142,55 +186,15 @@ let
         ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
       '';
 
-  site = sites.${siteName};
+  site = enterprise.${siteName};
 
-  units =
-    if site ? units && builtins.isAttrs site.units then
-      site.units
+  runtimeTargets =
+    if site ? runtimeTargets && builtins.isAttrs site.runtimeTargets then
+      site.runtimeTargets
     else
-      throw ''
-        container-settings:
+      { };
 
-        site.units missing for ${enterpriseName}.${siteName}
-
-        Site keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames site)}
-      '';
-
-  nodes =
-    if site ? nodes && builtins.isAttrs site.nodes then
-      site.nodes
-    else
-      throw ''
-        container-settings:
-
-        site.nodes missing for ${enterpriseName}.${siteName}
-
-        Site keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames site)}
-      '';
-
-  allUnitNames = builtins.attrNames units;
-
-  unitBelongsToHost = unitName: lib.hasPrefix "${hostname}-" unitName;
-
-  selectedUnits = lib.filter unitBelongsToHost allUnitNames;
-
-  _selectedNonEmpty =
-    if selectedUnits != [ ] then
-      true
-    else
-      throw ''
-        container-settings:
-
-        No units matched physical host '${hostname}'.
-
-        Expected prefix:
-          ${hostname}-
-
-        Available units:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ allUnitNames)}
-      '';
+  runtimeTargetNames = builtins.attrNames runtimeTargets;
 
   pppoeBindMounts =
     if pppoeEnabled then
@@ -213,49 +217,172 @@ let
     else
       { };
 
+  attrValues = attrs: map (name: attrs.${name}) (builtins.attrNames attrs);
+
+  realizationNodeForUnit =
+    unitName:
+      if builtins.hasAttr unitName realizationNodes then
+        realizationNodes.${unitName}
+      else
+        throw ''
+          container-settings:
+
+          Missing realization node for unit '${unitName}'.
+
+          Known realization nodes:
+          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames realizationNodes)}
+        '';
+
+  logicalNodeNameForUnit =
+    unitName:
+      let
+        node = realizationNodeForUnit unitName;
+      in
+      if node ? logicalNode
+        && builtins.isAttrs node.logicalNode
+        && node.logicalNode ? name
+        && builtins.isString node.logicalNode.name
+      then
+        node.logicalNode.name
+      else
+        "";
+
+  unitBelongsToDeploymentHost =
+    unitName:
+      builtins.hasAttr unitName realizationNodes
+      && builtins.isAttrs realizationNodes.${unitName}
+      && (realizationNodes.${unitName}.host or null) == deploymentHostName;
+
+  unitMatchesMachine =
+    unitName:
+      let
+        logicalNodeName = logicalNodeNameForUnit unitName;
+      in
+      logicalNodeName == hostname
+      || lib.hasPrefix "${hostname}-" logicalNodeName
+      || unitBelongsToDeploymentHost unitName;
+
+  nodeContextForUnit =
+    unitName:
+      if builtins.hasAttr unitName runtimeTargets then
+        runtimeTargets.${unitName}
+      else
+        throw ''
+          container-settings:
+
+          Missing runtime target for unit '${unitName}'.
+
+          Available runtime targets:
+          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames runtimeTargets)}
+        '';
+
+  unitRole =
+    unitName:
+      let
+        ctx = nodeContextForUnit unitName;
+      in
+      if ctx ? role then
+        ctx.role
+      else
+        throw ''
+          container-settings:
+
+          Node '${unitName}' missing role.
+
+          Node keys:
+          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames ctx)}
+        '';
+
+  selectedUnits =
+    lib.filter (
+      unitName:
+        unitRole unitName == "core"
+        && unitMatchesMachine unitName
+    ) runtimeTargetNames;
+
+  _selectedNonEmpty =
+    if selectedUnits != [ ] then
+      true
+    else
+      throw ''
+        container-settings:
+
+        No core-role runtime targets matched this machine.
+
+        Current hostname:
+        ${hostname}
+
+        Deployment host fallback:
+        ${deploymentHostName}
+
+        Available runtime targets:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ runtimeTargetNames)}
+      '';
+
+  runtimeTransitBridgeForUnit =
+    unitName:
+      let
+        realizationNode = realizationNodeForUnit unitName;
+        ports =
+          if realizationNode ? ports && builtins.isAttrs realizationNode.ports then
+            realizationNode.ports
+          else
+            throw ''
+              container-settings:
+
+              realization.nodes.${unitName}.ports missing or not an attrset.
+
+              realization node:
+              ${builtins.toJSON realizationNode}
+            '';
+
+        bridgePorts =
+          builtins.filter (
+            port:
+              builtins.isAttrs port
+              && port ? attach
+              && builtins.isAttrs port.attach
+              && (port.attach.kind or null) == "bridge"
+              && (port.attach ? bridge)
+              && builtins.isString port.attach.bridge
+          ) (attrValues ports);
+
+        directPorts =
+          builtins.filter (
+            port:
+              builtins.isAttrs port
+              && port ? attach
+              && builtins.isAttrs port.attach
+              && (port.attach.kind or null) == "direct"
+              && port ? link
+              && builtins.isString port.link
+          ) (attrValues ports);
+      in
+      if builtins.length bridgePorts == 1 then
+        (builtins.head bridgePorts).attach.bridge
+      else if builtins.length bridgePorts == 0 && builtins.length directPorts == 1 then
+        (builtins.head directPorts).link
+      else
+        throw ''
+          container-settings:
+
+          Expected exactly 1 bridge-backed runtime port or exactly 1 direct-link port for unit '${unitName}'.
+
+          bridge-backed ports:
+          ${builtins.toJSON bridgePorts}
+
+          direct-link ports:
+          ${builtins.toJSON directPorts}
+        '';
+
   mkContainer =
     unitName:
     let
-      fabricNodeContext =
-        if builtins.hasAttr unitName nodes then
-          nodes.${unitName}
-        else
-          throw ''
-            container-settings:
-
-            Missing node context for unit '${unitName}'.
-
-            Available node keys:
-            ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames nodes)}
-          '';
-
-      role =
-        if fabricNodeContext ? role then
-          fabricNodeContext.role
-        else
-          throw ''
-            container-settings:
-
-            Node '${unitName}' missing role.
-
-            Node keys:
-            ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames fabricNodeContext)}
-          '';
-
-      containerTemplate =
-        if role == "core" then
-          "wan"
-        else
-          throw ''
-            container-settings:
-
-            Host '${hostname}' only supports core-role units right now.
-
-            Unit '${unitName}' has role '${role}'.
-          '';
-
-      containerPath = ./. + "/container-${containerTemplate}";
+      fabricNodeContext = nodeContextForUnit unitName;
+      containerTemplate = "wan";
       containerName = containerTemplate;
+      containerPath = ./. + "/container-${containerTemplate}";
+      transitBridge = runtimeTransitBridgeForUnit unitName;
     in
     {
       name = unitName;
@@ -265,15 +392,16 @@ let
 
         extraVeths = {
           "${containerName}-wan" = {
-            hostBridge = "br-upstream";
+            hostBridge = wanConfig.bridge;
           };
-          "${containerName}-lan" = {
-            hostBridge = "br-fabric";
+          "${containerName}-fabric" = {
+            hostBridge = transitBridge;
           };
         };
 
         specialArgs = {
-          inherit fabricNodeContext containerName pppoeConfig;
+          inherit fabricNodeContext containerName pppoeConfig transitBridge;
+          realizationNode = realizationNodeForUnit unitName;
         };
 
         bindMounts = pppoeBindMounts;

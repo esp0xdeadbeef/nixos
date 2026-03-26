@@ -1,29 +1,75 @@
-# ./inventory.nix
 {
-  deployment.host.s-router-core = {
-    uplink = {
-      parent = "eth0";
+  deployment = {
+    hosts = {
+      lab-host = {
+        uplinks = {
+          management = {
+            parent = "eth0";
+            mode = "vlan";
+            vlan = 2;
+            bridge = "vlan2";
+          };
 
-      management = {
-        vlan = 2;
-        bridge = "vlan2";
-        addressing = {
-          ipv4.mode = "dhcp";
-          ipv6.mode = "disabled";
+          upstream-core = {
+            parent = "eth0";
+            mode = "vlan";
+            vlan = 5;
+            bridge = "br-upstream";
+          };
+
+          fabric = {
+            parent = "eth0";
+            mode = "vlan";
+            vlan = 200;
+            bridge = "br-fabric";
+          };
         };
-      };
 
-      wan = {
-        vlan = 5;
-        bridge = "br-upstream";
-      };
+        bridgeNetworks = {
+          vlan2 = {
+            DHCP = "ipv4";
+            IPv6AcceptRA = false;
+            LinkLocalAddressing = "ipv4";
+            ConfigureWithoutCarrier = true;
+          };
 
-      fabric = {
-        vlan = 200;
-        bridge = "br-fabric";
+          br-upstream = {
+            ConfigureWithoutCarrier = true;
+          };
+
+          br-fabric = {
+            ConfigureWithoutCarrier = true;
+          };
+        };
       };
     };
   };
 
-  fabric = { };
+  realization = {
+    nodes = {
+      esp0xdeadbeef-site-a-s-router-core-wan = {
+        host = "lab-host";
+        platform = "linux";
+
+        logicalNode = {
+          enterprise = "esp0xdeadbeef";
+          site = "site-a";
+          name = "s-router-core-wan";
+        };
+
+        ports = {
+          upstream-selector = {
+            link = "p2p-s-router-core-wan-s-router-upstream-selector";
+            attach = {
+              kind = "bridge";
+              bridge = "br-fabric";
+            };
+            interface = {
+              name = "ens3";
+            };
+          };
+        };
+      };
+    };
+  };
 }

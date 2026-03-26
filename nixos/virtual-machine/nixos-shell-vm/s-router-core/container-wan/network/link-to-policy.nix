@@ -6,11 +6,17 @@
 }:
 
 let
-  ifName = "${containerName}-lan";
+  ifName = "${containerName}-fabric";
 
   ifaces =
     if fabricNodeContext ? interfaces && builtins.isAttrs fabricNodeContext.interfaces then
       fabricNodeContext.interfaces
+    else if fabricNodeContext ? effectiveRuntimeRealization
+      && builtins.isAttrs fabricNodeContext.effectiveRuntimeRealization
+      && fabricNodeContext.effectiveRuntimeRealization ? interfaces
+      && builtins.isAttrs fabricNodeContext.effectiveRuntimeRealization.interfaces
+    then
+      fabricNodeContext.effectiveRuntimeRealization.interfaces
     else
       throw ''
         container: fabricNodeContext missing `interfaces` attrset
@@ -19,12 +25,15 @@ let
         ${builtins.toJSON fabricNodeContext}
       '';
 
-  candidates = lib.filterAttrs (
-    _: v:
-    builtins.isAttrs v
-    && (v.kind or null) == "p2p"
-    && (v.carrier or null) == "lan"
-  ) ifaces;
+  candidates =
+    lib.filterAttrs (
+      _: v:
+      builtins.isAttrs v
+      && (
+        (v.kind or null) == "p2p"
+        || (v.sourceKind or null) == "p2p"
+      )
+    ) ifaces;
 
   names = builtins.attrNames candidates;
 
@@ -33,7 +42,7 @@ let
       true
     else
       throw ''
-        container: expected exactly 1 LAN-side p2p interface
+        container: expected exactly 1 p2p interface for core role
 
         found: ${toString (builtins.length names)}
 

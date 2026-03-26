@@ -1,4 +1,3 @@
-# ./default.nix
 {
   outPath,
   lib,
@@ -7,7 +6,19 @@
 }:
 
 let
-  fabricInputs = import "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+  fabricPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+
+  fabricImported =
+    if builtins.pathExists fabricPath then
+      import fabricPath
+    else
+      { };
+
+  fabricInputs =
+    if builtins.isFunction fabricImported then
+      fabricImported { inherit lib; }
+    else
+      fabricImported;
 in
 {
   imports = [
