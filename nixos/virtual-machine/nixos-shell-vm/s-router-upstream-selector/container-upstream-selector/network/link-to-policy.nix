@@ -42,7 +42,13 @@ let
       throw "container-upstream-selector/network/link-to-policy.nix: missing policy link";
 
   ifaces =
-    if fabricNodeContext ? interfaces && builtins.isAttrs fabricNodeContext.interfaces then
+    if fabricNodeContext ? effectiveRuntimeRealization
+      && builtins.isAttrs fabricNodeContext.effectiveRuntimeRealization
+      && fabricNodeContext.effectiveRuntimeRealization ? interfaces
+      && builtins.isAttrs fabricNodeContext.effectiveRuntimeRealization.interfaces
+    then
+      fabricNodeContext.effectiveRuntimeRealization.interfaces
+    else if fabricNodeContext ? interfaces && builtins.isAttrs fabricNodeContext.interfaces then
       fabricNodeContext.interfaces
     else
       throw "container-upstream-selector/network/link-to-policy.nix: missing node interfaces";
