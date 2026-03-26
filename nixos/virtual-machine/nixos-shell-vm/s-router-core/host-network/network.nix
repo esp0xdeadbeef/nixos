@@ -1,18 +1,30 @@
 {
   config,
   lib,
+  globalInventory,
   ...
 }:
 
 let
-  inventoryImported = import ../inventory.nix;
-  inventory =
-    if builtins.isFunction inventoryImported then
-      inventoryImported { inherit lib; }
-    else
-      inventoryImported;
+  inventory = globalInventory;
 
   hostname = config.networking.hostName;
+
+  renderHosts =
+    if inventory ? render
+      && builtins.isAttrs inventory.render
+      && inventory.render ? hosts
+      && builtins.isAttrs inventory.render.hosts
+    then
+      inventory.render.hosts
+    else
+      { };
+
+  renderHostConfig =
+    if builtins.hasAttr hostname renderHosts && builtins.isAttrs renderHosts.${hostname} then
+      renderHosts.${hostname}
+    else
+      { };
 
   deploymentHosts =
     if inventory ? deployment
@@ -27,7 +39,12 @@ let
   deploymentHostNames = lib.sort builtins.lessThan (builtins.attrNames deploymentHosts);
 
   deploymentHostName =
-    if builtins.hasAttr hostname deploymentHosts then
+    if renderHostConfig ? deploymentHost
+      && builtins.isString renderHostConfig.deploymentHost
+      && builtins.hasAttr renderHostConfig.deploymentHost deploymentHosts
+    then
+      renderHostConfig.deploymentHost
+    else if builtins.hasAttr hostname deploymentHosts then
       hostname
     else if builtins.length deploymentHostNames == 1 then
       builtins.head deploymentHostNames

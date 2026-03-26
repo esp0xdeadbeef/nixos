@@ -2,13 +2,14 @@
   lib,
   pkgs,
   controlPlaneOut,
+  globalInventory,
   ...
 }:
 
 let
   hostname = "s-router-policy-only";
 
-  inventory = import ../inventory.nix;
+  inventory = globalInventory;
 
   listInvariants = import ../lib/list-invariants.nix { inherit lib; };
   inherit (listInvariants) duplicates;

@@ -4,15 +4,37 @@
   lib,
   outPath,
   controlPlaneOut,
+  globalInventory,
   ...
 }:
 
 let
   hostname = config.networking.hostName;
-  hostName = hostname;
-  containerName = "${hostname}-container";
+  renderHosts =
+    if globalInventory ? render
+      && builtins.isAttrs globalInventory.render
+      && globalInventory.render ? hosts
+      && builtins.isAttrs globalInventory.render.hosts
+    then
+      globalInventory.render.hosts
+    else
+      { };
 
-  inventory = import ./inventory.nix;
+  renderHostConfig =
+    if builtins.hasAttr hostname renderHosts && builtins.isAttrs renderHosts.${hostname} then
+      renderHosts.${hostname}
+    else
+      { };
+
+  hostName = hostname;
+
+  containerName =
+    if renderHostConfig ? containerName && builtins.isString renderHostConfig.containerName then
+      renderHostConfig.containerName
+    else
+      "${hostname}-container";
+
+  inventory = globalInventory;
 
   containerNode =
     if inventory ? realization && inventory.realization ? nodes && lib.hasAttr hostname inventory.realization.nodes then
@@ -120,16 +142,16 @@ in
     };
 
     specialArgs = {
-      inherit outPath controlPlaneOut;
+      inherit outPath controlPlaneOut globalInventory;
     };
 
-    config = { controlPlaneOut, ... }: {
+    config = { controlPlaneOut, globalInventory, ... }: {
       imports = [
         ./container
       ];
 
       _module.args = {
-        inherit controlPlaneOut;
+        inherit controlPlaneOut globalInventory;
       };
 
       networking.useNetworkd = true;

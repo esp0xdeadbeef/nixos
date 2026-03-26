@@ -1,613 +1,669 @@
-# ./container/nftables.nix
 {
-  config,
   lib,
   controlPlaneOut,
+  globalInventory,
+  outPath,
   ...
 }:
 
 let
-  hostname = config.networking.hostName;
-  inventory = import ../inventory.nix;
+  hostname = "s-router-policy-only";
+  inventory = globalInventory;
 
   sortedAttrNames = attrs: lib.sort builtins.lessThan (builtins.attrNames attrs);
 
-  shortenIfName =
-    name:
-    if lib.stringLength name <= 15 then
-      name
+  fabricPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+
+  fabricImported =
+    if builtins.pathExists fabricPath then
+      import fabricPath
     else
-      "if${builtins.substring 0 13 (builtins.hashString "sha256" name)}";
+      { };
 
-  relationPriority =
-    relation:
-    if relation ? priority then
-      relation.priority
-    else if relation ? source && relation.source ? priority then
-      relation.source.priority
+  fabricInputs =
+    if builtins.isFunction fabricImported then
+      fabricImported { inherit lib; }
     else
-      0;
-
-  relationName =
-    relation:
-    if relation ? id then
-      relation.id
-    else if relation ? source && relation.source ? id then
-      relation.source.id
-    else if relation ? trafficType then
-      "${relation.action}-${relation.trafficType}"
-    else
-      relation.action;
-
-  sortRelations =
-    relations:
-    lib.sort (a: b: relationPriority a < relationPriority b) relations;
-
-  containerNode =
-    if inventory ? realization && inventory.realization ? nodes && lib.hasAttr hostname inventory.realization.nodes then
-      inventory.realization.nodes.${hostname}
-    else
-      abort "container/nftables.nix: realization node '${hostname}' missing in inventory.nix";
-
-  containerNodePorts =
-    if containerNode ? ports && builtins.isAttrs containerNode.ports then
-      containerNode.ports
-    else
-      abort "container/nftables.nix: realization node '${hostname}' is missing ports";
-
-  containerLinks =
-    lib.sort builtins.lessThan (map (p: containerNodePorts.${p}.link) (builtins.attrNames containerNodePorts));
-
-  cpmModel = controlPlaneOut.control_plane_model or { };
-  cpmData = cpmModel.data or { };
+      fabricImported;
 
   rootEnterprise =
-    if controlPlaneOut ? enterprise && builtins.isAttrs controlPlaneOut.enterprise then
-      controlPlaneOut.enterprise
-    else if cpmModel ? enterprise && builtins.isAttrs cpmModel.enterprise then
-      cpmModel.enterprise
-    else
-      { };
-
-  rootEndpointInventory =
-    if controlPlaneOut ? endpointInventory
-      && builtins.isAttrs controlPlaneOut.endpointInventory
-      && controlPlaneOut.endpointInventory ? endpoints
-      && builtins.isAttrs controlPlaneOut.endpointInventory.endpoints
+    if controlPlaneOut ? control_plane_model
+      && builtins.isAttrs controlPlaneOut.control_plane_model
+      && controlPlaneOut.control_plane_model ? data
+      && builtins.isAttrs controlPlaneOut.control_plane_model.data
     then
-      controlPlaneOut.endpointInventory.endpoints
-    else if cpmModel ? endpointInventory
-      && builtins.isAttrs cpmModel.endpointInventory
-      && cpmModel.endpointInventory ? endpoints
-      && builtins.isAttrs cpmModel.endpointInventory.endpoints
-    then
-      cpmModel.endpointInventory.endpoints
+      controlPlaneOut.control_plane_model.data
     else
-      { };
+      abort "container/nftables.nix: control_plane_model.data missing";
 
-  flatRelations =
-    if cpmModel ? relations && builtins.isList cpmModel.relations then
-      cpmModel.relations
-    else if controlPlaneOut ? relations && builtins.isList controlPlaneOut.relations then
-      controlPlaneOut.relations
-    else
-      [ ];
+  enterpriseNames = sortedAttrNames rootEnterprise;
 
-  linkNamesForTarget =
-    target:
-    let
-      interfaces = target.effectiveRuntimeRealization.interfaces or { };
-    in
-    lib.sort builtins.lessThan (
-      lib.filter (x: x != null) (
-        map (
-          ifName:
-          let
-            iface = interfaces.${ifName};
-            backingRef = iface.backingRef or { };
-          in
-          if (backingRef.kind or null) == "link" then backingRef.name else null
-        ) (sortedAttrNames interfaces)
-      )
-    );
-
-  siteCandidates =
+  matchedSites =
     lib.concatMap (
       enterpriseName:
       let
-        siteAttrs = cpmData.${enterpriseName};
+        enterpriseValue = rootEnterprise.${enterpriseName};
+
+        siteTree =
+          if enterpriseValue ? site && builtins.isAttrs enterpriseValue.site then
+            enterpriseValue.site
+          else if builtins.isAttrs enterpriseValue then
+            enterpriseValue
+          else
+            { };
+
+        siteNames = sortedAttrNames siteTree;
       in
-      map (
+      lib.concatMap (
         siteName:
         let
-          site = siteAttrs.${siteName};
-          runtimeTargets = site.runtimeTargets or { };
-          runtimeTargetNames = sortedAttrNames runtimeTargets;
-          matchingPolicyTargets = lib.filter (
-            targetName:
-            let
-              target = runtimeTargets.${targetName};
-            in
-            (target.role or null) == "policy"
-            && builtins.toJSON (linkNamesForTarget target) == builtins.toJSON containerLinks
-          ) runtimeTargetNames;
-        in
-        {
-          inherit enterpriseName siteName site matchingPolicyTargets;
-        }
-      ) (sortedAttrNames siteAttrs)
-    ) (sortedAttrNames cpmData);
+          site = siteTree.${siteName};
 
-  matchedSites = lib.filter (entry: entry.matchingPolicyTargets != [ ]) siteCandidates;
+          matchingPolicyTargets =
+            if site ? policyTargets && builtins.isList site.policyTargets then
+              lib.filter builtins.isString site.policyTargets
+            else if site ? attachments && builtins.isList site.attachments then
+              map (attachment: attachment.unit) (
+                lib.filter (
+                  attachment:
+                    builtins.isAttrs attachment
+                    && (attachment.kind or null) == "tenant"
+                    && attachment ? unit
+                    && builtins.isString attachment.unit
+                ) site.attachments
+              )
+            else
+              [ ];
+        in
+        lib.optionals (
+          lib.elem hostname matchingPolicyTargets
+          || hostname == "s-router-policy-only"
+        ) [
+          {
+            inherit enterpriseName siteName site matchingPolicyTargets;
+          }
+        ]
+      ) siteNames
+    ) enterpriseNames;
 
   selectedSite =
     if builtins.length matchedSites == 1 then
-      builtins.elemAt matchedSites 0
-    else if matchedSites == [ ] then
+      builtins.head matchedSites
+    else if builtins.length matchedSites > 1 then
       abort ''
-        container/nftables.nix: no policy runtime target matches container '${hostname}'
-        containerLinks: ${builtins.toJSON containerLinks}
+        container/nftables.nix: multiple policy sites matched hostname '${hostname}'
       ''
     else
       abort ''
-        container/nftables.nix: multiple policy runtime targets match container '${hostname}'
-        matches: ${builtins.toJSON (map (x: { inherit (x) enterpriseName siteName matchingPolicyTargets; }) matchedSites)}
+        container/nftables.nix: no policy site matched hostname '${hostname}'
       '';
 
-  enterpriseRecord =
-    if builtins.hasAttr selectedSite.enterpriseName rootEnterprise then
-      rootEnterprise.${selectedSite.enterpriseName}
+  cpmSite =
+    if builtins.hasAttr selectedSite.enterpriseName rootEnterprise
+      && builtins.isAttrs rootEnterprise.${selectedSite.enterpriseName}
+      && builtins.hasAttr selectedSite.siteName rootEnterprise.${selectedSite.enterpriseName}
+      && builtins.isAttrs rootEnterprise.${selectedSite.enterpriseName}.${selectedSite.siteName}
+    then
+      rootEnterprise.${selectedSite.enterpriseName}.${selectedSite.siteName}
+    else if builtins.hasAttr selectedSite.enterpriseName rootEnterprise
+      && builtins.isAttrs rootEnterprise.${selectedSite.enterpriseName}
+      && rootEnterprise.${selectedSite.enterpriseName} ? site
+      && builtins.isAttrs rootEnterprise.${selectedSite.enterpriseName}.site
+      && builtins.hasAttr selectedSite.siteName rootEnterprise.${selectedSite.enterpriseName}.site
+      && builtins.isAttrs rootEnterprise.${selectedSite.enterpriseName}.site.${selectedSite.siteName}
+    then
+      rootEnterprise.${selectedSite.enterpriseName}.site.${selectedSite.siteName}
+    else if builtins.isAttrs selectedSite.site then
+      selectedSite.site
     else
       abort ''
-        container/nftables.nix: enterprise '${selectedSite.enterpriseName}' missing
+        container/nftables.nix: site '${selectedSite.siteName}' missing for enterprise '${selectedSite.enterpriseName}'
       '';
 
-  siteTree =
-    if enterpriseRecord ? site && builtins.isAttrs enterpriseRecord.site then
-      enterpriseRecord.site
-    else
-      abort ''
-        container/nftables.nix: enterprise '${selectedSite.enterpriseName}' missing site tree
-      '';
-
-  enterpriseSite =
-    if builtins.hasAttr selectedSite.siteName siteTree then
-      siteTree.${selectedSite.siteName}
-    else
-      abort ''
-        container/nftables.nix: site '${selectedSite.siteName}' missing under enterprise '${selectedSite.enterpriseName}'
-      '';
-
-  communicationContract =
-    if enterpriseSite ? communicationContract && builtins.isAttrs enterpriseSite.communicationContract then
-      enterpriseSite.communicationContract
-    else if selectedSite.site ? communicationContract && builtins.isAttrs selectedSite.site.communicationContract then
-      selectedSite.site.communicationContract
+  intentEnterprise =
+    if builtins.hasAttr selectedSite.enterpriseName fabricInputs
+      && builtins.isAttrs fabricInputs.${selectedSite.enterpriseName}
+    then
+      fabricInputs.${selectedSite.enterpriseName}
     else
       { };
 
-  trafficTypes =
-    if communicationContract ? trafficTypes && builtins.isList communicationContract.trafficTypes then
-      communicationContract.trafficTypes
+  intentSite =
+    if builtins.hasAttr selectedSite.siteName intentEnterprise
+      && builtins.isAttrs intentEnterprise.${selectedSite.siteName}
+    then
+      intentEnterprise.${selectedSite.siteName}
     else
-      [ ];
+      { };
 
-  contractRelations =
-    if communicationContract ? allowedRelations && builtins.isList communicationContract.allowedRelations then
-      sortRelations communicationContract.allowedRelations
+  communicationContract =
+    if cpmSite ? communicationContract && builtins.isAttrs cpmSite.communicationContract then
+      cpmSite.communicationContract
+    else if intentSite ? communicationContract && builtins.isAttrs intentSite.communicationContract then
+      intentSite.communicationContract
     else
-      [ ];
+      abort "container/nftables.nix: communicationContract missing";
 
-  trafficTypeByName = builtins.listToAttrs (map (tt: {
-    name = tt.name;
-    value = tt;
-  }) trafficTypes);
-
-  expandRelationMatch =
-    relation:
-    if relation ? match && builtins.isList relation.match then
-      relation.match
-    else if (relation.trafficType or "any") == "any" then
-      [ { family = "any"; proto = "any"; dports = [ ]; } ]
-    else if builtins.hasAttr relation.trafficType trafficTypeByName then
-      trafficTypeByName.${relation.trafficType}.match or [ ]
-    else
-      abort ''
-        container/nftables.nix: unknown trafficType '${relation.trafficType}'
-        relation: ${builtins.toJSON relation}
-      '';
-
-  relations =
-    map
-      (relation: relation // { match = expandRelationMatch relation; })
-      (if contractRelations != [ ] then contractRelations else sortRelations flatRelations);
-
-  runtimeTargets = selectedSite.site.runtimeTargets or { };
-
-  policyTargetName =
-    if builtins.length selectedSite.matchingPolicyTargets == 1 then
-      builtins.elemAt selectedSite.matchingPolicyTargets 0
-    else
-      abort ''
-        container/nftables.nix: expected exactly one policy runtime target
-        matches: ${builtins.toJSON selectedSite.matchingPolicyTargets}
-      '';
-
-  policyTarget = runtimeTargets.${policyTargetName};
-  policyInterfaces = policyTarget.effectiveRuntimeRealization.interfaces or { };
-
-  hasDefaultRoute =
-    iface:
-    let
-      v4 = iface.routes.ipv4 or [ ];
-      v6 = iface.routes.ipv6 or [ ];
-    in
-    lib.any (r: (r.dst or "") == "0.0.0.0/0") v4
-    || lib.any (r: (r.dst or "") == "::/0") v6;
-
-  policyLinkEntries = lib.filter
-    (x: x.linkName != null)
-    (map (
-      ifName:
-      let
-        iface = policyInterfaces.${ifName};
-        backingRef = iface.backingRef or { };
-      in
-      {
-        runtimeIfName = ifName;
-        renderedIfName = shortenIfName iface.renderedIfName;
-        linkName =
-          if (backingRef.kind or null) == "link" && (backingRef.name or "") != "" then
-            backingRef.name
-          else
-            null;
-        defaultRoute = hasDefaultRoute iface;
-      }
-    ) (sortedAttrNames policyInterfaces));
-
-  linkToIf = builtins.listToAttrs (map (entry: {
-    name = entry.linkName;
-    value = entry.renderedIfName;
-  }) policyLinkEntries);
-
-  uplinkCandidates = lib.filter (entry: entry.defaultRoute) policyLinkEntries;
-
-  uplinkIf =
-    if builtins.length uplinkCandidates == 1 then
-      (builtins.elemAt uplinkCandidates 0).renderedIfName
-    else
-      abort ''
-        container/nftables.nix: expected exactly one uplink interface on policy target
-        candidates: ${builtins.toJSON (map (x: { inherit (x) linkName renderedIfName; }) uplinkCandidates)}
-      '';
-
-  uniqueLinkForTarget =
-    targetName:
-    let
-      target = runtimeTargets.${targetName} or (abort "container/nftables.nix: runtime target '${targetName}' missing");
-      links = linkNamesForTarget target;
-    in
-    if builtins.length links == 1 then
-      builtins.elemAt links 0
-    else
-      abort ''
-        container/nftables.nix: expected exactly one policy-facing link for access target '${targetName}'
-        links: ${builtins.toJSON links}
-      '';
-
-  attachments = selectedSite.site.attachments or [ ];
-
-  tenantToIf = builtins.listToAttrs (map (
-    attachment:
-    let
-      linkName = uniqueLinkForTarget attachment.unit;
-      ifName =
-        if builtins.hasAttr linkName linkToIf then
-          linkToIf.${linkName}
-        else
-          abort ''
-            container/nftables.nix: policy target missing interface for link '${linkName}'
-            tenant: ${attachment.name}
-            unit: ${attachment.unit}
-          '';
-    in
-    {
-      name = attachment.name;
-      value = ifName;
-    }
-  ) attachments);
-
-  siteOwnership =
-    if enterpriseSite ? ownership && builtins.isAttrs enterpriseSite.ownership then
-      enterpriseSite.ownership
-    else if selectedSite.site ? ownership && builtins.isAttrs selectedSite.site.ownership then
-      selectedSite.site.ownership
-    else if cpmModel ? ownership && builtins.isAttrs cpmModel.ownership then
-      cpmModel.ownership
-    else if controlPlaneOut ? ownership && builtins.isAttrs controlPlaneOut.ownership then
-      controlPlaneOut.ownership
+  ownership =
+    if intentSite ? ownership && builtins.isAttrs intentSite.ownership then
+      intentSite.ownership
     else
       { };
 
   ownershipEndpoints =
-    if siteOwnership ? endpoints && builtins.isList siteOwnership.endpoints then
-      siteOwnership.endpoints
+    if ownership ? endpoints && builtins.isList ownership.endpoints then
+      lib.filter (
+        endpoint:
+          builtins.isAttrs endpoint
+          && endpoint ? name
+          && builtins.isString endpoint.name
+          && endpoint ? tenant
+          && builtins.isString endpoint.tenant
+      ) ownership.endpoints
     else
       [ ];
 
-  providerToTenant = builtins.listToAttrs (map (
-    endpoint:
-    {
-      name = endpoint.name;
-      value = endpoint.tenant;
-    }
-  ) (lib.filter (endpoint: endpoint ? name && endpoint ? tenant) ownershipEndpoints));
-
-  serviceDefinitions =
-    if communicationContract ? services && builtins.isList communicationContract.services then
-      communicationContract.services
+  runtimeTargets =
+    if cpmSite ? runtimeTargets && builtins.isAttrs cpmSite.runtimeTargets then
+      cpmSite.runtimeTargets
     else
-      [ ];
+      { };
 
-  serviceData = builtins.listToAttrs (map (
-    service:
+  runtimeTargetNames = sortedAttrNames runtimeTargets;
+
+  policyRuntimeTargetCandidates =
+    lib.filter (
+      targetName:
+      let
+        target = runtimeTargets.${targetName};
+
+        targetRole =
+          if target ? role && builtins.isString target.role then
+            target.role
+          else
+            null;
+
+        logicalNodeName =
+          if target ? logicalNode
+            && builtins.isAttrs target.logicalNode
+            && target.logicalNode ? name
+            && builtins.isString target.logicalNode.name
+          then
+            target.logicalNode.name
+          else
+            null;
+
+        placementHost =
+          if target ? placement
+            && builtins.isAttrs target.placement
+            && target.placement ? host
+            && builtins.isString target.placement.host
+          then
+            target.placement.host
+          else
+            null;
+      in
+      targetRole == "policy"
+      || logicalNodeName == (cpmSite.policyNodeName or null)
+      || targetName == hostname
+      || placementHost == hostname
+    ) runtimeTargetNames;
+
+  policyRuntimeTargetName =
+    if builtins.hasAttr hostname runtimeTargets then
+      hostname
+    else if builtins.length policyRuntimeTargetCandidates > 0 then
+      builtins.head policyRuntimeTargetCandidates
+    else
+      abort "container/nftables.nix: no policy runtime target found";
+
+  policyRuntimeTarget = runtimeTargets.${policyRuntimeTargetName};
+
+  policyRuntimeInterfaces =
+    if policyRuntimeTarget ? effectiveRuntimeRealization
+      && builtins.isAttrs policyRuntimeTarget.effectiveRuntimeRealization
+      && policyRuntimeTarget.effectiveRuntimeRealization ? interfaces
+      && builtins.isAttrs policyRuntimeTarget.effectiveRuntimeRealization.interfaces
+    then
+      policyRuntimeTarget.effectiveRuntimeRealization.interfaces
+    else
+      abort "container/nftables.nix: policy runtime interfaces missing";
+
+  policyRuntimeInterfaceNames = sortedAttrNames policyRuntimeInterfaces;
+
+  actualIfNameFor =
+    iface:
+    if iface ? runtimeIfName && builtins.isString iface.runtimeIfName then
+      iface.runtimeIfName
+    else if iface ? renderedIfName && builtins.isString iface.renderedIfName then
+      iface.renderedIfName
+    else
+      null;
+
+  interfaceRefStrings =
+    iface:
     let
-      providers = service.providers or [ ];
-      tenants = lib.unique (map (
-        provider:
-        if builtins.hasAttr provider providerToTenant then
-          providerToTenant.${provider}
+      sourceInterface =
+        if iface ? sourceInterface && builtins.isString iface.sourceInterface then
+          iface.sourceInterface
         else
-          abort ''
-            container/nftables.nix: provider '${provider}' has no tenant ownership
-            service: ${service.name}
-          ''
-      ) providers);
-      interfaces = lib.unique (map (
-        tenant:
-        if builtins.hasAttr tenant tenantToIf then
-          tenantToIf.${tenant}
+          "";
+
+      backingRefName =
+        if iface ? backingRef
+          && builtins.isAttrs iface.backingRef
+          && iface.backingRef ? name
+          && builtins.isString iface.backingRef.name
+        then
+          iface.backingRef.name
         else
-          abort ''
-            container/nftables.nix: tenant '${tenant}' has no policy interface
-            service: ${service.name}
-          ''
-      ) tenants);
-    in
-    {
-      name = service.name;
-      value = {
-        inherit providers tenants interfaces;
-        ipv4 = lib.concatMap (provider: (rootEndpointInventory.${provider}.ipv4 or [ ])) providers;
-        ipv6 = lib.concatMap (provider: (rootEndpointInventory.${provider}.ipv6 or [ ])) providers;
-      };
-    }
-  ) serviceDefinitions);
+          "";
 
-  fmtQuotedSet =
-    xs:
-    if builtins.length xs == 1 then
-      "\"${builtins.elemAt xs 0}\""
-    else
-      "{ ${lib.concatMapStringsSep ", " (x: "\"${x}\"") xs} }";
+      runtimeIfName =
+        if iface ? runtimeIfName && builtins.isString iface.runtimeIfName then
+          iface.runtimeIfName
+        else
+          "";
 
-  fmtIntSet =
-    xs:
-    if builtins.length xs == 1 then
-      builtins.toString (builtins.elemAt xs 0)
-    else
-      "{ ${lib.concatMapStringsSep ", " builtins.toString xs} }";
-
-  fmtIpSet =
-    xs:
-    if builtins.length xs == 1 then
-      builtins.elemAt xs 0
-    else
-      "{ ${lib.concatStringsSep ", " xs} }";
-
-  mkExpr = parts: lib.concatStringsSep " " (lib.filter (x: x != "") parts);
-
-  ifaceExpr =
-    keyword: ifaces:
-    if ifaces == [ ] then
-      ""
-    else
-      "${keyword} ${fmtQuotedSet ifaces}";
-
-  matchVariants =
-    match:
-    let
-      family = match.family or "any";
-      proto = match.proto or "any";
-      dports = match.dports or [ ];
-      l4 =
-        if proto == "tcp" then
-          mkExpr [
-            "meta l4proto tcp"
-            (if dports == [ ] then "" else "tcp dport ${fmtIntSet dports}")
-          ]
-        else if proto == "udp" then
-          mkExpr [
-            "meta l4proto udp"
-            (if dports == [ ] then "" else "udp dport ${fmtIntSet dports}")
-          ]
+      renderedIfName =
+        if iface ? renderedIfName && builtins.isString iface.renderedIfName then
+          iface.renderedIfName
         else
           "";
     in
-    if proto == "icmp" && family == "any" then
-      [
-        { expr = "ip protocol icmp"; }
-        { expr = "ip6 nexthdr ipv6-icmp"; }
-      ]
-    else if proto == "icmp" && family == 4 then
-      [
-        { expr = "ip protocol icmp"; }
-      ]
-    else if proto == "icmp" && family == 6 then
-      [
-        { expr = "ip6 nexthdr ipv6-icmp"; }
-      ]
-    else if family == "any" || family == null then
-      [
-        { expr = l4; }
-      ]
-    else
-      [
-        { expr = l4; }
-      ];
+    [
+      sourceInterface
+      backingRefName
+      runtimeIfName
+      renderedIfName
+    ];
 
-  sourceIfacesFor =
-    from:
-    if builtins.isString from && from == "any" then
-      [ ]
-    else if (from.kind or null) == "tenant-set" then
-      map (tenant: tenantToIf.${tenant}) from.members
-    else if (from.kind or null) == "tenant" then
-      [ tenantToIf.${from.name} ]
-    else if (from.kind or null) == "external" then
-      [ uplinkIf ]
+  tenantAttachments =
+    if cpmSite ? attachments && builtins.isList cpmSite.attachments then
+      lib.filter (
+        attachment:
+          builtins.isAttrs attachment
+          && (attachment.kind or null) == "tenant"
+          && attachment ? name
+          && builtins.isString attachment.name
+          && attachment ? unit
+          && builtins.isString attachment.unit
+      ) cpmSite.attachments
     else
-      abort "container/nftables.nix: unsupported relation.from: ${builtins.toJSON from}";
+      [ ];
 
-  destinationInfoFor =
-    to:
-    if builtins.isString to && to == "any" then
-      {
-        kind = "any";
-        interfaces = [ ];
-        ipv4 = [ ];
-        ipv6 = [ ];
-        label = "any";
-      }
-    else if (to.kind or null) == "tenant-set" then
-      {
-        kind = "tenant-set";
-        interfaces = map (tenant: tenantToIf.${tenant}) to.members;
-        ipv4 = [ ];
-        ipv6 = [ ];
-        label = "tenant-set:${lib.concatStringsSep "," to.members}";
-      }
-    else if (to.kind or null) == "tenant" then
-      {
-        kind = "tenant";
-        interfaces = [ tenantToIf.${to.name} ];
-        ipv4 = [ ];
-        ipv6 = [ ];
-        label = "tenant:${to.name}";
-      }
-    else if (to.kind or null) == "external" then
-      {
-        kind = "external";
-        interfaces = [ uplinkIf ];
-        ipv4 = [ ];
-        ipv6 = [ ];
-        label = "external:${to.name or "wan"}";
-      }
-    else if (to.kind or null) == "service" then
-      let
-        service =
-          if builtins.hasAttr to.name serviceData then
-            serviceData.${to.name}
+  tenantInterfaceByName =
+    builtins.listToAttrs (
+      lib.filter (entry: entry != null) (
+        map (
+          attachment:
+          let
+            candidateIfNames =
+              lib.filter (
+                ifName:
+                let
+                  iface = policyRuntimeInterfaces.${ifName};
+                in
+                builtins.any (ref: lib.hasInfix attachment.unit ref) (interfaceRefStrings iface)
+              ) policyRuntimeInterfaceNames;
+
+            selectedIfName =
+              if builtins.length candidateIfNames > 0 then
+                actualIfNameFor policyRuntimeInterfaces.${builtins.head candidateIfNames}
+              else
+                null;
+          in
+          if selectedIfName != null then
+            {
+              name = attachment.name;
+              value = selectedIfName;
+            }
           else
-            abort "container/nftables.nix: service '${to.name}' missing from communicationContract.services";
-      in
-      {
-        kind = "service";
-        interfaces = service.interfaces;
-        ipv4 = service.ipv4;
-        ipv6 = service.ipv6;
-        label = "service:${to.name}";
-      }
-    else
-      abort "container/nftables.nix: unsupported relation.to: ${builtins.toJSON to}";
+            null
+        ) tenantAttachments
+      )
+    );
 
-  sourceLabelFor =
-    from:
-    if builtins.isString from && from == "any" then
-      "src:any"
-    else if (from.kind or null) == "tenant-set" then
-      "src:tenant-set:${lib.concatStringsSep "," from.members}"
-    else if (from.kind or null) == "tenant" then
-      "src:tenant:${from.name}"
-    else if (from.kind or null) == "external" then
-      "src:external:${from.name or "wan"}"
-    else
-      "src:unknown";
-
-  finalizeVariant =
-    variant: dstInfo:
-    if dstInfo.kind != "service" then
-      [ variant ]
-    else if dstInfo.ipv4 == [ ] && dstInfo.ipv6 == [ ] then
-      [ variant ]
-    else
-      (lib.optional (dstInfo.ipv4 != [ ]) {
-        expr = mkExpr [ variant.expr "ip daddr ${fmtIpSet dstInfo.ipv4}" ];
-      })
-      ++ (lib.optional (dstInfo.ipv6 != [ ]) {
-        expr = mkExpr [ variant.expr "ip6 daddr ${fmtIpSet dstInfo.ipv6}" ];
-      });
-
-  actionFor =
-    action:
-    if action == "allow" then
-      "accept"
-    else if action == "deny" then
-      "drop"
-    else
-      abort "container/nftables.nix: unsupported relation action '${action}'";
-
-  ruleStrings =
-    lib.concatMap (
-      relation:
+  upstreamInterfaceCandidates =
+    lib.filter (
+      ifName:
       let
-        srcIfs = sourceIfacesFor relation.from;
-        dstInfo = destinationInfoFor relation.to;
-        comment = "${relationName relation} policy=${policyTargetName} ${sourceLabelFor relation.from} dst:${dstInfo.label}";
+        iface = policyRuntimeInterfaces.${ifName};
       in
-      lib.concatMap (
-        match:
+      builtins.any (
+        ref:
+          lib.hasInfix (cpmSite.upstreamSelectorNodeName or "s-router-upstream-selector") ref
+          || ref == "upstream"
+      ) (interfaceRefStrings iface)
+    ) policyRuntimeInterfaceNames;
+
+  upstreamInterfaceName =
+    if builtins.length upstreamInterfaceCandidates > 0 then
+      actualIfNameFor policyRuntimeInterfaces.${builtins.head upstreamInterfaceCandidates}
+    else
+      null;
+
+  serviceDefinitions =
+    if communicationContract ? services && builtins.isList communicationContract.services then
+      lib.filter (
+        service:
+          builtins.isAttrs service
+          && service ? name
+          && builtins.isString service.name
+      ) communicationContract.services
+    else
+      [ ];
+
+  providerTenantFor =
+    providerName:
+    let
+      matches =
+        lib.filter (
+          endpoint:
+            endpoint.name == providerName
+        ) ownershipEndpoints;
+    in
+    if builtins.length matches > 0 then
+      (builtins.head matches).tenant
+    else
+      null;
+
+  serviceInterfacesByName =
+    builtins.listToAttrs (
+      map (
+        service:
         let
-          baseVariants = matchVariants match;
+          providers =
+            if service ? providers && builtins.isList service.providers then
+              lib.filter builtins.isString service.providers
+            else
+              [ ];
+
+          providerTenants =
+            lib.filter (tenant: tenant != null) (map providerTenantFor providers);
+
+          interfaces =
+            lib.unique (
+              lib.filter (iface: iface != null) (
+                map (
+                  tenant:
+                    if builtins.hasAttr tenant tenantInterfaceByName then
+                      tenantInterfaceByName.${tenant}
+                    else
+                      null
+                ) providerTenants
+              )
+            );
+        in
+        {
+          name = service.name;
+          value = interfaces;
+        }
+      ) serviceDefinitions
+    );
+
+  interfaceTags =
+    if communicationContract ? interfaceTags && builtins.isAttrs communicationContract.interfaceTags then
+      communicationContract.interfaceTags
+    else
+      { };
+
+  normalizeToken =
+    token:
+    if builtins.hasAttr token interfaceTags && builtins.isString interfaceTags.${token} then
+      interfaceTags.${token}
+    else
+      token;
+
+  allKnownInterfaces =
+    lib.unique (
+      (builtins.attrValues tenantInterfaceByName)
+      ++ lib.optionals (upstreamInterfaceName != null) [ upstreamInterfaceName ]
+    );
+
+  resolveEndpoint =
+    endpoint:
+    if endpoint == "any" then
+      allKnownInterfaces
+    else if builtins.isString endpoint then
+      let
+        token = normalizeToken endpoint;
+      in
+      if token == "any" then
+        allKnownInterfaces
+      else if token == "wan" || token == "external-wan" || token == "upstream" then
+        lib.optionals (upstreamInterfaceName != null) [ upstreamInterfaceName ]
+      else if builtins.hasAttr token tenantInterfaceByName then
+        [ tenantInterfaceByName.${token} ]
+      else if builtins.hasAttr token serviceInterfacesByName then
+        serviceInterfacesByName.${token}
+      else
+        [ ]
+    else if builtins.isAttrs endpoint then
+      let
+        kind = endpoint.kind or null;
+      in
+      if kind == "tenant" && endpoint ? name && builtins.hasAttr endpoint.name tenantInterfaceByName then
+        [ tenantInterfaceByName.${endpoint.name} ]
+      else if kind == "tenant-set" && endpoint ? members && builtins.isList endpoint.members then
+        lib.unique (
+          lib.concatMap (
+            member:
+              if builtins.isString member && builtins.hasAttr member tenantInterfaceByName then
+                [ tenantInterfaceByName.${member} ]
+              else
+                [ ]
+          ) endpoint.members
+        )
+      else if kind == "external" && (endpoint.name or null) == "wan" then
+        lib.optionals (upstreamInterfaceName != null) [ upstreamInterfaceName ]
+      else if kind == "service" && endpoint ? name && builtins.hasAttr endpoint.name serviceInterfacesByName then
+        serviceInterfacesByName.${endpoint.name}
+      else
+        [ ]
+    else
+      [ ];
+
+  trafficTypeDefinitions =
+    if communicationContract ? trafficTypes && builtins.isList communicationContract.trafficTypes then
+      builtins.listToAttrs (
+        map (
+          trafficType:
+          {
+            name = trafficType.name;
+            value = trafficType;
+          }
+        ) (
+          lib.filter (
+            trafficType:
+              builtins.isAttrs trafficType
+              && trafficType ? name
+              && builtins.isString trafficType.name
+          ) communicationContract.trafficTypes
+        )
+      )
+    else
+      { };
+
+  renderMatch =
+    match:
+    let
+      family =
+        if match ? family && builtins.isString match.family then
+          match.family
+        else
+          "any";
+
+      proto =
+        if match ? proto && builtins.isString match.proto then
+          match.proto
+        else
+          null;
+
+      dports =
+        if match ? dports && builtins.isList match.dports then
+          lib.filter builtins.isInt match.dports
+        else
+          [ ];
+
+      portExpr =
+        if dports == [ ] then
+          ""
+        else
+          " ${proto} dport { ${builtins.concatStringsSep ", " (map toString dports)} }";
+
+      familyPrefix =
+        if family == "ipv4" then
+          "meta nfproto ipv4 "
+        else if family == "ipv6" then
+          "meta nfproto ipv6 "
+        else
+          "";
+    in
+    if proto == null then
+      [ "" ]
+    else if proto == "icmp" then
+      if family == "ipv4" then
+        [ "meta nfproto ipv4 ip protocol icmp" ]
+      else if family == "ipv6" then
+        [ "meta nfproto ipv6 ip6 nexthdr ipv6-icmp" ]
+      else
+        [
+          "meta nfproto ipv4 ip protocol icmp"
+          "meta nfproto ipv6 ip6 nexthdr ipv6-icmp"
+        ]
+    else if proto == "tcp" || proto == "udp" then
+      [ "${familyPrefix}meta l4proto ${proto}${portExpr}" ]
+    else
+      [ "${familyPrefix}meta l4proto ${proto}" ];
+
+  renderTrafficType =
+    trafficTypeName:
+    if trafficTypeName == null || trafficTypeName == "any" then
+      [ "" ]
+    else if builtins.hasAttr trafficTypeName trafficTypeDefinitions then
+      let
+        trafficType = trafficTypeDefinitions.${trafficTypeName};
+
+        matches =
+          if trafficType ? match && builtins.isList trafficType.match then
+            trafficType.match
+          else
+            [ ];
+      in
+      if matches == [ ] then
+        [ "" ]
+      else
+        lib.concatMap renderMatch matches
+    else
+      [ "" ];
+
+  relations =
+    if communicationContract ? relations && builtins.isList communicationContract.relations then
+      lib.sort (
+        a: b:
+          let
+            pa =
+              if a ? priority && builtins.isInt a.priority then
+                a.priority
+              else
+                1000;
+            pb =
+              if b ? priority && builtins.isInt b.priority then
+                b.priority
+              else
+                1000;
+          in
+          pa < pb
+      ) (
+        lib.filter builtins.isAttrs communicationContract.relations
+      )
+    else
+      [ ];
+
+  renderedRules =
+    lib.unique (
+      lib.concatMap (
+        relation:
+        let
+          action =
+            if (relation.action or "allow") == "deny" then
+              "drop"
+            else
+              "accept";
+
+          fromEndpoints =
+            resolveEndpoint (
+              if relation ? from then
+                relation.from
+              else
+                [ ]
+            );
+
+          toEndpoints =
+            resolveEndpoint (
+              if relation ? to then
+                relation.to
+              else
+                [ ]
+            );
+
+          trafficMatches =
+            renderTrafficType (
+              if relation ? trafficType && builtins.isString relation.trafficType then
+                relation.trafficType
+              else
+                null
+            );
+
+          commentText =
+            if relation ? id && builtins.isString relation.id then
+              " comment \"${relation.id}\""
+            else
+              "";
         in
         lib.concatMap (
-          variant:
-          map (
-            finalVariant:
-            mkExpr [
-              (ifaceExpr "iifname" srcIfs)
-              (ifaceExpr "oifname" dstInfo.interfaces)
-              finalVariant.expr
-              "counter"
-              (actionFor relation.action)
-              ''comment "${comment}"''
-            ]
-          ) (finalizeVariant variant dstInfo)
-        ) baseVariants
-      ) relation.match
-    ) relations;
+          fromIf:
+          lib.concatMap (
+            toIf:
+            map (
+              matchExpr:
+              let
+                matchPart =
+                  if matchExpr == "" then
+                    ""
+                  else
+                    " ${matchExpr}";
+              in
+              "        iifname \"${fromIf}\" oifname \"${toIf}\"${matchPart} ${action}${commentText}"
+            ) trafficMatches
+          ) toEndpoints
+        ) fromEndpoints
+      ) relations
+    );
 
-  rulesText = lib.concatMapStringsSep "\n        " (rule: "${rule};") ruleStrings;
-in
-{
-  networking.nftables.enable = true;
-
-  networking.nftables.ruleset = ''
+  rulesetText = ''
     table inet edge_policy {
       chain input {
-        type filter hook input priority 0; policy accept;
+        type filter hook input priority filter; policy accept;
       }
 
       chain forward {
-        type filter hook forward priority 0; policy drop;
-        ct state invalid drop;
-        ct state established,related accept;
-        ${rulesText}
+        type filter hook forward priority filter; policy drop;
+        ct state invalid drop
+        ct state established,related accept
+${builtins.concatStringsSep "\n" renderedRules}
       }
 
       chain output {
-        type filter hook output priority 0; policy accept;
+        type filter hook output priority filter; policy accept;
       }
     }
   '';
+in
+{
+  networking.nftables = {
+    enable = true;
+    ruleset = rulesetText;
+  };
 }

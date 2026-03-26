@@ -1,8 +1,6 @@
 {
   outPath,
   lib,
-  config,
-  inputs,
   ...
 }:
 
@@ -20,9 +18,19 @@ let
       fabricImported { inherit lib; }
     else
       fabricImported;
+
+  inventoryImported = import ../inventory.nix;
+
+  globalInventory =
+    if builtins.isFunction inventoryImported then
+      inventoryImported { inherit lib; }
+    else
+      inventoryImported;
 in
 {
-  _module.args.fabricInputs = fabricInputs;
+  _module.args = {
+    inherit fabricInputs globalInventory;
+  };
 
   imports = [
     ./host-config

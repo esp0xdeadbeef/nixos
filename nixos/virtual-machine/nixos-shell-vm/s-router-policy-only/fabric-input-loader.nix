@@ -1,4 +1,4 @@
-{ pkgs, inputs, fabricInputs, lib, outPath, ... }:
+{ pkgs, inputs, fabricInputs, globalInventory, lib, outPath, ... }:
 
 let
   system = pkgs.stdenv.hostPlatform.system;
@@ -14,6 +14,7 @@ let
   controlPlaneOut =
     inputs.network-control-plane-model.lib.${system}.build {
       input = forwardingOut;
+      inventory = globalInventory;
     };
 in
 {

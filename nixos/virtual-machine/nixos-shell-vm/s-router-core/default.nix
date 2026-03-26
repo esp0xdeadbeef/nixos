@@ -1,7 +1,6 @@
 {
   outPath,
   lib,
-  config,
   ...
 }:
 
@@ -19,8 +18,20 @@ let
       fabricImported { inherit lib; }
     else
       fabricImported;
+
+  inventoryImported = import ../inventory.nix;
+
+  globalInventory =
+    if builtins.isFunction inventoryImported then
+      inventoryImported { inherit lib; }
+    else
+      inventoryImported;
 in
 {
+  _module.args = {
+    inherit fabricInputs globalInventory;
+  };
+
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./fabric-input-loader.nix
@@ -29,6 +40,4 @@ in
     ./sops.nix
     ./container-settings.nix
   ];
-
-  _module.args.fabricInputs = fabricInputs;
 }

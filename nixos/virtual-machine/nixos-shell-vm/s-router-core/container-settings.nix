@@ -3,18 +3,29 @@
   pkgs,
   lib,
   fabricCompiled,
+  globalInventory,
   ...
 }:
 
 let
   hostname = config.networking.hostName;
+  inventory = globalInventory;
 
-  inventoryImported = import ./inventory.nix;
-  inventory =
-    if builtins.isFunction inventoryImported then
-      inventoryImported { inherit lib; }
+  renderHosts =
+    if inventory ? render
+      && builtins.isAttrs inventory.render
+      && inventory.render ? hosts
+      && builtins.isAttrs inventory.render.hosts
+    then
+      inventory.render.hosts
     else
-      inventoryImported;
+      { };
+
+  renderHostConfig =
+    if builtins.hasAttr hostname renderHosts && builtins.isAttrs renderHosts.${hostname} then
+      renderHosts.${hostname}
+    else
+      { };
 
   deploymentHosts =
     if inventory ? deployment
@@ -36,7 +47,12 @@ let
   deploymentHostNames = lib.sort builtins.lessThan (builtins.attrNames deploymentHosts);
 
   deploymentHostName =
-    if builtins.hasAttr hostname deploymentHosts then
+    if renderHostConfig ? deploymentHost
+      && builtins.isString renderHostConfig.deploymentHost
+      && builtins.hasAttr renderHostConfig.deploymentHost deploymentHosts
+    then
+      renderHostConfig.deploymentHost
+    else if builtins.hasAttr hostname deploymentHosts then
       hostname
     else if builtins.length deploymentHostNames == 1 then
       builtins.head deploymentHostNames
@@ -44,7 +60,7 @@ let
       throw ''
         container-settings:
 
-        inventory.deployment.hosts.${hostname} missing, and hostname fallback is ambiguous.
+        inventory.deployment host for '${hostname}' missing, and fallback is ambiguous.
 
         Current hostname:
         ${hostname}
@@ -70,20 +86,27 @@ let
 
   uplinkNames = lib.sort builtins.lessThan (builtins.attrNames uplinks);
 
-  wanConfig =
-    if uplinks ? upstream-core && builtins.isAttrs uplinks.upstream-core then
-      uplinks.upstream-core
+  wanUplinkName =
+    if renderHostConfig ? wanUplink
+      && builtins.isString renderHostConfig.wanUplink
+      && builtins.hasAttr renderHostConfig.wanUplink uplinks
+    then
+      renderHostConfig.wanUplink
+    else if uplinks ? upstream-core && builtins.isAttrs uplinks.upstream-core then
+      "upstream-core"
     else if builtins.length uplinkNames == 1 then
-      uplinks.${builtins.head uplinkNames}
+      builtins.head uplinkNames
     else
       throw ''
         container-settings:
 
-        inventory.deployment.hosts.${deploymentHostName}.uplinks.upstream-core missing and fallback is ambiguous.
+        inventory.deployment.hosts.${deploymentHostName}.uplinks WAN selection missing and fallback is ambiguous.
 
         Known uplinks:
         ${builtins.concatStringsSep "\n  - " ([ "" ] ++ uplinkNames)}
       '';
+
+  wanConfig = uplinks.${wanUplinkName};
 
   _wanBridgePresent =
     if wanConfig ? bridge && builtins.isString wanConfig.bridge then
@@ -291,10 +314,16 @@ let
           ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames ctx)}
         '';
 
+  runtimeRole =
+    if renderHostConfig ? runtimeRole && builtins.isString renderHostConfig.runtimeRole then
+      renderHostConfig.runtimeRole
+    else
+      "core";
+
   selectedUnits =
     lib.filter (
       unitName:
-        unitRole unitName == "core"
+        unitRole unitName == runtimeRole
         && unitMatchesMachine unitName
     ) runtimeTargetNames;
 
@@ -305,7 +334,7 @@ let
       throw ''
         container-settings:
 
-        No core-role runtime targets matched this machine.
+        No ${runtimeRole}-role runtime targets matched this machine.
 
         Current hostname:
         ${hostname}
@@ -373,11 +402,16 @@ let
           ${builtins.toJSON directPorts}
         '';
 
+  containerTemplate =
+    if renderHostConfig ? containerTemplate && builtins.isString renderHostConfig.containerTemplate then
+      renderHostConfig.containerTemplate
+    else
+      "wan";
+
   mkContainer =
     unitName:
     let
       fabricNodeContext = nodeContextForUnit unitName;
-      containerTemplate = "wan";
       containerName = containerTemplate;
       containerPath = ./. + "/container-${containerTemplate}";
       transitBridge = runtimeTransitBridgeForUnit unitName;
@@ -422,7 +456,6 @@ let
     };
 
   containersGenerated = builtins.listToAttrs (map mkContainer selectedUnits);
-
 in
 {
   networking.useNetworkd = true;

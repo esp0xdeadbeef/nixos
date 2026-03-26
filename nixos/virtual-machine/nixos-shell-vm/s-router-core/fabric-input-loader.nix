@@ -1,14 +1,7 @@
-{ pkgs, inputs, fabricInputs, lib, ... }:
+{ pkgs, inputs, fabricInputs, globalInventory, lib, outPath, ... }:
 
 let
   system = pkgs.stdenv.hostPlatform.system;
-
-  inventoryImported = import ./inventory.nix;
-  inventoryRaw =
-    if builtins.isFunction inventoryImported then
-      inventoryImported { inherit lib; }
-    else
-      inventoryImported;
 
   compilerOut =
     (inputs.nixos-network-compiler.lib.compile system) fabricInputs;
@@ -18,41 +11,11 @@ let
       input = compilerOut;
     };
 
-  controlPlaneLib = inputs.network-control-plane-model.lib;
-
   controlPlaneOut =
-    if controlPlaneLib ? ${system} then
-      let
-        systemLib = builtins.getAttr system controlPlaneLib;
-      in
-      if systemLib ? build then
-        systemLib.build {
-          input = forwardingOut;
-          inventory = inventoryRaw;
-        }
-      else
-        throw ''
-          fabric-input-loader:
-
-          network-control-plane-model.lib.${system} exists but has no `build`.
-
-          Available keys:
-          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames systemLib)}
-        ''
-    else if controlPlaneLib ? controlPlaneModel then
-      controlPlaneLib.controlPlaneModel {
-        input = forwardingOut;
-        inventory = inventoryRaw;
-      }
-    else
-      throw ''
-        fabric-input-loader:
-
-        Unsupported network-control-plane-model API.
-
-        Available keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames controlPlaneLib)}
-      '';
+    inputs.network-control-plane-model.lib.${system}.build {
+      input = forwardingOut;
+      inventory = globalInventory;
+    };
 in
 {
   _module.args = {
