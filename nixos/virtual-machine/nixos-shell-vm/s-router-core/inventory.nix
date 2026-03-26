@@ -1,3 +1,4 @@
+# ./inventory.nix
 {
   deployment = {
     hosts = {
@@ -15,6 +16,28 @@
             mode = "vlan";
             vlan = 5;
             bridge = "br-upstream";
+
+            ipv6 = {
+              enable = true;
+
+              # IPv6 Router Advertisements / SLAAC on the WAN interface.
+              acceptRA = true;
+
+              # Set to true if the ISP uses stateful DHCPv6 on the WAN link.
+              dhcp = false;
+
+              # Set to true if you want DHCPv6 Prefix Delegation.
+              dhcpv6PD = false;
+            };
+
+            # Uncomment and fill these only when using PPPoE.
+            # pppoe = {
+            #   enable = true;
+            #   usernameSecret = "pppoe-username";
+            #   passwordSecret = "pppoe-password";
+            #   mtu = 1492;
+            #   mru = 1492;
+            # };
           };
 
           fabric = {

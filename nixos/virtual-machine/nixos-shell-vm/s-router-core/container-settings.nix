@@ -1,5 +1,3 @@
-# ./container-settings.nix
-# ./s-router-core/container-settings.nix
 {
   config,
   pkgs,
@@ -400,7 +398,7 @@ let
         };
 
         specialArgs = {
-          inherit fabricNodeContext containerName pppoeConfig transitBridge;
+          inherit fabricNodeContext containerName wanConfig transitBridge;
           realizationNode = realizationNodeForUnit unitName;
         };
 

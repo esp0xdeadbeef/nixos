@@ -77,6 +77,44 @@ let
         iface:
         ${builtins.toJSON iface}
       '';
+
+  ifaceRoutes =
+    if iface ? routes && builtins.isAttrs iface.routes then
+      iface.routes
+    else
+      { };
+
+  mkStaticRoutes =
+    family:
+    let
+      routeKey = if family == 4 then "ipv4" else "ipv6";
+      viaKey = if family == 4 then "via4" else "via6";
+      rawRoutes =
+        if builtins.hasAttr routeKey ifaceRoutes && builtins.isList ifaceRoutes.${routeKey} then
+          ifaceRoutes.${routeKey}
+        else
+          [ ];
+    in
+    map (
+      route:
+      {
+        Destination = route.dst;
+        Gateway = route.${viaKey};
+        GatewayOnLink = true;
+      }
+    ) (
+      builtins.filter (
+        route:
+        builtins.isAttrs route
+        && (route.proto or null) != "connected"
+        && route ? dst
+        && builtins.isString route.dst
+        && builtins.hasAttr viaKey route
+        && builtins.isString route.${viaKey}
+      ) rawRoutes
+    );
+
+  staticRoutes = (mkStaticRoutes 4) ++ (mkStaticRoutes 6);
 in
 {
   systemd.network.networks."20-${ifName}" = {
@@ -86,6 +124,8 @@ in
       { Address = addr4; }
       { Address = addr6; }
     ];
+
+    routes = staticRoutes;
 
     networkConfig = {
       IPv4Forwarding = true;

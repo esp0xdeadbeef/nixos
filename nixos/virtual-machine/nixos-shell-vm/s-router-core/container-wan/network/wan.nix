@@ -1,51 +1,116 @@
-{ lib, pkgs, containerName, pppoeConfig ? { }, ... }:
+{ lib, pkgs, containerName, wanConfig ? { }, ... }:
 
 let
   ifName = "${containerName}-wan";
 
-  cfg = pppoeConfig;
+  cfg = wanConfig;
 
-  enabled =
-    if cfg ? enable then
-      cfg.enable
+  pppoe =
+    if cfg ? pppoe && builtins.isAttrs cfg.pppoe then
+      cfg.pppoe
+    else
+      { enable = false; };
+
+  pppoeEnabled =
+    if pppoe ? enable then
+      pppoe.enable
     else
       false;
 
   usernameSecret =
-    if cfg ? usernameSecret && builtins.isString cfg.usernameSecret then
-      cfg.usernameSecret
+    if pppoeEnabled then
+      if pppoe ? usernameSecret && builtins.isString pppoe.usernameSecret then
+        pppoe.usernameSecret
+      else
+        throw "pppoe.usernameSecret must be defined"
     else
-      throw "pppoe.usernameSecret must be defined";
+      null;
 
   passwordSecret =
-    if cfg ? passwordSecret && builtins.isString cfg.passwordSecret then
-      cfg.passwordSecret
+    if pppoeEnabled then
+      if pppoe ? passwordSecret && builtins.isString pppoe.passwordSecret then
+        pppoe.passwordSecret
+      else
+        throw "pppoe.passwordSecret must be defined"
     else
-      throw "pppoe.passwordSecret must be defined";
+      null;
 
   mtu =
-    if cfg ? mtu then
-      cfg.mtu
+    if pppoeEnabled then
+      if pppoe ? mtu then
+        pppoe.mtu
+      else
+        throw "pppoe.mtu must be defined"
     else
-      throw "pppoe.mtu must be defined";
+      null;
 
   mru =
-    if cfg ? mru then
-      cfg.mru
+    if pppoeEnabled then
+      if pppoe ? mru then
+        pppoe.mru
+      else
+        throw "pppoe.mru must be defined"
     else
-      throw "pppoe.mru must be defined";
+      null;
 
   ipv6 =
     if cfg ? ipv6 && builtins.isAttrs cfg.ipv6 then
       cfg.ipv6
+    else if pppoe ? ipv6 && builtins.isAttrs pppoe.ipv6 then
+      pppoe.ipv6
     else
       { };
+
+  ipv6Enabled =
+    if ipv6 ? enable then
+      ipv6.enable
+    else
+      false;
+
+  ipv6AcceptRA =
+    if ipv6 ? acceptRA then
+      ipv6.acceptRA
+    else
+      ipv6Enabled && !pppoeEnabled;
+
+  dhcpv6OnWan =
+    if ipv6 ? dhcp then
+      ipv6.dhcp
+    else
+      false;
 
   dhcpv6PD =
     if ipv6 ? dhcpv6PD then
       ipv6.dhcpv6PD
     else
       false;
+
+  dhcpMode =
+    if pppoeEnabled then
+      "no"
+    else if ipv6Enabled && dhcpv6OnWan then
+      "yes"
+    else
+      "ipv4";
+
+  linkLocalMode =
+    if ipv6Enabled || pppoeEnabled then
+      "yes"
+    else
+      "ipv4";
+
+  dhcpv6PDIfName =
+    if pppoeEnabled then
+      "ppp0"
+    else
+      ifName;
+
+  pppoePeerIpv6Lines =
+    lib.optionalString ipv6Enabled ''
+      +ipv6
+      ipv6cp-accept-local
+      ipv6cp-accept-remote
+    '';
 in
 {
   systemd.network.networks =
@@ -53,41 +118,39 @@ in
       "10-${ifName}" = {
         matchConfig.Name = ifName;
 
-        networkConfig =
-          {
-            IPv4Forwarding = true;
-            IPv6Forwarding = true;
-            ConfigureWithoutCarrier = true;
-          }
-          // lib.optionalAttrs (!enabled) {
-            DHCP = "ipv4";
-            IPv6AcceptRA = true;
-          }
-          // lib.optionalAttrs enabled {
-            DHCP = "no";
-            IPv6AcceptRA = false;
-          };
+        networkConfig = {
+          IPv4Forwarding = true;
+          IPv6Forwarding = ipv6Enabled;
+          ConfigureWithoutCarrier = true;
+          DHCP = dhcpMode;
+          IPv6AcceptRA = ipv6AcceptRA;
+          LinkLocalAddressing = linkLocalMode;
+        };
       };
     }
-    // lib.optionalAttrs enabled {
+    // lib.optionalAttrs pppoeEnabled {
       "11-ppp0" = {
         matchConfig.Name = "ppp0";
 
         networkConfig = {
           ConfigureWithoutCarrier = true;
-          IPv6AcceptRA = true;
+          IPv6AcceptRA = false;
           IPv4Forwarding = true;
-          IPv6Forwarding = true;
+          IPv6Forwarding = ipv6Enabled;
           DHCP = "no";
-          LinkLocalAddressing = "ipv6";
+          LinkLocalAddressing =
+            if ipv6Enabled then
+              "ipv6"
+            else
+              "no";
         };
       };
     };
 
   systemd.services = lib.mkMerge [
-    (lib.optionalAttrs enabled {
+    (lib.optionalAttrs pppoeEnabled {
       pppoe-wan = {
-        description = "PPPoE WAN (IPv4 + IPv6)";
+        description = "PPPoE WAN";
         wantedBy = [ "multi-user.target" ];
         after = [ "systemd-networkd.service" ];
         requires = [ "systemd-networkd.service" ];
@@ -136,11 +199,7 @@ in
 
             defaultroute
             persist
-
-            +ipv6
-            ipv6cp-accept-local
-            ipv6cp-accept-remote
-
+            ${pppoePeerIpv6Lines}
             mtu ${toString mtu}
             mru ${toString mru}
             EOF
@@ -156,15 +215,23 @@ in
       };
     })
 
-    (lib.optionalAttrs (enabled && dhcpv6PD) {
+    (lib.optionalAttrs dhcpv6PD {
       dhcpcd-ipv6 = {
         description = "DHCPv6 Prefix Delegation client";
         wantedBy = [ "multi-user.target" ];
-        after = [ "pppoe-wan.service" ];
-        wants = [ "pppoe-wan.service" ];
+        after =
+          if pppoeEnabled then
+            [ "pppoe-wan.service" ]
+          else
+            [ "systemd-networkd.service" ];
+        wants =
+          if pppoeEnabled then
+            [ "pppoe-wan.service" ]
+          else
+            [ "systemd-networkd.service" ];
 
         serviceConfig = {
-          ExecStart = "${pkgs.dhcpcd}/bin/dhcpcd -6 -d -B -f /etc/dhcpcd.conf ppp0";
+          ExecStart = "${pkgs.dhcpcd}/bin/dhcpcd -6 -d -B -f /etc/dhcpcd.conf ${dhcpv6PDIfName}";
           Restart = "always";
           RestartSec = 2;
         };
@@ -172,7 +239,7 @@ in
     })
   ];
 
-  environment.etc = lib.optionalAttrs (enabled && dhcpv6PD) {
+  environment.etc = lib.optionalAttrs dhcpv6PD {
     "dhcpcd.conf" = {
       mode = "0644";
       text = ''
@@ -184,7 +251,7 @@ in
         noipv4
         ipv6only
 
-        interface ppp0
+        interface ${dhcpv6PDIfName}
           iaid 1
           ia_pd 1
       '';
