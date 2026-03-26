@@ -5,6 +5,7 @@
   vlanId,
   outPath,
   fabricNodeContext,
+  tenantNetwork ? null,
   ...
 }:
 
@@ -63,34 +64,42 @@ let
           Cannot derive DHCP pool from subnet '${cidr}'.
         '';
 
-  tenantNetworks =
-    if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
-      fabricNodeContext.networks
+  tenantNetworkResolved =
+    if tenantNetwork != null
+      && builtins.isAttrs tenantNetwork
+      && tenantNetwork ? ipv4
+      && builtins.isString tenantNetwork.ipv4
+    then
+      tenantNetwork
     else
-      { };
+      let
+        tenantNetworks =
+          if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
+            fabricNodeContext.networks
+          else
+            { };
 
-  tenantNetworkNames =
-    builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+        tenantNetworkNames =
+          builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+      in
+      if builtins.length tenantNetworkNames == 1 then
+        tenantNetworks.${builtins.head tenantNetworkNames}
+      else
+        throw ''
+          kea:
 
-  tenantNetwork =
-    if builtins.length tenantNetworkNames == 1 then
-      tenantNetworks.${builtins.head tenantNetworkNames}
-    else
-      throw ''
-        kea:
+          Expected exactly 1 tenant network for access node.
 
-        Expected exactly 1 tenant network for access node.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
-      '';
+          Found:
+          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
+        '';
 
   lanIf = "lan-${toString vlanId}";
   lanName = "lan${toString vlanId}";
 
-  subnet = tenantNetwork.ipv4;
-  router4 = firstIPv4InSubnet tenantNetwork.ipv4;
-  pool = poolForSubnet tenantNetwork.ipv4;
+  subnet = tenantNetworkResolved.ipv4;
+  router4 = firstIPv4InSubnet tenantNetworkResolved.ipv4;
+  pool = poolForSubnet tenantNetworkResolved.ipv4;
 
   domainRaw = site.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";

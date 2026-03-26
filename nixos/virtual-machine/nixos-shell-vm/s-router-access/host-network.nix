@@ -1,610 +1,716 @@
 {
   config,
   lib,
-  fabricCompiled,
+  globalInventory,
+  controlPlaneOut,
   ...
 }:
 
 let
-  inventoryImported = import ./inventory.nix;
-  inventory =
-    if builtins.isFunction inventoryImported then
-      inventoryImported { inherit lib; }
-    else
-      inventoryImported;
-
+  inventory = globalInventory;
   hostname = config.networking.hostName;
+
+  renderHosts =
+    if inventory ? render
+      && builtins.isAttrs inventory.render
+      && inventory.render ? hosts
+      && builtins.isAttrs inventory.render.hosts
+    then
+      inventory.render.hosts
+    else
+      { };
+
+  renderHostConfig =
+    if builtins.hasAttr hostname renderHosts && builtins.isAttrs renderHosts.${hostname} then
+      renderHosts.${hostname}
+    else
+      { };
 
   deploymentHosts =
     if inventory ? deployment
-       && builtins.isAttrs inventory.deployment
-       && inventory.deployment ? host
-       && builtins.isAttrs inventory.deployment.host
+      && builtins.isAttrs inventory.deployment
+      && inventory.deployment ? hosts
+      && builtins.isAttrs inventory.deployment.hosts
     then
-      inventory.deployment.host
+      inventory.deployment.hosts
     else
       throw ''
         host-network:
 
-        inventory.deployment.host missing.
+        inventory.deployment.hosts missing.
 
         inventory:
         ${builtins.toJSON inventory}
       '';
 
-  hostConfig =
-    if builtins.hasAttr hostname deploymentHosts then
-      deploymentHosts.${hostname}
+  deploymentHostNames = lib.sort builtins.lessThan (builtins.attrNames deploymentHosts);
+
+  deploymentHostName =
+    if renderHostConfig ? deploymentHost
+      && builtins.isString renderHostConfig.deploymentHost
+      && builtins.hasAttr renderHostConfig.deploymentHost deploymentHosts
+    then
+      renderHostConfig.deploymentHost
+    else if builtins.hasAttr hostname deploymentHosts then
+      hostname
+    else if builtins.length deploymentHostNames == 1 then
+      builtins.head deploymentHostNames
     else
       throw ''
         host-network:
 
-        inventory.deployment.host.${hostname} missing.
+        inventory.deployment host for '${hostname}' missing, and fallback is ambiguous.
+
+        Current hostname:
+        ${hostname}
 
         Known deployment hosts:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames deploymentHosts)}
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ deploymentHostNames)}
       '';
 
-  uplink =
-    if hostConfig ? uplink && builtins.isAttrs hostConfig.uplink then
-      hostConfig.uplink
+  hostConfig = deploymentHosts.${deploymentHostName};
+
+  uplinks =
+    if hostConfig ? uplinks && builtins.isAttrs hostConfig.uplinks then
+      hostConfig.uplinks
     else
       throw ''
         host-network:
 
-        inventory.deployment.host.${hostname}.uplink missing.
+        inventory.deployment.hosts.${deploymentHostName}.uplinks missing.
 
         host config:
         ${builtins.toJSON hostConfig}
       '';
 
-  mgmt =
-    if uplink ? management && builtins.isAttrs uplink.management then
-      uplink.management
-    else
-      throw ''
-        host-network:
-
-        inventory.deployment.host.${hostname}.uplink.management missing.
-
-        uplink config:
-        ${builtins.toJSON uplink}
-      '';
-
-  trunkParent =
-    if uplink ? parent && builtins.isString uplink.parent then
-      uplink.parent
-    else
-      throw ''
-        host-network:
-
-        uplink.parent missing or not a string.
-
-        uplink config:
-        ${builtins.toJSON uplink}
-      '';
-
-  mgmtVlan =
-    if mgmt ? vlan then
-      mgmt.vlan
-    else
-      throw ''
-        host-network:
-
-        uplink.management.vlan missing.
-
-        management config:
-        ${builtins.toJSON mgmt}
-      '';
-
-  mgmtBridge =
-    if mgmt ? bridge && builtins.isString mgmt.bridge then
-      mgmt.bridge
-    else
-      throw ''
-        host-network:
-
-        uplink.management.bridge missing or not a string.
-
-        management config:
-        ${builtins.toJSON mgmt}
-      '';
-
-  mgmtAddressing =
-    if mgmt ? addressing && builtins.isAttrs mgmt.addressing then
-      mgmt.addressing
-    else
-      {
-        ipv4 = { mode = "dhcp"; };
-        ipv6 = { mode = "disabled"; };
-      };
-
-  mgmtIPv4 =
-    if mgmtAddressing ? ipv4 && builtins.isAttrs mgmtAddressing.ipv4 then
-      mgmtAddressing.ipv4
-    else
-      { mode = "dhcp"; };
-
-  mgmtIPv6 =
-    if mgmtAddressing ? ipv6 && builtins.isAttrs mgmtAddressing.ipv6 then
-      mgmtAddressing.ipv6
-    else
-      { mode = "disabled"; };
-
-  mgmtIPv4Mode =
-    if mgmtIPv4 ? mode && builtins.isString mgmtIPv4.mode then
-      mgmtIPv4.mode
-    else
-      "dhcp";
-
-  mgmtIPv6Mode =
-    if mgmtIPv6 ? mode && builtins.isString mgmtIPv6.mode then
-      mgmtIPv6.mode
-    else
-      "disabled";
-
-  _validateIPv4Mode =
-    if builtins.elem mgmtIPv4Mode [ "dhcp" "static" "disabled" ] then
-      true
-    else
-      throw ''
-        host-network:
-
-        Unsupported management.addressing.ipv4.mode '${mgmtIPv4Mode}'.
-        Supported: dhcp, static, disabled
-      '';
-
-  _validateIPv6Mode =
-    if builtins.elem mgmtIPv6Mode [ "dhcp" "static" "ra-only" "disabled" ] then
-      true
-    else
-      throw ''
-        host-network:
-
-        Unsupported management.addressing.ipv6.mode '${mgmtIPv6Mode}'.
-        Supported: dhcp, static, ra-only, disabled
-      '';
-
-  mgmtVlanIf = "${trunkParent}.${toString mgmtVlan}";
-
-  inventoryFabric =
-    if inventory ? fabric && builtins.isAttrs inventory.fabric then
-      inventory.fabric
+  bridgeNetworks =
+    if hostConfig ? bridgeNetworks && builtins.isAttrs hostConfig.bridgeNetworks then
+      hostConfig.bridgeNetworks
     else
       { };
 
-  enterprises =
-    if fabricCompiled ? enterprise && builtins.isAttrs fabricCompiled.enterprise then
-      fabricCompiled.enterprise
+  realizationNodes =
+    if inventory ? realization
+      && builtins.isAttrs inventory.realization
+      && inventory.realization ? nodes
+      && builtins.isAttrs inventory.realization.nodes
+    then
+      inventory.realization.nodes
     else
-      throw ''
-        host-network:
+      { };
 
-        fabricCompiled.enterprise missing.
-      '';
-
-  enterpriseName =
-    let
-      names = builtins.attrNames enterprises;
-    in
-    if builtins.length names == 1 then
-      builtins.head names
+  cpmData =
+    if controlPlaneOut ? control_plane_model
+      && builtins.isAttrs controlPlaneOut.control_plane_model
+      && controlPlaneOut.control_plane_model ? data
+      && builtins.isAttrs controlPlaneOut.control_plane_model.data
+    then
+      controlPlaneOut.control_plane_model.data
     else
-      throw ''
-        host-network:
+      { };
 
-        Expected exactly 1 enterprise.
+  sortedAttrNames = attrs: lib.sort builtins.lessThan (builtins.attrNames attrs);
 
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
-      '';
-
-  enterprise = enterprises.${enterpriseName};
-
-  sites =
-    if enterprise ? site && builtins.isAttrs enterprise.site then
-      enterprise.site
-    else
-      throw ''
-        host-network:
-
-        enterprise.site missing for '${enterpriseName}'.
-      '';
-
-  siteName =
-    let
-      names = builtins.attrNames sites;
-    in
-    if builtins.length names == 1 then
-      builtins.head names
-    else
-      throw ''
-        host-network:
-
-        Expected exactly 1 site for enterprise '${enterpriseName}'.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
-      '';
-
-  site = sites.${siteName};
-
-  nodes =
-    if site ? nodes && builtins.isAttrs site.nodes then
-      site.nodes
-    else
-      throw ''
-        host-network:
-
-        site.nodes missing for ${enterpriseName}.${siteName}
-      '';
-
-  attrValues =
-    attrs: map (name: attrs.${name}) (builtins.attrNames attrs);
-
-  splitCIDR =
-    cidr:
+  siteEntries =
+    lib.concatMap (
+      enterpriseName:
       let
-        parts = lib.splitString "/" cidr;
+        enterprise = cpmData.${enterpriseName};
       in
-      if builtins.length parts == 2 then
+      map (
+        siteName:
         {
-          address = builtins.elemAt parts 0;
-          prefix = builtins.elemAt parts 1;
+          inherit enterpriseName siteName;
+          site = enterprise.${siteName};
         }
-      else
-        throw ''
-          host-network:
+      ) (sortedAttrNames enterprise)
+    ) (sortedAttrNames cpmData);
 
-          invalid CIDR '${cidr}'
-        '';
+  runtimeTargets =
+    lib.foldl' (
+      acc: entry:
+      acc // (
+        if entry.site ? runtimeTargets && builtins.isAttrs entry.site.runtimeTargets then
+          entry.site.runtimeTargets
+        else
+          { }
+      )
+    ) { } siteEntries;
 
-  parseTenantVlanFromIPv4CIDR =
-    cidr:
-      let
-        ip = (splitCIDR cidr).address;
-        octets = lib.splitString "." ip;
-      in
-      if builtins.length octets == 4 then
-        builtins.fromJSON (builtins.elemAt octets 2)
-      else
-        throw ''
-          host-network:
-
-          cannot derive tenant VLAN from IPv4 CIDR '${cidr}'
-        '';
-
-  unitBelongsToHost =
-    unitName:
-      unitName == hostname
-      || lib.hasPrefix "${hostname}-" unitName;
-
-  localFabricUnits =
-    builtins.filter unitBelongsToHost (builtins.attrNames inventoryFabric);
-
-  unitPorts =
-    unitName:
-      let
-        node = inventoryFabric.${unitName};
-      in
-      if node ? ports && builtins.isAttrs node.ports then
-        node.ports
-      else
-        throw ''
-          host-network:
-
-          inventory.fabric.${unitName}.ports missing or not an attrset.
-        '';
-
-  tenantPortForUnit =
-    unitName:
-      let
-        ports = unitPorts unitName;
-        tenantPorts =
-          builtins.filter (
-            port:
-              builtins.isAttrs port
-              && port ? attachment
-              && builtins.isAttrs port.attachment
-              && (port.attachment.kind or null) == "tenant"
-              && (port.attachment ? name)
-          ) (attrValues ports);
-      in
-      if tenantPorts != [ ] then
-        builtins.head tenantPorts
-      else
-        throw ''
-          host-network:
-
-          No tenant-facing inventory port found for unit '${unitName}'.
-
-          inventory.fabric.${unitName}.ports:
-          ${builtins.toJSON ports}
-        '';
+  runtimeTargetNames = sortedAttrNames runtimeTargets;
 
   tenantNameForUnit =
     unitName:
-      (tenantPortForUnit unitName).attachment.name;
+    let
+      target =
+        if builtins.hasAttr unitName runtimeTargets then
+          runtimeTargets.${unitName}
+        else
+          { };
 
-  nodeContextForUnit =
+      logicalName =
+        if target ? logicalNode
+          && builtins.isAttrs target.logicalNode
+          && target.logicalNode ? name
+          && builtins.isString target.logicalNode.name
+        then
+          target.logicalNode.name
+        else if builtins.hasAttr unitName realizationNodes
+          && realizationNodes.${unitName} ? logicalNode
+          && builtins.isAttrs realizationNodes.${unitName}.logicalNode
+          && realizationNodes.${unitName}.logicalNode ? name
+          && builtins.isString realizationNodes.${unitName}.logicalNode.name
+        then
+          realizationNodes.${unitName}.logicalNode.name
+        else
+          unitName;
+    in
+    if lib.hasPrefix "s-router-access-" logicalName then
+      builtins.substring
+        (builtins.stringLength "s-router-access-")
+        (builtins.stringLength logicalName - builtins.stringLength "s-router-access-")
+        logicalName
+    else
+      null;
+
+  siteEntryForUnit =
     unitName:
-      if builtins.hasAttr unitName nodes then
-        nodes.${unitName}
-      else
-        throw ''
-          host-network:
+    let
+      tenantName = tenantNameForUnit unitName;
 
-          Missing CPM node context for unit '${unitName}'.
-        '';
+      matches =
+        builtins.filter (
+          entry:
+          tenantName != null
+          && entry.site ? attachments
+          && builtins.isList entry.site.attachments
+          && builtins.any (
+            attachment:
+            builtins.isAttrs attachment
+            && (attachment.kind or null) == "tenant"
+            && (attachment.name or null) == tenantName
+            && (attachment.unit or null) == unitName
+          ) entry.site.attachments
+        ) siteEntries;
+    in
+    if builtins.length matches == 1 then
+      builtins.head matches
+    else
+      null;
 
-  tenantNetworkForUnit =
+  tenantDomainForUnit =
     unitName:
+    let
+      tenantName = tenantNameForUnit unitName;
+      siteEntry = siteEntryForUnit unitName;
+      site =
+        if siteEntry != null then
+          siteEntry.site
+        else
+          null;
+
+      domains =
+        if site != null
+          && site ? domains
+          && builtins.isAttrs site.domains
+          && site.domains ? tenants
+          && builtins.isList site.domains.tenants
+        then
+          site.domains.tenants
+        else
+          [ ];
+
+      matches =
+        builtins.filter (
+          domain:
+          builtins.isAttrs domain
+          && (domain.name or null) == tenantName
+          && domain ? ipv4
+          && builtins.isString domain.ipv4
+        ) domains;
+    in
+    if builtins.length matches == 1 then
+      builtins.head matches
+    else
+      null;
+
+  vlanFromCIDR =
+    cidr:
+    let
+      addr = builtins.elemAt (lib.splitString "/" cidr) 0;
+      octets = lib.splitString "." addr;
+    in
+    if builtins.length octets == 4 then
+      builtins.fromJSON (builtins.elemAt octets 2)
+    else
+      throw ''
+        host-network:
+
+        Cannot derive VLAN from IPv4 CIDR '${cidr}'.
+      '';
+
+  localAccessUnits =
+    lib.filter (
+      unitName:
       let
-        tenantName = tenantNameForUnit unitName;
-        node = nodeContextForUnit unitName;
-        networks =
-          if node ? networks && builtins.isAttrs node.networks then
-            node.networks
+        target =
+          if builtins.hasAttr unitName runtimeTargets then
+            runtimeTargets.${unitName}
           else
             { };
+
+        logicalName =
+          if target ? logicalNode
+            && builtins.isAttrs target.logicalNode
+            && target.logicalNode ? name
+            && builtins.isString target.logicalNode.name
+          then
+            target.logicalNode.name
+          else
+            null;
+
+        role =
+          if target ? role && builtins.isString target.role then
+            target.role
+          else
+            null;
+
+        placementHost =
+          if target ? placement
+            && builtins.isAttrs target.placement
+            && target.placement ? host
+            && builtins.isString target.placement.host
+          then
+            target.placement.host
+          else
+            null;
+
+        realizationHost =
+          if builtins.hasAttr unitName realizationNodes
+            && realizationNodes.${unitName} ? host
+            && builtins.isString realizationNodes.${unitName}.host
+          then
+            realizationNodes.${unitName}.host
+          else
+            null;
       in
-      if builtins.hasAttr tenantName networks then
-        networks.${tenantName}
-      else
-        throw ''
-          host-network:
+      (role == "access" || (logicalName != null && lib.hasPrefix "s-router-access-" logicalName))
+      && (
+        placementHost == deploymentHostName
+        || realizationHost == deploymentHostName
+      )
+    ) runtimeTargetNames;
 
-          CPM node '${unitName}' has no tenant network '${tenantName}'.
+  uplinkNames = lib.sort builtins.lessThan (builtins.attrNames uplinks);
 
-          Known node networks:
-          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames networks)}
-        '';
+  trunkParent =
+    let
+      names = lib.unique (map (uplinkName: uplinks.${uplinkName}.parent) uplinkNames);
+    in
+    if builtins.length names == 1 then
+      builtins.head names
+    else
+      throw ''
+        host-network:
 
-  tenantVlanForUnit =
-    unitName:
-      parseTenantVlanFromIPv4CIDR (tenantNetworkForUnit unitName).ipv4;
+        Expected exactly 1 parent uplink for access host.
 
-  transitVlanForUnit =
-    unitName:
-      let
-        ports = unitPorts unitName;
-        transitPorts =
-          builtins.filter (
-            port:
+        Parents:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
+      '';
+
+  tenantBridgeSpecs =
+    lib.unique (
+      map (
+        unitName:
+        let
+          domain = tenantDomainForUnit unitName;
+          vlan =
+            if domain != null then
+              vlanFromCIDR domain.ipv4
+            else
+              throw ''
+                host-network:
+
+                Could not resolve tenant domain for local access unit '${unitName}'.
+              '';
+        in
+        {
+          bridge = "br-lan-${toString vlan}";
+          vlanIf = "${trunkParent}.${toString vlan}";
+          vlan = vlan;
+        }
+      ) localAccessUnits
+    );
+
+  synthesizedTransitLinks =
+    lib.unique (
+      lib.concatMap (
+        nodeName:
+        let
+          node = realizationNodes.${nodeName};
+          ports =
+            if node ? ports && builtins.isAttrs node.ports then
+              node.ports
+            else
+              { };
+        in
+        if (node.host or null) == deploymentHostName then
+          lib.concatMap (
+            portName:
+            let
+              port = ports.${portName};
+            in
+            lib.optionals (
               builtins.isAttrs port
-              && (port ? link)
-              && (port ? vlan)
-          ) (attrValues ports);
+              && port ? link
+              && builtins.isString port.link
+              && port ? attach
+              && builtins.isAttrs port.attach
+              && (port.attach.kind or null) == "direct"
+            ) [
+              port.link
+            ]
+          ) (builtins.attrNames ports)
+        else
+          [ ]
+      ) (builtins.attrNames realizationNodes)
+    );
+
+  transitBridges =
+    if hostConfig ? transitBridges && builtins.isAttrs hostConfig.transitBridges then
+      hostConfig.transitBridges
+    else
+      builtins.listToAttrs (
+        map (
+          linkName:
+          {
+            name = linkName;
+            value = {
+              name = linkName;
+            };
+          }
+        ) synthesizedTransitLinks
+      );
+
+  transitNames = lib.sort builtins.lessThan (builtins.attrNames transitBridges);
+
+  parentNames =
+    lib.unique (
+      map (uplinkName: uplinks.${uplinkName}.parent) uplinkNames
+    );
+
+  bridgeNetworkFor =
+    bridge:
+    if builtins.hasAttr bridge bridgeNetworks then
+      bridgeNetworks.${bridge}
+    else
+      { ConfigureWithoutCarrier = true; };
+
+  transitNamesForUplink =
+    uplinkName:
+    lib.filter (
+      transitName:
+      let
+        transit = transitBridges.${transitName};
       in
-      if transitPorts != [ ] then
-        (builtins.head transitPorts).vlan
-      else
-        throw ''
-          host-network:
+      (transit.parentUplink or null) == uplinkName
+    ) transitNames;
 
-          No transit inventory port found for unit '${unitName}'.
+  vlanIfNameFor =
+    uplinkName:
+    let
+      uplink = uplinks.${uplinkName};
+    in
+    if (uplink.mode or "") == "vlan" then
+      "${uplink.parent}.${toString uplink.vlan}"
+    else
+      null;
 
-          inventory.fabric.${unitName}.ports:
-          ${builtins.toJSON ports}
-        '';
+  uplinkNetdevsBase = builtins.listToAttrs (
+    lib.concatMap (
+      uplinkName:
+      let
+        uplink = uplinks.${uplinkName};
+        transitNamesOnUplink = transitNamesForUplink uplinkName;
+        vlanIfName = vlanIfNameFor uplinkName;
+      in
+      [
+        {
+          name = "10-${uplink.bridge}";
+          value = {
+            netdevConfig = {
+              Name = uplink.bridge;
+              Kind = "bridge";
+            };
+          };
+        }
+      ]
+      ++ lib.optionals ((uplink.mode or "") == "vlan") [
+        {
+          name = "11-${vlanIfName}";
+          value = {
+            netdevConfig = {
+              Name = vlanIfName;
+              Kind = "vlan";
+            };
+            vlanConfig.Id = uplink.vlan;
+          };
+        }
+      ]
+      ++ lib.optionals ((uplink.mode or "") == "trunk") (
+        map (
+          transitName:
+          let
+            transit = transitBridges.${transitName};
+            transitVlanIfName = "${uplink.bridge}.${toString transit.vlan}";
+          in
+          {
+            name = "12-${transitVlanIfName}";
+            value = {
+              netdevConfig = {
+                Name = transitVlanIfName;
+                Kind = "vlan";
+              };
+              vlanConfig.Id = transit.vlan;
+            };
+          }
+        ) transitNamesOnUplink
+      )
+    ) uplinkNames
+  );
 
-  tenantVlans =
-    lib.unique (
-      map tenantVlanForUnit localFabricUnits
+  tenantNetdevs =
+    builtins.listToAttrs (
+      lib.concatMap (
+        spec:
+        [
+          {
+            name = "13-${spec.bridge}";
+            value = {
+              netdevConfig = {
+                Name = spec.bridge;
+                Kind = "bridge";
+              };
+            };
+          }
+          {
+            name = "14-${spec.vlanIf}";
+            value = {
+              netdevConfig = {
+                Name = spec.vlanIf;
+                Kind = "vlan";
+              };
+              vlanConfig.Id = spec.vlan;
+            };
+          }
+        ]
+      ) tenantBridgeSpecs
     );
 
-  transitVlans =
-    lib.unique (
-      map transitVlanForUnit localFabricUnits
+  uplinkNetdevs = uplinkNetdevsBase // tenantNetdevs;
+
+  uplinkParentNetworks =
+    builtins.listToAttrs (
+      let
+        parentEntries =
+          map (
+            parentIf:
+            let
+              uplinksOnParent =
+                lib.filter (uplinkName: uplinks.${uplinkName}.parent == parentIf) uplinkNames;
+
+              vlanChildren =
+                (lib.filter (name: name != null) (map vlanIfNameFor uplinksOnParent))
+                ++ (map (spec: spec.vlanIf) tenantBridgeSpecs);
+
+              directBridgeUplinks =
+                lib.filter (
+                  uplinkName:
+                  let
+                    mode = uplinks.${uplinkName}.mode or "";
+                  in
+                  mode != "vlan"
+                ) uplinksOnParent;
+
+              _singleDirectBridge =
+                if builtins.length directBridgeUplinks <= 1 then
+                  true
+                else
+                  throw ''
+                    host-network: multiple non-vlan uplinks on parent '${parentIf}' are not supported
+
+                    uplinks:
+                    ${builtins.concatStringsSep "\n  - " ([ "" ] ++ directBridgeUplinks)}
+                  '';
+            in
+            {
+              name = "20-${parentIf}";
+              value = {
+                matchConfig.Name = parentIf;
+                networkConfig =
+                  {
+                    ConfigureWithoutCarrier = true;
+                  }
+                  // lib.optionalAttrs (vlanChildren != [ ]) {
+                    VLAN = vlanChildren;
+                  }
+                  // lib.optionalAttrs (builtins.length directBridgeUplinks == 1) {
+                    Bridge = uplinks.${builtins.head directBridgeUplinks}.bridge;
+                  };
+              };
+            }
+          ) parentNames;
+
+        vlanBridgeEntries =
+          lib.concatMap (
+            uplinkName:
+            let
+              uplink = uplinks.${uplinkName};
+              vlanIfName = vlanIfNameFor uplinkName;
+            in
+            lib.optionals ((uplink.mode or "") == "vlan") [
+              {
+                name = "21-${vlanIfName}";
+                value = {
+                  matchConfig.Name = vlanIfName;
+                  networkConfig = {
+                    Bridge = uplink.bridge;
+                    ConfigureWithoutCarrier = true;
+                  };
+                };
+              }
+            ]
+          ) uplinkNames;
+
+        tenantBridgeEntries =
+          map (
+            spec:
+            {
+              name = "22-${spec.vlanIf}";
+              value = {
+                matchConfig.Name = spec.vlanIf;
+                networkConfig = {
+                  Bridge = spec.bridge;
+                  ConfigureWithoutCarrier = true;
+                };
+              };
+            }
+          ) tenantBridgeSpecs;
+      in
+      parentEntries ++ vlanBridgeEntries ++ tenantBridgeEntries
     );
 
-  lanBridgeFor = vid: "br-lan-${toString vid}";
-  lanVlanIfFor = vid: "${trunkParent}.${toString vid}";
+  uplinkBridgeNetworks = builtins.listToAttrs (
+    map (
+      uplinkName:
+      let
+        uplink = uplinks.${uplinkName};
+        transitNamesOnUplink = transitNamesForUplink uplinkName;
+      in
+      {
+        name = "30-${uplink.bridge}";
+        value = {
+          matchConfig.Name = uplink.bridge;
+          networkConfig =
+            bridgeNetworkFor uplink.bridge
+            // lib.optionalAttrs ((uplink.mode or "") == "trunk" && transitNamesOnUplink != [ ]) {
+              VLAN = map (
+                transitName:
+                let
+                  transit = transitBridges.${transitName};
+                in
+                "${uplink.bridge}.${toString transit.vlan}"
+              ) transitNamesOnUplink;
+            };
+        };
+      }
+    ) uplinkNames
+  );
 
-  transitBridgeFor = vid: "br-tr-${toString vid}";
-  transitVlanIfFor = vid: "${trunkParent}.${toString vid}";
-
-  mgmtNetworkConfig = {
-    Bridge = mgmtBridge;
-    ConfigureWithoutCarrier = true;
-  };
-
-  mgmtBridgeNetworkConfig =
-    {
-      ConfigureWithoutCarrier = true;
-    }
-    //
-    (
-      if mgmtIPv4Mode == "dhcp" then
-        { DHCP = "ipv4"; }
-      else if mgmtIPv4Mode == "disabled" then
-        { }
-      else if mgmtIPv4Mode == "static" then
-        { DHCP = "no"; }
-      else
-        { }
-    )
-    //
-    (
-      if mgmtIPv6Mode == "dhcp" then
+  tenantBridgeNetworks =
+    builtins.listToAttrs (
+      map (
+        spec:
         {
-          DHCP = "yes";
-          IPv6AcceptRA = true;
+          name = "31-${spec.bridge}";
+          value = {
+            matchConfig.Name = spec.bridge;
+            networkConfig = {
+              ConfigureWithoutCarrier = true;
+            };
+          };
         }
-      else if mgmtIPv6Mode == "ra-only" then
-        {
-          DHCP = "ipv4";
-          IPv6AcceptRA = true;
-        }
-      else if mgmtIPv6Mode == "disabled" then
-        {
-          IPv6AcceptRA = false;
-          LinkLocalAddressing = "ipv4";
-        }
-      else if mgmtIPv6Mode == "static" then
-        {
-          IPv6AcceptRA = false;
-        }
-      else
-        { }
+      ) tenantBridgeSpecs
     );
 
-  mgmtBridgeAddresses =
-    []
-    ++ (if mgmtIPv4Mode == "static" then
-          map (addr: { Address = addr; }) (mgmtIPv4.addresses or [ ])
-        else
-          [ ])
-    ++ (if mgmtIPv6Mode == "static" then
-          map (addr: { Address = addr; }) (mgmtIPv6.addresses or [ ])
-        else
-          [ ]);
+  transitNetdevs = builtins.listToAttrs (
+    map (
+      transitName:
+      let
+        transit = transitBridges.${transitName};
+      in
+      {
+        name = "40-${transit.name}";
+        value = {
+          netdevConfig = {
+            Name = transit.name;
+            Kind = "bridge";
+          };
+        };
+      }
+    ) transitNames
+  );
 
-  mgmtBridgeRoutes =
-    []
-    ++ (if mgmtIPv4Mode == "static" && mgmtIPv4 ? gateway then
-          [ { Gateway = mgmtIPv4.gateway; } ]
-        else
-          [ ])
-    ++ (if mgmtIPv6Mode == "static" && mgmtIPv6 ? gateway then
-          [ { Gateway = mgmtIPv6.gateway; } ]
-        else
-          [ ]);
+  transitNetworks = builtins.listToAttrs (
+    lib.concatMap (
+      transitName:
+      let
+        transit = transitBridges.${transitName};
+        parentUplink = transit.parentUplink or null;
+      in
+      [
+        {
+          name = "50-${transit.name}";
+          value = {
+            matchConfig.Name = transit.name;
+            networkConfig.ConfigureWithoutCarrier = true;
+          };
+        }
+      ]
+      ++ lib.optionals (parentUplink != null && builtins.hasAttr parentUplink uplinks && (uplinks.${parentUplink}.mode or "") == "trunk") [
+        {
+          name =
+            let
+              uplink = uplinks.${parentUplink};
+              transitVlanIfName = "${uplink.bridge}.${toString transit.vlan}";
+            in
+            "51-${transitVlanIfName}";
+          value =
+            let
+              uplink = uplinks.${parentUplink};
+              transitVlanIfName = "${uplink.bridge}.${toString transit.vlan}";
+            in
+            {
+              matchConfig.Name = transitVlanIfName;
+              networkConfig = {
+                Bridge = transit.name;
+                ConfigureWithoutCarrier = true;
+              };
+            };
+        }
+      ]
+    ) transitNames
+  );
 in
 {
   networking.useNetworkd = true;
   systemd.network.enable = true;
 
-  systemd.network.netdevs =
-    lib.mkMerge (
-      [
-        {
-          "00-${mgmtBridge}" = {
-            netdevConfig = {
-              Name = mgmtBridge;
-              Kind = "bridge";
-            };
-          };
-        }
-        {
-          "01-${mgmtVlanIf}" = {
-            netdevConfig = {
-              Name = mgmtVlanIf;
-              Kind = "vlan";
-            };
-            vlanConfig.Id = mgmtVlan;
-          };
-        }
-      ]
-      ++
-      (map (vid: {
-        "10-${lanBridgeFor vid}" = {
-          netdevConfig = {
-            Name = lanBridgeFor vid;
-            Kind = "bridge";
-          };
-        };
-      }) tenantVlans)
-      ++
-      (map (vid: {
-        "11-${transitBridgeFor vid}" = {
-          netdevConfig = {
-            Name = transitBridgeFor vid;
-            Kind = "bridge";
-          };
-        };
-      }) transitVlans)
-      ++
-      (map (vid: {
-        "20-${lanVlanIfFor vid}" = {
-          netdevConfig = {
-            Name = lanVlanIfFor vid;
-            Kind = "vlan";
-          };
-          vlanConfig.Id = vid;
-        };
-      }) tenantVlans)
-      ++
-      (map (vid: {
-        "21-${transitVlanIfFor vid}" = {
-          netdevConfig = {
-            Name = transitVlanIfFor vid;
-            Kind = "vlan";
-          };
-          vlanConfig.Id = vid;
-        };
-      }) transitVlans)
-    );
-
+  systemd.network.netdevs = uplinkNetdevs // transitNetdevs;
   systemd.network.networks =
-    lib.mkMerge (
-      [
-        {
-          "00-${trunkParent}" = {
-            matchConfig.Name = trunkParent;
-            networkConfig = {
-              VLAN =
-                [ mgmtVlanIf ]
-                ++ (map lanVlanIfFor tenantVlans)
-                ++ (map transitVlanIfFor transitVlans);
-              ConfigureWithoutCarrier = true;
-            };
-          };
-        }
-
-        {
-          "05-${mgmtVlanIf}" = {
-            matchConfig.Name = mgmtVlanIf;
-            networkConfig = mgmtNetworkConfig;
-          };
-        }
-
-        {
-          "06-${mgmtBridge}" = {
-            matchConfig.Name = mgmtBridge;
-            networkConfig = mgmtBridgeNetworkConfig;
-            addresses = mgmtBridgeAddresses;
-            routes = mgmtBridgeRoutes;
-          };
-        }
-      ]
-      ++
-      (map (vid: {
-        "30-${lanVlanIfFor vid}" = {
-          matchConfig.Name = lanVlanIfFor vid;
-          networkConfig = {
-            Bridge = lanBridgeFor vid;
-            ConfigureWithoutCarrier = true;
-          };
-        };
-      }) tenantVlans)
-      ++
-      (map (vid: {
-        "31-${transitVlanIfFor vid}" = {
-          matchConfig.Name = transitVlanIfFor vid;
-          networkConfig = {
-            Bridge = transitBridgeFor vid;
-            ConfigureWithoutCarrier = true;
-          };
-        };
-      }) transitVlans)
-      ++
-      (map (vid: {
-        "40-${lanBridgeFor vid}" = {
-          matchConfig.Name = lanBridgeFor vid;
-          networkConfig = {
-            ConfigureWithoutCarrier = true;
-          };
-        };
-      }) tenantVlans)
-      ++
-      (map (vid: {
-        "41-${transitBridgeFor vid}" = {
-          matchConfig.Name = transitBridgeFor vid;
-          networkConfig = {
-            ConfigureWithoutCarrier = true;
-          };
-        };
-      }) transitVlans)
-    );
+    uplinkParentNetworks
+    // uplinkBridgeNetworks
+    // tenantBridgeNetworks
+    // transitNetworks;
 }

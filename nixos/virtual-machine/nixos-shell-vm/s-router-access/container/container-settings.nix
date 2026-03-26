@@ -2,129 +2,127 @@
   config,
   lib,
   outPath,
-  fabricCompiled,
+  controlPlaneOut,
+  globalInventory,
   ...
 }:
 
 let
   hostname = config.networking.hostName;
+  inventory = globalInventory;
 
-  inventoryImported = import ../inventory.nix;
-  inventory =
-    if builtins.isFunction inventoryImported then
-      inventoryImported { inherit lib; }
-    else
-      inventoryImported;
+  sortedAttrNames = attrs: lib.sort builtins.lessThan (builtins.attrNames attrs);
 
-  enterprises =
-    if fabricCompiled ? enterprise && builtins.isAttrs fabricCompiled.enterprise then
-      fabricCompiled.enterprise
+  cpmData =
+    if controlPlaneOut ? control_plane_model
+      && builtins.isAttrs controlPlaneOut.control_plane_model
+      && controlPlaneOut.control_plane_model ? data
+      && builtins.isAttrs controlPlaneOut.control_plane_model.data
+    then
+      controlPlaneOut.control_plane_model.data
     else
       throw ''
         container-settings:
 
-        fabricCompiled.enterprise missing.
+        controlPlaneOut.control_plane_model.data missing.
 
         Top-level keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames fabricCompiled)}
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames controlPlaneOut)}
       '';
 
-  enterpriseName =
-    let
-      names = builtins.attrNames enterprises;
-    in
-    if builtins.length names == 1 then
-      builtins.head names
+  siteEntries =
+    lib.concatMap (
+      enterpriseName:
+      let
+        enterprise = cpmData.${enterpriseName};
+      in
+      map (
+        siteName:
+        {
+          inherit enterpriseName siteName;
+          site = enterprise.${siteName};
+        }
+      ) (sortedAttrNames enterprise)
+    ) (sortedAttrNames cpmData);
+
+  runtimeTargets =
+    lib.foldl' (
+      acc: entry:
+      acc // (
+        if entry.site ? runtimeTargets && builtins.isAttrs entry.site.runtimeTargets then
+          entry.site.runtimeTargets
+        else
+          { }
+      )
+    ) { } siteEntries;
+
+  runtimeTargetNames = sortedAttrNames runtimeTargets;
+
+  realizationNodes =
+    if inventory ? realization
+      && builtins.isAttrs inventory.realization
+      && inventory.realization ? nodes
+      && builtins.isAttrs inventory.realization.nodes
+    then
+      inventory.realization.nodes
     else
       throw ''
         container-settings:
 
-        Expected exactly 1 enterprise.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
-      '';
-
-  enterprise = enterprises.${enterpriseName};
-
-  sites =
-    if enterprise ? site && builtins.isAttrs enterprise.site then
-      enterprise.site
-    else
-      throw ''
-        container-settings:
-
-        enterprise.site missing for '${enterpriseName}'.
-
-        Enterprise keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames enterprise)}
-      '';
-
-  siteName =
-    let
-      names = builtins.attrNames sites;
-    in
-    if builtins.length names == 1 then
-      builtins.head names
-    else
-      throw ''
-        container-settings:
-
-        Expected exactly 1 site for enterprise '${enterpriseName}'.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ names)}
-      '';
-
-  site = sites.${siteName};
-
-  units =
-    if site ? units && builtins.isAttrs site.units then
-      site.units
-    else
-      throw ''
-        container-settings:
-
-        site.units missing for ${enterpriseName}.${siteName}
-
-        Site keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames site)}
-      '';
-
-  nodes =
-    if site ? nodes && builtins.isAttrs site.nodes then
-      site.nodes
-    else
-      throw ''
-        container-settings:
-
-        site.nodes missing for ${enterpriseName}.${siteName}
-
-        Site keys:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames site)}
-      '';
-
-  inventoryFabric =
-    if inventory ? fabric && builtins.isAttrs inventory.fabric then
-      inventory.fabric
-    else
-      throw ''
-        container-settings:
-
-        inventory.fabric missing.
+        inventory.realization.nodes missing.
 
         inventory:
         ${builtins.toJSON inventory}
       '';
 
-  allUnitNames = builtins.attrNames units;
+  logicalNodeNameForUnit =
+    unitName:
+    let
+      target = runtimeTargets.${unitName};
+    in
+    if target ? logicalNode
+      && builtins.isAttrs target.logicalNode
+      && target.logicalNode ? name
+      && builtins.isString target.logicalNode.name
+    then
+      target.logicalNode.name
+    else
+      null;
+
+  placementHostForUnit =
+    unitName:
+    let
+      target = runtimeTargets.${unitName};
+    in
+    if target ? placement
+      && builtins.isAttrs target.placement
+      && target.placement ? host
+      && builtins.isString target.placement.host
+    then
+      target.placement.host
+    else
+      null;
+
+  realizationHostForUnit =
+    unitName:
+    if builtins.hasAttr unitName realizationNodes
+      && builtins.isAttrs realizationNodes.${unitName}
+      && realizationNodes.${unitName} ? host
+      && builtins.isString realizationNodes.${unitName}.host
+    then
+      realizationNodes.${unitName}.host
+    else
+      null;
 
   unitBelongsToHost =
     unitName:
-      unitName == hostname
-      || lib.hasPrefix "${hostname}-" unitName;
+      logicalNodeNameForUnit unitName == hostname
+      || unitName == hostname
+      || lib.hasPrefix "${hostname}-" unitName
+      || placementHostForUnit unitName == hostname
+      || realizationHostForUnit unitName == hostname;
 
-  selectedUnits = lib.filter unitBelongsToHost allUnitNames;
+  selectedUnits = lib.filter unitBelongsToHost runtimeTargetNames;
 
   _selectedNonEmpty =
     if selectedUnits != [ ] then
@@ -133,47 +131,171 @@ let
       throw ''
         container-settings:
 
-        No units matched physical host '${hostname}'.
+        No runtime targets matched host '${hostname}'.
 
-        Expected:
-          ${hostname}
-          ${hostname}-*
-
-        Available units:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ allUnitNames)}
+        Available runtime targets:
+        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ runtimeTargetNames)}
       '';
 
-  policyBase =
-    if inventory ? policyAccessTransitBase then
-      inventory.policyAccessTransitBase
-    else
-      100;
-
-  attrValues =
-    attrs: map (name: attrs.${name}) (builtins.attrNames attrs);
-
-  splitCIDR =
-    cidr:
+  runtimeTransitBridgeForUnit =
+    unitName:
       let
-        parts = lib.splitString "/" cidr;
+        realizationNode =
+          if builtins.hasAttr unitName realizationNodes then
+            realizationNodes.${unitName}
+          else
+            throw ''
+              container-settings:
+
+              Missing realization node for unit '${unitName}'.
+
+              Known realization nodes:
+              ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames realizationNodes)}
+            '';
+
+        ports =
+          if realizationNode ? ports && builtins.isAttrs realizationNode.ports then
+            realizationNode.ports
+          else
+            throw ''
+              container-settings:
+
+              realization.nodes.${unitName}.ports missing or not an attrset.
+
+              realization node:
+              ${builtins.toJSON realizationNode}
+            '';
+
+        portValues = map (name: ports.${name}) (builtins.attrNames ports);
+
+        bridgePorts =
+          builtins.filter (
+            port:
+              builtins.isAttrs port
+              && port ? attach
+              && builtins.isAttrs port.attach
+              && (port.attach.kind or null) == "bridge"
+              && port.attach ? bridge
+              && builtins.isString port.attach.bridge
+          ) portValues;
       in
-      if builtins.length parts == 2 then
-        {
-          address = builtins.elemAt parts 0;
-          prefix = builtins.elemAt parts 1;
-        }
+      if builtins.length bridgePorts == 1 then
+        (builtins.head bridgePorts).attach.bridge
       else
         throw ''
           container-settings:
 
-          Invalid CIDR '${cidr}'.
+          Expected exactly 1 bridge-backed runtime port for unit '${unitName}'.
+
+          bridge-backed ports:
+          ${builtins.toJSON bridgePorts}
         '';
 
-  parseTenantVlanFromIPv4CIDR =
-    cidr:
+  tenantNameForUnit =
+    unitName:
+    let
+      logicalName =
+        let
+          fromTarget = logicalNodeNameForUnit unitName;
+        in
+        if fromTarget != null then
+          fromTarget
+        else if builtins.hasAttr unitName realizationNodes
+          && realizationNodes.${unitName} ? logicalNode
+          && builtins.isAttrs realizationNodes.${unitName}.logicalNode
+          && realizationNodes.${unitName}.logicalNode ? name
+          && builtins.isString realizationNodes.${unitName}.logicalNode.name
+        then
+          realizationNodes.${unitName}.logicalNode.name
+        else
+          unitName;
+    in
+    if lib.hasPrefix "s-router-access-" logicalName then
+      builtins.substring
+        (builtins.stringLength "s-router-access-")
+        (builtins.stringLength logicalName - builtins.stringLength "s-router-access-")
+        logicalName
+    else
+      throw ''
+        container-settings:
+
+        Cannot derive tenant name from logical node '${logicalName}' for unit '${unitName}'.
+      '';
+
+  siteEntryForUnit =
+    unitName:
+    let
+      tenantName = tenantNameForUnit unitName;
+
+      matches =
+        builtins.filter (
+          entry:
+          entry.site ? attachments
+          && builtins.isList entry.site.attachments
+          && builtins.any (
+            attachment:
+            builtins.isAttrs attachment
+            && (attachment.kind or null) == "tenant"
+            && (attachment.name or null) == tenantName
+            && (attachment.unit or null) == unitName
+          ) entry.site.attachments
+        ) siteEntries;
+    in
+    if builtins.length matches == 1 then
+      builtins.head matches
+    else
+      throw ''
+        container-settings:
+
+        Could not uniquely resolve site for unit '${unitName}'.
+
+        tenantName: ${tenantName}
+      '';
+
+  tenantDomainForUnit =
+    unitName:
+    let
+      tenantName = tenantNameForUnit unitName;
+      site = (siteEntryForUnit unitName).site;
+
+      domains =
+        if site ? domains
+          && builtins.isAttrs site.domains
+          && site.domains ? tenants
+          && builtins.isList site.domains.tenants
+        then
+          site.domains.tenants
+        else
+          [ ];
+
+      matches =
+        builtins.filter (
+          domain:
+          builtins.isAttrs domain
+          && (domain.name or null) == tenantName
+          && domain ? ipv4
+          && builtins.isString domain.ipv4
+          && domain ? ipv6
+          && builtins.isString domain.ipv6
+        ) domains;
+    in
+    if builtins.length matches == 1 then
+      builtins.head matches
+    else
+      throw ''
+        container-settings:
+
+        Could not uniquely resolve tenant domain for unit '${unitName}'.
+
+        tenantName: ${tenantName}
+      '';
+
+  tenantVlanForUnit =
+    unitName:
       let
-        ip = (splitCIDR cidr).address;
-        octets = lib.splitString "." ip;
+        cidr = (tenantDomainForUnit unitName).ipv4;
+        addr = builtins.elemAt (lib.splitString "/" cidr) 0;
+        octets = lib.splitString "." addr;
       in
       if builtins.length octets == 4 then
         builtins.fromJSON (builtins.elemAt octets 2)
@@ -181,141 +303,15 @@ let
         throw ''
           container-settings:
 
-          Cannot derive tenant VLAN from IPv4 CIDR '${cidr}'.
+          Cannot derive tenant VLAN from IPv4 CIDR '${cidr}' for unit '${unitName}'.
         '';
-
-  fabricPortsForUnit =
-    unitName:
-      if builtins.hasAttr unitName inventoryFabric then
-        let
-          node = inventoryFabric.${unitName};
-        in
-        if node ? ports && builtins.isAttrs node.ports then
-          node.ports
-        else
-          throw ''
-            container-settings:
-
-            inventory.fabric.${unitName}.ports missing or not an attrset.
-
-            inventory.fabric.${unitName}:
-            ${builtins.toJSON node}
-          ''
-      else
-        throw ''
-          container-settings:
-
-          Missing inventory.fabric entry for unit '${unitName}'.
-
-          Known inventory.fabric units:
-          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames inventoryFabric)}
-
-          CPM site units:
-          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames units)}
-        '';
-
-  nodeContextForUnit =
-    unitName:
-      if builtins.hasAttr unitName nodes then
-        nodes.${unitName}
-      else
-        throw ''
-          container-settings:
-
-          Missing node context for unit '${unitName}'.
-        '';
-
-  tenantPortForUnit =
-    unitName:
-      let
-        ports = fabricPortsForUnit unitName;
-        tenantPorts =
-          builtins.filter (
-            port:
-              builtins.isAttrs port
-              && port ? attachment
-              && builtins.isAttrs port.attachment
-              && (port.attachment.kind or null) == "tenant"
-              && (port.attachment ? name)
-          ) (attrValues ports);
-      in
-      if tenantPorts != [ ] then
-        builtins.head tenantPorts
-      else
-        throw ''
-          container-settings:
-
-          No tenant-facing inventory port found for unit '${unitName}'.
-
-          inventory.fabric.${unitName}.ports:
-          ${builtins.toJSON ports}
-        '';
-
-  tenantNameForUnit =
-    unitName:
-      (tenantPortForUnit unitName).attachment.name;
-
-  tenantNetworkForUnit =
-    unitName:
-      let
-        node = nodeContextForUnit unitName;
-        tenantName = tenantNameForUnit unitName;
-        networks =
-          if node ? networks && builtins.isAttrs node.networks then
-            node.networks
-          else
-            { };
-      in
-      if builtins.hasAttr tenantName networks then
-        networks.${tenantName}
-      else
-        throw ''
-          container-settings:
-
-          CPM node '${unitName}' has no tenant network '${tenantName}'.
-
-          Known node networks:
-          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ builtins.attrNames networks)}
-        '';
-
-  vlanForUnit =
-    unitName:
-      parseTenantVlanFromIPv4CIDR (tenantNetworkForUnit unitName).ipv4;
-
-  transitPortForUnit =
-    unitName:
-      let
-        ports = fabricPortsForUnit unitName;
-        transitPorts =
-          builtins.filter (
-            port:
-              builtins.isAttrs port
-              && (port ? link)
-              && (port ? vlan)
-          ) (attrValues ports);
-      in
-      if transitPorts != [ ] then
-        builtins.head transitPorts
-      else
-        throw ''
-          container-settings:
-
-          No transit inventory port found for unit '${unitName}'.
-
-          inventory.fabric.${unitName}.ports:
-          ${builtins.toJSON ports}
-        '';
-
-  transitVlanForUnit =
-    unitName:
-      (transitPortForUnit unitName).vlan;
 
   mkContainer =
     unitName:
     let
-      fabricNodeContext = nodeContextForUnit unitName;
-      vid = vlanForUnit unitName;
-      transitVid = transitVlanForUnit unitName;
+      transitBridge = runtimeTransitBridgeForUnit unitName;
+      tenantVlan = tenantVlanForUnit unitName;
+      tenantDomain = tenantDomainForUnit unitName;
     in
     {
       name = unitName;
@@ -324,19 +320,25 @@ let
         privateNetwork = true;
 
         extraVeths = {
-          "lan-${toString vid}" = {
-            hostBridge = "br-lan-${toString vid}";
+          "lan-${toString tenantVlan}" = {
+            hostBridge = "br-lan-${toString tenantVlan}";
           };
-          "tr-${toString transitVid}" = {
-            hostBridge = "br-tr-${toString transitVid}";
+          "tr-${toString tenantVlan}" = {
+            hostBridge = transitBridge;
           };
         };
 
         specialArgs = {
-          inherit outPath fabricNodeContext;
-          vlanId = vid;
-          transitVlanId = transitVid;
-          policyAccessTransitBase = policyBase;
+          inherit outPath;
+          fabricNodeContext = runtimeTargets.${unitName};
+          tenantNetwork = {
+            name = tenantNameForUnit unitName;
+            ipv4 = tenantDomain.ipv4;
+            ipv6 = tenantDomain.ipv6;
+          };
+          vlanId = tenantVlan;
+          transitVlanId = tenantVlan;
+          policyAccessTransitBase = 100;
         };
 
         config = { ... }: {
@@ -368,7 +370,6 @@ let
         ];
       };
     };
-
 in
 {
   networking.useNetworkd = true;

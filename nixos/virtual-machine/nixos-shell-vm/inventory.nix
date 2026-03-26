@@ -87,10 +87,30 @@
 
       s-router-policy = {
         uplinks = {
+          management = {
+            parent = "eth0";
+            mode = "vlan";
+            vlan = 2;
+            bridge = "vlan2";
+          };
+
           trunk = {
             parent = "eth0";
             bridge = "br-fabric";
             mode = "trunk";
+          };
+        };
+
+        bridgeNetworks = {
+          vlan2 = {
+            DHCP = "ipv4";
+            IPv6AcceptRA = false;
+            LinkLocalAddressing = "ipv4";
+            ConfigureWithoutCarrier = true;
+          };
+
+          br-fabric = {
+            ConfigureWithoutCarrier = true;
           };
         };
 
@@ -412,6 +432,10 @@
 
   render = {
     hosts = {
+      s-router-access = {
+        deploymentHost = "s-router-policy";
+      };
+
       s-router-core = {
         containerTemplate = "wan";
         deploymentHost = "lab-host";

@@ -5,6 +5,7 @@
   vlanId,
   outPath,
   fabricNodeContext,
+  tenantNetwork ? null,
   ...
 }:
 
@@ -58,36 +59,46 @@ let
       else
         "${base}::1";
 
-  tenantNetworks =
-    if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
-      fabricNodeContext.networks
+  tenantNetworkResolved =
+    if tenantNetwork != null
+      && builtins.isAttrs tenantNetwork
+      && tenantNetwork ? ipv4
+      && builtins.isString tenantNetwork.ipv4
+      && tenantNetwork ? ipv6
+      && builtins.isString tenantNetwork.ipv6
+    then
+      tenantNetwork
     else
-      { };
+      let
+        tenantNetworks =
+          if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
+            fabricNodeContext.networks
+          else
+            { };
 
-  tenantNetworkNames =
-    builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+        tenantNetworkNames =
+          builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+      in
+      if builtins.length tenantNetworkNames == 1 then
+        tenantNetworks.${builtins.head tenantNetworkNames}
+      else
+        throw ''
+          dns:
 
-  tenantNetwork =
-    if builtins.length tenantNetworkNames == 1 then
-      tenantNetworks.${builtins.head tenantNetworkNames}
-    else
-      throw ''
-        dns:
+          Expected exactly 1 tenant network for access node.
 
-        Expected exactly 1 tenant network for access node.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
-      '';
+          Found:
+          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
+        '';
 
   domainRaw = site.domain or "lan.";
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
-  lan4 = firstIPv4InSubnet tenantNetwork.ipv4;
-  lan6 = firstIPv6InSubnet tenantNetwork.ipv6;
+  lan4 = firstIPv4InSubnet tenantNetworkResolved.ipv4;
+  lan6 = firstIPv6InSubnet tenantNetworkResolved.ipv6;
 
-  v4Net = tenantNetwork.ipv4;
-  v6Net = tenantNetwork.ipv6;
+  v4Net = tenantNetworkResolved.ipv4;
+  v6Net = tenantNetworkResolved.ipv6;
 
   upstream =
     site.defaultWanDns or [

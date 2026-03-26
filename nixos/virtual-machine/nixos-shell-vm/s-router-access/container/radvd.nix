@@ -1,3 +1,4 @@
+# ./s-router-access/container/radvd.nix
 {
   config,
   pkgs,
@@ -5,6 +6,7 @@
   vlanId,
   outPath,
   fabricNodeContext,
+  tenantNetwork ? null,
   ...
 }:
 
@@ -16,27 +18,35 @@ let
     else
       siteImported;
 
-  tenantNetworks =
-    if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
-      fabricNodeContext.networks
+  tenantNetworkResolved =
+    if tenantNetwork != null
+      && builtins.isAttrs tenantNetwork
+      && tenantNetwork ? ipv6
+      && builtins.isString tenantNetwork.ipv6
+    then
+      tenantNetwork
     else
-      { };
+      let
+        tenantNetworks =
+          if fabricNodeContext ? networks && builtins.isAttrs fabricNodeContext.networks then
+            fabricNodeContext.networks
+          else
+            { };
 
-  tenantNetworkNames =
-    builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+        tenantNetworkNames =
+          builtins.filter (n: n != "loopback") (builtins.attrNames tenantNetworks);
+      in
+      if builtins.length tenantNetworkNames == 1 then
+        tenantNetworks.${builtins.head tenantNetworkNames}
+      else
+        throw ''
+          radvd:
 
-  tenantNetwork =
-    if builtins.length tenantNetworkNames == 1 then
-      tenantNetworks.${builtins.head tenantNetworkNames}
-    else
-      throw ''
-        radvd:
+          Expected exactly 1 tenant network for access node.
 
-        Expected exactly 1 tenant network for access node.
-
-        Found:
-        ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
-      '';
+          Found:
+          ${builtins.concatStringsSep "\n  - " ([ "" ] ++ tenantNetworkNames)}
+        '';
 
   splitCIDR =
     cidr:
@@ -69,9 +79,9 @@ let
   domain = if lib.hasSuffix "." domainRaw then domainRaw else "${domainRaw}.";
 
   lanIf = "lan-${toString vlanId}";
-  prefixes = [ tenantNetwork.ipv6 ];
+  prefixes = [ tenantNetworkResolved.ipv6 ];
 
-  rdnss = firstIPv6InSubnet tenantNetwork.ipv6;
+  rdnss = firstIPv6InSubnet tenantNetworkResolved.ipv6;
   radvdConf = "/run/radvd.conf";
 
   gen = pkgs.writeShellScript "gen-radvd-${toString vlanId}" ''
