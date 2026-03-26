@@ -119,6 +119,11 @@ let
   uplinkNames = lib.sort builtins.lessThan (builtins.attrNames uplinks);
   transitNames = lib.sort builtins.lessThan (builtins.attrNames transitBridges);
 
+  parentNames =
+    lib.unique (
+      map (uplinkName: uplinks.${uplinkName}.parent) uplinkNames
+    );
+
   bridgeNetworkFor =
     bridge:
     if builtins.hasAttr bridge bridgeNetworks then
@@ -136,17 +141,23 @@ let
       (transit.parentUplink or null) == uplinkName
     ) transitNames;
 
+  vlanIfNameFor =
+    uplinkName:
+    let
+      uplink = uplinks.${uplinkName};
+    in
+    if (uplink.mode or "") == "vlan" then
+      "${uplink.parent}.${toString uplink.vlan}"
+    else
+      null;
+
   uplinkNetdevs = builtins.listToAttrs (
     lib.concatMap (
       uplinkName:
       let
         uplink = uplinks.${uplinkName};
         transitNamesOnUplink = transitNamesForUplink uplinkName;
-        vlanIfName =
-          if (uplink.mode or "") == "vlan" then
-            "${uplink.parent}.${toString uplink.vlan}"
-          else
-            null;
+        vlanIfName = vlanIfNameFor uplinkName;
       in
       [
         {
@@ -193,51 +204,80 @@ let
     ) uplinkNames
   );
 
-  uplinkParentNetworks = builtins.listToAttrs (
-    lib.concatMap (
-      uplinkName:
+  uplinkParentNetworks =
+    builtins.listToAttrs (
       let
-        uplink = uplinks.${uplinkName};
-        vlanIfName = "${uplink.parent}.${toString uplink.vlan}";
+        parentEntries =
+          map (
+            parentIf:
+            let
+              uplinksOnParent =
+                lib.filter (uplinkName: uplinks.${uplinkName}.parent == parentIf) uplinkNames;
+
+              vlanChildren =
+                lib.filter (name: name != null) (map vlanIfNameFor uplinksOnParent);
+
+              directBridgeUplinks =
+                lib.filter (
+                  uplinkName:
+                  let
+                    mode = uplinks.${uplinkName}.mode or "";
+                  in
+                  mode != "vlan"
+                ) uplinksOnParent;
+
+              _singleDirectBridge =
+                if builtins.length directBridgeUplinks <= 1 then
+                  true
+                else
+                  throw ''
+                    host-network: multiple non-vlan uplinks on parent '${parentIf}' are not supported
+
+                    uplinks:
+                    ${builtins.concatStringsSep "\n  - " ([ "" ] ++ directBridgeUplinks)}
+                  '';
+            in
+            {
+              name = "20-${parentIf}";
+              value = {
+                matchConfig.Name = parentIf;
+                networkConfig =
+                  {
+                    ConfigureWithoutCarrier = true;
+                  }
+                  // lib.optionalAttrs (vlanChildren != [ ]) {
+                    VLAN = vlanChildren;
+                  }
+                  // lib.optionalAttrs (builtins.length directBridgeUplinks == 1) {
+                    Bridge = uplinks.${builtins.head directBridgeUplinks}.bridge;
+                  };
+              };
+            }
+          ) parentNames;
+
+        vlanBridgeEntries =
+          lib.concatMap (
+            uplinkName:
+            let
+              uplink = uplinks.${uplinkName};
+              vlanIfName = vlanIfNameFor uplinkName;
+            in
+            lib.optionals ((uplink.mode or "") == "vlan") [
+              {
+                name = "21-${vlanIfName}";
+                value = {
+                  matchConfig.Name = vlanIfName;
+                  networkConfig = {
+                    Bridge = uplink.bridge;
+                    ConfigureWithoutCarrier = true;
+                  };
+                };
+              }
+            ]
+          ) uplinkNames;
       in
-      if (uplink.mode or "") == "vlan" then
-        [
-          {
-            name = "20-${uplink.parent}-${uplinkName}";
-            value = {
-              matchConfig.Name = uplink.parent;
-              networkConfig = {
-                VLAN = [ vlanIfName ];
-                ConfigureWithoutCarrier = true;
-              };
-            };
-          }
-          {
-            name = "21-${vlanIfName}";
-            value = {
-              matchConfig.Name = vlanIfName;
-              networkConfig = {
-                Bridge = uplink.bridge;
-                ConfigureWithoutCarrier = true;
-              };
-            };
-          }
-        ]
-      else
-        [
-          {
-            name = "20-${uplink.parent}-${uplinkName}";
-            value = {
-              matchConfig.Name = uplink.parent;
-              networkConfig = {
-                Bridge = uplink.bridge;
-                ConfigureWithoutCarrier = true;
-              };
-            };
-          }
-        ]
-    ) uplinkNames
-  );
+      parentEntries ++ vlanBridgeEntries
+    );
 
   uplinkBridgeNetworks = builtins.listToAttrs (
     map (
