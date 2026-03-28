@@ -215,6 +215,59 @@ let
 
   renderedBridgeNameMap = renderedDeploymentHost.bridgeNameMap or { };
 
+  renderedDeploymentHostDebug = {
+    hostName = renderedDeploymentHost.hostName or null;
+    deploymentHostName = renderedDeploymentHost.deploymentHostName or null;
+    runtimeRole = renderedDeploymentHost.runtimeRole or null;
+    selectedUnits = renderedDeploymentHost.selectedUnits or [ ];
+    selectedRoleNames = renderedDeploymentHost.selectedRoleNames or [ ];
+    bridgeNameMap = renderedDeploymentHost.bridgeNameMap or { };
+    bridges = renderedDeploymentHost.bridges or { };
+    netdevs = renderedDeploymentHost.netdevs or { };
+    networks = renderedDeploymentHost.networks or { };
+    attachTargets = renderedDeploymentHost.attachTargets or [ ];
+    localAttachTargets = renderedDeploymentHost.localAttachTargets or [ ];
+    uplinks = renderedDeploymentHost.uplinks or { };
+    transitBridges = renderedDeploymentHost.transitBridges or { };
+    containers = builtins.listToAttrs (
+      map
+        (containerName: {
+          name = containerName;
+          value =
+            let
+              container = renderedDeploymentHost.containers.${containerName};
+            in
+            {
+              autoStart = container.autoStart or false;
+              privateNetwork = container.privateNetwork or false;
+              extraVeths = container.extraVeths or { };
+              bindMounts = container.bindMounts or { };
+              allowedDevices = container.allowedDevices or [ ];
+              additionalCapabilities = container.additionalCapabilities or [ ];
+              specialArgs = {
+                unitName =
+                  if container ? specialArgs && container.specialArgs ? unitName then
+                    container.specialArgs.unitName
+                  else
+                    containerName;
+                deploymentHostName =
+                  if container ? specialArgs && container.specialArgs ? deploymentHostName then
+                    container.specialArgs.deploymentHostName
+                  else
+                    null;
+                s88RoleName =
+                  if container ? specialArgs && container.specialArgs ? s88RoleName then
+                    container.specialArgs.s88RoleName
+                  else
+                    null;
+              };
+            };
+        })
+        (sortedAttrNames (renderedDeploymentHost.containers or { }))
+    );
+    debug = renderedDeploymentHost.debug or { };
+  };
+
   localAttachTargets =
     lib.filter
       (target: builtins.elem (target.unitName or "") selectedUnits)
@@ -960,7 +1013,7 @@ let
     controlPlane = controlPlaneOut;
 
     rendered = {
-      deploymentHost = renderedDeploymentHost;
+      deploymentHost = renderedDeploymentHostDebug;
       bridgeNameMap = renderedBridgeNameMap;
       localAttachTargets = localAttachTargets;
     };
