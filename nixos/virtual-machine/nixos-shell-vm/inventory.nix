@@ -3,7 +3,7 @@
 
   deployment = {
     hosts = {
-      lab-host = {
+      s-router-core = {
         uplinks = {
           management = {
             parent = "eth0";
@@ -29,6 +29,10 @@
 
               # Set to true if you want DHCPv6 Prefix Delegation.
               dhcpv6PD = false;
+            };
+            ipv4 = {
+               enable = true;
+               dhcp = true;
             };
 
             # Uncomment and fill these only when using PPPoE.
@@ -150,35 +154,6 @@
             bridge = "vlan2";
           };
 
-          upstream-core = {
-            parent = "eth0";
-            bridge = "br-upstream";
-            mode = "vlan";
-            vlan = 5;
-
-            ipv6 = {
-              enable = true;
-
-              # IPv6 Router Advertisements / SLAAC on the WAN interface.
-              acceptRA = true;
-
-              # Set to true if the ISP uses stateful DHCPv6 on the WAN link.
-              dhcp = false;
-
-              # Set to true if you want DHCPv6 Prefix Delegation.
-              dhcpv6PD = false;
-            };
-
-            # Uncomment and fill these only when using PPPoE.
-            # pppoe = {
-            #   enable = true;
-            #   usernameSecret = "pppoe-username";
-            #   passwordSecret = "pppoe-password";
-            #   mtu = 1492;
-            #   mru = 1492;
-            # };
-          };
-
           trunk = {
             parent = "eth0";
             bridge = "br-fabric";
@@ -241,7 +216,7 @@
   realization = {
     nodes = {
       esp0xdeadbeef-site-a-s-router-core-wan = {
-        host = "lab-host";
+        host = "s-router-core";
         platform = "linux";
 
         logicalNode = {
@@ -394,7 +369,7 @@
       };
 
       s-router-upstream-selector = {
-        host = "s-router-policy-only";
+        host = "s-router-policy";
         platform = "linux";
 
         logicalNode = {
@@ -438,17 +413,13 @@
 
       s-router-core = {
         containerTemplate = "wan";
-        deploymentHost = "lab-host";
+        deploymentHost = "s-router-core";
         runtimeRole = "core";
         wanUplink = "upstream-core";
       };
 
       s-router-core-wan = {
         deploymentHost = "s-router-core-wan";
-      };
-
-      s-router-policy = {
-        deploymentHost = "s-router-policy";
       };
 
       s-router-policy-only = {
