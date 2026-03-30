@@ -1,4 +1,15 @@
-{ config, pkgs, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
+let
+  unstablePkgs = import inputs.nixpkgs-unstable {
+    system = pkgs.stdenv.hostPlatform.system;
+  };
+in
 {
   environment.etc.hosts.enable = false;
   programs.firefox.enable = true;
@@ -33,107 +44,109 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
 
-  environment.systemPackages = with pkgs; [
-    home-manager
-    nix-index
-    arandr
-    #hyprland
-    #rofi
-    #autorandr
-    fast-cli
-    #cudaPackages.cudatoolkit
-    alacritty
-    #flameshot
-    #google-chrome
-    navi
-    nixfmt-rfc-style
-    pulseaudio
-    feroxbuster
-    nuclei
-    gau # wayback machine
-    nmap
-    # inotify service (otherwise flameshot crashes)
-    dunst
-    unzip
-    metasploit
-    samba4Full
-    rlwrap
-    lastpass-cli
+  environment.systemPackages =
+    (with pkgs; [
+      home-manager
+      nix-index
+      arandr
+      #hyprland
+      #rofi
+      #autorandr
+      fast-cli
+      #cudaPackages.cudatoolkit
+      alacritty
+      #flameshot
+      #google-chrome
+      navi
+      nixfmt-rfc-style
+      pulseaudio
+      feroxbuster
+      nuclei
+      gau # wayback machine
+      nmap
+      # inotify service (otherwise flameshot crashes)
+      dunst
+      unzip
+      metasploit
+      samba4Full
+      rlwrap
+      lastpass-cli
 
-    tpm2-tss
-    vim
-    responder
-    playerctl
-    autorandr
-    gh
-    sshpass
-    man-pages
-    sbctl
-    openssl
-    tpm2-tools
-    jq
-    usbutils
-    file
-    jython
-    gron
-    mokutil
-    man
-    #dex
-    pciutils
-    autotiling
-    lshw
-    neofetch
+      tpm2-tss
+      vim
+      responder
+      playerctl
+      autorandr
+      gh
+      sshpass
+      man-pages
+      sbctl
+      openssl
+      tpm2-tools
+      jq
+      usbutils
+      file
+      jython
+      gron
+      mokutil
+      man
+      #dex
+      pciutils
+      autotiling
+      lshw
+      neofetch
 
-    # virtualization:
-    podman
-    docker
-    lxc
+      # virtualization:
+      podman
+      docker
+      lxc
 
-    # easier searching:
-    fzf
-    # package manager:
-    git
-    traceroute
-    tmux
-    dig
-    #(burpsuite.override { proEdition = true; })
-    zap
-    bindfs
-    xclip
-    wget
-    obsidian
-    #qemu
-    libvirt
-    spotify
-    virt-manager
-    virt-viewer
-    spice
-    spice-gtk
-    spice-protocol
-    win-spice
-    python3
-    libusb1
-    # firefox
-    # thunderbird
-    #discord
-    #slack
-    kubectl
-    docker
-    kind
-    #teams
-    brave
-    python3.pkgs.evdev
-    python3.pkgs.pygraphviz
-    podman-compose
-    #google-chrome
-    #chromium
-    #signal-desktop
-    sbctl
-    tcpdump
-    wireshark
-    tshark
-    # ventoy-full
-
-  ];
-
+      # easier searching:
+      fzf
+      # package manager:
+      git
+      traceroute
+      tmux
+      dig
+      #(burpsuite.override { proEdition = true; })
+      zap
+      bindfs
+      xclip
+      wget
+      obsidian
+      #qemu
+      libvirt
+      spotify
+      virt-manager
+      virt-viewer
+      spice
+      spice-gtk
+      spice-protocol
+      win-spice
+      python3
+      libusb1
+      # firefox
+      # thunderbird
+      #discord
+      #slack
+      kubectl
+      docker
+      kind
+      #teams
+      brave
+      python3.pkgs.evdev
+      python3.pkgs.pygraphviz
+      podman-compose
+      #google-chrome
+      #chromium
+      #signal-desktop
+      sbctl
+      tcpdump
+      wireshark
+      tshark
+      # ventoy-full
+    ])
+    ++ [
+      unstablePkgs.zap
+    ];
 }
