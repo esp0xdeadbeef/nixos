@@ -109,7 +109,6 @@ in
       tmux
       dig
       #(burpsuite.override { proEdition = true; })
-      zap
       bindfs
       xclip
       wget
