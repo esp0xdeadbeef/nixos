@@ -1,133 +1,72 @@
 {
   inputs,
   outPath,
-  config,
-  pkgs,
   lib,
   ...
 }:
 
 let
   api = inputs.network-renderer-nixos.lib;
-  renderer = api.renderer;
-  selectors = api.selectors;
 
-  system = pkgs.stdenv.hostPlatform.system;
-  hostName = config.networking.hostName;
+  moduleHostName = builtins.baseNameOf (builtins.toString ./.);
 
-  inventoryPath = builtins.toPath ../inventory.nix;
-  intentPath = builtins.toPath "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+  containerSelection = {
+    "s-router-core-wan" = true;
+  };
 
-  selected = selectors.query {
-    selector = hostName;
+  hostBuild = api.hostBuild {
     inherit
-      intentPath
-      inventoryPath
+      lib
+      outPath
       ;
-    file = "s-router-core/default.nix";
+    hostName = moduleHostName;
+    inventoryPath = ../inventory.nix;
+    selectorFile = "s-router-core/default.nix";
+    containerSelection = containerSelection;
   };
 
-  intent = selected.fabricInputs;
-  globalInventory = selected.globalInventory;
-  hostContext = selected.hostContext;
-
-  compilerOut = renderer.buildCompiler {
-    inherit intent system;
-  };
-
-  forwardingOut = renderer.buildForwarding {
-    inherit compilerOut system;
-  };
-
-  controlPlaneOut = renderer.buildControlPlane {
-    inherit
-      forwardingOut
-      system
-      ;
-    inventory = globalInventory;
-  };
-
-  renderedHostNetwork = renderer.renderHostNetwork {
-    hostName =
-      if hostContext ? deploymentHostName && builtins.isString hostContext.deploymentHostName then
-        hostContext.deploymentHostName
-      else
-        hostName;
-    cpm = controlPlaneOut;
-    inventory = globalInventory;
-  };
-
-  sanitizeContainer =
-    containerName: container: {
-      autoStart = container.autoStart or false;
-      privateNetwork = container.privateNetwork or false;
-      extraVeths = container.extraVeths or { };
-      bindMounts = container.bindMounts or { };
-      allowedDevices = container.allowedDevices or [ ];
-      additionalCapabilities = container.additionalCapabilities or [ ];
-      specialArgs = {
-        unitName =
-          if container ? specialArgs && container.specialArgs ? unitName then
-            container.specialArgs.unitName
-          else
-            containerName;
-        deploymentHostName =
-          if container ? specialArgs && container.specialArgs ? deploymentHostName then
-            container.specialArgs.deploymentHostName
-          else
-            null;
-        s88RoleName =
-          if container ? specialArgs && container.specialArgs ? s88RoleName then
-            container.specialArgs.s88RoleName
-          else
-            null;
-      };
+  extraContainerOptions = {
+    "*" = {
+      autoStart = true;
     };
 
-  sortedAttrNames = attrs: lib.sort builtins.lessThan (builtins.attrNames attrs);
-
-  sanitizedContainers = builtins.listToAttrs (
-    map (containerName: {
-      name = containerName;
-      value = sanitizeContainer containerName renderedHostNetwork.containers.${containerName};
-    }) (sortedAttrNames (renderedHostNetwork.containers or { }))
-  );
-
-  debugPayload = {
-    inherit
-      system
-      hostName
-      hostContext
-      intent
-      globalInventory
-      compilerOut
-      forwardingOut
-      controlPlaneOut
-      ;
-
-    intentPath = builtins.toString intentPath;
-    inventoryPath = builtins.toString inventoryPath;
-
-    renderedHost = {
-      hostName = renderedHostNetwork.hostName or null;
-      deploymentHostName = renderedHostNetwork.deploymentHostName or null;
-      runtimeRole = renderedHostNetwork.runtimeRole or null;
-      selectedUnits = renderedHostNetwork.selectedUnits or [ ];
-      selectedRoleNames = renderedHostNetwork.selectedRoleNames or [ ];
-      bridgeNameMap = renderedHostNetwork.bridgeNameMap or { };
-      bridges = renderedHostNetwork.bridges or { };
-      netdevs = renderedHostNetwork.netdevs or { };
-      networks = renderedHostNetwork.networks or { };
-      attachTargets = renderedHostNetwork.attachTargets or [ ];
-      localAttachTargets = renderedHostNetwork.localAttachTargets or [ ];
-      uplinks = renderedHostNetwork.uplinks or { };
-      transitBridges = renderedHostNetwork.transitBridges or { };
-      containers = sanitizedContainers;
-      debug = renderedHostNetwork.debug or { };
+    "s-router-core-wan" = {
+      additionalCapabilities = [ "NET_ADMIN" ];
     };
   };
+
+  mergeContainer =
+    name: rendered:
+    let
+      global = extraContainerOptions."*" or { };
+      named = extraContainerOptions.${name} or { };
+    in
+    lib.recursiveUpdate (lib.recursiveUpdate rendered global) named;
+
+  containers =
+    lib.mapAttrs mergeContainer (hostBuild.renderedHostNetwork.containers or { });
+
+  _validatedContainers =
+    if builtins.attrNames containers != [ ] then
+      true
+    else
+      throw ''
+        s-router-core/default.nix: no containers were rendered for host '${moduleHostName}'
+
+        containerSelection:
+        ${builtins.toJSON containerSelection}
+
+        rendered container names:
+        ${builtins.toJSON (builtins.attrNames (hostBuild.renderedHostNetwork.containers or { }))}
+
+        selected units:
+        ${builtins.toJSON (hostBuild.renderedHostNetwork.selectedUnits or [ ])}
+
+        selected roles:
+        ${builtins.toJSON (hostBuild.renderedHostNetwork.selectedRoleNames or [ ])}
+      '';
 in
-{
+builtins.seq _validatedContainers {
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./mount-utils.nix
@@ -136,20 +75,10 @@ in
 
   system.stateVersion = lib.mkForce "24.11";
 
-  _module.args = {
-    inherit
-      globalInventory
-      hostContext
-      intent
-      compilerOut
-      forwardingOut
-      controlPlaneOut
-      renderedHostNetwork
-      ;
-  };
+  _module.args = hostBuild.moduleArgs or { };
 
   environment.etc."network-renderer/network-renderer-nixos.json".text =
-    builtins.toJSON debugPayload;
+    builtins.toJSON (hostBuild.debugPayload or { });
 
   networking.useNetworkd = true;
   systemd.network.enable = true;
@@ -157,8 +86,7 @@ in
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce false;
 
-  systemd.network.netdevs = renderedHostNetwork.netdevs or { };
-  systemd.network.networks = renderedHostNetwork.networks or { };
-
-  containers = renderedHostNetwork.containers or { };
+  systemd.network.netdevs = hostBuild.renderedHostNetwork.netdevs or { };
+  systemd.network.networks = hostBuild.renderedHostNetwork.networks or { };
+  containers = containers;
 }
