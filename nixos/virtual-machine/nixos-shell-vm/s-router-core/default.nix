@@ -31,7 +31,10 @@ let
     };
 
     "s-router-core-wan" = {
-      additionalCapabilities = [ "NET_ADMIN" ];
+      additionalCapabilities = [
+        "CAP_NET_ADMIN"
+        "CAP_NET_RAW"
+      ];
     };
   };
 
