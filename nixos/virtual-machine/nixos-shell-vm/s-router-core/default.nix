@@ -8,68 +8,84 @@
 let
   api = inputs.network-renderer-nixos.lib;
 
-  moduleHostName = builtins.baseNameOf (builtins.toString ./.);
-
-  containerSelection = {
-    "s-router-core-wan" = true;
+  identity = {
+    enterpriseName = "esp0xdeadbeef";
+    siteName = "site-a";
+    boxName = builtins.baseNameOf (builtins.toString ./.);
   };
 
-  hostBuild = api.hostBuild {
-    inherit
-      lib
-      outPath
-      ;
-    hostName = moduleHostName;
+  fabric = {
+    intentPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
     inventoryPath = ../inventory.nix;
-    selectorFile = "s-router-core/default.nix";
-    containerSelection = containerSelection;
   };
 
-  extraContainerOptions = {
-    "*" = {
-      autoStart = true;
-    };
+  disabledContainers = { };
 
-    "s-router-core-wan" = {
-      additionalCapabilities = [
-        "CAP_NET_ADMIN"
-        "CAP_NET_RAW"
-      ];
-    };
+  commonContainerOptions = {
+    autoStart = true;
+    additionalCapabilities = [
+      "CAP_NET_ADMIN"
+      "CAP_NET_RAW"
+    ];
   };
 
-  mergeContainer =
-    name: rendered:
-    let
-      global = extraContainerOptions."*" or { };
-      named = extraContainerOptions.${name} or { };
-    in
-    lib.recursiveUpdate (lib.recursiveUpdate rendered global) named;
+  builtHost = api.renderer.buildHostFromPaths {
+    inherit (fabric) intentPath inventoryPath;
+    selector = identity.boxName;
+    file = "nixos/virtual-machine/nixos-shell-vm/s-router-core/default.nix";
+  };
 
-  containers =
-    lib.mapAttrs mergeContainer (hostBuild.renderedHostNetwork.containers or { });
+  resolvedHostContext =
+    (builtHost.hostContext or { })
+    // {
+      hostname = identity.boxName;
+      enterpriseName = identity.enterpriseName;
+      siteName = identity.siteName;
+      matchedEnterprises = [ identity.enterpriseName ];
+      matchedSites = [ identity.siteName ];
+    };
 
-  _validatedContainers =
-    if builtins.attrNames containers != [ ] then
-      true
-    else
-      throw ''
-        s-router-core/default.nix: no containers were rendered for host '${moduleHostName}'
+  renderedHost = api.host.build {
+    inherit lib outPath;
+    inherit (identity) enterpriseName siteName boxName;
+    inherit (fabric) intentPath inventoryPath;
+  };
 
-        containerSelection:
-        ${builtins.toJSON containerSelection}
+  renderedBridges = api.bridges.build {
+    inherit lib outPath;
+    inherit (identity) enterpriseName siteName boxName;
+    inherit (fabric) intentPath inventoryPath;
+  };
 
-        rendered container names:
-        ${builtins.toJSON (builtins.attrNames (hostBuild.renderedHostNetwork.containers or { }))}
+  renderedContainers = api.containers.buildForBox {
+    inherit lib outPath;
+    inherit (identity) enterpriseName siteName boxName;
+    inherit (fabric) intentPath inventoryPath;
 
-        selected units:
-        ${builtins.toJSON (hostBuild.renderedHostNetwork.selectedUnits or [ ])}
+    disabled = disabledContainers;
+    defaults = commonContainerOptions;
+  };
 
-        selected roles:
-        ${builtins.toJSON (hostBuild.renderedHostNetwork.selectedRoleNames or [ ])}
-      '';
+  renderedHostNetwork = {
+    hostName = renderedHost.hostName or identity.boxName;
+    deploymentHostName = renderedHost.deploymentHostName or null;
+    bridgeNameMap = renderedBridges.bridgeNameMap or { };
+    bridges = renderedBridges.bridges or { };
+    netdevs =
+      (renderedHost.netdevs or { })
+      // (renderedBridges.netdevs or { });
+    networks =
+      (renderedHost.networks or { })
+      // (renderedBridges.networks or { });
+    containers = renderedContainers;
+    debug = {
+      host = renderedHost.debug or { };
+      bridges = renderedBridges.debug or { };
+      containers = builtins.attrNames renderedContainers;
+    };
+  };
 in
-builtins.seq _validatedContainers {
+{
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./mount-utils.nix
@@ -78,10 +94,25 @@ builtins.seq _validatedContainers {
 
   system.stateVersion = lib.mkForce "24.11";
 
-  _module.args = hostBuild.moduleArgs or { };
+  _module.args = {
+    inherit identity fabric;
+    globalInventory = builtHost.globalInventory or { };
+    hostContext = resolvedHostContext;
+    intent = builtHost.fabricInputs or { };
+    fabricInputs = builtHost.fabricInputs or { };
+    compilerOut = builtHost.compilerOut or { };
+    forwardingOut = builtHost.forwardingOut or { };
+    controlPlaneOut = builtHost.controlPlaneOut or { };
+    inherit renderedHostNetwork;
+  };
 
   environment.etc."network-renderer/network-renderer-nixos.json".text =
-    builtins.toJSON (hostBuild.debugPayload or { });
+    builtins.toJSON {
+      inherit identity fabric disabledContainers;
+      host = renderedHost.debug or { };
+      bridges = renderedBridges.debug or { };
+      containers = builtins.attrNames renderedContainers;
+    };
 
   networking.useNetworkd = true;
   systemd.network.enable = true;
@@ -89,7 +120,13 @@ builtins.seq _validatedContainers {
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce false;
 
-  systemd.network.netdevs = hostBuild.renderedHostNetwork.netdevs or { };
-  systemd.network.networks = hostBuild.renderedHostNetwork.networks or { };
-  containers = containers;
+  systemd.network.netdevs =
+    (renderedHost.netdevs or { })
+    // (renderedBridges.netdevs or { });
+
+  systemd.network.networks =
+    (renderedHost.networks or { })
+    // (renderedBridges.networks or { });
+
+  containers = renderedContainers;
 }
