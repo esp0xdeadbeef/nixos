@@ -195,7 +195,7 @@
           };
 
           trafficType = "web";
-          action = "deny";
+          action = "allow";
         }
 
         {
