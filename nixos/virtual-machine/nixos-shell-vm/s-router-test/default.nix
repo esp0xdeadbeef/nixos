@@ -16,7 +16,16 @@ let
 
   fabric = {
     intentPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
-    inventoryPath = ../inventory.nix;
+    inventoryPath = ./inventory.nix;
+  };
+
+  inventory = import ./inventory.nix;
+  renderHostDefs = inventory.render.hosts or { };
+
+  disabledContainers = { };
+
+  commonContainerOptions = {
+    autoStart = true;
   };
 
   sliceArgs = {
@@ -24,20 +33,10 @@ let
     inherit (fabric) intentPath inventoryPath;
   };
 
-  disabledContainers = { };
-
-  commonContainerOptions = {
-    autoStart = true;
-    additionalCapabilities = [
-      "CAP_NET_ADMIN"
-      "CAP_NET_RAW"
-    ];
-  };
-
   builtHost = api.renderer.buildHostFromPaths {
     inherit (fabric) intentPath inventoryPath;
     selector = identity.boxName;
-    file = "nixos/virtual-machine/nixos-shell-vm/s-router-policy-only/default.nix";
+    file = "nixos/virtual-machine/nixos-shell-vm/s-router-test/default.nix";
   };
 
   resolvedHostContext =
@@ -51,16 +50,43 @@ let
     };
 
   renderedHost = api.host.build sliceArgs;
-
   renderedBridges = api.bridges.build sliceArgs;
 
-  renderedContainers = api.containers.buildForBox (
-    sliceArgs
-    // {
-      disabled = disabledContainers;
-      defaults = commonContainerOptions;
-    }
-  );
+  selectedRenderHostNames =
+    lib.filter
+      (renderHostName:
+        let
+          cfg = renderHostDefs.${renderHostName} or { };
+          deploymentTarget =
+            if builtins.isAttrs cfg && cfg ? deploymentHost && builtins.isString cfg.deploymentHost
+            then cfg.deploymentHost
+            else renderHostName;
+        in
+        deploymentTarget == identity.boxName
+      )
+      (builtins.attrNames renderHostDefs);
+
+  renderedContainersByRenderHost =
+    builtins.listToAttrs (
+      map
+        (renderHostName: {
+          name = renderHostName;
+          value = api.containers.buildForBox {
+            inherit (identity) enterpriseName siteName;
+            boxName = renderHostName;
+            inherit (fabric) intentPath inventoryPath;
+            disabled = disabledContainers;
+            defaults = commonContainerOptions;
+          };
+        })
+        selectedRenderHostNames
+    );
+
+  renderedContainers =
+    lib.foldl'
+      (acc: renderHostName: acc // renderedContainersByRenderHost.${renderHostName})
+      { }
+      selectedRenderHostNames;
 
   deploymentHostName =
     let
@@ -92,6 +118,9 @@ let
     debug = {
       host = renderedHost.debug or { };
       bridges = renderedBridges.debug or { };
+      selectedRenderHostNames = selectedRenderHostNames;
+      containersByRenderHost =
+        lib.mapAttrs (_: value: builtins.attrNames value) renderedContainersByRenderHost;
       containers = builtins.attrNames renderedContainers;
     };
   };
@@ -119,10 +148,12 @@ in
 
   environment.etc."network-renderer/network-renderer-nixos.json".text =
     builtins.toJSON {
-      inherit identity fabric disabledContainers;
+      inherit identity fabric disabledContainers selectedRenderHostNames;
       host = renderedHost.debug or { };
       bridges = renderedBridges.debug or { };
       containers = builtins.attrNames renderedContainers;
+      containersByRenderHost =
+        lib.mapAttrs (_: value: builtins.attrNames value) renderedContainersByRenderHost;
     };
 
   networking.useNetworkd = true;

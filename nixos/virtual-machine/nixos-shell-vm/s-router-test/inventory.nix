@@ -3,7 +3,9 @@
 
   deployment = {
     hosts = {
-      s-router-core = {
+      s-router-test = {
+        wanUplink = "upstream-core";
+
         uplinks = {
           management = {
             parent = "eth0";
@@ -31,11 +33,10 @@
             };
           };
 
-          fabric = {
+          trunk = {
             parent = "eth0";
-            mode = "vlan";
-            vlan = 200;
             bridge = "br-fabric";
+            mode = "trunk";
           };
         };
 
@@ -55,161 +56,53 @@
             ConfigureWithoutCarrier = true;
           };
         };
-      };
-
-      s-router-core-wan = {
-        uplinks = {
-          trunk = {
-            parent = "eth0";
-            bridge = "br-fabric";
-            mode = "trunk";
-          };
-        };
-
-        transitBridges = {
-          tr200 = {
-            name = "tr200";
-            vlan = 200;
-            parentUplink = "trunk";
-          };
-        };
-      };
-
-      s-router-policy = {
-        uplinks = {
-          management = {
-            parent = "eth0";
-            mode = "vlan";
-            vlan = 2;
-            bridge = "vlan2";
-          };
-
-          trunk = {
-            parent = "eth0";
-            bridge = "br-fabric";
-            mode = "trunk";
-          };
-        };
-
-        bridgeNetworks = {
-          vlan2 = {
-            DHCP = "ipv4";
-            IPv6AcceptRA = false;
-            LinkLocalAddressing = "ipv4";
-            ConfigureWithoutCarrier = true;
-          };
-
-          br-fabric = {
-            ConfigureWithoutCarrier = true;
-          };
-        };
 
         transitBridges = {
           tr100 = {
             name = "tr100";
-            vlan = 100;
+            vlan = 400;
             parentUplink = "trunk";
           };
 
           tr101 = {
             name = "tr101";
-            vlan = 101;
+            vlan = 401;
             parentUplink = "trunk";
           };
 
           tr102 = {
             name = "tr102";
-            vlan = 102;
+            vlan = 402;
+            parentUplink = "trunk";
+          };
+
+          tr200 = {
+            name = "tr200";
+            vlan = 500;
             parentUplink = "trunk";
           };
 
           tr201 = {
             name = "tr201";
-            vlan = 201;
+            vlan = 501;
             parentUplink = "trunk";
           };
 
           admin = {
             name = "admin";
-            vlan = 10;
+            vlan = 310;
             parentUplink = "trunk";
           };
 
           client = {
             name = "client";
-            vlan = 20;
+            vlan = 320;
             parentUplink = "trunk";
           };
 
           mgmt = {
             name = "mgmt";
-            vlan = 30;
-            parentUplink = "trunk";
-          };
-        };
-      };
-
-      s-router-policy-only = {
-        uplinks = {
-          management = {
-            parent = "eth0";
-            mode = "vlan";
-            vlan = 2;
-            bridge = "vlan2";
-          };
-
-          trunk = {
-            parent = "eth0";
-            bridge = "br-fabric";
-            mode = "trunk";
-          };
-        };
-
-        bridgeNetworks = {
-          vlan2 = {
-            DHCP = "ipv4";
-            IPv6AcceptRA = false;
-            LinkLocalAddressing = "ipv4";
-            ConfigureWithoutCarrier = true;
-          };
-
-          br-upstream = {
-            ConfigureWithoutCarrier = true;
-          };
-
-          br-fabric = {
-            ConfigureWithoutCarrier = true;
-          };
-        };
-
-        transitBridges = {
-          tr100 = {
-            name = "tr100";
-            vlan = 100;
-            parentUplink = "trunk";
-          };
-
-          tr101 = {
-            name = "tr101";
-            vlan = 101;
-            parentUplink = "trunk";
-          };
-
-          tr102 = {
-            name = "tr102";
-            vlan = 102;
-            parentUplink = "trunk";
-          };
-
-          tr200 = {
-            name = "tr200";
-            vlan = 200;
-            parentUplink = "trunk";
-          };
-
-          tr201 = {
-            name = "tr201";
-            vlan = 201;
+            vlan = 330;
             parentUplink = "trunk";
           };
         };
@@ -220,7 +113,7 @@
   realization = {
     nodes = {
       esp0xdeadbeef-site-a-s-router-core-wan = {
-        host = "s-router-core";
+        host = "s-router-test";
         platform = "linux";
 
         logicalNode = {
@@ -234,7 +127,7 @@
             link = "p2p-s-router-core-wan-s-router-upstream-selector";
             attach = {
               kind = "bridge";
-              bridge = "br-fabric";
+              bridge = "tr200";
             };
             interface = {
               name = "ens3";
@@ -244,7 +137,7 @@
       };
 
       s-router-access-admin = {
-        host = "s-router-policy";
+        host = "s-router-test";
         platform = "linux";
 
         logicalNode = {
@@ -279,7 +172,7 @@
       };
 
       s-router-access-client = {
-        host = "s-router-policy";
+        host = "s-router-test";
         platform = "linux";
 
         logicalNode = {
@@ -314,7 +207,7 @@
       };
 
       s-router-access-mgmt = {
-        host = "s-router-policy";
+        host = "s-router-test";
         platform = "linux";
 
         logicalNode = {
@@ -349,7 +242,7 @@
       };
 
       s-router-policy-only = {
-        host = "s-router-policy-only";
+        host = "s-router-test";
         platform = "nixos-container";
 
         logicalNode = {
@@ -406,7 +299,7 @@
       };
 
       s-router-upstream-selector = {
-        host = "s-router-policy";
+        host = "s-router-test";
         platform = "linux";
 
         logicalNode = {
@@ -445,23 +338,27 @@
   render = {
     hosts = {
       s-router-access = {
-        deploymentHost = "s-router-policy";
+        deploymentHost = "s-router-test";
       };
 
       s-router-core = {
         containerTemplate = "wan";
-        deploymentHost = "s-router-core";
+        deploymentHost = "s-router-test";
         runtimeRole = "core";
         wanUplink = "upstream-core";
       };
 
       s-router-core-wan = {
-        deploymentHost = "s-router-core-wan";
+        deploymentHost = "s-router-test";
       };
 
       s-router-policy-only = {
         containerName = "s-router-policy-only-container";
-        deploymentHost = "s-router-policy-only";
+        deploymentHost = "s-router-test";
+      };
+
+      s-router-upstream-selector = {
+        deploymentHost = "s-router-test";
       };
     };
   };

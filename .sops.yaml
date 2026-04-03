@@ -20,6 +20,7 @@ keys:
   - &s-router-upstream-selector age1xnwyn6yl7mdtnk6jkg5k22pk33x3zfql9r8suqcamfu5w3x2rqmsste7qv
   - &s-router-legacy-core age15vvnx3wd06juu0fc3ywykzdukf7mft2xswl3pmycvtjtvl5unpcq5tdl9l
   - &s-router-access age1e5jk0alk58pksmvqtvfkhwv8prlyd748m8jn7aq5jp88yjfwl9zqx0yn6l
+  - &s-router-test age1ry9jff7wmz6aenhhvna4qk280jtnruhhffzwyd6uwa2dljy0p5wqajh9p9
   
   
 
@@ -252,3 +253,11 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-access
+  - path_regex: '^(secrets/)*s-router-test.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-test

@@ -19,6 +19,11 @@ let
     inventoryPath = ../inventory.nix;
   };
 
+  sliceArgs = {
+    inherit (identity) enterpriseName siteName boxName;
+    inherit (fabric) intentPath inventoryPath;
+  };
+
   disabledContainers = { };
 
   commonContainerOptions = {
@@ -45,30 +50,36 @@ let
       matchedSites = [ identity.siteName ];
     };
 
-  renderedHost = api.host.build {
-    inherit lib outPath;
-    inherit (identity) enterpriseName siteName boxName;
-    inherit (fabric) intentPath inventoryPath;
-  };
+  renderedHost = api.host.build sliceArgs;
 
-  renderedBridges = api.bridges.build {
-    inherit lib outPath;
-    inherit (identity) enterpriseName siteName boxName;
-    inherit (fabric) intentPath inventoryPath;
-  };
+  renderedBridges = api.bridges.build sliceArgs;
 
-  renderedContainers = api.containers.buildForBox {
-    inherit lib outPath;
-    inherit (identity) enterpriseName siteName boxName;
-    inherit (fabric) intentPath inventoryPath;
+  renderedContainers = api.containers.buildForBox (
+    sliceArgs
+    // {
+      disabled = disabledContainers;
+      defaults = commonContainerOptions;
+    }
+  );
 
-    disabled = disabledContainers;
-    defaults = commonContainerOptions;
-  };
+  deploymentHostName =
+    let
+      fromBuiltHost =
+        if
+          builtHost ? hostContext
+          && builtins.isAttrs builtHost.hostContext
+          && builtHost.hostContext ? deploymentHostName
+          && builtins.isString builtHost.hostContext.deploymentHostName
+        then
+          builtHost.hostContext.deploymentHostName
+        else
+          null;
+    in
+    if fromBuiltHost != null then fromBuiltHost else renderedHost.deploymentHostName or null;
 
   renderedHostNetwork = {
     hostName = renderedHost.hostName or identity.boxName;
-    deploymentHostName = renderedHost.deploymentHostName or null;
+    inherit deploymentHostName;
     bridgeNameMap = renderedBridges.bridgeNameMap or { };
     bridges = renderedBridges.bridges or { };
     netdevs =
