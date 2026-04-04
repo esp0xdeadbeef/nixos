@@ -176,29 +176,6 @@
         }
 
         {
-          id = "deny-web-to-wan";
-
-          priority = 50;
-
-          from = {
-            kind = "tenant-set";
-            members = [
-              "mgmt"
-              "admin"
-              "client"
-            ];
-          };
-
-          to = {
-            kind = "external";
-            name = "wan";
-          };
-
-          trafficType = "web";
-          action = "allow";
-        }
-
-        {
           id = "allow-tenants-to-wan";
 
           priority = 100;
