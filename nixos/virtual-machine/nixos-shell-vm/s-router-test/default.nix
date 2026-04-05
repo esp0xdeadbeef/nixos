@@ -171,4 +171,5 @@ in
     // (renderedBridges.networks or { });
 
   containers = renderedContainers;
+  environment.etc."network-artifacts/control-plane-model.json".text = builtins.toJSON builtHost.controlPlaneOut;
 }

@@ -34,10 +34,10 @@ in
       description = "s-router-core VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
     })
-    (mkVM "s-router-upstream-selector" {
-      description = "s-router-upstream-selector VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
-    })
+    #(mkVM "s-router-upstream-selector" {
+    #  description = "s-router-upstream-selector VM (nixos-shell)";
+    #  repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
+    #})
 
     (mkVM "s-router-policy-only" {
       description = "s-router-policy-only VM (nixos-shell)";

@@ -21,6 +21,7 @@
             bridge = "br-upstream";
 
             ipv6 = {
+              method = "slaac";
               enable = true;
               acceptRA = true;
               dhcp = false;
@@ -28,6 +29,7 @@
             };
 
             ipv4 = {
+              method = "dhcp";
               enable = true;
               dhcp = true;
             };
@@ -123,6 +125,17 @@
         };
 
         ports = {
+          wan = {
+            uplink = "wan";
+            attach = {
+              kind = "bridge";
+              bridge = "br-upstream";
+            };
+            interface = {
+              name = "wan";
+            };
+          };
+
           upstream-selector = {
             link = "p2p-s-router-core-wan-s-router-upstream-selector";
             attach = {
@@ -159,7 +172,7 @@
           };
 
           tenant-admin = {
-            link = "tenant-admin-lan";
+            logicalInterface = "tenant-admin";
             attach = {
               kind = "bridge";
               bridge = "admin";
@@ -194,7 +207,7 @@
           };
 
           tenant-client = {
-            link = "tenant-client-lan";
+            logicalInterface = "tenant-client";
             attach = {
               kind = "bridge";
               bridge = "client";
@@ -229,7 +242,7 @@
           };
 
           tenant-mgmt = {
-            link = "tenant-mgmt-lan";
+            logicalInterface = "tenant-mgmt";
             attach = {
               kind = "bridge";
               bridge = "mgmt";
