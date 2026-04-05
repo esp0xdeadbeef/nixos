@@ -881,11 +881,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1775353775,
-        "narHash": "sha256-RtAROcC8PMixh3GDKZ4dnOF3in0VGepXW7cDnOoqcUY=",
+        "lastModified": 1775358483,
+        "narHash": "sha256-x7VJkNlvB+cWqHRd5vp07HF1ltQsMX7h4wyDGunIJuw=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "f2ec71a139317639cb960e09b2dd4f9305e0067c",
+        "rev": "b7e05b705fb0c523253e66faa17e4a52c61bc284",
         "type": "github"
       },
       "original": {
