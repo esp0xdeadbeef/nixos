@@ -1,6 +1,18 @@
 {
   schemaVersion = 1;
 
+  endpoints = {
+    web01 = {
+      ipv4 = [ "10.20.15.10" ];
+      ipv6 = [ "fd42:dead:beef:15::10" ];
+    };
+
+    s-sigma = {
+      ipv4 = [ "10.20.10.10" ];
+      ipv6 = [ "fd42:dead:beef:10::10" ];
+    };
+  };
+
   deployment = {
     hosts = {
       s-router-access = {
@@ -199,8 +211,8 @@
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          name = "s-router-core-wan";
           site = "site-a";
+          name = "s-router-core-wan";
         };
 
         ports = {
@@ -216,7 +228,8 @@
           };
 
           wan = {
-            uplink = "wan";
+            upstream = "upstream-core";
+            link = "wan";
             attach = {
               kind = "bridge";
               bridge = "br-upstream";
@@ -228,14 +241,14 @@
         };
       };
 
-      s-router-access-admin = {
+      esp0xdeadbeef-site-a-s-router-access-admin = {
         host = "s-router-access";
         platform = "linux";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          name = "s-router-access-admin";
           site = "site-a";
+          name = "s-router-access-admin";
         };
 
         ports = {
@@ -261,16 +274,42 @@
             };
           };
         };
+
+        advertisements = {
+          dhcp4 = {
+            tenant-admin = {
+              interface = "tenant-admin";
+              id = "tenant-admin";
+              subnet = "10.20.15.0/24";
+              pool = {
+                start = "10.20.15.100";
+                end = "10.20.15.200";
+              };
+              router = "10.20.15.1";
+              dnsServers = [ "10.20.15.1" ];
+              domain = "lan.";
+            };
+          };
+
+          ipv6Ra = {
+            tenant-admin = {
+              interface = "tenant-admin";
+              prefixes = [ "fd42:dead:beef:15::/64" ];
+              rdnss = [ "fd42:dead:beef:15::1" ];
+              dnssl = [ "lan." ];
+            };
+          };
+        };
       };
 
-      s-router-access-client = {
+      esp0xdeadbeef-site-a-s-router-access-client = {
         host = "s-router-access";
         platform = "linux";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          name = "s-router-access-client";
           site = "site-a";
+          name = "s-router-access-client";
         };
 
         ports = {
@@ -296,16 +335,42 @@
             };
           };
         };
+
+        advertisements = {
+          dhcp4 = {
+            tenant-client = {
+              interface = "tenant-client";
+              id = "tenant-client";
+              subnet = "10.20.20.0/24";
+              pool = {
+                start = "10.20.20.100";
+                end = "10.20.20.200";
+              };
+              router = "10.20.20.1";
+              dnsServers = [ "10.20.20.1" ];
+              domain = "lan.";
+            };
+          };
+
+          ipv6Ra = {
+            tenant-client = {
+              interface = "tenant-client";
+              prefixes = [ "fd42:dead:beef:20::/64" ];
+              rdnss = [ "fd42:dead:beef:20::1" ];
+              dnssl = [ "lan." ];
+            };
+          };
+        };
       };
 
-      s-router-access-mgmt = {
+      esp0xdeadbeef-site-a-s-router-access-mgmt = {
         host = "s-router-access";
         platform = "linux";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          name = "s-router-access-mgmt";
           site = "site-a";
+          name = "s-router-access-mgmt";
         };
 
         ports = {
@@ -331,16 +396,42 @@
             };
           };
         };
+
+        advertisements = {
+          dhcp4 = {
+            tenant-mgmt = {
+              interface = "tenant-mgmt";
+              id = "tenant-mgmt";
+              subnet = "10.20.10.0/24";
+              pool = {
+                start = "10.20.10.100";
+                end = "10.20.10.200";
+              };
+              router = "10.20.10.1";
+              dnsServers = [ "10.20.10.1" ];
+              domain = "lan.";
+            };
+          };
+
+          ipv6Ra = {
+            tenant-mgmt = {
+              interface = "tenant-mgmt";
+              prefixes = [ "fd42:dead:beef:10::/64" ];
+              rdnss = [ "fd42:dead:beef:10::1" ];
+              dnssl = [ "lan." ];
+            };
+          };
+        };
       };
 
-      s-router-policy-only = {
+      esp0xdeadbeef-site-a-s-router-policy = {
         host = "s-router-policy";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          name = "s-router-policy";
           site = "site-a";
+          name = "s-router-policy";
         };
 
         ports = {
@@ -368,14 +459,14 @@
         };
       };
 
-      s-router-upstream-selector = {
+      esp0xdeadbeef-site-a-s-router-upstream-selector = {
         host = "s-router-policy";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          name = "s-router-upstream-selector";
           site = "site-a";
+          name = "s-router-upstream-selector";
         };
 
         ports = {
@@ -403,14 +494,14 @@
         };
       };
 
-      s-router-downstream-selector = {
+      esp0xdeadbeef-site-a-s-router-downstream-selector = {
         host = "s-router-policy";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          name = "s-router-downstream-selector";
           site = "site-a";
+          name = "s-router-downstream-selector";
         };
 
         ports = {
@@ -421,7 +512,7 @@
               bridge = "tr202";
             };
             interface = {
-              name = "policy"
+              name = "policy";
             };
           };
 
@@ -479,7 +570,7 @@
         deploymentHost = "s-router-core";
       };
 
-      s-router-policy-only = {
+      s-router-policy = {
         containerName = "s-router-policy-only-container";
         deploymentHost = "s-router-policy";
       };
