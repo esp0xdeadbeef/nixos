@@ -271,6 +271,8 @@
             };
             interface = {
               name = "tenant-admin";
+              addr4 = "10.20.15.1/24";
+              addr6 = "fd42:dead:beef:15::1/64";
             };
           };
         };
@@ -279,7 +281,7 @@
           dhcp4 = {
             tenant-admin = {
               interface = "tenant-admin";
-              id = "tenant-admin";
+              id = "admin";
               subnet = "10.20.15.0/24";
               pool = {
                 start = "10.20.15.100";
@@ -332,6 +334,8 @@
             };
             interface = {
               name = "tenant-client";
+              addr4 = "10.20.20.1/24";
+              addr6 = "fd42:dead:beef:20::1/64";
             };
           };
         };
@@ -340,7 +344,7 @@
           dhcp4 = {
             tenant-client = {
               interface = "tenant-client";
-              id = "tenant-client";
+              id = "client";
               subnet = "10.20.20.0/24";
               pool = {
                 start = "10.20.20.100";
@@ -393,6 +397,8 @@
             };
             interface = {
               name = "tenant-mgmt";
+              addr4 = "10.20.10.1/24";
+              addr6 = "fd42:dead:beef:10::1/64";
             };
           };
         };
@@ -401,7 +407,7 @@
           dhcp4 = {
             tenant-mgmt = {
               interface = "tenant-mgmt";
-              id = "tenant-mgmt";
+              id = "mgmt";
               subnet = "10.20.10.0/24";
               pool = {
                 start = "10.20.10.100";

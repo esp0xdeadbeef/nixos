@@ -1,18 +1,4 @@
 {
-  schemaVersion = 1;
-
-  endpoints = {
-    web01 = {
-      ipv4 = [ "10.20.15.10" ];
-      ipv6 = [ "fd42:dead:beef:15::10" ];
-    };
-
-    s-sigma = {
-      ipv4 = [ "10.20.10.10" ];
-      ipv6 = [ "fd42:dead:beef:10::10" ];
-    };
-  };
-
   deployment = {
     hosts = {
       s-router-test = {
@@ -198,6 +184,8 @@
             };
             interface = {
               name = "tenant-admin";
+              addr4 = "10.20.15.1/24";
+              addr6 = "fd42:dead:beef:15::1/64";
             };
           };
         };
@@ -206,7 +194,7 @@
           dhcp4 = {
             tenant-admin = {
               interface = "tenant-admin";
-              id = "tenant-admin";
+              id = "admin";
               subnet = "10.20.15.0/24";
               pool = {
                 start = "10.20.15.100";
@@ -259,6 +247,8 @@
             };
             interface = {
               name = "tenant-client";
+              addr4 = "10.20.20.1/24";
+              addr6 = "fd42:dead:beef:20::1/64";
             };
           };
         };
@@ -267,7 +257,7 @@
           dhcp4 = {
             tenant-client = {
               interface = "tenant-client";
-              id = "tenant-client";
+              id = "client";
               subnet = "10.20.20.0/24";
               pool = {
                 start = "10.20.20.100";
@@ -320,6 +310,8 @@
             };
             interface = {
               name = "tenant-mgmt";
+              addr4 = "10.20.10.1/24";
+              addr6 = "fd42:dead:beef:10::1/64";
             };
           };
         };
@@ -328,7 +320,7 @@
           dhcp4 = {
             tenant-mgmt = {
               interface = "tenant-mgmt";
-              id = "tenant-mgmt";
+              id = "mgmt";
               subnet = "10.20.10.0/24";
               pool = {
                 start = "10.20.10.100";
@@ -477,54 +469,6 @@
           };
         };
       };
-    };
-  };
-
-  render = {
-    hosts = {
-      s-router-access = {
-        deploymentHost = "s-router-test";
-      };
-
-      s-router-core = {
-        containerTemplate = "wan";
-        deploymentHost = "s-router-test";
-        runtimeRole = "core";
-        wanUplink = "upstream-core";
-      };
-
-      s-router-core-wan = {
-        deploymentHost = "s-router-test";
-      };
-
-      s-router-downstream-selector = {
-        deploymentHost = "s-router-test";
-      };
-
-      s-router-policy = {
-        deploymentHost = "s-router-test";
-      };
-
-      s-router-upstream-selector = {
-        deploymentHost = "s-router-test";
-      };
-    };
-  };
-
-  secrets = {
-    pppoe-password = {
-      owner = "root";
-      mode = "0400";
-    };
-
-    pppoe-username = {
-      owner = "root";
-      mode = "0400";
-    };
-
-    subnet-ipv6 = {
-      owner = "root";
-      mode = "0400";
     };
   };
 }
