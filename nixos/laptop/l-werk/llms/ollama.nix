@@ -1,7 +1,15 @@
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
+
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    system = pkgs.system;
+    config = config.nixpkgs.config;
+  };
+in
 {
   services.ollama = {
     enable = true;
+    package = pkgs-unstable.ollama;
     loadModels = [
       "llama3.1:8b"
       "qwen2.5-coder:1.5b-base"
@@ -17,5 +25,6 @@
     ];
     host = "0.0.0.0";
   };
+
   networking.firewall.interfaces.podman0.allowedTCPPorts = [ 11434 ];
 }
