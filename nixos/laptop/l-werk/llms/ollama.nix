@@ -12,6 +12,8 @@
       "nous-hermes2:34b"
       "wizardlm2:7b"
       "llama3.1:13b"
+      "gemma4:31b"
+      "gemma4:e4b"
     ];
     host = "0.0.0.0";
   };
