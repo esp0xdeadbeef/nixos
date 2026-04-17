@@ -19,18 +19,15 @@ let
     inventoryPath = ./inventory.nix;
   };
 
-  inventory = import ./inventory.nix;
-  renderHostDefs = inventory.render.hosts or { };
+  sliceArgs = {
+    inherit (identity) enterpriseName siteName boxName;
+    inherit (fabric) intentPath inventoryPath;
+  };
 
   disabledContainers = { };
 
   commonContainerOptions = {
     autoStart = true;
-  };
-
-  sliceArgs = {
-    inherit (identity) enterpriseName siteName boxName;
-    inherit (fabric) intentPath inventoryPath;
   };
 
   builtHost = api.renderer.buildHostFromPaths {
@@ -50,43 +47,16 @@ let
     };
 
   renderedHost = api.host.build sliceArgs;
+
   renderedBridges = api.bridges.build sliceArgs;
 
-  selectedRenderHostNames =
-    lib.filter
-      (renderHostName:
-        let
-          cfg = renderHostDefs.${renderHostName} or { };
-          deploymentTarget =
-            if builtins.isAttrs cfg && cfg ? deploymentHost && builtins.isString cfg.deploymentHost
-            then cfg.deploymentHost
-            else renderHostName;
-        in
-        deploymentTarget == identity.boxName
-      )
-      (builtins.attrNames renderHostDefs);
-
-  renderedContainersByRenderHost =
-    builtins.listToAttrs (
-      map
-        (renderHostName: {
-          name = renderHostName;
-          value = api.containers.buildForBox {
-            inherit (identity) enterpriseName siteName;
-            boxName = renderHostName;
-            inherit (fabric) intentPath inventoryPath;
-            disabled = disabledContainers;
-            defaults = commonContainerOptions;
-          };
-        })
-        selectedRenderHostNames
-    );
-
-  renderedContainers =
-    lib.foldl'
-      (acc: renderHostName: acc // renderedContainersByRenderHost.${renderHostName})
-      { }
-      selectedRenderHostNames;
+  renderedContainers = api.containers.buildForBox (
+    sliceArgs
+    // {
+      disabled = disabledContainers;
+      defaults = commonContainerOptions;
+    }
+  );
 
   deploymentHostName =
     let
@@ -118,9 +88,6 @@ let
     debug = {
       host = renderedHost.debug or { };
       bridges = renderedBridges.debug or { };
-      selectedRenderHostNames = selectedRenderHostNames;
-      containersByRenderHost =
-        lib.mapAttrs (_: value: builtins.attrNames value) renderedContainersByRenderHost;
       containers = builtins.attrNames renderedContainers;
     };
   };
@@ -148,12 +115,10 @@ in
 
   environment.etc."network-renderer/network-renderer-nixos.json".text =
     builtins.toJSON {
-      inherit identity fabric disabledContainers selectedRenderHostNames;
+      inherit identity fabric disabledContainers;
       host = renderedHost.debug or { };
       bridges = renderedBridges.debug or { };
       containers = builtins.attrNames renderedContainers;
-      containersByRenderHost =
-        lib.mapAttrs (_: value: builtins.attrNames value) renderedContainersByRenderHost;
     };
 
   networking.useNetworkd = true;
@@ -171,5 +136,4 @@ in
     // (renderedBridges.networks or { });
 
   containers = renderedContainers;
-  environment.etc."network-artifacts/control-plane-model.json".text = builtins.toJSON builtHost.controlPlaneOut;
 }
