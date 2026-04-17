@@ -133,7 +133,7 @@
         };
       };
 
-      s-router-policy = {
+      s-router-policy-only = {
         uplinks = {
           management = {
             parent = "eth0";
@@ -430,19 +430,19 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-policy = {
-        host = "s-router-policy";
+      esp0xdeadbeef-site-a-s-router-policy-only = {
+        host = "s-router-policy-only";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
-          name = "s-router-policy";
+          name = "s-router-policy-only";
         };
 
         ports = {
           upstream-selector = {
-            link = "p2p-s-router-policy-s-router-upstream-selector";
+            link = "p2p-s-router-policy-only-s-router-upstream-selector";
             attach = {
               kind = "bridge";
               bridge = "tr201";
@@ -453,7 +453,7 @@
           };
 
           downstream-selector = {
-            link = "p2p-s-router-downstream-selector-s-router-policy";
+            link = "p2p-s-router-downstream-selector-s-router-policy-only";
             attach = {
               kind = "bridge";
               bridge = "tr202";
@@ -466,7 +466,7 @@
       };
 
       esp0xdeadbeef-site-a-s-router-upstream-selector = {
-        host = "s-router-policy";
+        host = "s-router-policy-only";
         platform = "nixos-container";
 
         logicalNode = {
@@ -488,7 +488,7 @@
           };
 
           policy = {
-            link = "p2p-s-router-policy-s-router-upstream-selector";
+            link = "p2p-s-router-policy-only-s-router-upstream-selector";
             attach = {
               kind = "bridge";
               bridge = "tr201";
@@ -501,7 +501,7 @@
       };
 
       esp0xdeadbeef-site-a-s-router-downstream-selector = {
-        host = "s-router-policy";
+        host = "s-router-policy-only";
         platform = "nixos-container";
 
         logicalNode = {
@@ -512,7 +512,7 @@
 
         ports = {
           policy = {
-            link = "p2p-s-router-downstream-selector-s-router-policy";
+            link = "p2p-s-router-downstream-selector-s-router-policy-only";
             attach = {
               kind = "bridge";
               bridge = "tr202";
@@ -576,17 +576,17 @@
         deploymentHost = "s-router-core";
       };
 
-      s-router-policy = {
+      s-router-policy-only = {
         containerName = "s-router-policy-only-container";
-        deploymentHost = "s-router-policy";
+        deploymentHost = "s-router-policy-only";
       };
 
       s-router-upstream-selector = {
-        deploymentHost = "s-router-policy";
+        deploymentHost = "s-router-policy-only";
       };
 
       s-router-downstream-selector = {
-        deploymentHost = "s-router-policy";
+        deploymentHost = "s-router-policy-only";
       };
     };
   };

@@ -355,7 +355,7 @@
 
         ports = {
           policy = {
-            link = "p2p-s-router-downstream-selector-s-router-policy";
+            link = "p2p-s-router-downstream-selector-s-router-policy-only";
             attach = {
               kind = "bridge";
               bridge = "tr103";
@@ -407,12 +407,12 @@
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
-          name = "s-router-policy";
+          name = "s-router-policy-only";
         };
 
         ports = {
           upstream-selector = {
-            link = "p2p-s-router-policy-s-router-upstream-selector";
+            link = "p2p-s-router-policy-only-s-router-upstream-selector";
             attach = {
               kind = "bridge";
               bridge = "tr201";
@@ -423,7 +423,7 @@
           };
 
           downstream-selector = {
-            link = "p2p-s-router-downstream-selector-s-router-policy";
+            link = "p2p-s-router-downstream-selector-s-router-policy-only";
             attach = {
               kind = "bridge";
               bridge = "tr103";
@@ -458,7 +458,7 @@
           };
 
           policy = {
-            link = "p2p-s-router-policy-s-router-upstream-selector";
+            link = "p2p-s-router-policy-only-s-router-upstream-selector";
             attach = {
               kind = "bridge";
               bridge = "tr201";

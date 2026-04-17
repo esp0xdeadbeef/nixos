@@ -281,7 +281,7 @@
           role = "upstream-selector";
         };
 
-        s-router-policy = {
+        s-router-policy-only = {
           role = "policy";
         };
 
@@ -327,10 +327,10 @@
         ]
         [
           "s-router-upstream-selector"
-          "s-router-policy"
+          "s-router-policy-only"
         ]
         [
-          "s-router-policy"
+          "s-router-policy-only"
           "s-router-downstream-selector"
         ]
         [
