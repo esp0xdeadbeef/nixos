@@ -401,11 +401,11 @@
         "pkgs-by-name-for-flake-parts": "pkgs-by-name-for-flake-parts"
       },
       "locked": {
-        "lastModified": 1776437560,
-        "narHash": "sha256-LGq195pYHd2eIZ7hy+mqKKUc/TwmwDnBW8XKJE8QV+Q=",
+        "lastModified": 1776483294,
+        "narHash": "sha256-yLJs08xH77XgSQnMCQzaHBQYtMu6II/Z13OtWmujlsU=",
         "owner": "khaneliman",
         "repo": "khanelivim",
-        "rev": "43013254a204cd94586fd8e43580b632ac6b9434",
+        "rev": "b04084e2ee7a4528ab701dbea5b98e46e930b76b",
         "type": "github"
       },
       "original": {
@@ -854,11 +854,11 @@
         "nixpkgs": "nixpkgs_6"
       },
       "locked": {
-        "lastModified": 1776482372,
-        "narHash": "sha256-k48XzKU7nAVARh7P/Zo7Hc3DExVtFeWT1I+cUaE+jTE=",
+        "lastModified": 1776483495,
+        "narHash": "sha256-kgG924B8BYjWZrbBF9JR/PWguRW8tpjNTx6IFLM4nN8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "36943ce553b3cfd4b870052a2e9c788861dd68ba",
+        "rev": "5aa8669b8c17c458cfbc2edc59217e75c0a60f7e",
         "type": "github"
       },
       "original": {
