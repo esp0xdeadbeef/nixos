@@ -40,23 +40,6 @@
           };
         };
 
-        bridgeNetworks = {
-          vlan2 = {
-            DHCP = "ipv4";
-            IPv6AcceptRA = false;
-            LinkLocalAddressing = "ipv4";
-            ConfigureWithoutCarrier = true;
-          };
-
-          br-upstream = {
-            ConfigureWithoutCarrier = true;
-          };
-
-          br-fabric = {
-            ConfigureWithoutCarrier = true;
-          };
-        };
-
         transitBridges = {
           tr100 = {
             name = "tr100";
@@ -120,12 +103,18 @@
     nodes = {
       esp0xdeadbeef-site-a-s-router-core-wan = {
         host = "s-router-test";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
           name = "s-router-core-wan";
+        };
+
+        containers = {
+          default = {
+            runtimeName = "s-router-core-wan";
+          };
         };
 
         ports = {
@@ -141,8 +130,8 @@
           };
 
           wan = {
-            upstream = "upstream-core";
-            link = "wan";
+            uplink = "wan";
+            external = true;
             attach = {
               kind = "bridge";
               bridge = "br-upstream";
@@ -156,12 +145,18 @@
 
       esp0xdeadbeef-site-a-s-router-access-admin = {
         host = "s-router-test";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
           name = "s-router-access-admin";
+        };
+
+        containers = {
+          default = {
+            runtimeName = "s-router-access-admin";
+          };
         };
 
         ports = {
@@ -219,12 +214,18 @@
 
       esp0xdeadbeef-site-a-s-router-access-client = {
         host = "s-router-test";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
           name = "s-router-access-client";
+        };
+
+        containers = {
+          default = {
+            runtimeName = "s-router-access-client";
+          };
         };
 
         ports = {
@@ -282,12 +283,18 @@
 
       esp0xdeadbeef-site-a-s-router-access-mgmt = {
         host = "s-router-test";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
           name = "s-router-access-mgmt";
+        };
+
+        containers = {
+          default = {
+            runtimeName = "s-router-access-mgmt";
+          };
         };
 
         ports = {
@@ -345,12 +352,18 @@
 
       esp0xdeadbeef-site-a-s-router-downstream-selector = {
         host = "s-router-test";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
           name = "s-router-downstream-selector";
+        };
+
+        containers = {
+          default = {
+            runtimeName = "s-router-downstream-selector";
+          };
         };
 
         ports = {
@@ -410,6 +423,12 @@
           name = "s-router-policy-only";
         };
 
+        containers = {
+          default = {
+            runtimeName = "s-router-policy";
+          };
+        };
+
         ports = {
           upstream-selector = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector";
@@ -437,12 +456,18 @@
 
       esp0xdeadbeef-site-a-s-router-upstream-selector = {
         host = "s-router-test";
-        platform = "linux";
+        platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
           name = "s-router-upstream-selector";
+        };
+
+        containers = {
+          default = {
+            runtimeName = "s-router-upstream-selector";
+          };
         };
 
         ports = {

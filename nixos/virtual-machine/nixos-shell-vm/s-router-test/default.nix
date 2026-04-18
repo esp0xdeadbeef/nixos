@@ -20,7 +20,7 @@ let
   };
 
   sliceArgs = {
-    inherit (identity) enterpriseName siteName boxName;
+    inherit (identity) boxName;
     inherit (fabric) intentPath inventoryPath;
   };
 
@@ -57,6 +57,12 @@ let
       defaults = commonContainerOptions;
     }
   );
+
+  renderedArtifacts = api.artifacts.controlPlaneSplitFromPaths {
+    inherit (fabric) intentPath inventoryPath;
+    fileName = "control-plane-model.json";
+    directory = "network-artifacts";
+  };
 
   deploymentHostName =
     let
@@ -97,6 +103,7 @@ in
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./mount-utils.nix
     ./sops.nix
+    renderedArtifacts
   ];
 
   system.stateVersion = lib.mkForce "24.11";
