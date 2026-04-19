@@ -1,13 +1,14 @@
 {
   inputs,
-  outPath,
+  config,
   lib,
+  pkgs,
+  modulesPath,
+  outPath,
   ...
 }:
 
 let
-  api = inputs.network-renderer-nixos.lib;
-
   identity = {
     enterpriseName = "esp0xdeadbeef";
     siteName = "site-a";
@@ -19,128 +20,126 @@ let
     inventoryPath = ./inventory.nix;
   };
 
-  sliceArgs = {
-    inherit (identity) boxName;
+  system = if builtins ? currentSystem then builtins.currentSystem else "x86_64-linux";
+
+  renderer = inputs.network-renderer-nixos.libBySystem.${system};
+
+  vmBuild = renderer.vm.build {
     inherit (fabric) intentPath inventoryPath;
-  };
-
-  disabledContainers = { };
-
-  commonContainerOptions = {
-    autoStart = true;
-  };
-
-  builtHost = api.renderer.buildHostFromPaths {
-    inherit (fabric) intentPath inventoryPath;
-    selector = identity.boxName;
-    file = "nixos/virtual-machine/nixos-shell-vm/s-router-test/default.nix";
-  };
-
-  resolvedHostContext =
-    (builtHost.hostContext or { })
-    // {
-      hostname = identity.boxName;
-      enterpriseName = identity.enterpriseName;
-      siteName = identity.siteName;
-      matchedEnterprises = [ identity.enterpriseName ];
-      matchedSites = [ identity.siteName ];
-    };
-
-  renderedHost = api.host.build sliceArgs;
-
-  renderedBridges = api.bridges.build sliceArgs;
-
-  renderedContainers = api.containers.buildForBox (
-    sliceArgs
-    // {
-      disabled = disabledContainers;
-      defaults = commonContainerOptions;
-    }
-  );
-
-  renderedArtifacts = api.artifacts.controlPlaneSplitFromPaths {
-    inherit (fabric) intentPath inventoryPath;
-    fileName = "control-plane-model.json";
-    directory = "network-artifacts";
-  };
-
-  deploymentHostName =
-    let
-      fromBuiltHost =
-        if
-          builtHost ? hostContext
-          && builtins.isAttrs builtHost.hostContext
-          && builtHost.hostContext ? deploymentHostName
-          && builtins.isString builtHost.hostContext.deploymentHostName
-        then
-          builtHost.hostContext.deploymentHostName
-        else
-          null;
-    in
-    if fromBuiltHost != null then fromBuiltHost else renderedHost.deploymentHostName or null;
-
-  renderedHostNetwork = {
-    hostName = renderedHost.hostName or identity.boxName;
-    inherit deploymentHostName;
-    bridgeNameMap = renderedBridges.bridgeNameMap or { };
-    bridges = renderedBridges.bridges or { };
-    netdevs =
-      (renderedHost.netdevs or { })
-      // (renderedBridges.netdevs or { });
-    networks =
-      (renderedHost.networks or { })
-      // (renderedBridges.networks or { });
-    containers = renderedContainers;
-    debug = {
-      host = renderedHost.debug or { };
-      bridges = renderedBridges.debug or { };
-      containers = builtins.attrNames renderedContainers;
+    boxName = identity.boxName;
+    simulatedContainerDefaults = {
+      autoStart = true;
+      privateNetwork = true;
     };
   };
 in
 {
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    "${modulesPath}/virtualisation/qemu-vm.nix"
+    vmBuild.artifactModule
+    inputs.sops-nix.nixosModules.sops
     ./mount-utils.nix
     ./sops.nix
-    renderedArtifacts
   ];
 
   system.stateVersion = lib.mkForce "24.11";
+  system.build.nixos-shell = config.system.build.vm;
+
+  sops.defaultSopsFile = builtins.toFile "vm-empty-secrets.yaml" "{}";
+  sops.validateSopsFiles = false;
 
   _module.args = {
     inherit identity fabric;
-    globalInventory = builtHost.globalInventory or { };
-    hostContext = resolvedHostContext;
-    intent = builtHost.fabricInputs or { };
-    fabricInputs = builtHost.fabricInputs or { };
-    compilerOut = builtHost.compilerOut or { };
-    forwardingOut = builtHost.forwardingOut or { };
-    controlPlaneOut = builtHost.controlPlaneOut or { };
-    inherit renderedHostNetwork;
+    renderedHostNetwork = {
+      hostName = vmBuild.boxName;
+      deploymentHostName = null;
+      bridgeNameMap = { };
+      bridges = { };
+      netdevs = vmBuild.renderedNetdevs;
+      networks = vmBuild.renderedNetworks;
+      containers = vmBuild.renderedContainers;
+      debug = {
+        host = { };
+        bridges = { };
+        containers = builtins.attrNames vmBuild.renderedContainers;
+      };
+    };
   };
 
   environment.etc."network-renderer/network-renderer-nixos.json".text =
     builtins.toJSON {
-      inherit identity fabric disabledContainers;
-      host = renderedHost.debug or { };
-      bridges = renderedBridges.debug or { };
-      containers = builtins.attrNames renderedContainers;
+      inherit identity fabric;
+      host = { };
+      bridges = { };
+      containers = builtins.attrNames vmBuild.renderedContainers;
     };
 
+  boot.loader.grub.enable = false;
+  boot.isContainer = false;
+
+  networking.hostName = vmBuild.boxName;
   networking.useNetworkd = true;
-  systemd.network.enable = true;
   networking.useDHCP = false;
   networking.useHostResolvConf = lib.mkForce false;
+  networking.nftables.enable = false;
+  networking.firewall.enable = false;
+
+  systemd.network.enable = true;
+  systemd.network.netdevs = vmBuild.renderedNetdevs;
+  systemd.network.networks = vmBuild.renderedNetworks;
+
   services.resolved.enable = lib.mkForce false;
 
-  systemd.network.netdevs =
-    (renderedHost.netdevs or { })
-    // (renderedBridges.netdevs or { });
+  virtualisation = {
+    memorySize = 4096;
+    cores = 4;
+    graphics = false;
+    forwardPorts = [
+      {
+        from = "host";
+        host.port = 2222;
+        guest.port = 22;
+      }
+    ];
+    vmVariant = {
+      virtualisation = {
+        memorySize = 4096;
+        cores = 4;
+        graphics = false;
+        forwardPorts = [
+          {
+            from = "host";
+            host.port = 2222;
+            guest.port = 22;
+          }
+        ];
+      };
+    };
+  };
 
-  systemd.network.networks =
-    (renderedHost.networks or { })
-    // (renderedBridges.networks or { });
+  users.mutableUsers = false;
+  users.users.root = {
+    initialHashedPassword = "";
+    shell = pkgs.bashInteractive;
+    ignoreShellProgramCheck = true;
+  };
 
-  containers = renderedContainers;
+  programs.bash.enable = true;
+  programs.zsh.enable = false;
+
+  services.getty.autologinUser = "root";
+  services.openssh.enable = true;
+
+  environment.systemPackages = with pkgs; [
+    bashInteractive
+    git
+    jq
+    vim
+    iproute2
+    iputils
+    tcpdump
+    curl
+  ];
+
+  containers = vmBuild.renderedContainers;
 }
