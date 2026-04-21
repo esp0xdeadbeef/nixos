@@ -1,14 +1,13 @@
 {
   inputs,
-  config,
   lib,
-  pkgs,
-  modulesPath,
   outPath,
   ...
 }:
 
 let
+  api = inputs.network-renderer-nixos.lib;
+
   identity = {
     enterpriseName = "esp0xdeadbeef";
     siteName = "site-a";
@@ -20,126 +19,171 @@ let
     inventoryPath = ./inventory.nix;
   };
 
-  system = if builtins ? currentSystem then builtins.currentSystem else "x86_64-linux";
-
-  renderer = inputs.network-renderer-nixos.libBySystem.${system};
-
-  vmBuild = renderer.vm.build {
+  sliceArgs = {
+    inherit (identity) enterpriseName siteName boxName;
     inherit (fabric) intentPath inventoryPath;
-    boxName = identity.boxName;
-    simulatedContainerDefaults = {
-      autoStart = true;
-      privateNetwork = true;
+  };
+
+  disabledContainers = { };
+
+  commonContainerOptions = {
+    autoStart = true;
+    additionalCapabilities = [
+      "CAP_NET_ADMIN"
+      "CAP_NET_RAW"
+    ];
+  };
+
+  builtHost = api.renderer.buildHostFromPaths {
+    inherit (fabric) intentPath inventoryPath;
+    selector = identity.boxName;
+    file = "nixos/virtual-machine/nixos-shell-vm/s-router-test/default.nix";
+  };
+
+  resolvedHostContext =
+    (builtHost.hostContext or { })
+    // {
+      hostname = identity.boxName;
+      enterpriseName = identity.enterpriseName;
+      siteName = identity.siteName;
+      matchedEnterprises = [ identity.enterpriseName ];
+      matchedSites = [ identity.siteName ];
+    };
+
+  renderedHost = api.host.build sliceArgs;
+
+  renderedBridges = api.bridges.build sliceArgs;
+
+  renderedContainers = api.containers.buildForBox (
+    sliceArgs
+    // {
+      disabled = disabledContainers;
+      defaults = commonContainerOptions;
+    }
+  );
+
+  deploymentHostName =
+    let
+      fromBuiltHost =
+        if
+          builtHost ? hostContext
+          && builtins.isAttrs builtHost.hostContext
+          && builtHost.hostContext ? deploymentHostName
+          && builtins.isString builtHost.hostContext.deploymentHostName
+        then
+          builtHost.hostContext.deploymentHostName
+        else
+          null;
+    in
+    if fromBuiltHost != null then fromBuiltHost else renderedHost.deploymentHostName or null;
+
+  renderedHostNetwork = {
+    hostName = renderedHost.hostName or identity.boxName;
+    inherit deploymentHostName;
+    bridgeNameMap = renderedBridges.bridgeNameMap or { };
+    bridges = renderedBridges.bridges or { };
+    netdevs =
+      (renderedHost.netdevs or { })
+      // (renderedBridges.netdevs or { });
+    networks =
+      (renderedHost.networks or { })
+      // (renderedBridges.networks or { });
+    containers = renderedContainers;
+    debug = {
+      host = renderedHost.debug or { };
+      bridges = renderedBridges.debug or { };
+      containers = builtins.attrNames renderedContainers;
     };
   };
 in
 {
   imports = [
-    "${modulesPath}/virtualisation/qemu-vm.nix"
-    vmBuild.artifactModule
-    inputs.sops-nix.nixosModules.sops
+    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./mount-utils.nix
     ./sops.nix
   ];
 
-  system.stateVersion = lib.mkForce "24.11";
-  system.build.nixos-shell = config.system.build.vm;
-
-  sops.defaultSopsFile = builtins.toFile "vm-empty-secrets.yaml" "{}";
-  sops.validateSopsFiles = false;
+  system.stateVersion = lib.mkForce "25.11";
 
   _module.args = {
     inherit identity fabric;
-    renderedHostNetwork = {
-      hostName = vmBuild.boxName;
-      deploymentHostName = null;
-      bridgeNameMap = { };
-      bridges = { };
-      netdevs = vmBuild.renderedNetdevs;
-      networks = vmBuild.renderedNetworks;
-      containers = vmBuild.renderedContainers;
-      debug = {
-        host = { };
-        bridges = { };
-        containers = builtins.attrNames vmBuild.renderedContainers;
-      };
-    };
+    globalInventory = builtHost.globalInventory or { };
+    hostContext = resolvedHostContext;
+    intent = builtHost.fabricInputs or { };
+    fabricInputs = builtHost.fabricInputs or { };
+    compilerOut = builtHost.compilerOut or { };
+    forwardingOut = builtHost.forwardingOut or { };
+    controlPlaneOut = builtHost.controlPlaneOut or { };
+    inherit renderedHostNetwork;
   };
 
   environment.etc."network-renderer/network-renderer-nixos.json".text =
     builtins.toJSON {
       inherit identity fabric;
-      host = { };
-      bridges = { };
-      containers = builtins.attrNames vmBuild.renderedContainers;
+      host = renderedHost.debug or { };
+      bridges = renderedBridges.debug or { };
+      containers = builtins.attrNames renderedContainers;
     };
 
-  boot.loader.grub.enable = false;
-  boot.isContainer = false;
-
-  networking.hostName = vmBuild.boxName;
   networking.useNetworkd = true;
+  systemd.network.enable = true;
   networking.useDHCP = false;
   networking.useHostResolvConf = lib.mkForce false;
-  networking.nftables.enable = false;
-  networking.firewall.enable = false;
-
-  systemd.network.enable = true;
-  systemd.network.netdevs = vmBuild.renderedNetdevs;
-  systemd.network.networks = vmBuild.renderedNetworks;
-
   services.resolved.enable = lib.mkForce false;
 
-  virtualisation = {
-    memorySize = 4096;
-    cores = 4;
-    graphics = false;
-    forwardPorts = [
+  systemd.network.netdevs =
+    (renderedHost.netdevs or { })
+    // (renderedBridges.netdevs or { });
+
+  # Management uplink (eth0.2 -> vlan2) should get DHCPv4 so the host itself
+  # has connectivity. `mgmt` is a tenant L2 bridge (VLAN 330), not the host mgmt
+  # uplink; expect the host address on `vlan2` instead.
+  systemd.network.networks =
+    lib.recursiveUpdate
+      (
+        (renderedHost.networks or { })
+        // (renderedBridges.networks or { })
+      )
       {
-        from = "host";
-        host.port = 2222;
-        guest.port = 22;
-      }
-    ];
-    vmVariant = {
-      virtualisation = {
-        memorySize = 4096;
-        cores = 4;
-        graphics = false;
-        forwardPorts = [
+        "30-vlan2".networkConfig.DHCP = "ipv4";
+      };
+
+  containers =
+    renderedContainers
+    // {
+      # Simple endpoint to validate tenant behavior (DHCPv4, SLAAC/RDNSS, DNS).
+      client-test = {
+        autoStart = true;
+        privateNetwork = true;
+        hostBridge = "client";
+
+        config =
+          { pkgs, ... }:
           {
-            from = "host";
-            host.port = 2222;
-            guest.port = 22;
-          }
-        ];
+            system.stateVersion = "25.11";
+
+            networking.useNetworkd = true;
+            systemd.network.enable = true;
+            networking.useDHCP = false;
+
+            networking.useHostResolvConf = false;
+            services.resolved.enable = true;
+
+            systemd.network.networks."10-eth0" = {
+              matchConfig.Name = "eth0";
+              networkConfig = {
+                DHCP = "ipv4";
+                IPv6AcceptRA = true;
+              };
+            };
+
+            environment.systemPackages = [
+              pkgs.bind
+              pkgs.curl
+              pkgs.iproute2
+              pkgs.iputils
+            ];
+          };
       };
     };
-  };
-
-  users.mutableUsers = false;
-  users.users.root = {
-    initialHashedPassword = "";
-    shell = pkgs.bashInteractive;
-    ignoreShellProgramCheck = true;
-  };
-
-  programs.bash.enable = true;
-  programs.zsh.enable = false;
-
-  services.getty.autologinUser = "root";
-  services.openssh.enable = true;
-
-  environment.systemPackages = with pkgs; [
-    bashInteractive
-    git
-    jq
-    vim
-    iproute2
-    iputils
-    tcpdump
-    curl
-  ];
-
-  containers = vmBuild.renderedContainers;
 }

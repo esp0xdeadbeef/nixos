@@ -1,3 +1,75 @@
+let
+  coreDns = {
+    listen = [
+      "10.19.0.3"
+      "fd42:dead:beef:1900::3"
+    ];
+    allowFrom = [
+      "10.0.0.0/8"
+      "fd42:dead:beef::/48"
+    ];
+    forwarders = [
+      "1.1.1.1"
+      "9.9.9.9"
+      "2606:4700:4700::1111"
+      "2620:fe::fe"
+    ];
+    advertised = {
+      dnsServers = [ "10.19.0.3" ];
+      rdnss = [ "fd42:dead:beef:1900::3" ];
+    };
+  };
+
+  accessDns = {
+    admin = {
+      listen = [
+        "10.20.15.1"
+        "fd42:dead:beef:15::1"
+      ];
+      allowFrom = [
+        "10.20.15.0/24"
+        "fd42:dead:beef:15::/64"
+      ];
+      forwarders = coreDns.listen;
+      advertised = {
+        dnsServers = [ "10.20.15.1" ];
+        rdnss = [ "fd42:dead:beef:15::1" ];
+      };
+    };
+
+    client = {
+      listen = [
+        "10.20.20.1"
+        "fd42:dead:beef:20::1"
+      ];
+      allowFrom = [
+        "10.20.20.0/24"
+        "fd42:dead:beef:20::/64"
+      ];
+      forwarders = coreDns.listen;
+      advertised = {
+        dnsServers = [ "10.20.20.1" ];
+        rdnss = [ "fd42:dead:beef:20::1" ];
+      };
+    };
+
+    mgmt = {
+      listen = [
+        "10.20.10.1"
+        "fd42:dead:beef:10::1"
+      ];
+      allowFrom = [
+        "10.20.10.0/24"
+        "fd42:dead:beef:10::/64"
+      ];
+      forwarders = coreDns.listen;
+      advertised = {
+        dnsServers = [ "10.20.10.1" ];
+        rdnss = [ "fd42:dead:beef:10::1" ];
+      };
+    };
+  };
+in
 {
   deployment = {
     hosts = {
@@ -10,6 +82,22 @@
             mode = "vlan";
             vlan = 2;
             bridge = "vlan2";
+
+            # Run DHCP on the management uplink (eth0.2 -> vlan2) so the host
+            # can reach the outside world without any bridgeNetworks hacks.
+            ipv4 = {
+              method = "dhcp";
+              enable = true;
+              dhcp = true;
+            };
+
+            ipv6 = {
+              method = "none";
+              enable = false;
+              acceptRA = false;
+              dhcp = false;
+              dhcpv6PD = false;
+            };
           };
 
           upstream-core = {
@@ -65,6 +153,19 @@
             parentUplink = "trunk";
           };
 
+          # Dedicated lanes between downstream-selector <-> policy-only.
+          tr104 = {
+            name = "tr104";
+            vlan = 404;
+            parentUplink = "trunk";
+          };
+
+          tr105 = {
+            name = "tr105";
+            vlan = 405;
+            parentUplink = "trunk";
+          };
+
           tr200 = {
             name = "tr200";
             vlan = 500;
@@ -74,6 +175,19 @@
           tr201 = {
             name = "tr201";
             vlan = 501;
+            parentUplink = "trunk";
+          };
+
+          # Dedicated lanes between policy-only <-> upstream-selector.
+          tr202 = {
+            name = "tr202";
+            vlan = 502;
+            parentUplink = "trunk";
+          };
+
+          tr203 = {
+            name = "tr203";
+            vlan = 503;
             parentUplink = "trunk";
           };
 
@@ -115,6 +229,10 @@
           default = {
             runtimeName = "s-router-core-wan";
           };
+        };
+
+        services = {
+          dns = coreDns;
         };
 
         ports = {
@@ -159,6 +277,10 @@
           };
         };
 
+        services = {
+          dns = accessDns.admin;
+        };
+
         ports = {
           transit-downstream-selector = {
             link = "p2p-s-router-access-admin-s-router-downstream-selector";
@@ -196,7 +318,7 @@
                 end = "10.20.15.200";
               };
               router = "10.20.15.1";
-              dnsServers = [ "10.20.15.1" ];
+              dnsServers = accessDns.admin.advertised.dnsServers;
               domain = "lan.";
             };
           };
@@ -205,7 +327,7 @@
             tenant-admin = {
               interface = "tenant-admin";
               prefixes = [ "fd42:dead:beef:15::/64" ];
-              rdnss = [ "fd42:dead:beef:15::1" ];
+              rdnss = accessDns.admin.advertised.rdnss;
               dnssl = [ "lan." ];
             };
           };
@@ -226,6 +348,10 @@
           default = {
             runtimeName = "s-router-access-client";
           };
+        };
+
+        services = {
+          dns = accessDns.client;
         };
 
         ports = {
@@ -265,7 +391,7 @@
                 end = "10.20.20.200";
               };
               router = "10.20.20.1";
-              dnsServers = [ "10.20.20.1" ];
+              dnsServers = accessDns.client.advertised.dnsServers;
               domain = "lan.";
             };
           };
@@ -274,7 +400,7 @@
             tenant-client = {
               interface = "tenant-client";
               prefixes = [ "fd42:dead:beef:20::/64" ];
-              rdnss = [ "fd42:dead:beef:20::1" ];
+              rdnss = accessDns.client.advertised.rdnss;
               dnssl = [ "lan." ];
             };
           };
@@ -295,6 +421,10 @@
           default = {
             runtimeName = "s-router-access-mgmt";
           };
+        };
+
+        services = {
+          dns = accessDns.mgmt;
         };
 
         ports = {
@@ -334,7 +464,7 @@
                 end = "10.20.10.200";
               };
               router = "10.20.10.1";
-              dnsServers = [ "10.20.10.1" ];
+              dnsServers = accessDns.mgmt.advertised.dnsServers;
               domain = "lan.";
             };
           };
@@ -343,7 +473,7 @@
             tenant-mgmt = {
               interface = "tenant-mgmt";
               prefixes = [ "fd42:dead:beef:10::/64" ];
-              rdnss = [ "fd42:dead:beef:10::1" ];
+              rdnss = accessDns.mgmt.advertised.rdnss;
               dnssl = [ "lan." ];
             };
           };
@@ -367,14 +497,36 @@
         };
 
         ports = {
-          policy = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only";
+          policy-admin = {
+            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin";
             attach = {
               kind = "bridge";
               bridge = "tr103";
             };
             interface = {
-              name = "policy";
+              name = "policy-admin";
+            };
+          };
+
+          policy-client = {
+            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client";
+            attach = {
+              kind = "bridge";
+              bridge = "tr104";
+            };
+            interface = {
+              name = "policy-client";
+            };
+          };
+
+          policy-mgmt = {
+            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt";
+            attach = {
+              kind = "bridge";
+              bridge = "tr105";
+            };
+            interface = {
+              name = "policy-mgmt";
             };
           };
 
@@ -425,30 +577,76 @@
 
         containers = {
           default = {
-            runtimeName = "s-router-policy";
+            # Match the logical node name so `nixos-container run s-router-policy-only ...`
+            # works (and avoids confusion when debugging).
+            runtimeName = "s-router-policy-only";
           };
         };
 
         ports = {
-          upstream-selector = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector";
+          upstream-admin = {
+            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr201";
             };
             interface = {
-              name = "upstream";
+              name = "upstream-admin";
             };
           };
 
-          downstream-selector = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only";
+          upstream-client = {
+            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-wan";
+            attach = {
+              kind = "bridge";
+              bridge = "tr202";
+            };
+            interface = {
+              name = "upstream-client";
+            };
+          };
+
+          upstream-mgmt = {
+            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-wan";
+            attach = {
+              kind = "bridge";
+              bridge = "tr203";
+            };
+            interface = {
+              name = "upstream-mgmt";
+            };
+          };
+
+          downstream-admin = {
+            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin";
             attach = {
               kind = "bridge";
               bridge = "tr103";
             };
             interface = {
-              name = "downstream";
+              name = "downstream-admin";
+            };
+          };
+
+          downstream-client = {
+            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client";
+            attach = {
+              kind = "bridge";
+              bridge = "tr104";
+            };
+            interface = {
+              name = "downstream-client";
+            };
+          };
+
+          downstream-mgmt = {
+            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt";
+            attach = {
+              kind = "bridge";
+              bridge = "tr105";
+            };
+            interface = {
+              name = "downstream-mgmt";
             };
           };
         };
@@ -483,13 +681,35 @@
           };
 
           policy = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector";
+            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr201";
             };
             interface = {
               name = "policy";
+            };
+          };
+
+          policy-client = {
+            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-wan";
+            attach = {
+              kind = "bridge";
+              bridge = "tr202";
+            };
+            interface = {
+              name = "policy-client";
+            };
+          };
+
+          policy-mgmt = {
+            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-wan";
+            attach = {
+              kind = "bridge";
+              bridge = "tr203";
+            };
+            interface = {
+              name = "policy-mgmt";
             };
           };
         };
