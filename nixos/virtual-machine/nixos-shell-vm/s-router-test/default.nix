@@ -15,7 +15,7 @@ let
   };
 
   fabric = {
-    intentPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
+    intentPath = ./intent.nix;
     inventoryPath = ./inventory.nix;
   };
 
@@ -33,6 +33,35 @@ let
       "CAP_NET_RAW"
     ];
   };
+
+  mkTenantEndpoint =
+    bridge:
+    { pkgs, ... }:
+    {
+      system.stateVersion = "25.11";
+
+      networking.useNetworkd = true;
+      systemd.network.enable = true;
+      networking.useDHCP = false;
+
+      networking.useHostResolvConf = false;
+      services.resolved.enable = true;
+
+      systemd.network.networks."10-eth0" = {
+        matchConfig.Name = "eth0";
+        networkConfig = {
+          DHCP = "ipv4";
+          IPv6AcceptRA = true;
+        };
+      };
+
+      environment.systemPackages = [
+        pkgs.bind
+        pkgs.curl
+        pkgs.iproute2
+        pkgs.iputils
+      ];
+    };
 
   builtHost = api.renderer.buildHostFromPaths {
     inherit (fabric) intentPath inventoryPath;
@@ -151,39 +180,29 @@ in
   containers =
     renderedContainers
     // {
-      # Simple endpoint to validate tenant behavior (DHCPv4, SLAAC/RDNSS, DNS).
+      # Simple endpoints to validate tenant behavior (DHCPv4, SLAAC/RDNSS, DNS).
+      admin-test = {
+        autoStart = true;
+        privateNetwork = true;
+        hostBridge = "admin";
+
+        config = mkTenantEndpoint "admin";
+      };
+
       client-test = {
         autoStart = true;
         privateNetwork = true;
         hostBridge = "client";
 
-        config =
-          { pkgs, ... }:
-          {
-            system.stateVersion = "25.11";
+        config = mkTenantEndpoint "client";
+      };
 
-            networking.useNetworkd = true;
-            systemd.network.enable = true;
-            networking.useDHCP = false;
+      mgmt-test = {
+        autoStart = true;
+        privateNetwork = true;
+        hostBridge = "mgmt";
 
-            networking.useHostResolvConf = false;
-            services.resolved.enable = true;
-
-            systemd.network.networks."10-eth0" = {
-              matchConfig.Name = "eth0";
-              networkConfig = {
-                DHCP = "ipv4";
-                IPv6AcceptRA = true;
-              };
-            };
-
-            environment.systemPackages = [
-              pkgs.bind
-              pkgs.curl
-              pkgs.iproute2
-              pkgs.iputils
-            ];
-          };
+        config = mkTenantEndpoint "mgmt";
       };
     };
 }
