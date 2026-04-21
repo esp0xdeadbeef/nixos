@@ -997,11 +997,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1776780957,
-        "narHash": "sha256-rbLHiQXJyHh0K9MtA0BJhyQLFyhTxj/93g/02zXT3FQ=",
+        "lastModified": 1776781617,
+        "narHash": "sha256-gv+DiwuPTl3YfN0gbco4jLztywp3eJ5gkXMXsyct7dY=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "eb0eade9b58e0f5df7f17624938ed746b0c668b5",
+        "rev": "46e9d203292fb5e640ecddb0a88e27523f07a80b",
         "type": "github"
       },
       "original": {
