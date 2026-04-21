@@ -444,11 +444,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1776610258,
-        "narHash": "sha256-zKkT/PhgoxUY2EbUmxDHLXT7QPFUH3oxFaiWfZbiGfk=",
+        "lastModified": 1776787811,
+        "narHash": "sha256-lQyATTmTVu7RxSHTyaBqrOYDwYDPpoH7gWGZcTXSDuM=",
         "owner": "nix-community",
         "repo": "lanzaboote",
-        "rev": "67384fbc57e36fad6fd59fa191341cdea89e6b7d",
+        "rev": "a5b519e0d76fe8722f674bad6ba923748248a65a",
         "type": "github"
       },
       "original": {
@@ -655,11 +655,11 @@
         "nixpkgs-network": "nixpkgs-network_3"
       },
       "locked": {
-        "lastModified": 1776731882,
-        "narHash": "sha256-ufKpDZGbOLQGT7a3nl2FGffEKG31EDQHNe+SltaW2yg=",
+        "lastModified": 1776788361,
+        "narHash": "sha256-YytI3umJCNa8k/frO5u9/BwjcJN97nkfWPfdoVKZE2I=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "d9da610d6c02ee1d49a4f0bc060cf88214e8e4c9",
+        "rev": "7a2d78d08c222051957205b452bc34be9cad4fb7",
         "type": "github"
       },
       "original": {
@@ -997,11 +997,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1776785793,
-        "narHash": "sha256-zJgXRe8Xz4tyeVhgWmhhcqx0o813LrjiTPYAPZ1gxHw=",
+        "lastModified": 1776788361,
+        "narHash": "sha256-TCabMcAJ9LDi8bOa5BY70L+YXaP7Ke6ZdSuNB4GgB+8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "fb47a5da8ca5a7073552c05e6e5f526f074328c2",
+        "rev": "9ff1e6fb14c76113ba6bad707636b2f03e10068b",
         "type": "github"
       },
       "original": {
