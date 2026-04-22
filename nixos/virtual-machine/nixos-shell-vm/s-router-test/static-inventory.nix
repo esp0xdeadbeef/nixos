@@ -1,1 +1,1 @@
-import ./multi-static-inventory.nix
+import ./profiles/dual-wan-branch/static-inventory.nix

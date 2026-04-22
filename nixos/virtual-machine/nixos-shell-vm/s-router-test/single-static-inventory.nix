@@ -1,3 +1,1 @@
-(import ./single-bgp-inventory.nix) // {
-  controlPlane = { };
-}
+import ./profiles/single-wan/static-inventory.nix

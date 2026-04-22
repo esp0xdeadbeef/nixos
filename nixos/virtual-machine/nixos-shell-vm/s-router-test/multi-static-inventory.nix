@@ -1,3 +1,1 @@
-(import ./multi-bgp-inventory.nix) // {
-  controlPlane = { };
-}
+import ./profiles/dual-wan/static-inventory.nix

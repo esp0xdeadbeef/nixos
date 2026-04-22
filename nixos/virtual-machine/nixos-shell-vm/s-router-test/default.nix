@@ -2,6 +2,7 @@
   inputs,
   lib,
   outPath,
+  pkgs,
   ...
 }:
 
@@ -33,35 +34,6 @@ let
       "CAP_NET_RAW"
     ];
   };
-
-  mkTenantEndpoint =
-    bridge:
-    { pkgs, ... }:
-    {
-      system.stateVersion = "25.11";
-
-      networking.useNetworkd = true;
-      systemd.network.enable = true;
-      networking.useDHCP = false;
-
-      networking.useHostResolvConf = false;
-      services.resolved.enable = true;
-
-      systemd.network.networks."10-eth0" = {
-        matchConfig.Name = "eth0";
-        networkConfig = {
-          DHCP = "ipv4";
-          IPv6AcceptRA = true;
-        };
-      };
-
-      environment.systemPackages = [
-        pkgs.bind
-        pkgs.curl
-        pkgs.iproute2
-        pkgs.iputils
-      ];
-    };
 
   builtHost = api.renderer.buildHostFromPaths {
     inherit (fabric) intentPath inventoryPath;
@@ -124,15 +96,50 @@ let
       containers = builtins.attrNames renderedContainers;
     };
   };
+
+  builders = import ./modules/container-builders.nix { inherit lib pkgs; };
+
+  testContainers = import ./modules/test-containers.nix {
+    inherit (builders) mkTenantEndpoint;
+  };
+
+  overlayContainers = import ./modules/overlay-containers.nix {
+    inherit renderedHostNetwork;
+    inherit (builders) mkNebulaNode mkNebulaProfileMount;
+  };
+
+  dmzContainers = import ./modules/dmz-containers.nix {
+    inherit renderedHostNetwork;
+    inherit (builders) mkDmzEndpoint;
+  };
 in
 {
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./mount-utils.nix
     ./sops.nix
+    (import ./modules/nebula-bootstrap.nix {
+      inherit pkgs renderedHostNetwork;
+    })
   ];
 
   system.stateVersion = lib.mkForce "25.11";
+
+  environment.systemPackages = with pkgs; [
+    ethtool
+    iproute2
+    iputils
+    jq
+    lsof
+    mtr
+    nftables
+    nebula
+    openssh
+    procps
+    strace
+    tcpdump
+    traceroute
+  ];
 
   _module.args = {
     inherit identity fabric;
@@ -156,10 +163,10 @@ in
 
   networking.useNetworkd = true;
   systemd.network.enable = true;
+  systemd.network.wait-online.enable = false;
   networking.useDHCP = false;
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce false;
-
   systemd.network.netdevs =
     (renderedHost.netdevs or { })
     // (renderedBridges.netdevs or { });
@@ -179,30 +186,7 @@ in
 
   containers =
     renderedContainers
-    // {
-      # Simple endpoints to validate tenant behavior (DHCPv4, SLAAC/RDNSS, DNS).
-      admin-test = {
-        autoStart = true;
-        privateNetwork = true;
-        hostBridge = "admin";
-
-        config = mkTenantEndpoint "admin";
-      };
-
-      client-test = {
-        autoStart = true;
-        privateNetwork = true;
-        hostBridge = "client";
-
-        config = mkTenantEndpoint "client";
-      };
-
-      mgmt-test = {
-        autoStart = true;
-        privateNetwork = true;
-        hostBridge = "mgmt";
-
-        config = mkTenantEndpoint "mgmt";
-      };
-    };
+    // testContainers
+    // overlayContainers
+    // dmzContainers;
 }
