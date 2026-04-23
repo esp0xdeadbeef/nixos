@@ -17,18 +17,8 @@ without changing the architectural model.
 
 ## Profile Layout
 
-Each profile lives under `profiles/<profile-name>/` and always contains:
+Current profile :
 
-- `intent.nix`
-- `bgp-inventory.nix`
-- `static-inventory.nix`
-
-Current profile families:
-
-- `single-wan`
-  Single enterprise, single uplink, DMZ service exposure.
-- `dual-wan`
-  Single enterprise, dual uplink, no branch enterprise.
 - `dual-wan-branch`
   Two enterprises in one VM:
   - enterprise A: dual uplink, DMZ, overlay termination intent

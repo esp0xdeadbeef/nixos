@@ -140,6 +140,7 @@ in
         ports = {
           upstream-selector = {
             link = "p2p-s-router-core-isp-a-s-router-upstream-selector";
+            adapterName = "p2p-s-router-core-isp-a-s-router-upstream-selector-upstream-selector";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-core-isp-a-upstream";
@@ -174,6 +175,7 @@ in
         ports = {
           upstream-selector = {
             link = "p2p-s-router-core-isp-b-s-router-upstream-selector";
+            adapterName = "p2p-s-router-core-isp-b-s-router-upstream-selector-upstream-selector";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-core-isp-b-upstream";
@@ -204,10 +206,22 @@ in
         };
 
         containers.default.runtimeName = "s-router-access-admin";
+        services.dns = {
+          listen = [
+            "10.20.15.1"
+            "fd42:dead:beef:15::1"
+          ];
+          allowFrom = [
+            "10.20.15.0/24"
+            "fd42:dead:beef:15::/64"
+          ];
+          forwarders = publicDns4 ++ publicDns6;
+        };
 
         ports = {
           transit-downstream-selector = {
             link = "p2p-s-router-access-admin-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-admin-s-router-downstream-selector-transit-downstream-selector";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-admin";
@@ -263,10 +277,22 @@ in
         };
 
         containers.default.runtimeName = "s-router-access-client";
+        services.dns = {
+          listen = [
+            "10.20.20.1"
+            "fd42:dead:beef:20::1"
+          ];
+          allowFrom = [
+            "10.20.20.0/24"
+            "fd42:dead:beef:20::/64"
+          ];
+          forwarders = publicDns4 ++ publicDns6;
+        };
 
         ports = {
           transit-downstream-selector = {
             link = "p2p-s-router-access-client-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-client-s-router-downstream-selector-transit-downstream-selector";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-client";
@@ -322,10 +348,22 @@ in
         };
 
         containers.default.runtimeName = "s-router-access-mgmt";
+        services.dns = {
+          listen = [
+            "10.20.10.1"
+            "fd42:dead:beef:10::1"
+          ];
+          allowFrom = [
+            "10.20.10.0/24"
+            "fd42:dead:beef:10::/64"
+          ];
+          forwarders = publicDns4 ++ publicDns6;
+        };
 
         ports = {
           transit-downstream-selector = {
             link = "p2p-s-router-access-mgmt-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-mgmt-s-router-downstream-selector-transit-downstream-selector";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-mgmt";
@@ -385,6 +423,7 @@ in
         ports = {
           policy-admin = {
             link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin-policy-admin";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-policy-access-admin";
@@ -394,6 +433,7 @@ in
 
           policy-client = {
             link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client-policy-client";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-policy-access-client";
@@ -403,6 +443,7 @@ in
 
           policy-mgmt = {
             link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt-policy-mgmt";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-policy-access-mgmt";
@@ -412,6 +453,7 @@ in
 
           access-admin = {
             link = "p2p-s-router-access-admin-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-admin-s-router-downstream-selector-access-admin";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-admin";
@@ -421,6 +463,7 @@ in
 
           access-client = {
             link = "p2p-s-router-access-client-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-client-s-router-downstream-selector-access-client";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-client";
@@ -430,6 +473,7 @@ in
 
           access-mgmt = {
             link = "p2p-s-router-access-mgmt-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-mgmt-s-router-downstream-selector-access-mgmt";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-mgmt";
@@ -454,6 +498,7 @@ in
         ports = {
           upstream-admin-isp-a = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-a";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-a-upstream-admin-isp-a";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-admin-isp-a";
@@ -463,6 +508,7 @@ in
 
           upstream-admin-isp-b = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-b";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-b-upstream-admin-isp-b";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-admin-isp-b";
@@ -472,6 +518,7 @@ in
 
           upstream-client-isp-a = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-a";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-a-upstream-client-isp-a";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-client-isp-a";
@@ -481,6 +528,7 @@ in
 
           upstream-client-isp-b = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-b";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-b-upstream-client-isp-b";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-client-isp-b";
@@ -490,6 +538,7 @@ in
 
           upstream-mgmt-isp-a = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-a";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-a-upstream-mgmt-isp-a";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-mgmt-isp-a";
@@ -499,6 +548,7 @@ in
 
           upstream-mgmt-isp-b = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-b";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-b-upstream-mgmt-isp-b";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-mgmt-isp-b";
@@ -508,6 +558,7 @@ in
 
           downstream-admin = {
             link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin-downstream-admin";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-policy-access-admin";
@@ -517,6 +568,7 @@ in
 
           downstream-client = {
             link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client-downstream-client";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-policy-access-client";
@@ -526,6 +578,7 @@ in
 
           downstream-mgmt = {
             link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt-downstream-mgmt";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-downstream-policy-access-mgmt";
@@ -550,6 +603,7 @@ in
         ports = {
           core-isp-a = {
             link = "p2p-s-router-core-isp-a-s-router-upstream-selector";
+            adapterName = "p2p-s-router-core-isp-a-s-router-upstream-selector-core-isp-a";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-core-isp-a-upstream";
@@ -559,6 +613,7 @@ in
 
           core-isp-b = {
             link = "p2p-s-router-core-isp-b-s-router-upstream-selector";
+            adapterName = "p2p-s-router-core-isp-b-s-router-upstream-selector-core-isp-b";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-core-isp-b-upstream";
@@ -568,6 +623,7 @@ in
 
           policy-admin-isp-a = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-a";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-a-policy-admin-isp-a";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-admin-isp-a";
@@ -577,6 +633,7 @@ in
 
           policy-admin-isp-b = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-b";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-isp-b-policy-admin-isp-b";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-admin-isp-b";
@@ -586,6 +643,7 @@ in
 
           policy-client-isp-a = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-a";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-a-policy-client-isp-a";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-client-isp-a";
@@ -595,6 +653,7 @@ in
 
           policy-client-isp-b = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-b";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-isp-b-policy-client-isp-b";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-client-isp-b";
@@ -604,6 +663,7 @@ in
 
           policy-mgmt-isp-a = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-a";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-a-policy-mgmt-isp-a";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-mgmt-isp-a";
@@ -613,6 +673,7 @@ in
 
           policy-mgmt-isp-b = {
             link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-b";
+            adapterName = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-isp-b-policy-mgmt-isp-b";
             attach = {
               kind = "bridge";
               bridge = "br-site-a-policy-upstream-access-mgmt-isp-b";
