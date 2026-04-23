@@ -21,7 +21,7 @@ let
   };
 
   sliceArgs = {
-    inherit (identity) enterpriseName siteName boxName;
+    inherit (identity) boxName;
     inherit (fabric) intentPath inventoryPath;
   };
 
@@ -45,10 +45,6 @@ let
     (builtHost.hostContext or { })
     // {
       hostname = identity.boxName;
-      enterpriseName = identity.enterpriseName;
-      siteName = identity.siteName;
-      matchedEnterprises = [ identity.enterpriseName ];
-      matchedSites = [ identity.siteName ];
     };
 
   renderedHost = api.host.build sliceArgs;

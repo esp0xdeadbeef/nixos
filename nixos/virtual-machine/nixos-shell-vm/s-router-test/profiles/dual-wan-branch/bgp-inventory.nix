@@ -22,26 +22,31 @@ let
     ];
     forwarders = publicDns4 ++ publicDns6;
     advertised = {
-      dnsServers = publicDns4;
-      rdnss = publicDns6;
+      dnsServers = [ "router-self" ];
+      rdnss = [ "router-self" ];
     };
   };
 
-  branchCoreDns = {
+  branchAccessDns = {
     listen = [
-      "10.59.0.3"
-      "fd42:dead:feed:1900::3"
+      "10.60.10.1"
+      "fd42:dead:feed:10::1"
     ];
     allowFrom = [
       "10.60.10.0/24"
       "fd42:dead:feed:10::/64"
     ];
-    forwarders = publicDns4 ++ publicDns6;
+    forwarders = [
+      "10.20.10.1"
+      "fd42:dead:beef:10::1"
+    ];
     advertised = {
-      dnsServers = publicDns4;
-      rdnss = publicDns6;
+      dnsServers = [ "router-self" ];
+      rdnss = [ "router-self" ];
     };
   };
+
+  policyDerivedDns = dnsAttrs: builtins.removeAttrs dnsAttrs [ "forwarders" "upstreams" ];
 
   host = base.deployment.hosts.s-router-test;
 
@@ -52,6 +57,11 @@ base
   endpoints =
     (base.endpoints or { })
     // {
+      site-dns-mgmt = {
+        ipv4 = [ "10.20.10.1" ];
+        ipv6 = [ "fd42:dead:beef:10::1" ];
+      };
+
       nebula01 = {
         ipv4 = [ "10.20.30.10" ];
         ipv6 = [ "fd42:dead:beef:30::10" ];
@@ -133,14 +143,22 @@ base
           s-router-test =
             host
             // {
+              # Ensure WAN-only nodes in this profile resolve to the ISP-B uplink
+              # instead of falling back to an unrelated host uplink.
+              wanUplink = "uplink-isp-b";
+
               bridgeNetworks =
                 host.bridgeNetworks
                 // {
                   br-site-a-policy-upstream-access-admin-east-west = { };
                   br-site-a-policy-upstream-access-client-east-west = { };
+                  br-site-a-policy-upstream-access-client2-east-west = { };
                   br-site-a-policy-upstream-access-mgmt-east-west = { };
-                  br-site-a-policy-upstream-access-dmz-isp-a = { };
-                  br-site-a-policy-upstream-access-dmz-isp-b = { };
+                  br-site-a-policy-upstream-access-client2-isp-a = { };
+                  br-site-a-policy-upstream-access-client2-isp-b = { };
+                  br-site-a-downstream-policy-access-client2 = { };
+                  br-site-a-downstream-client2 = { };
+                  client2 = { };
                   br-site-a-downstream-policy-access-dmz = { };
                   br-site-a-downstream-dmz = { };
                   dmz = { };
@@ -160,6 +178,18 @@ base
     nodes =
       siteANodes
       // {
+        esp0xdeadbeef-site-a-s-router-access-admin =
+          siteANodes.esp0xdeadbeef-site-a-s-router-access-admin
+          // {
+            services.dns = policyDerivedDns siteANodes.esp0xdeadbeef-site-a-s-router-access-admin.services.dns;
+          };
+
+        esp0xdeadbeef-site-a-s-router-access-client =
+          siteANodes.esp0xdeadbeef-site-a-s-router-access-client
+          // {
+            services.dns = policyDerivedDns siteANodes.esp0xdeadbeef-site-a-s-router-access-client.services.dns;
+          };
+
         esp0xdeadbeef-site-a-s-router-access-dmz = {
           host = "s-router-test";
           platform = "nixos-container";
@@ -171,11 +201,12 @@ base
           };
 
           containers.default.runtimeName = "s-router-access-dmz";
-          services.dns = dmzDns;
+          services.dns = policyDerivedDns dmzDns;
 
           ports = {
             transit-downstream-selector = {
               link = "p2p-s-router-access-dmz-s-router-downstream-selector";
+              adapterName = "${"p2p-s-router-access-dmz-s-router-downstream-selector"}-transit-downstream-selector";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-a-downstream-dmz";
@@ -220,6 +251,77 @@ base
           };
         };
 
+        esp0xdeadbeef-site-a-s-router-access-client2 = {
+          host = "s-router-test";
+          platform = "nixos-container";
+
+          logicalNode = {
+            enterprise = "esp0xdeadbeef";
+            site = "site-a";
+            name = "s-router-access-client2";
+          };
+
+          containers.default.runtimeName = "s-router-access-client2";
+          services.dns = policyDerivedDns {
+            listen = [
+              "10.20.40.1"
+              "fd42:dead:beef:40::1"
+            ];
+            allowFrom = [
+              "10.20.40.0/24"
+              "fd42:dead:beef:40::/64"
+            ];
+            forwarders = publicDns4 ++ publicDns6;
+          };
+
+          ports = {
+            transit-downstream-selector = {
+              link = "p2p-s-router-access-client2-s-router-downstream-selector";
+              adapterName = "${"p2p-s-router-access-client2-s-router-downstream-selector"}-transit-downstream-selector";
+              attach = {
+                kind = "bridge";
+                bridge = "br-site-a-downstream-client2";
+              };
+              interface.name = "transit";
+            };
+
+            tenant-client2 = {
+              logicalInterface = "tenant-client2";
+              attach = {
+                kind = "bridge";
+                bridge = "client2";
+              };
+              interface = {
+                name = "tenant-client2";
+                addr4 = "10.20.40.1/24";
+                addr6 = "fd42:dead:beef:40::1/64";
+              };
+            };
+          };
+
+          advertisements = {
+            dhcp4.tenant-client2 = {
+              interface = "tenant-client2";
+              id = "client2";
+              subnet = "10.20.40.0/24";
+              pool = {
+                start = "10.20.40.100";
+                end = "10.20.40.200";
+              };
+              router = "10.20.40.1";
+              dnsServers = [ "router-self" ];
+              domain = "lan.";
+            };
+
+            ipv6Ra.tenant-client2 = {
+              interface = "tenant-client2";
+              prefixes = [ "fd42:dead:beef:40::/64" ];
+              rdnss = [ "router-self" ];
+              dnssl = [ "lan." ];
+            };
+          };
+        };
+
         esp0xdeadbeef-site-a-s-router-downstream-selector =
           siteANodes.esp0xdeadbeef-site-a-s-router-downstream-selector
           // {
@@ -228,6 +330,7 @@ base
               // {
                 policy-dmz = {
                   link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-dmz";
+                  adapterName = "${"p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-dmz"}-policy-dmz";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-downstream-policy-access-dmz";
@@ -237,11 +340,32 @@ base
 
                 access-dmz = {
                   link = "p2p-s-router-access-dmz-s-router-downstream-selector";
+                  adapterName = "${"p2p-s-router-access-dmz-s-router-downstream-selector"}-access-dmz";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-downstream-dmz";
                   };
                   interface.name = "access-dmz";
+                };
+
+                policy-client2 = {
+                  link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client2";
+                  adapterName = "${"p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client2"}-policy-client2";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-downstream-policy-access-client2";
+                  };
+                  interface.name = "policy-client2";
+                };
+
+                access-client2 = {
+                  link = "p2p-s-router-access-client2-s-router-downstream-selector";
+                  adapterName = "${"p2p-s-router-access-client2-s-router-downstream-selector"}-access-client2";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-downstream-client2";
+                  };
+                  interface.name = "access-client2";
                 };
               };
           };
@@ -254,6 +378,7 @@ base
               // {
                 upstream-admin-east-west = {
                   link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-east-west"}-upstream-admin-east-west";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-policy-upstream-access-admin-east-west";
@@ -263,6 +388,7 @@ base
 
                 upstream-client-east-west = {
                   link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-east-west"}-upstream-client-east-west";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-policy-upstream-access-client-east-west";
@@ -270,8 +396,40 @@ base
                   interface.name = "up-cli-ew";
                 };
 
+                upstream-client2-east-west = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-east-west"}-upstream-client2-east-west";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-client2-east-west";
+                  };
+                  interface.name = "up-cl2-ew";
+                };
+
+                upstream-client2-isp-a = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-a";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-a"}-upstream-client2-isp-a";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-client2-isp-a";
+                  };
+                  interface.name = "up-cl2-a";
+                };
+
+                upstream-client2-isp-b = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-b";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-b"}-upstream-client2-isp-b";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-client2-isp-b";
+                  };
+                  interface.name = "up-cl2-b";
+                };
+
+
                 upstream-mgmt-east-west = {
                   link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-east-west"}-upstream-mgmt-east-west";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-policy-upstream-access-mgmt-east-west";
@@ -279,31 +437,24 @@ base
                   interface.name = "up-mgt-ew";
                 };
 
-                upstream-dmz-isp-a = {
-                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-dmz--uplink-isp-a";
-                  attach = {
-                    kind = "bridge";
-                    bridge = "br-site-a-policy-upstream-access-dmz-isp-a";
-                  };
-                  interface.name = "up-dmz-a";
-                };
-
-                upstream-dmz-isp-b = {
-                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-dmz--uplink-isp-b";
-                  attach = {
-                    kind = "bridge";
-                    bridge = "br-site-a-policy-upstream-access-dmz-isp-b";
-                  };
-                  interface.name = "up-dmz-b";
-                };
-
                 downstream-dmz = {
                   link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-dmz";
+                  adapterName = "${"p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-dmz"}-downstream-dmz";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-downstream-policy-access-dmz";
                   };
                   interface.name = "downstream-dmz";
+                };
+
+                downstream-client2 = {
+                  link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client2";
+                  adapterName = "${"p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client2"}-downstream-client2";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-downstream-policy-access-client2";
+                  };
+                  interface.name = "downstream-client2";
                 };
               };
           };
@@ -316,6 +467,7 @@ base
               // {
                 policy-admin-east-west = {
                   link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-east-west"}-policy-admin-east-west";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-policy-upstream-access-admin-east-west";
@@ -325,6 +477,7 @@ base
 
                 policy-client-east-west = {
                   link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-east-west"}-policy-client-east-west";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-policy-upstream-access-client-east-west";
@@ -332,8 +485,39 @@ base
                   interface.name = "pol-cli-ew";
                 };
 
+                policy-client2-east-west = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-east-west"}-policy-client2-east-west";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-client2-east-west";
+                  };
+                  interface.name = "pol-cl2-ew";
+                };
+
+                policy-client2-isp-a = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-a";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-a"}-policy-client2-isp-a";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-client2-isp-a";
+                  };
+                  interface.name = "pol-cl2-a";
+                };
+
+                policy-client2-isp-b = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-b";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client2--uplink-isp-b"}-policy-client2-isp-b";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-client2-isp-b";
+                  };
+                  interface.name = "pol-cl2-b";
+                };
+
                 policy-mgmt-east-west = {
                   link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-east-west";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-east-west"}-policy-mgmt-east-west";
                   attach = {
                     kind = "bridge";
                     bridge = "br-site-a-policy-upstream-access-mgmt-east-west";
@@ -341,23 +525,6 @@ base
                   interface.name = "pol-mgt-ew";
                 };
 
-                policy-dmz-isp-a = {
-                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-dmz--uplink-isp-a";
-                  attach = {
-                    kind = "bridge";
-                    bridge = "br-site-a-policy-upstream-access-dmz-isp-a";
-                  };
-                  interface.name = "pol-dmz-a";
-                };
-
-                policy-dmz-isp-b = {
-                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-dmz--uplink-isp-b";
-                  attach = {
-                    kind = "bridge";
-                    bridge = "br-site-a-policy-upstream-access-dmz-isp-b";
-                  };
-                  interface.name = "pol-dmz-b";
-                };
               };
           };
 
@@ -372,11 +539,11 @@ base
           };
 
           containers.default.runtimeName = "b-router-core";
-          services.dns = branchCoreDns;
 
           ports = {
             upstream-selector = {
               link = "p2p-b-router-core-b-router-upstream-selector";
+              adapterName = "${"p2p-b-router-core-b-router-upstream-selector"}-upstream-selector";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-core-upstream";
@@ -407,10 +574,12 @@ base
           };
 
           containers.default.runtimeName = "b-router-access-branch";
+          services.dns = branchAccessDns;
 
           ports = {
             transit-downstream-selector = {
               link = "p2p-b-router-access-branch-b-router-downstream-selector";
+              adapterName = "${"p2p-b-router-access-branch-b-router-downstream-selector"}-transit-downstream-selector";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-downstream-branch";
@@ -442,14 +611,14 @@ base
                 end = "10.60.10.200";
               };
               router = "10.60.10.1";
-              dnsServers = publicDns4;
+              dnsServers = branchAccessDns.advertised.dnsServers;
               domain = "lan.";
             };
 
             ipv6Ra.tenant-branch = {
               interface = "tenant-branch";
               prefixes = [ "fd42:dead:feed:10::/64" ];
-              rdnss = publicDns6;
+              rdnss = branchAccessDns.advertised.rdnss;
               dnssl = [ "lan." ];
             };
           };
@@ -470,6 +639,7 @@ base
           ports = {
             policy-branch = {
               link = "p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-branch";
+              adapterName = "${"p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-branch"}-policy-branch";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-downstream-policy-access-branch";
@@ -479,6 +649,7 @@ base
 
             access-branch = {
               link = "p2p-b-router-access-branch-b-router-downstream-selector";
+              adapterName = "${"p2p-b-router-access-branch-b-router-downstream-selector"}-access-branch";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-downstream-branch";
@@ -503,6 +674,7 @@ base
           ports = {
             upstream-branch-east-west = {
               link = "p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-east-west";
+              adapterName = "${"p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-east-west"}-upstream-branch-east-west";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-policy-upstream-access-branch-east-west";
@@ -512,6 +684,7 @@ base
 
             upstream-branch = {
               link = "p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-wan";
+              adapterName = "${"p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-wan"}-upstream-branch";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-policy-upstream-access-branch";
@@ -521,6 +694,7 @@ base
 
             downstream-branch = {
               link = "p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-branch";
+              adapterName = "${"p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-branch"}-downstream-branch";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-downstream-policy-access-branch";
@@ -545,6 +719,7 @@ base
           ports = {
             core = {
               link = "p2p-b-router-core-b-router-upstream-selector";
+              adapterName = "${"p2p-b-router-core-b-router-upstream-selector"}-core";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-core-upstream";
@@ -554,6 +729,7 @@ base
 
             policy-branch-east-west = {
               link = "p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-east-west";
+              adapterName = "${"p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-east-west"}-policy-branch-east-west";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-policy-upstream-access-branch-east-west";
@@ -563,6 +739,7 @@ base
 
             policy-branch = {
               link = "p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-wan";
+              adapterName = "${"p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-branch--uplink-wan"}-policy-branch";
               attach = {
                 kind = "bridge";
                 bridge = "br-site-b-policy-upstream-access-branch";

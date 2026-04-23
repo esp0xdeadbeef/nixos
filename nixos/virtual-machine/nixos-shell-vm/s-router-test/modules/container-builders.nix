@@ -37,6 +37,10 @@ let
       gw4,
       addr6,
       gw6,
+      dnsServers ? [
+        gw4
+        gw6
+      ],
       allowedTcpPorts ? [ ],
       allowedUdpPorts ? [ ],
       extraModules ? [ ],
@@ -88,12 +92,7 @@ let
                 addr4
                 addr6
               ];
-              DNS = [
-                "1.1.1.1"
-                "9.9.9.9"
-                "2606:4700:4700::1111"
-                "2620:fe::fe"
-              ];
+              DNS = dnsServers;
               Domains = [ "lan." ];
               IPv6AcceptRA = false;
             };
@@ -135,7 +134,11 @@ let
               }
 
               chain output {
-                type filter hook output priority filter; policy accept;
+                type filter hook output priority filter; policy drop;
+                oifname "lo" accept
+                ct state established,related accept
+                ip daddr ${dmz4} accept
+                ip6 daddr ${dmz6} accept
               }
             }
           '';

@@ -8,6 +8,7 @@ if renderedHostNetwork.bridges ? branch then
     nebula-core = {
       autoStart = true;
       privateNetwork = true;
+      enableTun = true;
       hostBridge = "br-uplink1";
       bindMounts = mkNebulaProfileMount "nebula-core";
 
@@ -33,6 +34,7 @@ if renderedHostNetwork.bridges ? branch then
     branch-node01 = {
       autoStart = true;
       privateNetwork = true;
+      enableTun = true;
       hostBridge = "branch";
       bindMounts = mkNebulaProfileMount "branch-node01";
 
