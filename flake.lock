@@ -1061,11 +1061,11 @@
         "nixpkgs": "nixpkgs_9"
       },
       "locked": {
-        "lastModified": 1777056670,
-        "narHash": "sha256-oH7kf4ARCyfw6po1hWoZoH81MmaLqlnzn0ZQAQ8s4/U=",
+        "lastModified": 1777060315,
+        "narHash": "sha256-7kMVsh50BARicdgYjpQxJolVf+cLTlxhDmZRqJkCWOc=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "8d51ccf4998c6062716989120c6ba0faf5a5f0f7",
+        "rev": "54aae263b37ea767cf1b0129664e2d8ec9ed5ae2",
         "type": "github"
       },
       "original": {
