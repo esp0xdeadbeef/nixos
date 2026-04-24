@@ -329,6 +329,12 @@ base
         ipv4 = "10.60.10.0/24";
         ipv6 = "fd42:dead:feed:10::/64";
       }
+      {
+        kind = "tenant";
+        name = "hostile";
+        ipv4 = "10.70.10.0/24";
+        ipv6 = "fd42:dead:feed:70::/64";
+      }
     ];
 
     communicationContract = {
@@ -368,11 +374,41 @@ base
         }
 
         {
+          id = "deny-hostile-dns-to-wan";
+          priority = 91;
+          from = {
+            kind = "tenant-set";
+            members = [ "hostile" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+
+        {
           id = "allow-branch-to-wan";
           priority = 100;
           from = {
             kind = "tenant-set";
             members = [ "branch" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+
+        {
+          id = "allow-hostile-to-wan";
+          priority = 101;
+          from = {
+            kind = "tenant-set";
+            members = [ "hostile" ];
           };
           to = {
             kind = "external";
@@ -415,6 +451,7 @@ base
 
       interfaceTags = {
         tenant-branch = "branch";
+        tenant-hostile = "hostile";
         external-wan = "wan";
         external-east-west = "east-west";
       };
@@ -455,6 +492,16 @@ base
             }
           ];
         };
+
+        b-router-access-hostile = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "hostile";
+            }
+          ];
+        };
       };
 
       links = [
@@ -473,6 +520,10 @@ base
         [
           "b-router-downstream-selector"
           "b-router-access-branch"
+        ]
+        [
+          "b-router-downstream-selector"
+          "b-router-access-hostile"
         ]
       ];
     };

@@ -46,6 +46,25 @@ let
     };
   };
 
+  hostileAccessDns = {
+    listen = [
+      "10.70.10.1"
+      "fd42:dead:feed:70::1"
+    ];
+    allowFrom = [
+      "10.70.10.0/24"
+      "fd42:dead:feed:70::/64"
+    ];
+    forwarders = [
+      "10.20.10.1"
+      "fd42:dead:beef:10::1"
+    ];
+    advertised = {
+      dnsServers = [ "router-self" ];
+      rdnss = [ "router-self" ];
+    };
+  };
+
   policyDerivedDns = dnsAttrs: builtins.removeAttrs dnsAttrs [ "forwarders" "upstreams" ];
 
   overrideAdvertisedRouterSelf =
@@ -165,6 +184,11 @@ base
                       addr6 = "fd42:dead:beef:ee::20/128";
                     };
 
+                    hostile-node01 = {
+                      addr4 = "100.96.10.30/32";
+                      addr6 = "fd42:dead:beef:ee::30/128";
+                    };
+
                     hetzner-nebula-prodtest-01 = {
                       addr4 = "100.96.10.254/32";
                       addr6 = "fd42:dead:beef:ee::254/128";
@@ -218,9 +242,13 @@ base
                   br-site-b-core-upstream = { };
                   br-site-b-policy-upstream-access-branch-east-west = { };
                   br-site-b-policy-upstream-access-branch = { };
+                  br-site-b-policy-upstream-access-hostile = { };
                   br-site-b-downstream-policy-access-branch = { };
+                  br-site-b-downstream-policy-access-hostile = { };
                   br-site-b-downstream-branch = { };
+                  br-site-b-downstream-hostile = { };
                   branch = { };
+                  hostile = { };
                 };
             };
         };
@@ -694,6 +722,67 @@ base
           };
         };
 
+        espbranch-site-b-b-router-access-hostile = {
+          host = "s-router-test";
+          platform = "nixos-container";
+
+          logicalNode = {
+            enterprise = "espbranch";
+            site = "site-b";
+            name = "b-router-access-hostile";
+          };
+
+          containers.default.runtimeName = "b-router-access-hostile";
+          services.dns = hostileAccessDns;
+
+          ports = {
+            transit-downstream-selector = {
+              link = "p2p-b-router-access-hostile-b-router-downstream-selector";
+              adapterName = "${"p2p-b-router-access-hostile-b-router-downstream-selector"}-transit-downstream-selector";
+              attach = {
+                kind = "bridge";
+                bridge = "br-site-b-downstream-hostile";
+              };
+              interface.name = "transit";
+            };
+
+            tenant-hostile = {
+              logicalInterface = "tenant-hostile";
+              attach = {
+                kind = "bridge";
+                bridge = "hostile";
+              };
+              interface = {
+                name = "tenant-hostile";
+                addr4 = "10.70.10.1/24";
+                addr6 = "fd42:dead:feed:70::1/64";
+              };
+            };
+          };
+
+          advertisements = {
+            dhcp4.tenant-hostile = {
+              interface = "tenant-hostile";
+              id = "hostile";
+              subnet = "10.70.10.0/24";
+              pool = {
+                start = "10.70.10.100";
+                end = "10.70.10.200";
+              };
+              router = "10.70.10.1";
+              dnsServers = hostileAccessDns.advertised.dnsServers;
+              domain = "lan.";
+            };
+
+            ipv6Ra.tenant-hostile = {
+              interface = "tenant-hostile";
+              prefixes = [ "fd42:dead:feed:70::/64" ];
+              rdnss = hostileAccessDns.advertised.rdnss;
+              dnssl = [ "lan." ];
+            };
+          };
+        };
+
         espbranch-site-b-b-router-downstream-selector = {
           host = "s-router-test";
           platform = "nixos-container";
@@ -725,6 +814,26 @@ base
                 bridge = "br-site-b-downstream-branch";
               };
               interface.name = "access-branch";
+            };
+
+            policy-hostile = {
+              link = "p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-hostile";
+              adapterName = "${"p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-hostile"}-policy-hostile";
+              attach = {
+                kind = "bridge";
+                bridge = "br-site-b-downstream-policy-access-hostile";
+              };
+              interface.name = "policy-hostile";
+            };
+
+            access-hostile = {
+              link = "p2p-b-router-access-hostile-b-router-downstream-selector";
+              adapterName = "${"p2p-b-router-access-hostile-b-router-downstream-selector"}-access-hostile";
+              attach = {
+                kind = "bridge";
+                bridge = "br-site-b-downstream-hostile";
+              };
+              interface.name = "access-hostile";
             };
           };
         };
@@ -771,6 +880,26 @@ base
               };
               interface.name = "downstream-branch";
             };
+
+            upstream-hostile = {
+              link = "p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-hostile--uplink-wan";
+              adapterName = "${"p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-hostile--uplink-wan"}-upstream-hostile";
+              attach = {
+                kind = "bridge";
+                bridge = "br-site-b-policy-upstream-access-hostile";
+              };
+              interface.name = "up-hostile";
+            };
+
+            downstream-hostile = {
+              link = "p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-hostile";
+              adapterName = "${"p2p-b-router-downstream-selector-b-router-policy--access-b-router-access-hostile"}-downstream-hostile";
+              attach = {
+                kind = "bridge";
+                bridge = "br-site-b-downstream-policy-access-hostile";
+              };
+              interface.name = "downstream-hostile";
+            };
           };
         };
 
@@ -815,6 +944,16 @@ base
                 bridge = "br-site-b-policy-upstream-access-branch";
               };
               interface.name = "policy-branch";
+            };
+
+            policy-hostile = {
+              link = "p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-hostile--uplink-wan";
+              adapterName = "${"p2p-b-router-policy-b-router-upstream-selector--access-b-router-access-hostile--uplink-wan"}-policy-hostile";
+              attach = {
+                kind = "bridge";
+                bridge = "br-site-b-policy-upstream-access-hostile";
+              };
+              interface.name = "policy-hostile";
             };
           };
         };

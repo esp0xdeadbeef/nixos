@@ -207,6 +207,7 @@ let
       services.resolved.enable = true;
 
       environment.systemPackages = with pkgs; [
+        bind
         curl
         iproute2
         iputils
