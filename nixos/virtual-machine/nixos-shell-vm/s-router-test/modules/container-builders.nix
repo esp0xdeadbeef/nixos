@@ -31,6 +31,83 @@ let
       ];
     };
 
+  mkStaticTenantEndpoint =
+    {
+      addr4,
+      gw4,
+      addr6,
+      gw6,
+      dnsServers ? [
+        gw4
+        gw6
+      ],
+      hostname ? null,
+      extraModules ? [ ],
+    }:
+    {
+      pkgs,
+      lib,
+      ...
+    }@moduleArgs:
+    let
+      evaluatedExtraModules = map (
+        module: if builtins.isFunction module then module moduleArgs else module
+      ) extraModules;
+      hostnameModule =
+        lib.optional (hostname != null) {
+          networking.hostName = hostname;
+        };
+    in
+    lib.mkMerge (
+      [
+        {
+          system.stateVersion = "25.11";
+
+          networking.useNetworkd = true;
+          systemd.network.enable = true;
+          networking.useDHCP = false;
+
+          networking.useHostResolvConf = false;
+          services.resolved.enable = true;
+
+          systemd.network.networks."10-eth0" = {
+            matchConfig.Name = "eth0";
+            networkConfig = {
+              Address = [
+                addr4
+                addr6
+              ];
+              DNS = dnsServers;
+              Domains = [ "lan." ];
+              IPv6AcceptRA = false;
+              MulticastDNS = "yes";
+            };
+            routes = [
+              {
+                Destination = "0.0.0.0/0";
+                Gateway = gw4;
+              }
+              {
+                Destination = "::/0";
+                Gateway = gw6;
+              }
+            ];
+          };
+
+          environment.systemPackages = [
+            pkgs.avahi
+            pkgs.bind
+            pkgs.curl
+            pkgs.iproute2
+            pkgs.iputils
+            pkgs.traceroute
+          ];
+        }
+      ]
+      ++ hostnameModule
+      ++ evaluatedExtraModules
+    );
+
   mkDmzEndpoint =
     {
       addr4,
@@ -231,6 +308,7 @@ in
     mkDmzEndpoint
     mkNebulaNode
     mkNebulaProfileMount
+    mkStaticTenantEndpoint
     mkTenantEndpoint
     ;
 }

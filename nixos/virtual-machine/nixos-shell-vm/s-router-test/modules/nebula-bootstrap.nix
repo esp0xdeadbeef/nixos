@@ -1,229 +1,193 @@
-{ pkgs, renderedHostNetwork }:
+{
+  lib,
+  pkgs,
+  nebulaRuntimePlan ? {
+    overlays = { };
+    nodes = { };
+  },
+}:
 let
-  sites = renderedHostNetwork.sites or { };
+  sortedAttrNames = attrs: builtins.sort builtins.lessThan (builtins.attrNames attrs);
 
-  requireAttr = path: value:
-    if builtins.isAttrs value then
-      value
-    else
-      throw "s-router-test/nebula-bootstrap.nix: missing attrset at ${path}";
+  sanitizeName =
+    value:
+    lib.replaceStrings
+      [
+        "::"
+        ":"
+        "."
+        "/"
+        " "
+      ]
+      [
+        "-"
+        "-"
+        "-"
+        "-"
+        "-"
+      ]
+      value;
 
-  requireString = path: value:
-    if builtins.isString value && value != "" then
-      value
-    else
-      throw "s-router-test/nebula-bootstrap.nix: missing string at ${path}";
+  runtimeNodeNames = sortedAttrNames (nebulaRuntimePlan.nodes or { });
 
-  stripPrefixLength =
-    cidr:
-    let
-      match = builtins.match "([^/]+)/[0-9]+" cidr;
-    in
-    if match == null then
-      throw "s-router-test/nebula-bootstrap.nix: expected CIDR, got ${builtins.toJSON cidr}"
-    else
-      builtins.head match;
+  runtimeNodes =
+    builtins.mapAttrs (
+      nodeName: node:
+      let
+        overlayAddresses = node.overlayAddresses or [ ];
+        lighthouse = node.lighthouse or { };
+        lighthouseAddresses = lighthouse.overlayAddresses or [ ];
+        lighthouseIps = lighthouse.overlayIps or [ ];
+      in
+      {
+        overlayId = node.overlayId or null;
+        certCidr4 = builtins.elemAt overlayAddresses 0;
+        certCidr6 = builtins.elemAt overlayAddresses 1;
+        groupsCsv = lib.concatStringsSep "," (node.groups or [ ]);
+        unsafeRoutes = node.unsafeRoutes or [ ];
+        service = node.service or {
+          name = "nebula-runtime";
+          interface = "nebula1";
+        };
+        materialization = node.materialization or { };
+        lighthouse = {
+          overlayId = node.overlayId or null;
+          node = lighthouse.node or null;
+          endpoint = lighthouse.endpoint or null;
+          endpoint6 = lighthouse.endpoint6 or null;
+          port = builtins.toString (lighthouse.port or 4242);
+          certCidr4 = builtins.elemAt lighthouseAddresses 0;
+          certCidr6 = builtins.elemAt lighthouseAddresses 1;
+          overlayIp4 = builtins.elemAt lighthouseIps 0;
+          overlayIp6 = builtins.elemAt lighthouseIps 1;
+        };
+      }
+    ) (nebulaRuntimePlan.nodes or { });
 
-  readPrefixLength =
-    cidr:
-    let
-      match = builtins.match "[^/]+/([0-9]+)" cidr;
-    in
-    if match == null then
-      throw "s-router-test/nebula-bootstrap.nix: expected CIDR prefix length, got ${builtins.toJSON cidr}"
-    else
-      builtins.fromJSON (builtins.head match);
+  overlayNames = sortedAttrNames (nebulaRuntimePlan.overlays or { });
 
-  withPrefixLength = cidr: prefixLength: "${stripPrefixLength cidr}/${builtins.toString prefixLength}";
+  lighthouseFingerprints =
+    lib.unique (
+      map
+        (
+          overlayId:
+          let
+            overlay = nebulaRuntimePlan.overlays.${overlayId};
+            lighthouse = overlay.lighthouse or { };
+            overlayAddresses = lighthouse.overlayAddresses or [ ];
+          in
+          lib.concatStringsSep "|" [
+            (builtins.elemAt overlayAddresses 0)
+            (builtins.elemAt overlayAddresses 1)
+            (lighthouse.endpoint or "")
+            (lighthouse.endpoint6 or "")
+            (builtins.toString (lighthouse.port or 4242))
+          ]
+        )
+        overlayNames
+    );
 
-  siteA = requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a" (
-    (requireAttr "renderedHostNetwork.sites.esp0xdeadbeef" (sites.esp0xdeadbeef or null))."site-a" or null
-  );
-  siteB = requireAttr "renderedHostNetwork.sites.espbranch.site-b" (
-    (requireAttr "renderedHostNetwork.sites.espbranch" (sites.espbranch or null))."site-b" or null
-  );
+  lighthouses =
+    builtins.listToAttrs (
+      lib.imap0
+        (
+          index: fingerprint:
+          let
+            matchingOverlayIds =
+              lib.filter
+                (
+                  overlayId:
+                  let
+                    overlay = nebulaRuntimePlan.overlays.${overlayId};
+                    lighthouse = overlay.lighthouse or { };
+                    overlayAddresses = lighthouse.overlayAddresses or [ ];
+                  in
+                  fingerprint
+                  == lib.concatStringsSep "|" [
+                    (builtins.elemAt overlayAddresses 0)
+                    (builtins.elemAt overlayAddresses 1)
+                    (lighthouse.endpoint or "")
+                    (lighthouse.endpoint6 or "")
+                    (builtins.toString (lighthouse.port or 4242))
+                  ]
+                )
+                overlayNames;
+            baseOverlay = nebulaRuntimePlan.overlays.${builtins.head matchingOverlayIds};
+            baseLighthouse = baseOverlay.lighthouse or { };
+            overlayAddresses = baseLighthouse.overlayAddresses or [ ];
+            overlayIps = baseLighthouse.overlayIps or [ ];
+            memberNodeNames =
+              lib.filter
+                (nodeName: builtins.elem (runtimeNodes.${nodeName}.overlayId or "") matchingOverlayIds)
+                runtimeNodeNames;
+            unsafeNetworks =
+              lib.unique (
+                builtins.concatLists (
+                  map
+                    (nodeName: map (route: route.route or "") (runtimeNodes.${nodeName}.unsafeRoutes or [ ]))
+                    memberNodeNames
+                )
+              );
+            logicalName = sanitizeName baseOverlay.name;
+            name = logicalName;
+          in
+          {
+            inherit name;
+            value = {
+              id = logicalName;
+              overlayIds = matchingOverlayIds;
+              node = baseLighthouse.node or null;
+              endpoint = baseLighthouse.endpoint or null;
+              endpoint6 = baseLighthouse.endpoint6 or null;
+              port = builtins.toString (baseLighthouse.port or 4242);
+              certCidr4 = builtins.elemAt overlayAddresses 0;
+              certCidr6 = builtins.elemAt overlayAddresses 1;
+              overlayIp4 = builtins.elemAt overlayIps 0;
+              overlayIp6 = builtins.elemAt overlayIps 1;
+              certNetworks = [
+                (builtins.elemAt overlayAddresses 0)
+                (builtins.elemAt overlayAddresses 1)
+              ];
+              unsafeNetworks = unsafeNetworks;
+              certBaseName = "${logicalName}-${baseLighthouse.node or "lighthouse"}";
+              serviceName = "nebula-s-router-test-lighthouse-${logicalName}";
+              interfaceName = "nebula${builtins.toString index}";
+              overlayNetworks4Csv = builtins.elemAt overlayAddresses 0;
+              overlayNetworks6Csv = builtins.elemAt overlayAddresses 1;
+            };
+          }
+        )
+        lighthouseFingerprints
+    );
 
-  overlayA = requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west" (
-    (requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays" (siteA.overlays or null))."east-west"
-      or null
-  );
-  overlayB = requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west" (
-    (requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays" (siteB.overlays or null))."east-west"
-      or null
-  );
-  overlayANebula = requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nebula" (
-    overlayA.nebula or null
-  );
-  overlayAIpam = requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.ipam" (
-    overlayA.ipam or null
-  );
-  overlayALighthouse = requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nebula.lighthouse" (
-    overlayANebula.lighthouse or null
-  );
-  overlayBIpam = requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.ipam" (
-    overlayB.ipam or null
-  );
+  lighthouseNames = sortedAttrNames lighthouses;
 
-  overlayANodes = requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes" (
-    overlayA.nodes or null
-  );
-  overlayBNodes = requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes" (
-    overlayB.nodes or null
-  );
-
-  coreOverlayCidr = requireString
-    "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.nebula-core.addr4"
-    ((requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.nebula-core" (overlayANodes.nebula-core or null)).addr4 or null);
-  coreOverlayCidr6 = requireString
-    "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.nebula-core.addr6"
-    ((requireAttr "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.nebula-core" (overlayANodes.nebula-core or null)).addr6 or null);
-  branchOverlayCidr = requireString
-    "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.branch-node01.addr4"
-    ((requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.branch-node01" (overlayBNodes.branch-node01 or null)).addr4 or null);
-  branchOverlayCidr6 = requireString
-    "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.branch-node01.addr6"
-    ((requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.branch-node01" (overlayBNodes.branch-node01 or null)).addr6 or null);
-  hostileOverlayCidr = requireString
-    "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.hostile-node01.addr4"
-    ((requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.hostile-node01" (overlayBNodes.hostile-node01 or null)).addr4 or null);
-  hostileOverlayCidr6 = requireString
-    "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.hostile-node01.addr6"
-    ((requireAttr "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.nodes.hostile-node01" (overlayBNodes.hostile-node01 or null)).addr6 or null);
-  lighthouseNodeName =
-    requireString
-      "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nebula.lighthouse.node"
-      (overlayALighthouse.node or null);
-  lighthouseOverlayCidr = requireString
-    "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.${lighthouseNodeName}.addr4"
-    ((requireAttr
-      "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.${lighthouseNodeName}"
-      (overlayANodes.${lighthouseNodeName} or null)).addr4 or null);
-  lighthouseOverlayCidr6 = requireString
-    "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.${lighthouseNodeName}.addr6"
-    ((requireAttr
-      "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nodes.${lighthouseNodeName}"
-      (overlayANodes.${lighthouseNodeName} or null)).addr6 or null);
-  lighthouseEndpoint = requireString
-    "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nebula.lighthouse.endpoint"
-    (overlayALighthouse.endpoint or null);
-  lighthouseEndpoint6 = requireString
-    "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.nebula.lighthouse.endpoint6"
-    (overlayALighthouse.endpoint6 or null);
-  lighthousePort = builtins.toString (overlayALighthouse.port or 4242);
-  overlayAV4PrefixLength = readPrefixLength (
-    requireString
-      "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.ipam.ipv4.prefix"
-      ((requireAttr
-        "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.ipam.ipv4"
-        (overlayAIpam.ipv4 or null)).prefix or null)
-  );
-  overlayAV6PrefixLength = readPrefixLength (
-    requireString
-      "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.ipam.ipv6.prefix"
-      ((requireAttr
-        "renderedHostNetwork.sites.esp0xdeadbeef.site-a.overlays.east-west.ipam.ipv6"
-        (overlayAIpam.ipv6 or null)).prefix or null)
-  );
-  overlayBV4PrefixLength = readPrefixLength (
-    requireString
-      "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.ipam.ipv4.prefix"
-      ((requireAttr
-        "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.ipam.ipv4"
-        (overlayBIpam.ipv4 or null)).prefix or null)
-  );
-  overlayBV6PrefixLength = readPrefixLength (
-    requireString
-      "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.ipam.ipv6.prefix"
-      ((requireAttr
-        "renderedHostNetwork.sites.espbranch.site-b.overlays.east-west.ipam.ipv6"
-        (overlayBIpam.ipv6 or null)).prefix or null)
-  );
-
-  lighthouseOverlayIp = stripPrefixLength lighthouseOverlayCidr;
-  lighthouseOverlayIp6 = stripPrefixLength lighthouseOverlayCidr6;
-  coreCertCidr = withPrefixLength coreOverlayCidr overlayAV4PrefixLength;
-  coreCertCidr6 = withPrefixLength coreOverlayCidr6 overlayAV6PrefixLength;
-  branchCertCidr = withPrefixLength branchOverlayCidr overlayBV4PrefixLength;
-  branchCertCidr6 = withPrefixLength branchOverlayCidr6 overlayBV6PrefixLength;
-  hostileCertCidr = withPrefixLength hostileOverlayCidr overlayBV4PrefixLength;
-  hostileCertCidr6 = withPrefixLength hostileOverlayCidr6 overlayBV6PrefixLength;
-  lighthouseCertCidr = withPrefixLength lighthouseOverlayCidr overlayAV4PrefixLength;
-  lighthouseCertCidr6 = withPrefixLength lighthouseOverlayCidr6 overlayAV6PrefixLength;
-  hostileUnsafeRoutes = [
-    {
-      route = "0.0.0.0/1";
-      via = lighthouseOverlayIp;
-    }
-    {
-      route = "128.0.0.0/1";
-      via = lighthouseOverlayIp;
-    }
-    {
-      route = "::/1";
-      via = lighthouseOverlayIp6;
-    }
-    {
-      route = "8000::/1";
-      via = lighthouseOverlayIp6;
-    }
-  ];
-  lighthouseUnsafeNetworks = builtins.concatStringsSep "," (map (route: route.route) hostileUnsafeRoutes);
+  runtimeNodesJson = builtins.toJSON runtimeNodes;
+  lighthousesJson = builtins.toJSON lighthouses;
 in
-if renderedHostNetwork.bridges ? branch then
+if runtimeNodeNames == [ ] then
+  { }
+else
   {
     environment.etc."s-router-test/nebula-bootstrap-spec.json".text =
       builtins.toJSON {
-        core = {
-          container = "nebula-core";
-          overlayIp = coreOverlayCidr;
-          overlayIp6 = coreOverlayCidr6;
-        };
-
-        branchNode = {
-          container = "branch-node01";
-          overlayIp = branchOverlayCidr;
-          overlayIp6 = branchOverlayCidr6;
-        };
-
-        hostileNode = {
-          container = "hostile-node01";
-          overlayIp = hostileOverlayCidr;
-          overlayIp6 = hostileOverlayCidr6;
-        };
-
-        lighthouse = {
-          node = lighthouseNodeName;
-          overlayIp = lighthouseOverlayCidr;
-          overlayIp6 = lighthouseOverlayCidr6;
-          endpoint = lighthouseEndpoint;
-          endpoint6 = lighthouseEndpoint6;
-          port = lighthousePort;
-        };
+        runtimeNodes = runtimeNodes;
+        lighthouses = lighthouses;
       };
 
-    systemd.tmpfiles.rules = [
-      "d /persist/nebula-runtime 0700 root root -"
-      "d /persist/nebula-runtime/pki 0700 root root -"
-      "d /persist/nebula-runtime/profiles 0700 root root -"
-      "d /persist/nebula-runtime/profiles/hetzner-nebula-prodtest-01 0700 root root -"
-      "d /persist/nebula-runtime/profiles/nebula-core 0700 root root -"
-      "d /persist/nebula-runtime/profiles/branch-node01 0700 root root -"
-      "d /persist/nebula-runtime/profiles/hostile-node01 0700 root root -"
-    ];
+    systemd.tmpfiles.rules =
+      [
+        "d /persist/nebula-runtime 0700 root root -"
+        "d /persist/nebula-runtime/pki 0700 root root -"
+        "d /persist/nebula-runtime/profiles 0700 root root -"
+      ]
+      ++ map (nodeName: "d /persist/nebula-runtime/profiles/${nodeName} 0700 root root -") runtimeNodeNames;
 
     systemd.services.nebula-profile-bootstrap = {
       description = "Generate and distribute Nebula runtime profiles for s-router-test";
       wantedBy = [ "multi-user.target" ];
-      after = [
-        "network-online.target"
-        "container@nebula-core.service"
-        "container@branch-node01.service"
-      ];
-      wants = [
-        "network-online.target"
-        "container@nebula-core.service"
-        "container@branch-node01.service"
-      ];
+      after = [ "network-online.target" ] ++ map (nodeName: "container@${nodeName}.service") runtimeNodeNames;
+      wants = [ "network-online.target" ] ++ map (nodeName: "container@${nodeName}.service") runtimeNodeNames;
       serviceConfig.Type = "oneshot";
       path = with pkgs; [
         bash
@@ -243,28 +207,28 @@ if renderedHostNetwork.bridges ? branch then
         state_dir="/persist/nebula-runtime"
         pki_dir="$state_dir/pki"
         profiles_dir="$state_dir/profiles"
-        mkdir -p \
-          "$pki_dir" \
-          "$profiles_dir/hetzner-nebula-prodtest-01" \
-          "$profiles_dir/nebula-core" \
-          "$profiles_dir/branch-node01" \
-          "$profiles_dir/hostile-node01"
+        runtime_nodes_json='${runtimeNodesJson}'
+        lighthouses_json='${lighthousesJson}'
+
+        mkdir -p "$pki_dir"
+        printf '%s' "$runtime_nodes_json" | jq -r 'keys[]' | while read -r node_name; do
+          mkdir -p "$profiles_dir/$node_name"
+        done
 
         issue_node_cert() {
-          local node_name="$1"
-          local node_cidr4="$2"
-          local node_cidr6="$3"
-          local node_groups="$4"
-          local node_unsafe_networks="''${5:-}"
-          local cert_path="$pki_dir/$node_name.crt"
-          local key_path="$pki_dir/$node_name.key"
+          local cert_name="$1"
+          local node_networks="$2"
+          local node_groups="$3"
+          local node_unsafe_networks="''${4:-}"
+          local cert_path="$pki_dir/$cert_name.crt"
+          local key_path="$pki_dir/$cert_name.key"
 
           rm -f "$cert_path" "$key_path"
           cert_args=(
             -ca-crt "$pki_dir/ca.crt"
             -ca-key "$pki_dir/ca.key"
-            -name "$node_name"
-            -networks "$node_cidr4,$node_cidr6"
+            -name "$cert_name"
+            -networks "$node_networks"
             -groups "$node_groups"
             -out-crt "$cert_path"
             -out-key "$key_path"
@@ -279,10 +243,20 @@ if renderedHostNetwork.bridges ? branch then
           ${pkgs.nebula}/bin/nebula-cert ca -name s-router-test-lab -out-crt "$pki_dir/ca.crt" -out-key "$pki_dir/ca.key"
         fi
 
-        issue_node_cert nebula-core ${coreCertCidr} ${coreCertCidr6} lab,core
-        issue_node_cert branch-node01 ${branchCertCidr} ${branchCertCidr6} lab,branch
-        issue_node_cert hostile-node01 ${hostileCertCidr} ${hostileCertCidr6} lab,hostile
-        issue_node_cert ${lighthouseNodeName} ${lighthouseCertCidr} ${lighthouseCertCidr6} lab,lighthouse ${lighthouseUnsafeNetworks}
+        printf '%s' "$runtime_nodes_json" | jq -r 'keys[]' | while read -r node_name; do
+          cert_cidr4="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].certCidr4')"
+          cert_cidr6="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].certCidr6')"
+          groups_csv="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].groupsCsv')"
+          unsafe_networks="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].unsafeRoutes | map(.route) | join(",")')"
+          issue_node_cert "$node_name" "$cert_cidr4,$cert_cidr6" "$groups_csv" "$unsafe_networks"
+        done
+
+        printf '%s' "$lighthouses_json" | jq -r 'keys[]' | while read -r lighthouse_id; do
+          cert_base_name="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].certBaseName')"
+          cert_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].certNetworks | join(",")')"
+          unsafe_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].unsafeNetworks | join(",")')"
+          issue_node_cert "$cert_base_name" "$cert_networks" "lab,lighthouse" "$unsafe_networks"
+        done
 
         root_ssh_dir="/persist/root/.ssh"
         mkdir -p "$root_ssh_dir"
@@ -294,13 +268,46 @@ if renderedHostNetwork.bridges ? branch then
 
         install_profile() {
           local profile_name="$1"
-          local cert_name="$2"
-          local key_name="$3"
           local profile_dir="$profiles_dir/$profile_name"
           local pki_base="/persist/etc/nebula"
+          local cert_name="$profile_name.crt"
+          local key_name="$profile_name.key"
+          local lighthouse_ip4
+          local lighthouse_ip6
+          local lighthouse_endpoint
+          local lighthouse_endpoint6
+          local lighthouse_port
+          local unsafe_routes_yaml
+          local unsafe_fw_rules
 
-          if [ "$profile_name" = "${lighthouseNodeName}" ]; then
-            pki_base="/root/nebula-s-router-test/profile"
+          lighthouse_ip4="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.overlayIp4')"
+          lighthouse_ip6="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.overlayIp6')"
+          lighthouse_endpoint="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.endpoint')"
+          lighthouse_endpoint6="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.endpoint6')"
+          lighthouse_port="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.port')"
+          unsafe_routes_yaml="$(
+            printf '%s' "$runtime_nodes_json" \
+              | jq -r --arg n "$profile_name" '
+                  .[$n].unsafeRoutes
+                  | map(
+                      "    - route: \(.route)\n      via: "
+                      + (if (.route | contains(":")) then "__LIGHTHOUSE_IPV6__" else "__LIGHTHOUSE_IPV4__" end)
+                      + "\n      mtu: 1300\n      install: false"
+                    )
+                  | join("\n")
+                '
+          )"
+          unsafe_fw_rules="$(
+            printf '%s' "$runtime_nodes_json" \
+              | jq -r --arg n "$profile_name" '
+                  .[$n].unsafeRoutes
+                  | map("    - port: any\n      proto: any\n      host: any\n      local_cidr: \(.route)")
+                  | join("\n")
+                '
+          )"
+
+          if [ -n "$unsafe_routes_yaml" ]; then
+            unsafe_routes_yaml="$(printf '%s\n' "$unsafe_routes_yaml" | sed "s/__LIGHTHOUSE_IPV4__/''${lighthouse_ip4}/g; s/__LIGHTHOUSE_IPV6__/''${lighthouse_ip6}/g")"
           fi
 
           install -d -m 0700 "$profile_dir"
@@ -314,21 +321,20 @@ pki:
   key: $pki_base/$key_name
 static_map:
   network: ip
-$(if [ "$profile_name" = "nebula-core" ]; then cat <<CORE
 
 static_host_map:
-  "${lighthouseOverlayIp}":
-    - "${lighthouseEndpoint}:${lighthousePort}"
-    - "[${lighthouseEndpoint6}]:${lighthousePort}"
-  "${lighthouseOverlayIp6}":
-    - "${lighthouseEndpoint}:${lighthousePort}"
-    - "[${lighthouseEndpoint6}]:${lighthousePort}"
+  "$lighthouse_ip4":
+    - "$lighthouse_endpoint:$lighthouse_port"
+    - "[$lighthouse_endpoint6]:$lighthouse_port"
+  "$lighthouse_ip6":
+    - "$lighthouse_endpoint:$lighthouse_port"
+    - "[$lighthouse_endpoint6]:$lighthouse_port"
 
 lighthouse:
   am_lighthouse: false
   hosts:
-    - "${lighthouseOverlayIp}"
-    - "${lighthouseOverlayIp6}"
+    - "$lighthouse_ip4"
+    - "$lighthouse_ip6"
 
 punchy:
   punch: true
@@ -336,64 +342,13 @@ punchy:
 listen:
   host: "[::]"
   port: 4242
-CORE
-elif [ "$profile_name" = "${lighthouseNodeName}" ]; then cat <<LH
-
-static_host_map: {}
-
-lighthouse:
-  am_lighthouse: true
-
-listen:
-  host: "[::]"
-  port: ${lighthousePort}
-LH
-else cat <<BRANCH
-
-static_host_map:
-  "${lighthouseOverlayIp}":
-    - "${lighthouseEndpoint}:${lighthousePort}"
-    - "[${lighthouseEndpoint6}]:${lighthousePort}"
-  "${lighthouseOverlayIp6}":
-    - "${lighthouseEndpoint}:${lighthousePort}"
-    - "[${lighthouseEndpoint6}]:${lighthousePort}"
-
-lighthouse:
-  am_lighthouse: false
-  hosts:
-    - "${lighthouseOverlayIp}"
-    - "${lighthouseOverlayIp6}"
-
-punchy:
-  punch: true
-
-listen:
-  host: "[::]"
-  port: 4242
-BRANCH
-fi)
 
 tun:
   dev: nebula1
   drop_multicast: false
-$(if [ "$profile_name" = "hostile-node01" ]; then cat <<UNSAFE
+$(if [ -n "$unsafe_routes_yaml" ]; then cat <<UNSAFE
   unsafe_routes:
-    - route: 0.0.0.0/1
-      via: ${lighthouseOverlayIp}
-      mtu: 1300
-      install: false
-    - route: 128.0.0.0/1
-      via: ${lighthouseOverlayIp}
-      mtu: 1300
-      install: false
-    - route: ::/1
-      via: ${lighthouseOverlayIp6}
-      mtu: 1300
-      install: false
-    - route: 8000::/1
-      via: ${lighthouseOverlayIp6}
-      mtu: 1300
-      install: false
+$unsafe_routes_yaml
 UNSAFE
 fi)
 
@@ -402,65 +357,37 @@ firewall:
     - port: any
       proto: any
       host: any
-$(if [ "$profile_name" = "hostile-node01" ]; then cat <<UNSAFEFWOUT
-    - port: any
-      proto: any
-      host: any
-      local_cidr: 0.0.0.0/1
-    - port: any
-      proto: any
-      host: any
-      local_cidr: 128.0.0.0/1
-    - port: any
-      proto: any
-      host: any
-      local_cidr: ::/1
-    - port: any
-      proto: any
-      host: any
-      local_cidr: 8000::/1
+$(if [ -n "$unsafe_fw_rules" ]; then cat <<UNSAFEFWOUT
+$unsafe_fw_rules
 UNSAFEFWOUT
 fi)
   inbound:
     - port: any
       proto: any
       host: any
-$(if [ "$profile_name" = "${lighthouseNodeName}" ]; then cat <<UNSAFEFWIN
-    - port: any
-      proto: any
-      host: any
-      local_cidr: 0.0.0.0/1
-    - port: any
-      proto: any
-      host: any
-      local_cidr: 128.0.0.0/1
-    - port: any
-      proto: any
-      host: any
-      local_cidr: ::/1
-    - port: any
-      proto: any
-      host: any
-      local_cidr: 8000::/1
-UNSAFEFWIN
-fi)
 EOF
         }
 
-        install_profile nebula-core "nebula-core.crt" "nebula-core.key"
-        install_profile branch-node01 "branch-node01.crt" "branch-node01.key"
-        install_profile hostile-node01 "hostile-node01.crt" "hostile-node01.key"
-        install_profile ${lighthouseNodeName} "${lighthouseNodeName}.crt" "${lighthouseNodeName}.key"
+        printf '%s' "$runtime_nodes_json" | jq -r 'keys[]' | while read -r node_name; do
+          install_profile "$node_name"
+        done
 
-        restart_nebula_runtime() {
+        best_effort_restart_nebula_runtime() {
           local machine_name="$1"
-          ${pkgs.systemd}/bin/systemd-run --quiet --wait --pipe -M "$machine_name" \
-            /bin/sh -lc 'systemctl restart nebula-runtime'
+          for _ in $(seq 1 10); do
+            if ${pkgs.systemd}/bin/machinectl show "$machine_name" --property Leader --value >/dev/null 2>&1; then
+              if ${pkgs.systemd}/bin/machinectl shell "$machine_name" /bin/sh -lc 'systemctl restart nebula-runtime' </dev/null >/dev/null 2>&1; then
+                return 0
+              fi
+            fi
+            sleep 1
+          done
+          return 0
         }
 
-        restart_nebula_runtime nebula-core
-        restart_nebula_runtime branch-node01
-        restart_nebula_runtime hostile-node01
+        printf '%s' "$runtime_nodes_json" | jq -r 'keys[]' | while read -r node_name; do
+          best_effort_restart_nebula_runtime "$node_name"
+        done
 
         if ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
           -i "$root_ssh_dir/id_ed25519" root@46.224.173.254 true 2>/dev/null; then
@@ -468,85 +395,132 @@ EOF
           remote_profile_dir="$remote_state_dir/profile"
           remote_bin_dir="$remote_state_dir/bin"
 
-          ${pkgs.openssh}/bin/scp -q -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
-            -i "$root_ssh_dir/id_ed25519" \
-            "$profiles_dir/${lighthouseNodeName}/ca.crt" \
-            "$profiles_dir/${lighthouseNodeName}/${lighthouseNodeName}.crt" \
-            "$profiles_dir/${lighthouseNodeName}/${lighthouseNodeName}.key" \
-            "$profiles_dir/${lighthouseNodeName}/config.yml" \
-            root@46.224.173.254:/root/
+          printf '%s' "$lighthouses_json" | jq -r 'keys[]' | while read -r lighthouse_id; do
+            cert_base_name="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].certBaseName')"
+            service_name="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].serviceName')"
+            interface_name="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].interfaceName')"
+            lighthouse_port="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].port')"
+            overlay_networks4_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks4Csv')"
+            overlay_networks6_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks6Csv')"
 
-          ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
-            -i "$root_ssh_dir/id_ed25519" root@46.224.173.254 '
-              set -euo pipefail
-              remote_state_dir="'"$remote_state_dir"'"
-              remote_profile_dir="'"$remote_profile_dir"'"
-              remote_bin_dir="'"$remote_bin_dir"'"
-              install -d -m 0700 "$remote_profile_dir" "$remote_bin_dir"
-              install -m 0600 /root/ca.crt "$remote_profile_dir/ca.crt"
-              install -m 0600 /root/'"${lighthouseNodeName}"'.crt "$remote_profile_dir/'"${lighthouseNodeName}"'.crt"
-              install -m 0600 /root/'"${lighthouseNodeName}"'.key "$remote_profile_dir/'"${lighthouseNodeName}"'.key"
-              install -m 0600 /root/config.yml "$remote_profile_dir/config.yml"
-              rm -f /root/ca.crt /root/'"${lighthouseNodeName}"'.crt /root/'"${lighthouseNodeName}"'.key /root/config.yml
+            cat > "$profiles_dir/$cert_base_name.config.yml" <<EOF
+pki:
+  ca: $remote_profile_dir/ca.crt
+  cert: $remote_profile_dir/$cert_base_name.crt
+  key: $remote_profile_dir/$cert_base_name.key
+static_map:
+  network: ip
 
-              if ! command -v nebula >/dev/null 2>&1; then
-                if ! test -x "$remote_bin_dir/nebula"; then
-                  tmpdir="$(mktemp -d)"
-                  trap "rm -rf \"$tmpdir\"" EXIT
-                  curl -fsSL https://github.com/slackhq/nebula/releases/download/v1.10.3/nebula-linux-amd64.tar.gz \
-                    | tar -C "$tmpdir" -xz
-                  install -m 0755 "$tmpdir/nebula" "$remote_bin_dir/nebula"
+static_host_map: {}
+
+lighthouse:
+  am_lighthouse: true
+
+listen:
+  host: "[::]"
+  port: $lighthouse_port
+
+tun:
+  dev: $interface_name
+  drop_multicast: false
+
+firewall:
+  outbound:
+    - port: any
+      proto: any
+      host: any
+  inbound:
+    - port: any
+      proto: any
+      host: any
+EOF
+
+            ${pkgs.openssh}/bin/scp -q -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
+              -i "$root_ssh_dir/id_ed25519" \
+              "$pki_dir/ca.crt" \
+              "$pki_dir/$cert_base_name.crt" \
+              "$pki_dir/$cert_base_name.key" \
+              "$profiles_dir/$cert_base_name.config.yml" \
+              root@46.224.173.254:/root/ \
+              </dev/null
+
+            ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
+              -i "$root_ssh_dir/id_ed25519" root@46.224.173.254 "
+                set -euo pipefail
+                remote_state_dir='$remote_state_dir'
+                remote_profile_dir='$remote_profile_dir'
+                remote_bin_dir='$remote_bin_dir'
+                cert_base_name='$cert_base_name'
+                service_name='$service_name'
+                interface_name='$interface_name'
+                lighthouse_port='$lighthouse_port'
+                overlay_networks4_csv='$overlay_networks4_csv'
+                overlay_networks6_csv='$overlay_networks6_csv'
+
+                install -d -m 0700 \"\$remote_profile_dir\" \"\$remote_bin_dir\"
+                install -m 0600 /root/ca.crt \"\$remote_profile_dir/ca.crt\"
+                install -m 0600 /root/\$cert_base_name.crt \"\$remote_profile_dir/\$cert_base_name.crt\"
+                install -m 0600 /root/\$cert_base_name.key \"\$remote_profile_dir/\$cert_base_name.key\"
+                install -m 0600 /root/\$cert_base_name.config.yml \"\$remote_profile_dir/\$cert_base_name.config.yml\"
+                rm -f /root/ca.crt /root/\$cert_base_name.crt /root/\$cert_base_name.key /root/\$cert_base_name.config.yml
+
+                if ! command -v nebula >/dev/null 2>&1; then
+                  if ! test -x \"\$remote_bin_dir/nebula\"; then
+                    tmpdir=\"\$(mktemp -d)\"
+                    trap 'rm -rf \"\$tmpdir\"' EXIT
+                    curl -fsSL https://github.com/slackhq/nebula/releases/download/v1.10.3/nebula-linux-amd64.tar.gz | tar -C \"\$tmpdir\" -xz
+                    install -m 0755 \"\$tmpdir/nebula\" \"\$remote_bin_dir/nebula\"
+                  fi
+                  nebula_bin=\"\$remote_bin_dir/nebula\"
+                else
+                  nebula_bin=\"\$(command -v nebula)\"
                 fi
-                nebula_bin="$remote_bin_dir/nebula"
-              else
-                nebula_bin="$(command -v nebula)"
-              fi
 
-              cat > /etc/systemd/system/nebula-s-router-test-lighthouse.service <<EOF
+                systemctl disable --now nebula-s-router-test-lighthouse.service 2>/dev/null || true
+
+                cat > /etc/systemd/system/\$service_name.service <<EOF_REMOTE
 [Unit]
-Description=Temporary Nebula lighthouse for s-router-test validation
+Description=Temporary Nebula lighthouse for s-router-test validation (\$service_name)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=$nebula_bin -config $remote_profile_dir/config.yml
+ExecStart=\$nebula_bin -config \$remote_profile_dir/\$cert_base_name.config.yml
 Restart=always
 RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
-EOF
-              if command -v iptables >/dev/null 2>&1; then
-                iptables -C INPUT -p udp --dport '"${lighthousePort}"' -j ACCEPT 2>/dev/null \
-                  || iptables -I INPUT -p udp --dport '"${lighthousePort}"' -j ACCEPT
-                iptables -C FORWARD -i nebula1 -o eth0 -j ACCEPT 2>/dev/null \
-                  || iptables -I FORWARD -i nebula1 -o eth0 -j ACCEPT
-                iptables -C FORWARD -i eth0 -o nebula1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null \
-                  || iptables -I FORWARD -i eth0 -o nebula1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                iptables -t nat -C POSTROUTING -s 100.96.10.0/24 -o eth0 -j MASQUERADE 2>/dev/null \
-                  || iptables -t nat -I POSTROUTING -s 100.96.10.0/24 -o eth0 -j MASQUERADE
-              fi
-              if command -v ip6tables >/dev/null 2>&1; then
-                ip6tables -C INPUT -p udp --dport '"${lighthousePort}"' -j ACCEPT 2>/dev/null \
-                  || ip6tables -I INPUT -p udp --dport '"${lighthousePort}"' -j ACCEPT
-                ip6tables -C FORWARD -i nebula1 -o eth0 -j ACCEPT 2>/dev/null \
-                  || ip6tables -I FORWARD -i nebula1 -o eth0 -j ACCEPT
-                ip6tables -C FORWARD -i eth0 -o nebula1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null \
-                  || ip6tables -I FORWARD -i eth0 -o nebula1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                ip6tables -t nat -C POSTROUTING -s fd42:dead:beef:ee::/64 -o eth0 -j MASQUERADE 2>/dev/null \
-                  || ip6tables -t nat -I POSTROUTING -s fd42:dead:beef:ee::/64 -o eth0 -j MASQUERADE
-              fi
-              sysctl -w net.ipv4.ip_forward=1
-              sysctl -w net.ipv6.conf.all.forwarding=1
-              systemctl daemon-reload
-              systemctl enable nebula-s-router-test-lighthouse.service
-              systemctl restart nebula-s-router-test-lighthouse.service
-            '
+EOF_REMOTE
+
+                if command -v iptables >/dev/null 2>&1; then
+                  iptables -C INPUT -p udp --dport \$lighthouse_port -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport \$lighthouse_port -j ACCEPT
+                  iptables -C FORWARD -i \$interface_name -o eth0 -j ACCEPT 2>/dev/null || iptables -I FORWARD -i \$interface_name -o eth0 -j ACCEPT
+                  iptables -C FORWARD -i eth0 -o \$interface_name -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || iptables -I FORWARD -i eth0 -o \$interface_name -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                  printf '%s' \"\$overlay_networks4_csv\" | tr ',' '\n' | while read -r cidr; do
+                    [ -n \"\$cidr\" ] || continue
+                    iptables -t nat -C POSTROUTING -s \"\$cidr\" -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -I POSTROUTING -s \"\$cidr\" -o eth0 -j MASQUERADE
+                  done
+                fi
+                if command -v ip6tables >/dev/null 2>&1; then
+                  ip6tables -C INPUT -p udp --dport \$lighthouse_port -j ACCEPT 2>/dev/null || ip6tables -I INPUT -p udp --dport \$lighthouse_port -j ACCEPT
+                  ip6tables -C FORWARD -i \$interface_name -o eth0 -j ACCEPT 2>/dev/null || ip6tables -I FORWARD -i \$interface_name -o eth0 -j ACCEPT
+                  ip6tables -C FORWARD -i eth0 -o \$interface_name -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || ip6tables -I FORWARD -i eth0 -o \$interface_name -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                  printf '%s' \"\$overlay_networks6_csv\" | tr ',' '\n' | while read -r cidr; do
+                    [ -n \"\$cidr\" ] || continue
+                    ip6tables -t nat -C POSTROUTING -s \"\$cidr\" -o eth0 -j MASQUERADE 2>/dev/null || ip6tables -t nat -I POSTROUTING -s \"\$cidr\" -o eth0 -j MASQUERADE
+                  done
+                fi
+                sysctl -w net.ipv4.ip_forward=1
+                sysctl -w net.ipv6.conf.all.forwarding=1
+                systemctl daemon-reload
+                systemctl enable \$service_name.service
+                systemctl restart \$service_name.service
+              " </dev/null
+          done
         else
           echo "nebula-profile-bootstrap: Hetzner SSH key not authorized yet for root@46.224.173.254" >&2
         fi
       '';
     };
   }
-else
-  { }

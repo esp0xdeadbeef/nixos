@@ -74,7 +74,7 @@ let
     in
     if fromBuiltHost != null then fromBuiltHost else renderedHost.deploymentHostName or null;
 
-  renderedHostNetwork = {
+  renderedHostNetworkBase = {
     hostName = renderedHost.hostName or identity.boxName;
     inherit deploymentHostName;
     bridgeNameMap = renderedBridges.bridgeNameMap or { };
@@ -94,14 +94,27 @@ let
     };
   };
 
+  nebulaRuntimePlan = api.overlayRuntime.nebulaPlan {
+    renderedHostNetwork = renderedHostNetworkBase;
+    inventory = builtHost.globalInventory or { };
+  };
+
+  renderedHostNetwork =
+    renderedHostNetworkBase
+    // {
+      overlayRuntime = {
+        nebula = nebulaRuntimePlan;
+      };
+    };
+
   builders = import ./modules/container-builders.nix { inherit lib pkgs; };
 
   testContainers = import ./modules/test-containers.nix {
-    inherit (builders) mkTenantEndpoint;
+    inherit (builders) mkStaticTenantEndpoint mkTenantEndpoint;
   };
 
   overlayContainers = import ./modules/overlay-containers.nix {
-    inherit renderedHostNetwork;
+    inherit lib nebulaRuntimePlan;
     inherit (builders) mkNebulaNode mkNebulaProfileMount;
   };
 
@@ -117,7 +130,7 @@ in
     ./mount-utils.nix
     ./sops.nix
     (import ./modules/nebula-bootstrap.nix {
-      inherit pkgs renderedHostNetwork;
+      inherit lib pkgs nebulaRuntimePlan;
     })
   ];
 

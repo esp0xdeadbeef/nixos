@@ -226,6 +226,36 @@ base
           }
 
           {
+            id = "allow-sitea-mgmt-to-sitec-storage";
+            priority = 116;
+            from = {
+              kind = "tenant-set";
+              members = [ "mgmt" ];
+            };
+            to = {
+              kind = "external";
+              name = "site-c-storage";
+            };
+            trafficType = "any";
+            action = "allow";
+          }
+
+          {
+            id = "allow-sitec-storage-to-sitea-mgmt";
+            priority = 117;
+            from = {
+              kind = "external";
+              name = "site-c-storage";
+            };
+            to = {
+              kind = "tenant-set";
+              members = [ "mgmt" ];
+            };
+            trafficType = "any";
+            action = "allow";
+          }
+
+          {
             id = "allow-wan-to-dmz-nebula";
             priority = 120;
             from = {
@@ -253,6 +283,7 @@ base
           external-isp-a = "isp-a";
           external-isp-b = "isp-b";
           external-east-west = "east-west";
+          external-site-c-storage = "site-c-storage";
           service-site-dns-mgmt = "site-dns-mgmt";
           service-dmz-nebula = "dmz-nebula";
         };
@@ -262,6 +293,12 @@ base
         {
           name = "east-west";
           peerSite = "espbranch.site-b";
+          terminateOn = "s-router-core-isp-b";
+          mustTraverse = [ "policy" ];
+        }
+        {
+          name = "site-c-storage";
+          peerSite = "esp0xdeadbeef.site-c";
           terminateOn = "s-router-core-isp-b";
           mustTraverse = [ "policy" ];
         }
@@ -524,6 +561,461 @@ base
         [
           "b-router-downstream-selector"
           "b-router-access-hostile"
+        ]
+      ];
+    };
+  };
+
+  esp0xdeadbeef.site-c = {
+    pools = {
+      p2p = {
+        ipv4 = "10.80.0.0/24";
+        ipv6 = "fd42:dead:cafe:1000::/118";
+      };
+
+      loopback = {
+        ipv4 = "10.89.0.0/24";
+        ipv6 = "fd42:dead:cafe:1900::/118";
+      };
+    };
+
+    ownership.prefixes = [
+      {
+        kind = "tenant";
+        name = "mgmt";
+        ipv4 = "10.90.10.0/24";
+        ipv6 = "fd42:dead:cafe:10::/64";
+      }
+      {
+        kind = "tenant";
+        name = "home-users";
+        ipv4 = "10.90.20.0/24";
+        ipv6 = "fd42:dead:cafe:20::/64";
+      }
+      {
+        kind = "tenant";
+        name = "printer";
+        ipv4 = "10.90.30.0/29";
+        ipv6 = "fd42:dead:cafe:30::/64";
+      }
+      {
+        kind = "tenant";
+        name = "nas";
+        ipv4 = "10.90.40.0/29";
+        ipv6 = "fd42:dead:cafe:40::/64";
+      }
+      {
+        kind = "tenant";
+        name = "streaming";
+        ipv4 = "10.90.50.0/29";
+        ipv6 = "fd42:dead:cafe:50::/64";
+      }
+      {
+        kind = "tenant";
+        name = "iot";
+        ipv4 = "10.90.60.0/24";
+        ipv6 = "fd42:dead:cafe:60::/64";
+      }
+    ];
+
+    communicationContract = {
+      trafficTypes = [
+        {
+          name = "dns";
+          match = [
+            {
+              proto = "udp";
+              dports = [ 53 ];
+              family = "any";
+            }
+            {
+              proto = "tcp";
+              dports = [ 53 ];
+              family = "any";
+            }
+          ];
+        }
+      ];
+
+      services = [
+        {
+          name = "sitec-dns-mgmt";
+          trafficType = "dns";
+          providers = [ "sitec-dns-mgmt" ];
+        }
+      ];
+
+      relations = [
+        {
+          id = "allow-sitec-mgmt-internal";
+          priority = 10;
+          from = {
+            kind = "tenant-set";
+            members = [ "mgmt" ];
+          };
+          to = {
+            kind = "tenant-set";
+            members = [
+              "mgmt"
+              "home-users"
+              "printer"
+              "nas"
+              "streaming"
+              "iot"
+            ];
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-home-to-local-services";
+          priority = 20;
+          from = {
+            kind = "tenant-set";
+            members = [ "home-users" ];
+          };
+          to = {
+            kind = "tenant-set";
+            members = [
+              "printer"
+              "nas"
+              "streaming"
+            ];
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-tenants-to-mgmt-dns";
+          priority = 30;
+          from = {
+            kind = "tenant-set";
+            members = [
+              "mgmt"
+              "home-users"
+              "printer"
+              "nas"
+              "streaming"
+              "iot"
+            ];
+          };
+          to = {
+            kind = "service";
+            name = "sitec-dns-mgmt";
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-mgmt-dns-to-wan";
+          priority = 31;
+          from = {
+            kind = "tenant-set";
+            members = [ "mgmt" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
+        {
+          id = "deny-sitec-printer-dns-to-wan";
+          priority = 40;
+          from = {
+            kind = "tenant-set";
+            members = [ "printer" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+        {
+          id = "deny-sitec-nas-dns-to-wan";
+          priority = 41;
+          from = {
+            kind = "tenant-set";
+            members = [ "nas" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+        {
+          id = "allow-sitec-home-to-wan";
+          priority = 100;
+          from = {
+            kind = "tenant-set";
+            members = [ "home-users" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-streaming-to-wan";
+          priority = 101;
+          from = {
+            kind = "tenant-set";
+            members = [ "streaming" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-iot-to-wan";
+          priority = 102;
+          from = {
+            kind = "tenant-set";
+            members = [ "iot" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-mgmt-to-wan";
+          priority = 103;
+          from = {
+            kind = "tenant-set";
+            members = [ "mgmt" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "deny-sitec-printer-to-wan";
+          priority = 110;
+          from = {
+            kind = "tenant-set";
+            members = [ "printer" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "any";
+          action = "deny";
+        }
+        {
+          id = "deny-sitec-nas-to-wan";
+          priority = 111;
+          from = {
+            kind = "tenant-set";
+            members = [ "nas" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+          };
+          trafficType = "any";
+          action = "deny";
+        }
+        {
+          id = "allow-sitec-printer-to-storage-overlay";
+          priority = 120;
+          from = {
+            kind = "tenant-set";
+            members = [ "printer" ];
+          };
+          to = {
+            kind = "external";
+            name = "site-c-storage";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-nas-to-storage-overlay";
+          priority = 121;
+          from = {
+            kind = "tenant-set";
+            members = [ "nas" ];
+          };
+          to = {
+            kind = "external";
+            name = "site-c-storage";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-mgmt-to-storage-overlay";
+          priority = 122;
+          from = {
+            kind = "tenant-set";
+            members = [ "mgmt" ];
+          };
+          to = {
+            kind = "external";
+            name = "site-c-storage";
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+        {
+          id = "allow-sitec-storage-overlay-to-mgmt";
+          priority = 123;
+          from = {
+            kind = "external";
+            name = "site-c-storage";
+          };
+          to = {
+            kind = "tenant-set";
+            members = [ "mgmt" ];
+          };
+          trafficType = "any";
+          action = "allow";
+        }
+      ];
+
+      interfaceTags = {
+        tenant-mgmt = "mgmt";
+        tenant-home-users = "home-users";
+        tenant-streaming = "streaming";
+        tenant-printer = "printer";
+        tenant-nas = "nas";
+        tenant-iot = "iot";
+        external-wan = "wan";
+        external-site-c-storage = "site-c-storage";
+        service-sitec-dns-mgmt = "sitec-dns-mgmt";
+      };
+    };
+
+    transport.overlays = [
+      {
+        name = "site-c-storage";
+        peerSite = "esp0xdeadbeef.site-a";
+        terminateOn = "c-router-core";
+        mustTraverse = [ "policy" ];
+      }
+    ];
+
+    topology = {
+      nodes = {
+        c-router-core = {
+          role = "core";
+
+          uplinks = {
+            wan = {
+              ipv4 = [ "0.0.0.0/0" ];
+              ipv6 = [ "::/0" ];
+            };
+          };
+        };
+
+        c-router-upstream-selector.role = "upstream-selector";
+        c-router-policy.role = "policy";
+        c-router-downstream-selector.role = "downstream-selector";
+
+        c-router-access-mgmt = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "mgmt";
+            }
+          ];
+        };
+
+        c-router-access-media = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "home-users";
+            }
+            {
+              kind = "tenant";
+              name = "streaming";
+            }
+          ];
+        };
+
+        c-router-access-printer = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "printer";
+            }
+          ];
+        };
+
+        c-router-access-nas = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "nas";
+            }
+          ];
+        };
+
+        c-router-access-iot = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "iot";
+            }
+          ];
+        };
+      };
+
+      links = [
+        [
+          "c-router-core"
+          "c-router-upstream-selector"
+        ]
+        [
+          "c-router-upstream-selector"
+          "c-router-policy"
+        ]
+        [
+          "c-router-policy"
+          "c-router-downstream-selector"
+        ]
+        [
+          "c-router-downstream-selector"
+          "c-router-access-mgmt"
+        ]
+        [
+          "c-router-downstream-selector"
+          "c-router-access-media"
+        ]
+        [
+          "c-router-downstream-selector"
+          "c-router-access-printer"
+        ]
+        [
+          "c-router-downstream-selector"
+          "c-router-access-nas"
+        ]
+        [
+          "c-router-downstream-selector"
+          "c-router-access-iot"
         ]
       ];
     };

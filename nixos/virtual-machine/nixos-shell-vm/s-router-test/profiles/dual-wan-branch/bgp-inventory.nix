@@ -94,6 +94,10 @@ let
   host = base.deployment.hosts.s-router-test;
 
   siteANodes = base.realization.nodes;
+
+  siteC = import ./site-c-bgp.nix {
+    inherit base publicDns4 publicDns6 policyDerivedDns;
+  };
 in
 base
 // {
@@ -109,13 +113,15 @@ base
         ipv4 = [ "10.20.30.10" ];
         ipv6 = [ "fd42:dead:beef:30::10" ];
       };
-    };
+    }
+    // siteC.endpoints;
 
   controlPlane =
     base.controlPlane
     // {
       sites =
-        base.controlPlane.sites
+        siteC.controlPlaneSites (
+          base.controlPlane.sites
         // {
           esp0xdeadbeef =
             base.controlPlane.sites.esp0xdeadbeef
@@ -152,6 +158,22 @@ base
                         endpoint = "46.224.173.254";
                         endpoint6 = "2a01:4f8:c013:628b::1";
                         port = 4242;
+                      };
+                    };
+                    runtimeNodes = {
+                      nebula-core = {
+                        groups = [
+                          "lab"
+                          "core"
+                        ];
+                        service = {
+                          name = "nebula-runtime";
+                          interface = "nebula1";
+                        };
+                        container = {
+                          hostBridge = "br-uplink1";
+                          profile = "core-client";
+                        };
                       };
                     };
                   };
@@ -204,10 +226,48 @@ base
                     port = 4242;
                   };
                 };
+                runtimeNodes = {
+                  branch-node01 = {
+                    groups = [
+                      "lab"
+                      "branch"
+                    ];
+                    service = {
+                      name = "nebula-runtime";
+                      interface = "nebula1";
+                    };
+                    container = {
+                      hostBridge = "branch";
+                      profile = "branch-web";
+                    };
+                  };
+
+                  hostile-node01 = {
+                    groups = [
+                      "lab"
+                      "hostile"
+                    ];
+                    unsafeRoutes = [
+                      { route = "0.0.0.0/1"; }
+                      { route = "128.0.0.0/1"; }
+                      { route = "::/1"; }
+                      { route = "8000::/1"; }
+                    ];
+                    service = {
+                      name = "nebula-runtime";
+                      interface = "nebula1";
+                    };
+                    container = {
+                      hostBridge = "hostile";
+                      profile = "hostile-exit";
+                    };
+                  };
+                };
               };
             };
           };
-        };
+        }
+        );
     };
 
   deployment =
@@ -217,8 +277,9 @@ base
         base.deployment.hosts
         // {
           s-router-test =
-            host
-            // {
+            siteC.deploymentHost (
+              host
+              // {
               # Ensure WAN-only nodes in this profile resolve to the ISP-B uplink
               # instead of falling back to an unrelated host uplink.
               wanUplink = "uplink-isp-b";
@@ -230,6 +291,7 @@ base
                   br-site-a-policy-upstream-access-client-east-west = { };
                   br-site-a-policy-upstream-access-client2-east-west = { };
                   br-site-a-policy-upstream-access-mgmt-east-west = { };
+                  br-site-a-policy-upstream-access-mgmt-site-c-storage = { };
                   br-site-a-policy-upstream-access-client2-isp-a = { };
                   br-site-a-policy-upstream-access-client2-isp-b = { };
                   br-site-a-downstream-policy-access-client2 = { };
@@ -250,7 +312,8 @@ base
                   branch = { };
                   hostile = { };
                 };
-            };
+              }
+            );
         };
     };
 
@@ -535,6 +598,16 @@ base
                   interface.name = "up-mgt-ew";
                 };
 
+                upstream-mgmt-site-c-storage = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-site-c-storage";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-site-c-storage"}-upstream-mgmt-site-c-storage";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-mgmt-site-c-storage";
+                  };
+                  interface.name = "up-mgt-sitec";
+                };
+
                 downstream-dmz = {
                   link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-dmz";
                   adapterName = "${"p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-dmz"}-downstream-dmz";
@@ -621,6 +694,16 @@ base
                     bridge = "br-site-a-policy-upstream-access-mgmt-east-west";
                   };
                   interface.name = "pol-mgt-ew";
+                };
+
+                policy-mgmt-site-c-storage = {
+                  link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-site-c-storage";
+                  adapterName = "${"p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-site-c-storage"}-policy-mgmt-site-c-storage";
+                  attach = {
+                    kind = "bridge";
+                    bridge = "br-site-a-policy-upstream-access-mgmt-site-c-storage";
+                  };
+                  interface.name = "pol-mgt-sitec";
                 };
 
               };
@@ -957,6 +1040,7 @@ base
             };
           };
         };
-      };
+        }
+      // siteC.realizationNodes;
   };
 }
