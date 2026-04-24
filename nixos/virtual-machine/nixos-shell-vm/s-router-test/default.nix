@@ -127,7 +127,6 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     "${inputs.network-renderer-nixos}/s88/ControlModule/module/host-validation.nix"
-    ./mount-utils.nix
     ./sops.nix
     (import ./modules/nebula-bootstrap.nix {
       inherit lib pkgs nebulaRuntimePlan;
@@ -137,6 +136,8 @@ in
   system.stateVersion = lib.mkForce "25.11";
 
   environment.systemPackages = with pkgs; [
+    bindfs
+    gron
     ethtool
     iproute2
     iputils
