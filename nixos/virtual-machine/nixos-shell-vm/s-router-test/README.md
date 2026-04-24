@@ -24,12 +24,15 @@ Current profile :
   - enterprise A: dual uplink, DMZ, overlay termination intent
   - enterprise B: single uplink, branch-side overlay termination intent
 
-Root wrapper files choose the active profile:
+The active model now lives directly in the root files:
 
 - [intent.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/intent.nix:1)
+- [inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/inventory.nix:1)
+
+Compatibility wrappers still exist for mode selection and older references:
+
 - [bgp-inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/bgp-inventory.nix:1)
 - [static-inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/static-inventory.nix:1)
-- [inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/inventory.nix:1)
 
 ## Recommended Modeling Pattern
 

@@ -5,8 +5,11 @@ Verified on 2026-04-24. Treat older conclusions as stale.
 ## Fixed And Live-Verified
 
 - Returned live host after the latest BGP rebuild is:
-  - `/nix/store/2x40w6r19fg0d6q8i3sbvdb32vy1zacq-nixos-system-s-router-test-25.11.20260421.10e7ad5`
+  - `/nix/store/m070dyjjvlxmnbih6z1386yc42l5sbbp-nixos-system-s-router-test-25.11.20260421.10e7ad5`
 - `s88-network-validation-status` is ready on that returned host.
+- The root-file refactor is live-validated:
+  - the active generation booted successfully after moving the full active model into root `intent.nix` and `inventory.nix`
+  - the compatibility wrappers still resolve correctly for BGP and static selection
 - `site-c` access-router DNS is fixed live:
   - `c-router-access-mgmt` answers `test-machine-01.printer` and `home-user-01.home-users` locally
   - `c-router-access-media` now answers `test-machine-01.printer`, `home-user-01.home-users`, and public names locally without the earlier `SERVFAIL`
@@ -26,6 +29,21 @@ Verified on 2026-04-24. Treat older conclusions as stale.
   - `home-user-01` direct `@1.1.1.1` queries time out
 - `site-c` printer internet egress is blocked live:
   - `test-machine-01` resolves normally but `curl -4 ifconfig.me` and `curl -6 ifconfig.me` time out
+- The generalized Nebula bootstrap now runs successfully on the returned host:
+  - `nebula-profile-bootstrap.service` finished successfully on the current generation
+  - the current journal shows:
+    - `Created symlink /etc/systemd/system/multi-user.target.wants/nebula-s-router-test-lighthouse-site-c-storage.service`
+- Hetzner now has both modeled lighthouse runtimes live:
+  - UDP `4242` is listening for `nebula-s-router-test-lighthouse-east-west.service`
+  - UDP `4243` is listening for `nebula-s-router-test-lighthouse-site-c-storage.service`
+  - Hetzner now has both overlay interfaces:
+    - `nebula0` `100.96.10.254/24` `fd42:dead:beef:ee::254/64`
+    - `nebula1` `100.96.20.254/24` `fd42:dead:beef:ec::254/64`
+- `site-c` storage-side Nebula containers now boot and hold live runtime state:
+  - `nas-node01` `nebula-runtime.service` is active
+  - `printer-node01` `nebula-runtime.service` is active
+  - `nas-node01` has `nebula1` on `100.96.20.10/24` and `fd42:dead:beef:ec::10/64`
+  - `printer-node01` has `nebula1` on `100.96.20.20/24` and `fd42:dead:beef:ec::20/64`
 - Previously verified hostile/branch/site-a live properties still check out directly on the current host:
   - `b-router-access-branch` resolves `example.com`
   - `branch-node01` resolves `example.com` and direct `@1.1.1.1` still times out
@@ -40,6 +58,7 @@ Verified on 2026-04-24. Treat older conclusions as stale.
 - `network-control-plane-model` now preserves modeled `services.mdns` reflector settings in runtime-target service data; `tests/test-mdns-service.sh` passes locally.
 - `network-renderer-nixos` now renders modeled `services.mdns` into avahi reflector configuration; `tests/test-mdns-service.sh` passes locally.
 - The shared `site-c` profile now injects the same authoritative local zones/records into the media, printer, and NAS edge DNS services instead of only `c-router-access-mgmt`.
+- `network-renderer-nixos` now emits a normalized Nebula runtime plan, and `s-router-test` consumes that plan instead of rebuilding overlay runtime state from ad hoc local glue.
 - The `site-c` locked-chain local build gate passes in both wrappers:
   - BGP wrapper built `/nix/store/7nr4n5jln5x6qc47pp02f11cra6l8vfb-nixos-system-s-router-test-25.11.20260421.10e7ad5`
   - static wrapper built `/nix/store/vi8f8cj465lcaqj2bjc4fv6zy05pgri7-nixos-system-s-router-test-25.11.20260421.10e7ad5`
@@ -52,13 +71,28 @@ Verified on 2026-04-24. Treat older conclusions as stale.
 
 - `site-c` mDNS discovery is still broken live:
   - `home-user-01` cannot resolve or browse `streaming-cast-01.local`
-  - `streaming-cast-01` cannot resolve or browse `home-user-01.local`
-  - `c-router-access-media` has `avahi-daemon` active and an nft `allow-mdns-service` rule, but discovery still does not cross the media router
+  - `home-user-01` has mDNS enabled on `eth0` and uses `10.90.20.1` / `fd42:dead:cafe:20::1` as DNS, so this is not just a client resolver being fully disabled
+  - `streaming-cast-01` is advertising `_googlecast._tcp` and `_workstation._tcp` locally on its `streaming` segment
+  - `streaming-cast-01` still does not show successful reverse discovery of `home-user-01.local`
+  - `c-router-access-media` has `avahi-daemon` active and the live shortened interfaces are:
+    - `tenant-streami`
+    - `tenant-users`
+  - discovery still does not cross the media router
+  - the current rendered Avahi config still needs to be inspected more directly because the live `/etc/avahi` dump did not yet show an obvious reflector stanza
 - `site-c` storage-overlay Nebula is still broken live:
-  - `nas-node01` and `printer-node01` have `nebula1` up on `100.96.20.0/24` and `fd42:dead:beef:ec::/64`
-  - both repeatedly try to handshake to Hetzner `46.224.173.254:4242` / `[2a01:4f8:c013:628b::1]:4242`
-  - those handshakes time out continuously
-  - neither node can reach tested overlay peers such as `100.96.10.254`, `fd42:dead:beef:ee::254`, `100.96.10.1`, or `fd42:dead:beef:ee::1`
+  - `nas-node01` and `printer-node01` now target the correct Hetzner storage endpoint:
+    - `46.224.173.254:4243`
+    - `[2a01:4f8:c013:628b::1]:4243`
+  - both repeatedly send stage-1 handshakes to those endpoints and still time out
+  - `nas-node01` live logs show an initial burst of `sendto: network is unreachable`, then repeated `Handshake message sent` followed by `Handshake timed out`
+  - direct overlay pings from `nas-node01` and `printer-node01` to `100.96.20.254` and `fd42:dead:beef:ec::254` still fail
+  - `nas-node01` underlay route to the Hetzner endpoint is still plain site-c WAN egress:
+    - IPv4: `46.224.173.254 via 10.90.40.1 dev eth0`
+    - IPv6: `2a01:4f8:c013:628b::1 via fe80::... dev eth0`
+  - live policy routing is still wrong for the storage path on `c-router-policy`:
+    - `ip -6 route get 2a01:4f8:c013:628b::1 iif downstream-nas` selects `up-iot-wan`
+    - `ip -6 route get 2a01:4f8:c013:628b::1 iif down-printer` selects `up-iot-wan`
+  - this confirms the current `site-c-storage` path is still modeled as the wrong class of external path for the user’s intended design
 - `site-c` is not production-ready yet because the required live discovery and storage-overlay checks still fail.
 
 ## Pending Or Unknown
@@ -71,20 +105,21 @@ Verified on 2026-04-24. Treat older conclusions as stale.
     - renderer/control-plane emits desired overlay runtime state
     - the lab may temporarily automate issuance because this is a test VM
     - the real design must require explicit manual unlock and retrieval of the CA
-- The current BGP reboot returned a new host generation, but the rebuild loop still did not complete a trustworthy dry-run/live hash comparison:
-  - `expected system evaluation failed; continuing without hash comparison`
-  - `error: interrupted by the user`
-- `s88-network-validation-status` on the returned host reports `dnsA=fail` / `dnsAAAA=fail` for `b-router-access-branch` and `b-router-access-hostile`, but direct live checks after the snapshot show both access resolvers and both endpoints resolving normally again. That mismatch is currently unresolved.
+- The rebuild loop still does not complete a trustworthy dry-run/live hash comparison:
+  - on the last two returned generations it logged:
+    - `expected system evaluation failed; continuing without hash comparison`
+    - `error: interrupted by the user`
 - `site-c` NAS overlay reachability to the intended storage peers is not yet proven because the storage overlay itself is still failing to establish.
 
 ## Next Concrete Debugging Target
 
 - Fix the `site-c` mDNS reflector path in the correct renderer/control-plane layer:
+  - inspect the actual rendered avahi configuration on `c-router-access-media`
   - verify whether `services.mdns.allowInterfaces` is still using pre-shortening names while the live interfaces are shortened (`tenant-users`, `tenant-streami`)
   - then revalidate `home-user-01` discovery of `streaming-cast-01`
 - Fix the `site-c-storage` Hetzner Nebula path:
-  - verify the Hetzner-side profile/service for the `100.96.20.0/24` / `fd42:dead:beef:ec::/64` overlay
-  - verify the host bootstrap is actually provisioning the `site-c-storage` remote runtime, not just the east-west runtime
+  - the host bootstrap is now provisioning the `site-c-storage` remote runtime correctly, but the live route selection is still wrong before the handshake can ever be trusted
+  - remodel `site-c-storage` as the user-requested separate-site/upstream shape instead of the current same-site external that falls back to WAN policy
   - then revalidate `nas-node01` / `printer-node01` overlay reachability and no-internet behavior
 - After those two fixes, rerun:
   - the local build gate
