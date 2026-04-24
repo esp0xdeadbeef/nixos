@@ -48,6 +48,30 @@ let
 
   policyDerivedDns = dnsAttrs: builtins.removeAttrs dnsAttrs [ "forwarders" "upstreams" ];
 
+  overrideAdvertisedRouterSelf =
+    inherited: tenantKey:
+    inherited
+    // {
+      dhcp4 =
+        (inherited.dhcp4 or { })
+        // {
+          ${tenantKey} =
+            inherited.dhcp4.${tenantKey}
+            // {
+              dnsServers = [ "router-self" ];
+            };
+        };
+      ipv6Ra =
+        (inherited.ipv6Ra or { })
+        // {
+          ${tenantKey} =
+            inherited.ipv6Ra.${tenantKey}
+            // {
+              rdnss = [ "router-self" ];
+            };
+        };
+    };
+
   host = base.deployment.hosts.s-router-test;
 
   siteANodes = base.realization.nodes;
@@ -85,15 +109,29 @@ base
                     ipam = {
                       ipv4.prefix = "100.96.10.0/24";
                       ipv6.prefix = "fd42:dead:beef:ee::/64";
-                      nodes.s-router-core-isp-b = {
-                        addr4 = "100.96.10.1/32";
-                        addr6 = "fd42:dead:beef:ee::1/128";
+                      nodes = {
+                        s-router-core-isp-b = {
+                          addr4 = "100.96.10.1/32";
+                          addr6 = "fd42:dead:beef:ee::1/128";
+                        };
+
+                        nebula-core = {
+                          addr4 = "100.96.10.10/32";
+                          addr6 = "fd42:dead:beef:ee::10/128";
+                        };
+
+                        hetzner-nebula-prodtest-01 = {
+                          addr4 = "100.96.10.254/32";
+                          addr6 = "fd42:dead:beef:ee::254/128";
+                        };
                       };
                     };
                     nebula = {
                       role = "core-client";
                       lighthouse = {
-                        endpoint = "nebula01";
+                        node = "hetzner-nebula-prodtest-01";
+                        endpoint = "46.224.173.254";
+                        endpoint6 = "2a01:4f8:c013:628b::1";
                         port = 4242;
                       };
                     };
@@ -116,15 +154,29 @@ base
                 ipam = {
                   ipv4.prefix = "100.96.10.0/24";
                   ipv6.prefix = "fd42:dead:beef:ee::/64";
-                  nodes.b-router-core = {
-                    addr4 = "100.96.10.2/32";
-                    addr6 = "fd42:dead:beef:ee::2/128";
+                  nodes = {
+                    b-router-core = {
+                      addr4 = "100.96.10.2/32";
+                      addr6 = "fd42:dead:beef:ee::2/128";
+                    };
+
+                    branch-node01 = {
+                      addr4 = "100.96.10.20/32";
+                      addr6 = "fd42:dead:beef:ee::20/128";
+                    };
+
+                    hetzner-nebula-prodtest-01 = {
+                      addr4 = "100.96.10.254/32";
+                      addr6 = "fd42:dead:beef:ee::254/128";
+                    };
                   };
                 };
                 nebula = {
                   role = "core-client";
                   lighthouse = {
-                    endpoint = "nebula01";
+                    node = "hetzner-nebula-prodtest-01";
+                    endpoint = "46.224.173.254";
+                    endpoint6 = "2a01:4f8:c013:628b::1";
                     port = 4242;
                   };
                 };
@@ -182,12 +234,30 @@ base
           siteANodes.esp0xdeadbeef-site-a-s-router-access-admin
           // {
             services.dns = policyDerivedDns siteANodes.esp0xdeadbeef-site-a-s-router-access-admin.services.dns;
+            advertisements =
+              overrideAdvertisedRouterSelf
+                siteANodes.esp0xdeadbeef-site-a-s-router-access-admin.advertisements
+                "tenant-admin";
           };
 
         esp0xdeadbeef-site-a-s-router-access-client =
           siteANodes.esp0xdeadbeef-site-a-s-router-access-client
           // {
             services.dns = policyDerivedDns siteANodes.esp0xdeadbeef-site-a-s-router-access-client.services.dns;
+            advertisements =
+              overrideAdvertisedRouterSelf
+                siteANodes.esp0xdeadbeef-site-a-s-router-access-client.advertisements
+                "tenant-client";
+          };
+
+        esp0xdeadbeef-site-a-s-router-access-mgmt =
+          siteANodes.esp0xdeadbeef-site-a-s-router-access-mgmt
+          // {
+            services.dns = policyDerivedDns siteANodes.esp0xdeadbeef-site-a-s-router-access-mgmt.services.dns;
+            advertisements =
+              overrideAdvertisedRouterSelf
+                siteANodes.esp0xdeadbeef-site-a-s-router-access-mgmt.advertisements
+                "tenant-mgmt";
           };
 
         esp0xdeadbeef-site-a-s-router-access-dmz = {

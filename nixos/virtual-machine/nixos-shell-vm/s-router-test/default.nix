@@ -79,6 +79,7 @@ let
     inherit deploymentHostName;
     bridgeNameMap = renderedBridges.bridgeNameMap or { };
     bridges = renderedBridges.bridges or { };
+    sites = builtHost.renderedHost.sites or { };
     netdevs =
       (renderedHost.netdevs or { })
       // (renderedBridges.netdevs or { });
@@ -112,6 +113,7 @@ in
 {
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    "${inputs.network-renderer-nixos}/s88/ControlModule/module/host-validation.nix"
     ./mount-utils.nix
     ./sops.nix
     (import ./modules/nebula-bootstrap.nix {

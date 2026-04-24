@@ -211,6 +211,21 @@ base
           }
 
           {
+            id = "allow-east-west-to-sitea-mgmt-dns";
+            priority = 115;
+            from = {
+              kind = "external";
+              name = "east-west";
+            };
+            to = {
+              kind = "service";
+              name = "site-dns-mgmt";
+            };
+            trafficType = "dns";
+            action = "allow";
+          }
+
+          {
             id = "allow-wan-to-dmz-nebula";
             priority = 120;
             from = {
