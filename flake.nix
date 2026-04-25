@@ -42,6 +42,9 @@ network-control-plane-model = {
 network-renderer-nixos = {
   url = "github:esp0xdeadbeef/network-renderer-nixos";
 };
+    network-labs = {
+      url = "github:esp0xdeadbeef/network-labs";
+    };
     nixvim = {
       url = "github:nix-community/nixvim";
     };
