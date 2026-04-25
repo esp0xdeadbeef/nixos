@@ -52,6 +52,11 @@ let
         matchConfig.Name = "eth0";
         networkConfig = {
           DHCP = "ipv4";
+          DNS = [
+            "10.70.10.1"
+            "fd42:dead:feed:70::1"
+          ];
+          Domains = [ "lan." ];
           IPv6AcceptRA = true;
         };
         linkConfig.RequiredForOnline = "no";
@@ -65,6 +70,18 @@ let
         };
         routingPolicyRules = [
           {
+            Priority = 80;
+            To = "10.70.10.0/24";
+            Table = 254;
+            Family = "ipv4";
+          }
+          {
+            Priority = 81;
+            To = "fd42:dead:feed:70::/64";
+            Table = 254;
+            Family = "ipv6";
+          }
+          {
             Priority = 100;
             To = "46.224.173.254/32";
             Table = 254;
@@ -73,6 +90,18 @@ let
           {
             Priority = 101;
             To = "2a01:4f8:c013:628b::1/128";
+            Table = 254;
+            Family = "ipv6";
+          }
+          {
+            Priority = 105;
+            To = "100.96.10.0/24";
+            Table = 254;
+            Family = "ipv4";
+          }
+          {
+            Priority = 106;
+            To = "fd42:dead:beef:ee::/64";
             Table = 254;
             Family = "ipv6";
           }
@@ -112,9 +141,12 @@ let
       };
     };
     firewallModule = {
-      services.resolved.enable = true;
-      services.resolved.extraConfig = ''
-        FallbackDNS=
+      networking.resolvconf.enable = lib.mkForce false;
+      services.resolved.enable = lib.mkForce false;
+      environment.etc."resolv.conf".text = lib.mkForce ''
+        nameserver 10.70.10.1
+        nameserver fd42:dead:feed:70::1
+        options edns0
       '';
 
       networking.firewall.enable = false;
@@ -159,6 +191,54 @@ let
         }
       '';
     };
+    extraModules = [
+      ({ pkgs, ... }: {
+        systemd.services.hostile-overlay-ipv6-source-fix = {
+          description = "Prefer the hostile SLAAC GUA for overlay IPv6 egress";
+          wantedBy = [ "multi-user.target" ];
+          after = [ "network-online.target" "nebula-runtime.service" ];
+          wants = [ "network-online.target" "nebula-runtime.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          path = with pkgs; [
+            bash
+            coreutils
+            gnugrep
+            gawk
+            iproute2
+          ];
+          script = ''
+            set -euo pipefail
+
+            gua=""
+            for _ in $(seq 1 60); do
+              gua="$(
+                ip -6 -o addr show dev eth0 scope global \
+                  | grep -v ' fd' \
+                  | grep -v 'temporary' \
+                  | head -n1 \
+                  | awk '{ print $4 }'
+              )"
+              gua="''${gua%/*}"
+              if [ -n "$gua" ]; then
+                break
+              fi
+              sleep 1
+            done
+
+            if [ -z "$gua" ]; then
+              echo "hostile-overlay-ipv6-source-fix: no global hostile GUA found on eth0 after waiting" >&2
+              exit 1
+            fi
+
+            ip -6 route replace ::/1 via fd42:dead:beef:ee::254 dev nebula1 table 100 src "$gua"
+            ip -6 route replace 8000::/1 via fd42:dead:beef:ee::254 dev nebula1 table 100 src "$gua"
+          '';
+        };
+      })
+    ];
   };
 
   storageClientContainer = {

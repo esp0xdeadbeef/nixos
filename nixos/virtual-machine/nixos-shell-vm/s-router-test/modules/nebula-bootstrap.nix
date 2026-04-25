@@ -183,12 +183,103 @@ else
       ]
       ++ map (nodeName: "d /persist/nebula-runtime/profiles/${nodeName} 0700 root root -") runtimeNodeNames;
 
+    systemd.services.nebula-ca-unseal = {
+      description = "Unlock the Nebula CA into /run for explicit issuance work";
+      serviceConfig.Type = "oneshot";
+      path = with pkgs; [
+        bash
+        coreutils
+        nebula
+        openssl
+        util-linux
+      ];
+      script = ''
+        set -euo pipefail
+
+        state_dir="/persist/nebula-runtime"
+        pki_dir="$state_dir/pki"
+        run_dir="/run/nebula-runtime"
+        unsealed_dir="$run_dir/unsealed"
+        passphrase_file="/run/keys/nebula-ca-passphrase"
+        legacy_ca_key="$pki_dir/ca.key"
+        encrypted_ca_key="$pki_dir/ca.key.enc"
+        ca_crt="$pki_dir/ca.crt"
+        unsealed_ca_key="$unsealed_dir/ca.key"
+        tmpdir=""
+
+        cleanup() {
+          rm -f "$passphrase_file"
+          if [ -n "$tmpdir" ] && [ -d "$tmpdir" ]; then
+            rm -rf "$tmpdir"
+          fi
+        }
+        trap cleanup EXIT
+
+        if [ ! -s "$passphrase_file" ]; then
+          echo "nebula-ca-unseal: missing transient passphrase file $passphrase_file" >&2
+          exit 1
+        fi
+
+        install -d -m 0700 "$pki_dir" "$run_dir" "$unsealed_dir"
+
+        seal_plaintext_key() {
+          local plaintext_key="$1"
+
+          ${pkgs.openssl}/bin/openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in "$plaintext_key" \
+            -out "$encrypted_ca_key" \
+            -pass "file:$passphrase_file"
+          chmod 0600 "$encrypted_ca_key"
+
+          if command -v shred >/dev/null 2>&1; then
+            shred -u "$plaintext_key" 2>/dev/null || rm -f "$plaintext_key"
+          else
+            rm -f "$plaintext_key"
+          fi
+        }
+
+        if [ -s "$legacy_ca_key" ]; then
+          if [ ! -s "$encrypted_ca_key" ]; then
+            seal_plaintext_key "$legacy_ca_key"
+          else
+            if command -v shred >/dev/null 2>&1; then
+              shred -u "$legacy_ca_key" 2>/dev/null || rm -f "$legacy_ca_key"
+            else
+              rm -f "$legacy_ca_key"
+            fi
+          fi
+        fi
+
+        if [ ! -s "$encrypted_ca_key" ]; then
+          if [ -s "$ca_crt" ]; then
+            echo "nebula-ca-unseal: refusing to continue with cert present but missing encrypted CA key" >&2
+            exit 1
+          fi
+
+          tmpdir="$(mktemp -d)"
+          ${pkgs.nebula}/bin/nebula-cert ca \
+            -name s-router-test-lab \
+            -out-crt "$tmpdir/ca.crt" \
+            -out-key "$tmpdir/ca.key"
+          install -m 0600 "$tmpdir/ca.crt" "$ca_crt"
+          seal_plaintext_key "$tmpdir/ca.key"
+        fi
+
+        rm -f "$unsealed_ca_key"
+        ${pkgs.openssl}/bin/openssl enc -d -aes-256-cbc -pbkdf2 \
+          -in "$encrypted_ca_key" \
+          -out "$unsealed_ca_key" \
+          -pass "file:$passphrase_file"
+        chmod 0600 "$unsealed_ca_key"
+      '';
+    };
+
     systemd.services.nebula-profile-bootstrap = {
       description = "Generate and distribute Nebula runtime profiles for s-router-test";
-      wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" ] ++ map (nodeName: "container@${nodeName}.service") runtimeNodeNames;
       wants = [ "network-online.target" ] ++ map (nodeName: "container@${nodeName}.service") runtimeNodeNames;
       serviceConfig.Type = "oneshot";
+      unitConfig.ConditionPathExists = "/run/nebula-runtime/unsealed/ca.key";
       path = with pkgs; [
         bash
         coreutils
@@ -207,8 +298,14 @@ else
         state_dir="/persist/nebula-runtime"
         pki_dir="$state_dir/pki"
         profiles_dir="$state_dir/profiles"
+        signing_ca_key="/run/nebula-runtime/unsealed/ca.key"
         runtime_nodes_json='${runtimeNodesJson}'
         lighthouses_json='${lighthousesJson}'
+
+        cleanup() {
+          rm -f "$signing_ca_key"
+        }
+        trap cleanup EXIT
 
         mkdir -p "$pki_dir"
         printf '%s' "$runtime_nodes_json" | jq -r 'keys[]' | while read -r node_name; do
@@ -226,7 +323,7 @@ else
           rm -f "$cert_path" "$key_path"
           cert_args=(
             -ca-crt "$pki_dir/ca.crt"
-            -ca-key "$pki_dir/ca.key"
+            -ca-key "$signing_ca_key"
             -name "$cert_name"
             -networks "$node_networks"
             -groups "$node_groups"
@@ -239,8 +336,9 @@ else
           ${pkgs.nebula}/bin/nebula-cert sign "''${cert_args[@]}"
         }
 
-        if [ ! -s "$pki_dir/ca.crt" ] || [ ! -s "$pki_dir/ca.key" ]; then
-          ${pkgs.nebula}/bin/nebula-cert ca -name s-router-test-lab -out-crt "$pki_dir/ca.crt" -out-key "$pki_dir/ca.key"
+        if [ ! -s "$pki_dir/ca.crt" ] || [ ! -s "$signing_ca_key" ]; then
+          echo "nebula-profile-bootstrap: missing unlocked CA material; run nebula-ca-unseal first" >&2
+          exit 1
         fi
 
         printf '%s' "$runtime_nodes_json" | jq -r 'keys[]' | while read -r node_name; do
@@ -248,6 +346,16 @@ else
           cert_cidr6="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].certCidr6')"
           groups_csv="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].groupsCsv')"
           unsafe_networks="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].unsafeRoutes | map(.route) | join(",")')"
+          if [ "$node_name" = "hostile-node01" ] && [ -s /run/secrets/subnet-ipv6 ]; then
+            delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
+            if [ -n "$delegated_prefix" ]; then
+              if [ -n "$unsafe_networks" ]; then
+                unsafe_networks="$unsafe_networks,$delegated_prefix"
+              else
+                unsafe_networks="$delegated_prefix"
+              fi
+            fi
+          fi
           issue_node_cert "$node_name" "$cert_cidr4,$cert_cidr6" "$groups_csv" "$unsafe_networks"
         done
 
@@ -305,6 +413,32 @@ else
                   | join("\n")
                 '
           )"
+
+          if [ "$profile_name" = "hostile-node01" ] && [ -s /run/secrets/subnet-ipv6 ]; then
+            delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
+            if [ -n "$delegated_prefix" ]; then
+              extra_route_yaml="    - route: $delegated_prefix
+      via: $lighthouse_ip6
+      mtu: 1300
+      install: false"
+              extra_fw_rule="    - port: any
+      proto: any
+      host: any
+      local_cidr: $delegated_prefix"
+              if [ -n "$unsafe_routes_yaml" ]; then
+                unsafe_routes_yaml="$unsafe_routes_yaml
+$extra_route_yaml"
+              else
+                unsafe_routes_yaml="$extra_route_yaml"
+              fi
+              if [ -n "$unsafe_fw_rules" ]; then
+                unsafe_fw_rules="$unsafe_fw_rules
+$extra_fw_rule"
+              else
+                unsafe_fw_rules="$extra_fw_rule"
+              fi
+            fi
+          fi
 
           if [ -n "$unsafe_routes_yaml" ]; then
             unsafe_routes_yaml="$(printf '%s\n' "$unsafe_routes_yaml" | sed "s/__LIGHTHOUSE_IPV4__/''${lighthouse_ip4}/g; s/__LIGHTHOUSE_IPV6__/''${lighthouse_ip6}/g")"
@@ -402,6 +536,14 @@ EOF
             lighthouse_port="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].port')"
             overlay_networks4_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks4Csv')"
             overlay_networks6_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks6Csv')"
+            unsafe_fw_rules="$(
+              printf '%s' "$lighthouses_json" \
+                | jq -r --arg n "$lighthouse_id" '
+                    .[$n].unsafeNetworks
+                    | map("    - port: any\n      proto: any\n      host: any\n      local_cidr: \(.)")
+                    | join("\n")
+                  '
+            )"
 
             cat > "$profiles_dir/$cert_base_name.config.yml" <<EOF
 pki:
@@ -433,6 +575,7 @@ firewall:
     - port: any
       proto: any
       host: any
+$(if [ -n "$unsafe_fw_rules" ]; then printf '%s\n' "$unsafe_fw_rules"; fi)
 EOF
 
             ${pkgs.openssh}/bin/scp -q -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
@@ -522,5 +665,14 @@ EOF_REMOTE
           echo "nebula-profile-bootstrap: Hetzner SSH key not authorized yet for root@46.224.173.254" >&2
         fi
       '';
+    };
+
+    systemd.paths.nebula-profile-bootstrap = {
+      description = "Start Nebula profile bootstrap when the CA is unsealed into /run";
+      wantedBy = [ "multi-user.target" ];
+      pathConfig = {
+        PathExists = "/run/nebula-runtime/unsealed/ca.key";
+        Unit = "nebula-profile-bootstrap.service";
+      };
     };
   }

@@ -37,6 +37,7 @@ let
       gw4,
       addr6,
       gw6,
+      mdnsClient ? false,
       dnsServers ? [
         gw4
         gw6
@@ -102,6 +103,17 @@ let
             pkgs.iputils
             pkgs.traceroute
           ];
+
+          services.avahi = lib.mkIf mdnsClient {
+            enable = true;
+            nssmdns4 = true;
+            nssmdns6 = true;
+            publish = {
+              enable = false;
+              addresses = false;
+              workstation = false;
+            };
+          };
         }
       ]
       ++ hostnameModule

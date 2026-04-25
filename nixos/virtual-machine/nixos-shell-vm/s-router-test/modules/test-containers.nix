@@ -85,6 +85,7 @@ in
       gw4 = "10.90.20.1";
       addr6 = "fd42:dead:cafe:20::10/64";
       gw6 = "fd42:dead:cafe:20::1";
+      mdnsClient = true;
       dnsServers = [
         "10.90.20.1"
         "fd42:dead:cafe:20::1"
@@ -152,6 +153,30 @@ in
             </service>
           </service-group>
         '')
+        ({
+          pkgs,
+          lib,
+          ...
+        }:
+          {
+            networking.firewall.allowedTCPPorts = lib.mkAfter [ 8009 ];
+
+            systemd.sockets.fake-googlecast = {
+              wantedBy = [ "sockets.target" ];
+              listenStreams = [ "[::]:8009" ];
+              socketConfig = {
+                Accept = true;
+                BindIPv6Only = "both";
+              };
+            };
+
+            systemd.services."fake-googlecast@" = {
+              serviceConfig = {
+                StandardInput = "socket";
+                ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.coreutils}/bin/cat >/dev/null'";
+              };
+            };
+          })
       ];
     };
   };

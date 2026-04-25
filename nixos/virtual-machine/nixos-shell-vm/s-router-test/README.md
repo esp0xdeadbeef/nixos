@@ -150,6 +150,52 @@ The important rule is:
 That matches the security model you described: no silent background CA handling if
 the root secret is not explicitly unsealed.
 
+## Current CA Flow
+
+The current test-VM implementation now follows that rule closely enough for this
+lab:
+
+1. the public CA stays on disk at `/persist/nebula-runtime/pki/ca.crt`
+2. the private CA key stays encrypted at rest at `/persist/nebula-runtime/pki/ca.key.enc`
+3. the host does not carry a persistent `sops` secret for the decrypt credential
+4. an operator or external bot must supply the decrypt credential transiently
+   over an active SSH session into `/run/keys/nebula-ca-passphrase`
+5. `nebula-ca-unseal.service` unseals the CA only into `/run/nebula-runtime/unsealed/ca.key`
+6. `nebula-profile-bootstrap.path` notices that `/run` key and starts issuance
+   automatically
+7. after issuance, the transient `/run` passphrase and unsealed key are deleted
+
+For the disposable test VM, the helper entrypoint is:
+
+- [scripts/s-router-test-nebula-ca-unseal.sh](/home/deadbeef/github/scripts/s-router-test-nebula-ca-unseal.sh:1)
+
+and the rebuild loop already calls it after the host returns:
+
+- [scripts/s-router-test-rebuild-loop.sh](/home/deadbeef/github/scripts/s-router-test-rebuild-loop.sh:1)
+
+That keeps the decrypt credential off-host except during the explicit unlock
+window while still letting the test harness reissue certs automatically after
+the operator or bot has authenticated.
+
+## Remote Helper
+
+For disposable live validation nodes, use:
+
+- [scripts/exec-on-remote.sh](/home/deadbeef/github/scripts/exec-on-remote.sh:1)
+
+It takes a host plus command/arguments and forwards them over SSH without
+hand-writing nested shell quoting each time.
+
+Example:
+
+```bash
+./scripts/exec-on-remote.sh root@46.224.173.254 ip -6 route
+```
+
+That is useful for the temporary Hetzner validation box and other disposable
+live probes where ad hoc SSH quoting was getting in the way of repeatable
+checks.
+
 ## Current Lab Direction
 
 The active multi-enterprise profile is designed to validate this target shape:
@@ -168,3 +214,74 @@ The active multi-enterprise profile is designed to validate this target shape:
 The lab is still a renderer-validation environment first. If a workaround starts
 replacing renderer behavior instead of exercising it, that is a regression in
 test quality.
+
+## Hostile IPv6 Direction
+
+The intended hostile IPv6 design is:
+
+- hostile clients receive real GUA from a delegated `/64`
+- routers and intermediate hops do not receive those client GUAs
+- public IPv6 exit is routed, not NAT66
+- the public-exit path is owned by the modeled router/core path, not by a
+  client-local overlay runtime
+
+For the current disposable external validator, a routed hostile `/64` is now
+available from Hetzner:
+
+- `2a01:4f8:1c17:b337::/64`
+
+That means the previous “this VPS cannot possibly do non-NAT hostile IPv6”
+statement is no longer true as a hard external limitation. The remaining work is
+to model and validate the routed-prefix path correctly through the `network-*`
+chain and the disposable VPS configuration.
+
+## Production Gate
+
+`s-router-test` is only production-ready when all of these are live-verified on
+the returned host generation through the locked flake chain:
+
+- local build gate passes
+- rebuild loop returns a live host and `s88-network-validation-status` is ready
+- access-router DNS works for all modeled tenants and does not self-forward
+- direct public DNS leaks are blocked from restricted tenant contexts
+- lane preservation is correct in live kernel routing, not just rendered files
+- overlay traffic selects the intended path from the correct container contexts
+- hostile egress still exits via the modeled Hetzner path on both IPv4 and IPv6
+- `site-c` local-name resolution and intended east-west/service reachability work
+- `site-c` discovery works where intended
+- `site-c` storage overlay reaches the Hetzner storage lighthouse without giving
+  NAS or printer general internet access
+- hostile clients receive delegated global IPv6 space where required; transit
+  routers and intermediate hops must not receive those client GUAs
+
+Anything less belongs in `regression.md`, not in a “production-ready” claim.
+
+## Current Site-C Target
+
+`site-c` is intended to model:
+
+- `mgmt`
+- `home-users`
+- `printer`
+- `nas`
+- `streaming`
+- `iot`
+
+with these security constraints:
+
+- `home-users` may reach `printer`, `nas`, and `streaming`
+- `printer` and `nas` must not have general internet egress
+- `printer` local names must resolve both ways via the modeled site DNS path
+- `streaming` discovery should be visible from `home-users`, not the other way
+  around
+- `site-c-storage` is an overlay-only storage path, not a reason to route NAS or
+  printer traffic over generic WAN defaults
+
+The long-term design split is still:
+
+- control-plane / renderer emit desired overlay runtime state
+- `s-router-test` materializes that state in this specific lab
+
+For the multi-site direction beyond this VM harness, see:
+
+- [MULTI_SITE_OVERLAY_PLAN.md](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/MULTI_SITE_OVERLAY_PLAN.md:1)

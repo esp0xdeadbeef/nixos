@@ -16,8 +16,10 @@ let
   };
 
   fabric = {
-    intentPath = ./intent.nix;
-    inventoryPath = ./inventory.nix;
+    intentPath =
+      "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-bgp/intent.nix";
+    inventoryPath =
+      "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-static/inventory-base.nix";
   };
 
   sliceArgs = {
@@ -118,6 +120,16 @@ let
     inherit (builders) mkNebulaNode mkNebulaProfileMount;
   };
 
+  hostileGuaOverrides = import ./modules/hostile-gua-overrides.nix {
+    baseContainer = renderedContainers."b-router-access-hostile" or null;
+  };
+
+  storageRouteOverrides = import ./modules/site-c-storage-route-overrides.nix {
+    inherit lib pkgs;
+    siteCStorageOverlay = (nebulaRuntimePlan.overlays or { })."esp0xdeadbeef::site-c::site-c-storage" or null;
+    baseContainer = renderedContainers."c-router-policy" or null;
+  };
+
   dmzContainers = import ./modules/dmz-containers.nix {
     inherit renderedHostNetwork;
     inherit (builders) mkDmzEndpoint;
@@ -197,7 +209,7 @@ in
       };
 
   containers =
-    renderedContainers
+    (lib.recursiveUpdate (lib.recursiveUpdate renderedContainers hostileGuaOverrides) storageRouteOverrides)
     // testContainers
     // overlayContainers
     // dmzContainers;
