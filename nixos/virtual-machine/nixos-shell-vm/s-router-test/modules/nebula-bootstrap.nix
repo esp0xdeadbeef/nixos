@@ -363,6 +363,20 @@ else
           cert_base_name="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].certBaseName')"
           cert_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].certNetworks | join(",")')"
           unsafe_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].unsafeNetworks | join(",")')"
+          hostile_overlay_id="$(printf '%s' "$runtime_nodes_json" | jq -r '.["hostile-node01"].overlayId // empty')"
+          if [ -s /run/secrets/subnet-ipv6 ] && [ -n "$hostile_overlay_id" ]; then
+            delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
+            if [ -n "$delegated_prefix" ]; then
+              lighthouse_overlay_ids_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayIds | join(",")')"
+              if printf '%s\n' "$lighthouse_overlay_ids_csv" | tr ',' '\n' | grep -Fxq "$hostile_overlay_id"; then
+                if [ -n "$unsafe_networks" ]; then
+                  unsafe_networks="$unsafe_networks,$delegated_prefix"
+                else
+                  unsafe_networks="$delegated_prefix"
+                fi
+              fi
+            fi
+          fi
           issue_node_cert "$cert_base_name" "$cert_networks" "lab,lighthouse" "$unsafe_networks"
         done
 
@@ -536,13 +550,29 @@ EOF
             lighthouse_port="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].port')"
             overlay_networks4_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks4Csv')"
             overlay_networks6_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks6Csv')"
+            unsafe_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].unsafeNetworks | join(",")')"
+            hostile_overlay_id="$(printf '%s' "$runtime_nodes_json" | jq -r '.["hostile-node01"].overlayId // empty')"
+            if [ -s /run/secrets/subnet-ipv6 ] && [ -n "$hostile_overlay_id" ]; then
+              delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
+              if [ -n "$delegated_prefix" ]; then
+                lighthouse_overlay_ids_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayIds | join(",")')"
+                if printf '%s\n' "$lighthouse_overlay_ids_csv" | tr ',' '\n' | grep -Fxq "$hostile_overlay_id"; then
+                  if [ -n "$unsafe_networks" ]; then
+                    unsafe_networks="$unsafe_networks,$delegated_prefix"
+                  else
+                    unsafe_networks="$delegated_prefix"
+                  fi
+                fi
+              fi
+            fi
             unsafe_fw_rules="$(
-              printf '%s' "$lighthouses_json" \
-                | jq -r --arg n "$lighthouse_id" '
-                    .[$n].unsafeNetworks
-                    | map("    - port: any\n      proto: any\n      host: any\n      local_cidr: \(.)")
-                    | join("\n")
-                  '
+              printf '%s\n' "$unsafe_networks" \
+                | tr ',' '\n' \
+                | sed '/^$/d' \
+                | sed 's/^/    - port: any\
+      proto: any\
+      host: any\
+      local_cidr: /'
             )"
 
             cat > "$profiles_dir/$cert_base_name.config.yml" <<EOF

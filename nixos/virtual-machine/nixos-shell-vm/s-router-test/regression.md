@@ -2,385 +2,128 @@
 
 Verified on 2026-04-25. Treat older conclusions as stale.
 
-## Required Validation Scope
-
-Do not call `s-router-test` production-ready unless the current returned host has
-all of these live-verified:
-
-- local build gate passed during the rebuild loop
-- `s88-network-validation-status` is ready on the returned generation
-- access-router DNS works and direct public DNS leaks are blocked from restricted
-  contexts
-- live `ip route get` / `ip -6 route get` checks preserve the intended lanes
-- hostile egress still exits through Hetzner on both IPv4 and IPv6
-- `site-c` local DNS names resolve in the intended directions
-- `site-c` discovery works in the intended direction
-- `site-c` storage overlay reaches the Hetzner storage lighthouse without giving
-  NAS or printer internet access
-- hostile clients receive delegated global IPv6 space where required; transit
-  routers and intermediate hops must not receive those client GUAs
-
 ## Fixed And Live-Verified
 
-- Current live BGP host verified on 2026-04-25 is:
-  - `/nix/store/6cc10rhsc92m2cpr397aybrbyjf521n5-nixos-system-s-router-test-25.11.20260421.10e7ad5`
-- The current returned static-wrapper host is reachable and validation-ready:
-  - `/nix/store/bqq863piq7w08sn5kyc2nhrv19y4msgp-nixos-system-s-router-test-25.11.20260421.10e7ad5`
-  - `s88-network-validation-status` is ready on that returned static host too
-- `s88-network-validation-status` is ready on that returned host.
-- The rebuild loop is a trustworthy gate again on this cycle:
-  - local build passed
-- A fresh full static-wrapper rebuild-loop cycle is now live-verified on the current returned static host:
-  - pre-reboot system: `/nix/store/bqq863piq7w08sn5kyc2nhrv19y4msgp-...`
-  - post-reboot system: `/nix/store/bqq863piq7w08sn5kyc2nhrv19y4msgp-...`
-  - dry-run/live hash matched
-  - local build passed
-  - post-return CA unlock succeeded
-  - post-return site-c streaming probe passed
-  - post-return hostile public-egress probe passed
-- The root-file refactor is live-validated:
-  - the active generation booted successfully after moving the full active model into root `intent.nix` and `inventory.nix`
-  - the compatibility wrappers still resolve correctly for BGP and static selection
-- `site-c` access-router local authoritative DNS still works live:
-  - `c-router-access-mgmt` answers `test-machine-01.printer` and `home-user-01.home-users` locally
-- `site-c` endpoint name resolution now works live in the intended directions:
-  - `sigma-site-c` resolves `test-machine-01.printer` to `10.90.30.2` and `fd42:dead:cafe:30::10`
-  - `home-user-01` resolves `test-machine-01.printer` to `10.90.30.2` and `fd42:dead:cafe:30::10`
-  - `test-machine-01` resolves `home-user-01.home-users` to `10.90.20.10` and `fd42:dead:cafe:20::10`
-- `site-c` endpoint reachability is fixed live for the DNS-backed paths:
-  - `sigma-site-c` reaches `test-machine-01.printer`
-  - `home-user-01` reaches `test-machine-01.printer`
-  - `test-machine-01` reaches `home-user-01.home-users`
-- The recursive-DNS renderer bug that pinned unbound egress to listener
-  addresses is fixed live:
-  - `c-router-access-mgmt` no longer renders:
-    - `outgoing-interface: 10.90.10.1`
-    - `outgoing-interface: fd42:dead:cafe:10::1`
-  - it now renders the routed transit addresses instead:
-    - `outgoing-interface: 10.80.0.4`
-    - `outgoing-interface: fd42:dead:cafe:1000:0:0:0:4`
-- `site-c` direct public DNS leak prevention is fixed live for the verified endpoint contexts:
-  - `sigma-site-c` direct `@1.1.1.1` and `@2606:4700:4700::1111` queries time out
-  - `home-user-01` direct `@1.1.1.1` queries time out
-- `site-c` printer internet egress is blocked live:
-  - `test-machine-01` resolves normally but `curl -4 ifconfig.me` and `curl -6 ifconfig.me` time out
-- `site-c` mDNS client resolution now works live from `home-user-01`:
-  - `home-user-01` now has an active Avahi client daemon
-  - `resolvectl query streaming-cast-01.local` returns `fd42:dead:cafe:50::10`
-  - `avahi-resolve-host-name -4 streaming-cast-01.local` returns `10.90.50.2`
-  - `avahi-resolve-host-name -6 streaming-cast-01.local` returns `fd42:dead:cafe:50::10`
-- The generalized Nebula bootstrap now runs successfully on the returned host:
-  - `nebula-profile-bootstrap.service` finished successfully on the current generation
-  - the current journal shows:
-    - `Created symlink /etc/systemd/system/multi-user.target.wants/nebula-s-router-test-lighthouse-site-c-storage.service`
-- Hetzner now has both modeled lighthouse runtimes live:
-  - UDP `4242` is listening for `nebula-s-router-test-lighthouse-east-west.service`
-  - UDP `4243` is listening for `nebula-s-router-test-lighthouse-site-c-storage.service`
-  - Hetzner now has both overlay interfaces:
-    - `nebula0` `100.96.10.254/24` `fd42:dead:beef:ee::254/64`
-    - `nebula1` `100.96.20.254/24` `fd42:dead:beef:ec::254/64`
-- `site-c` storage-side Nebula containers now boot and hold live runtime state:
-  - `nas-node01` `nebula-runtime.service` is active
-  - `printer-node01` `nebula-runtime.service` is active
-  - `nas-node01` has `nebula1` on `100.96.20.10/24` and `fd42:dead:beef:ec::10/64`
-  - `printer-node01` has `nebula1` on `100.96.20.20/24` and `fd42:dead:beef:ec::20/64`
-- The `c-router-policy` all-`extraVeths` startup deadlock is fixed live in the renderer:
-  - `container@c-router-policy.service` is now `active (running)`
-  - `ExecStartPost` runs successfully on the returned host
-  - all host-side `cpol-p2pcro-*` veths are now `UP`, bridged, and `LOWER_UP`
-  - this confirms the old `systemd-networkd-wait-online` vs `ExecStartPost` deadlock is gone for the policy container
-- Selector lane route pollution is fixed live in the renderer:
-  - `s-router-downstream-selector` main table now contains only connected routes
-  - `b-router-downstream-selector` main table now contains only connected routes
-  - `c-router-downstream-selector` main table now contains only connected routes
-  - the lane-specific tables are now correct again:
-    - `s-router-downstream-selector` `table 2004` for `iif access-mgmt` points to `policy-mgmt`
-    - `b-router-downstream-selector` `table 2000` for `iif access-branch` has the expected `policy-branch` default
-    - `c-router-downstream-selector` `table 2002` for `iif access-mgmt` points to `policy-mgmt`
-- Upstream-selector policy-lane tables are now rendered correctly live:
-  - `s-router-upstream-selector` now has a real `table 2012` for `iif pol-mgmt-a`
-  - that table carries the core defaults and site/branch/site-c prefixes via `core-a` / `core-b`
-  - `ip -6 route get 2606:4700:4700::1111 iif pol-mgmt-a` now resolves via `core-a table 2012`
-- The `site-c` upstream-selector transit-endpoint return-route ownership bug is fixed live:
-  - on `c-router-upstream-selector`, `table 2000` now routes:
-    - `10.80.0.4 via 10.80.0.28 dev policy-mgmt-wan`
-    - `10.80.0.6 via 10.80.0.32 dev pol-nas-wan`
-    - `10.80.0.8 via 10.80.0.36 dev pol-prn-wan`
-  - the reverse path is fixed live too:
-    - `ip route get 10.80.0.4 from 1.1.1.1 iif core` now resolves via `policy-mgmt-wan table 2000`
-    - `ip -6 route get fd42:dead:cafe:1000::4 from 2606:4700:4700::1111 iif core` now resolves via `policy-mgmt-wan table 2000`
-  - this proves the CPM/renderer return-route fix now reaches the live host
-- `site-c` recursive/public DNS is fixed live for the mgmt lane:
-  - `c-router-access-mgmt` `dig @127.0.0.1 example.com A` now succeeds
-  - `c-router-access-mgmt` public IPv4 and IPv6 ping now succeed
-  - host validation now reports `c-router-access-mgmt` `dnsA: ok` and `dnsAAAA: ok`
-- The renderer now recognizes abbreviated policy-lane tenant names on `c-router-policy`:
-  - `down-media` / `down-printer`
-  - `up-med-*` / `up-prn-*` / `up-mgt-*`
-  - this restores the intended site-c mgmt DNS route placement into the media and printer policy tables
-- `site-c` media/printer recursive DNS is fixed live again on the current returned host:
-  - host validation now reports `c-router-access-media` `dnsA: ok` and `dnsAAAA: ok`
-  - host validation now reports `c-router-access-printer` `dnsA: ok` and `dnsAAAA: ok`
-- Branch and hostile access-router DNS are fixed live on the current returned host:
-  - host validation now reports `b-router-access-branch` `dnsA: ok` and `dnsAAAA: ok`
-  - host validation now reports `b-router-access-hostile` `dnsA: ok` and `dnsAAAA: ok`
-- Hostile client DNS, public egress, and GUA delegation are fixed live:
-  - `hostile-node01` now resolves through the modeled hostile resolver path:
-    - `/etc/resolv.conf` contains `10.70.10.1` and `fd42:dead:feed:70::1`
-    - `dig example.com A` and `dig example.com AAAA` succeed
-  - Hetzner public exit is live again from the hostile client:
-    - `curl -4 ifconfig.me` returns `46.224.173.254`
-    - `curl -6 ifconfig.me` returns `2a01:4f8:c013:628b::1`
-  - hostile client-only GUA delegation is live:
-    - `hostile-node01` `eth0` now has `2a10:3781:59de:70::/64` addresses
-    - `b-router-access-hostile` itself does not have a GUA on the tenant lane
-    - `nebula1` on `hostile-node01` remains ULA-only
-  - the current live hostile overlay/public-exit path is also re-verified on the actual returned BGP host:
-    - `ip -6 route get fd42:dead:beef:ee::254` selects `dev nebula1`
-    - `ping -6 -I nebula1 fd42:dead:beef:ee::254` succeeds
-    - `ping 100.96.10.254` succeeds
-    - `curl -4 ifconfig.me` returns `46.224.173.254`
-    - `curl -6 ifconfig.me` returns `2a01:4f8:c013:628b::1`
-- `site-c-storage` overlay reachability is fixed live:
-  - `nas-node01` reaches `100.96.20.254` and `fd42:dead:beef:ec::254`
-  - `printer-node01` reaches `100.96.20.254` and `fd42:dead:beef:ec::254`
-  - both nodes still keep their ordinary underlay default routes on `eth0`; only the overlay addresses ride on `nebula1`
-- `container@c-router-policy.service` is active on the current returned host.
-- `site-c` Chromecast-style discovery is fixed live in the intended direction:
-  - from `home-user-01`, `avahi-browse -rt _googlecast._tcp` now discovers `streaming-cast-01`
-  - discovered records include:
-    - IPv4 `10.90.50.2`
-    - IPv6 `fd42:dead:cafe:50::10`
-    - port `8009`
-- `!! priority !!` Nebula CA handling is fixed live for the test-VM flow:
-  - the returned host no longer keeps the CA private key in plaintext under `/persist/nebula-runtime/pki/ca.key`
-  - the CA now lives encrypted at rest as:
-    - `/persist/nebula-runtime/pki/ca.key.enc`
-  - the public CA remains at:
-    - `/persist/nebula-runtime/pki/ca.crt`
-  - the decrypt credential is no longer a host-side `sops` secret or persistent host file
-  - `./scripts/s-router-test-nebula-ca-unseal.sh` now decrypts the passphrase locally and pushes it transiently over SSH into:
-    - `/run/keys/nebula-ca-passphrase`
-  - `nebula-ca-unseal.service` consumes that transient file, unseals the CA only into:
-    - `/run/nebula-runtime/unsealed/ca.key`
-  - `nebula-profile-bootstrap.path` watches that `/run` key and starts `nebula-profile-bootstrap.service` automatically when it appears
-  - after issuance:
-    - `/run/keys/nebula-ca-passphrase` is removed
-    - `/run/nebula-runtime/unsealed/ca.key` is removed
-    - `nebula-profile-bootstrap.path` returns to `active (waiting)`
-- The hostile delegated routed `/64` is now live on the current returned host:
-  - current live host is `/nix/store/q1qcr9vvv1n6s4jsf0s9nmwhzixqr11b-nixos-system-s-router-test-25.11.20260421.10e7ad5`
-  - `hostile-node01` now receives SLAAC GUAs from `2a01:4f8:1c17:b337::/64` on `eth0`
-  - the old VPS IPv6 NAT66 rule for `fd42:dead:beef:ee::/64` is gone
-- The hostile Nebula cert now carries the delegated hostile `/64` live:
-  - `nebula-cert print -path /persist/nebula-runtime/pki/hostile-node01.crt` now includes:
-    - `unsafeNetworks: 2a01:4f8:1c17:b337::/64`
-    - `nebula-profile-bootstrap.service` returns to `inactive (dead)` after a successful run
-  - this full path is now live-verified through `./scripts/s-router-test-rebuild-loop.sh` on the returned host generation above
-- Direct VPS validation proves the routed Hetzner `/64` itself is usable:
-  - adding `2a01:4f8:1c17:b337::1/128` on `eth0` works immediately with `nodad`
-  - `curl -6 --interface 2a01:4f8:1c17:b337::1 https://ifconfig.me/ip` returns `2a01:4f8:1c17:b337::1`
-- The hostile routed-prefix path now works live without IPv6 NAT66 when the disposable VPS carries the intended route:
-  - `2a01:4f8:1c17:b337::/64 via fd42:dead:beef:ee::30 dev nebula0`
-  - after re-applying that route with [s-router-test-hetzner-east-west-exit.sh](/home/deadbeef/github/scripts/s-router-test-hetzner-east-west-exit.sh:1), `hostile-node01` `curl -6 ifconfig.me` returns:
-    - `2a01:4f8:1c17:b337:ac54:7ff:fe09:3b24`
-  - packet capture on the VPS confirms the routed-prefix shape:
-    - SYNs arrive on `nebula0` from `2a01:4f8:1c17:b337:ac54:7ff:fe09:3b24`
-    - those SYNs exit `eth0` unchanged
-    - SYN-ACKs return on `eth0` to the hostile delegated GUA
-- The currently returned static-wrapper host also keeps the CA in the intended at-rest form:
-  - `/persist/nebula-runtime/pki/ca.key.enc` exists
-  - `/persist/nebula-runtime/pki/ca.key` does not exist
-  - `nebula-profile-bootstrap.path` is back to `active (waiting)` after issuance
-- The currently returned static-wrapper host still preserves the already-fixed `site-c` behavior:
-  - `streaming-cast-01` still has `fake-googlecast.socket` active
-  - `home-user-01` reaches `10.90.50.2:8009` and `fd42:dead:cafe:50::10:8009`
-  - `home-user-01` still discovers `streaming-cast-01` over `_googlecast._tcp`
-  - `nas-node01` still reaches `100.96.20.254` and `fd42:dead:beef:ec::254`
-- The currently returned static-wrapper host now also restores hostile overlay and public exit correctly:
-  - `hostile-node01` reaches `100.96.10.254`
-  - `hostile-node01` reaches `fd42:dead:beef:ee::254`
-  - `curl -4 ifconfig.me` returns `46.224.173.254`
-  - `curl -6 ifconfig.me` returns `2a01:4f8:c013:628b::1`
-  - the hostile client GUA remains present on `eth0`
-  - the static hostile rebuild-loop post-check now passes too
+- Current returned host:
+  - `/nix/store/2rvs4qjfk25fsms8adn40v1whj1y3jl5-nixos-system-s-router-test-25.11.20260421.10e7ad5`
+- `s88-network-validation-status` is ready on that generation.
+- `s-router-test` now consumes the canonical locked `network-labs` examples
+  directly from [default.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/default.nix:1):
+  - intent:
+    `inputs.network-labs/examples/tri-site-dual-wan-overlay-integration-bgp/intent.nix`
+  - inventory:
+    `inputs.network-labs/examples/tri-site-dual-wan-overlay-integration-static/inventory-base.nix`
+- Old local profile wrappers and copied model files have been removed from
+  `s-router-test`; the canonical model now lives only in `network-labs`.
+- Ownership is now explicit:
+  - `network-*` repositories must emit the schemas/runtime plans
+  - `s-router-test` must only consume those emitted results and materialize
+    disposable emulated nodes around them
+- The canonical `network-labs` examples compile in both consumers:
+  - BGP:
+    - `inventory-nixos.nix` compiles through `network-renderer-nixos`
+    - `inventory-clab.nix` compiles through `network-renderer-containerlab-linux-backend`
+  - static:
+    - `inventory-nixos.nix` compiles through `network-renderer-nixos`
+    - `inventory-clab.nix` compiles through `network-renderer-containerlab-linux-backend`
+- Disposable Hetzner validator current live state:
+  - `eth0` has `2a01:4f8:c013:628b::1/64`
+  - `eth0` also has `2a01:4f8:1c17:b337::1/128`
+  - the hostile delegated prefix is routed back over Nebula:
+    - `2a01:4f8:1c17:b337::/64 via fd42:dead:beef:ee::30 dev nebula0`
+  - IPv6 NAT66 is not present on the VPS anymore
+- Hostile lane basics on the returned `s-router-test` host:
+  - `hostile-node01` has SLAAC GUA addresses from `2a01:4f8:1c17:b337::/64`
+  - hostile DNS works through `10.70.10.1`
+  - the hostile access router still resolves normally too
+  - `b-router-access-hostile` itself does not carry hostile GUA on the
+    infrastructure hops:
+    - `tenant-hostile` stays `fd42:dead:feed:70::1/64`
+    - `transit` stays `fd42:dead:feed:1000::2/127`
+- Operator helpers now exist for repeatable validation:
+  - [exec-on-remote.sh](/home/deadbeef/github/scripts/exec-on-remote.sh:1)
+  - [exec-in-s-router-test-machine.sh](/home/deadbeef/github/scripts/exec-in-s-router-test-machine.sh:1)
 
 ## Fixed But Only Locally Tested
 
-- `network-control-plane-model` now filters self-listen addresses out of policy-derived DNS forwarders, avoiding self-forward loops; `tests/test-policy-derived-dns-upstreams.sh` passes locally.
-- `network-control-plane-model` now preserves authoritative `services.dns.localZones` and `services.dns.localRecords` in runtime-target DNS data; `tests/test-dns-local-records.sh` passes locally.
-- `network-renderer-nixos` now renders those authoritative DNS local zones/records into valid quoted unbound `local-data` entries; `tests/test-dns-local-records.sh` passes locally.
-- `network-control-plane-model` now preserves modeled `services.mdns` reflector settings in runtime-target service data; `tests/test-mdns-service.sh` passes locally.
-- `network-renderer-nixos` now renders modeled `services.mdns` into avahi reflector configuration; `tests/test-mdns-service.sh` passes locally.
-- The shared `site-c` profile now injects the same authoritative local zones/records into the media, printer, and NAS edge DNS services instead of only `c-router-access-mgmt`.
-- `network-renderer-nixos` now emits a normalized Nebula runtime plan, and `s-router-test` consumes that plan instead of rebuilding overlay runtime state from ad hoc local glue.
-- `network-control-plane-model` now synthesizes internal host routes for remote transit endpoint addresses, so exit cores can reverse-path translated access-router traffic back through the upstream/policy chain instead of only knowing loopbacks and tenant/overlay prefixes.
-- `network-renderer-nixos` now has a downstream regression that proves those synthesized transit return routes land in the rendered core networkd config.
-- Focused and upstream local gates passed for that route fix:
-  - `network-control-plane-model/tests/test-transit-endpoint-return-routes.sh`
-  - `network-control-plane-model/tests/test-passing-fixtures.sh`
-  - `network-renderer-nixos/tests/test-transit-endpoint-return-routes.sh`
-- The `site-c` locked-chain local build gate passes in both wrappers:
-  - BGP wrapper built `/nix/store/7nr4n5jln5x6qc47pp02f11cra6l8vfb-nixos-system-s-router-test-25.11.20260421.10e7ad5`
-  - static wrapper built `/nix/store/vi8f8cj465lcaqj2bjc4fv6zy05pgri7-nixos-system-s-router-test-25.11.20260421.10e7ad5`
-- The local `s-router-test` inventory cleanup now has a real split point:
-  - the large `site-c` inventory block moved out of [inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/inventory.nix:1)
-  - it now lives in [inventory-parts/site-c.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/inventory-parts/site-c.nix:1)
-  - both files parse locally with `nix-instantiate --parse`
-- A canonical three-site example snapshot now exists in `network-labs`:
-  - [examples/s-router-test-three-site/intent.nix](/home/deadbeef/github/network-labs/examples/s-router-test-three-site/intent.nix:1)
-  - [examples/s-router-test-three-site/inventory-base.nix](/home/deadbeef/github/network-labs/examples/s-router-test-three-site/inventory-base.nix:1)
-  - [examples/s-router-test-three-site/inventory-nixos.nix](/home/deadbeef/github/network-labs/examples/s-router-test-three-site/inventory-nixos.nix:1)
-  - [examples/s-router-test-three-site/inventory-static.nix](/home/deadbeef/github/network-labs/examples/s-router-test-three-site/inventory-static.nix:1)
-  - the copied example and wrapper files parse locally
+- No additional local-only fix is being carried forward in this cleanup round.
 
 ## Implemented But Not Yet Live-Validated
 
-- No additional unverified functional `site-c` or hostile item remains from the current static wrapper itself.
+- No new implementation is being carried forward here without live proof.
 
 ## Still Broken
 
-- `s-router-test` is still not production-safe in the architectural sense yet, even though the hostile routed-prefix path now works live:
-  - the active topology still keeps the hostile public-exit behavior in local lab glue instead of a modeled router/core public-exit path
-  - active intent and inventory still disagree on the site-b east-west owner:
-    - `intent.nix` says `transport.overlays.east-west.terminateOn = "b-router-core"`
-    - but `inventory.nix` still materializes `hostile-node01` itself as a Nebula runtime node with `unsafeRoutes`
-  - active intent also does not yet describe the hostile public-exit target honestly:
-    - `intent.nix` allows `hostile -> wan` for `trafficType = "any"`
-    - it only allows `hostile -> east-west` for `trafficType = "dns"`
-    - so the current hostile public exit is not just locally materialized, it also outruns the declared policy semantics
-  - live route enumeration proves that simply attaching Nebula to `b-router-core` would not yet be enough:
-    - `b-router-core` currently has a plain WAN default via `eth0`
-    - it has no hostile-specific source-based or lane-specific public-default table that would steer hostile internet traffic into `overlay-west`
-    - `b-router-upstream-selector` can distinguish hostile lanes (`table 2003` / `2004` on `pol-hostile-ew` / `policy-hostile`)
-    - but `b-router-core` only sees that traffic arrive on its single `upstream` interface, so current core-side rules cannot distinguish hostile from branch
-  - the concrete missing `network-*` feature is now clear:
-    - the model first needs an honest way to say that hostile public traffic should use `east-west` rather than ordinary WAN
-    - CPM/renderer need a modeled way to emit core-side source-aware public egress policy for overlay externals
-    - for this lab that means hostile-originated public traffic must be steerable to `overlay-west` on `b-router-core` without also sending normal branch traffic there
-    - renderer enumeration shows the current container policy-routing path cannot express that yet:
-      - `network-renderer-nixos/s88/ControlModule/render/container-networks.nix` currently synthesizes rules only from `IncomingInterface`
-      - it has no current source-prefix keyed rule emission path for container interfaces
-  - until that exists, the hostile non-NAT IPv6 path can be made functionally green with local runtime glue, but the final router-owned `terminateOn = "b-router-core"` design cannot be realized honestly through the current `network-*` chain
+- `s-router-test` is still not production-ready.
+- Hostile public IPv6 egress is still broken on the current returned host even
+  though the routed hostile `/64` exists end to end:
+  - `hostile-node01` `curl -6 https://ifconfig.me/ip` times out
+  - live route selection inside `hostile-node01` still chooses the client-local
+    overlay path:
+    - `ip -6 route get 2606:4700:4700::1111`
+    - `via fd42:dead:beef:ee::254 dev nebula1 table 100 src fd42:dead:beef:ee::30`
+  - so the returned host is still using the ULA overlay exit table for public
+    IPv6 instead of the routed hostile GUA path
+  - the local `hostile-overlay-ipv6-source-fix.service` is failing on boot, so
+    the local lab glue is not even applying its own intended source rewrite
+  - even after a manual `ip -6 route replace ... src 2a01:4f8:1c17:b337:...`
+    in `table 100`, `curl -6` still times out
+  - VPS packet capture proves the delegated-GUA path is alive as far as the
+    disposable exit:
+    - SYN leaves on `eth0` with source `2a01:4f8:1c17:b337:ac54:7ff:fe09:3b24`
+    - SYN-ACK returns on `eth0`
+    - VPS sends that SYN-ACK back into `nebula0`
+  - `hostile-node01` `tcpdump -ni nebula1` sees only outbound SYN packets, not
+    the returning SYN-ACK
+  - hostile Nebula runtime reports the east-west tunnel as `state: dead`
+- Hostile GAU mode must not use NAT66:
+  - hostile clients should exit with routed GUA from `2a01:4f8:1c17:b337::/64`
+  - routers and intermediate hops must not get those client GUAs
+  - NAT66 is explicitly not the intended final design for hostile IPv6
+- The router-owned hostile public-exit design is still not represented honestly
+  in the active chain:
+  - local lab glue still owns part of the hostile exit behavior
+  - `b-router-core` still only has interface-based rules:
+    - `iif overlay-west -> table 2000`
+    - `iif upstream -> table 2001`
+  - it does not yet have hostile-source-aware public-default steering that
+    would let the modeled core own the public east-west exit cleanly
 
 ## Pending Or Unknown
 
-- The latest rebuild-loop cycle completed on:
-  - `/nix/store/q1qcr9vvv1n6s4jsf0s9nmwhzixqr11b-nixos-system-s-router-test-25.11.20260421.10e7ad5`
-  - local build passed
-  - validation came back ready
-  - at that time the hostile probe still logged a timed-out IPv6 fetch even though the routed-prefix design itself was already correct
-  - active live enumeration later showed the immediate failure mode:
-    - the disposable VPS was missing the kernel route:
-      - `2a01:4f8:1c17:b337::/64 via fd42:dead:beef:ee::30 dev nebula0`
-    - `hostile-node01` was also still contaminated by an earlier manually added:
-      - `2a01:4f8:1c17:b337::30/64` on `nebula1`
-  - after deleting that stale manual address and re-running the Hetzner helper, hostile IPv6 public exit worked live
-- The remaining workflow question is narrower now:
-  - determine why the routed `/64` was absent from the VPS kernel table during the earlier returned-host probe even though [s-router-test-hetzner-east-west-exit.sh](/home/deadbeef/github/scripts/s-router-test-hetzner-east-west-exit.sh:1) already contains the correct `ip -6 route replace`
-  - determine whether that was only drift from manual testing or whether the rebuild-loop needs a stricter post-helper assertion
+- I have not rerun a full rebuild-loop cycle after this cleanup patch set yet.
+- I have not re-verified whether hostile IPv4 stayed green after this cleanup
+  round, because the current blocker is specifically hostile IPv6 route
+  selection on the live returned host.
+
+## Wrong-Layer Assumptions
+
+- [modules/site-c-storage-route-overrides.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/site-c-storage-route-overrides.nix:1)
+  still injects `ip rule` / `ip route` behavior locally for `c-router-policy`.
+  That belongs upstream in the `network-*` model/render chain.
+- [modules/overlay-containers.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/overlay-containers.nix:1)
+  still carries hostile-specific overlay exit exceptions and table-100 route
+  policy. Those semantics should be modeled upstream, not hand-carried by the
+  lab.
+- [modules/overlay-containers.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/overlay-containers.nix:1)
+  also owns the failing `hostile-overlay-ipv6-source-fix.service`, which is a
+  local attempt to repair hostile GUA source selection after boot. That is
+  another concrete example of route/runtime semantics being repaired in the lab
+  instead of emitted correctly from the `network-*` chain.
+- [modules/nebula-bootstrap.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/nebula-bootstrap.nix:1)
+  and [modules/overlay-containers.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/overlay-containers.nix:1)
+  still materialize Nebula runtime ownership locally. The target is
+  renderer-owned runtime consumption from upstream overlay data.
+- Delegated-prefix flags and hostile `/64` route semantics should be calculated
+  in the model/render chain, not recomputed in the live environment.
 
 ## Next Concrete Debugging Target
 
-- Add a focused `network-*` regression for router-owned overlay public exit:
-  - given `terminateOn = "b-router-core"` and a hostile-only east-west public-exit policy
-  - assert that the control-plane / renderer chain emits core-side policy-routing that can steer hostile public defaults into `overlay-west` without moving ordinary branch public defaults off WAN
-  - adding the address as `/64` on `eth0` is the wrong shape for routed clients behind Nebula:
-    - it stayed `tentative` without `nodad`
-    - and it would make the whole hostile client `/64` look on-link on `eth0`
-
-## Next Concrete Debugging Target
-
-- Replace the current temporary hostile public-exit design with a real routed-prefix model:
-  - IPv4 public exit on the disposable VPS still inherently needs NAT unless there is provider-routed public IPv4 space for the hostile clients
-  - IPv6 should not stay NAT-based in the final design
-  - the current external candidate for that hostile routed prefix is now:
-    - `2a01:4f8:1c17:b337::/64`
-  - the current lab source file has now been switched for `s-router-test` itself:
-    - `nixos/secrets/s-router-test.yaml`
-  - the intended solution is modeled prefix delegation / prefix slicing in the `network-*` chain:
-    - upstream owns a larger routed prefix
-    - CPM / renderer slice a client `/64` for the hostile lane
-    - that `/64` is routed over the intended path to the hostile next hop
-    - the hostile access side advertises that `/64` to clients
-    - routers and transit hops must not autoconfigure those client GUAs themselves
-    - the external/VPS side must carry return routing for that hostile `/64`
-    - hostile internet egress should traverse the intended site path:
-      - `b-router-access-hostile -> b-router-downstream-selector -> b-router-policy -> b-router-upstream-selector -> b-router-core`
-      - not a client-local overlay exit
-  - once that routed-prefix design exists, the hostile lab should stop depending on VPS-side NAT for IPv6 entirely
-- The immediate live target is narrower than the long-term model cleanup:
-  - `hostile-node01` now receives SLAAC GUAs from `2a01:4f8:1c17:b337::/64`
-  - the hostile Nebula profile/cert now advertises that delegated `/64`
-  - with the hostile `table 100` routes sourced from a hostile GUA, hostile SYNs leave the VPS on `eth0` with that routed GUA source
-  - and SYN-ACKs come back from the internet to the same hostile GUA on `nebula0`
-  - but the flow still times out, so the remaining current fix surface is:
-    - make the hostile table-100 IPv6 source-selection fix apply reliably before the probe runs
-    - prove whether the returned SYN-ACKs seen on `nebula0` actually reach `hostile-node01`
-    - if they do not, stop papering over the client-local overlay exit and move the path toward the intended router-owned `terminateOn = "b-router-core"` design
-
-## Assumptions In The Wrong Layer
-
-- The `site-c` streaming work split is now clearer:
-  - the `home-users -> streaming` policy/render fix belonged in the `network-*` chain and is now live there
-  - the existence of a real dummy service behind the Chromecast advertisement belongs in the lab endpoint materialization and is now implemented there
-- The current streaming target is intentionally a harness-side synthetic service:
-  - [modules/test-containers.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/test-containers.nix:127) advertises `_googlecast._tcp` for `streaming-cast-01`
-  - and now also binds the advertised service port `8009`
-- `s-router-test` still contains policy/routing/runtime behavior that should be emitted by the `network-*` model/renderer chain instead of being invented locally in the lab:
-  - [modules/site-c-storage-route-overrides.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/site-c-storage-route-overrides.nix:1) is locally injecting `ip rule` / `ip route` state for `c-router-policy`
-  - that means storage-endpoint lane selection is currently being “fixed” in the harness instead of being modeled in intent/inventory and rendered deterministically upstream
-  - the required policy is exactly the kind of thing that should come from `intent.nix` / `inventory.nix` through CPM and renderer, not from a local oneshot route installer
-- Nebula runtime-node shape is still too local to `s-router-test`:
-  - overlay membership, lighthouse selection, node groups, unsafe routes, and per-node runtime interfaces should come from normalized renderer output
-  - `s-router-test` should only materialize that plan for this disposable lab, not decide new runtime nodes or route semantics itself
-- The current core-termination gap is now explicit upstream:
-  - `network-renderer-nixos` already emits `api.overlayRuntime.nebulaPlan`
-  - but there is still no generic renderer materialization path that attaches a Nebula runtime directly onto an already-rendered router container such as `b-router-core`
-  - the live lab still consumes that plan through local glue:
-    - [modules/overlay-containers.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/overlay-containers.nix:1)
-    - [modules/nebula-bootstrap.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/nebula-bootstrap.nix:1)
-  - that missing renderer-owned materialization path is why the intent-level `terminateOn = "b-router-core"` shape is still not the active public-exit topology
-- Hostile IPv6 client delegation must also be model-driven:
-  - the intent should describe that hostile client endpoints receive delegated GUA `/64` space
-  - routers and intermediate hops must not receive those client GUAs
-  - that delegation/prefix-slicing behavior should be rendered from model data, not added as lab-local RA/route glue later
-- The current delegated-`/64` hostile runtime shaping is still too local:
-  - the hostile Nebula `unsafeNetworks` addition for `2a01:4f8:1c17:b337::/64`
-  - and the hostile table-100 IPv6 source-selection override
-  - are currently being computed in the live environment instead of being emitted from the model/render chain
-  - the next iteration should move those flags/route semantics into the model itself
-- The old local hostile `/64` injection is no longer the active design:
-  - renderer-owned PD-aware RA logic now materializes the hostile delegated `/64` live
-  - [modules/hostile-gua-overrides.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/hostile-gua-overrides.nix:1) now only bind-mounts the delegated-prefix source file into the hostile access container
-  - the remaining wrong-layer part is the lab-specific delegated-prefix source plumbing itself:
-    - `inventory.nix` still points at `/run/secrets/subnet-ipv6`
-    - `s-router-test` still provides that source file as disposable lab state
-  - the final design should feed delegated external prefixes from a modeled upstream allocation/ownership path rather than from a lab-local mounted secret file
-- The current hostile-exit route-policy carve-out is also still a local lab assumption:
-  - [modules/overlay-containers.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/modules/overlay-containers.nix:1) now adds explicit `to 100.96.10.0/24` and `to fd42:dead:beef:ee::/64` `lookup main` exceptions ahead of the blanket hostile `table 100` exit rules
-  - that fixes the live static hostile tunnel break, but it is still lab-local route policy for a behavior that should ultimately be described by the upstream model/runtime plan instead of hand-authored container policy
-- The current hostile public-exit topology is still wrong-layer and mismatched with the intent:
-  - `intent.nix` says the east-west overlay terminates on `b-router-core`
-  - but `inventory.nix` still materializes `hostile-node01` itself as a Nebula runtime node with:
-    - overlay address `100.96.10.30/32` / `fd42:dead:beef:ee::30/128`
-    - `unsafeRoutes` for `0.0.0.0/1`, `128.0.0.0/1`, `::/1`, and `8000::/1`
-  - live `ip route get` / `ip -6 route get` on `hostile-node01` proves that public traffic is still policy-routed directly into `nebula1` from the client context:
-    - IPv4 source `100.96.10.30`
-    - IPv6 source `fd42:dead:beef:ee::30`
-  - that is not the intended dedicated-access-node / router-terminated design
-  - the final public-exit path should be owned by the modeled router/core path, not by a client container running its own overlay runtime
-- The currently live hostile public-exit workaround is also still wrong-layer temporary state:
-  - hostile public egress currently depends on temporary Hetzner-side NAT state for the east-west overlay exit
-  - that is acceptable only as disposable external validation glue
-  - the final architecture should route a delegated hostile IPv6 `/64` back over the modeled path instead of masquerading it at the VPS
-- The current regression boundary changed after the new Hetzner allocation:
-  - the blocker is no longer “this VPS can never do routed hostile IPv6”
-  - the blocker is now that the newly available routed `/64` has not yet been wired into the modeled hostile path and live-validated
-- That temporary Hetzner state is now at least explicit and scripted, not hidden drift:
-  - [scripts/s-router-test-hetzner-east-west-exit.sh](/home/deadbeef/github/scripts/s-router-test-hetzner-east-west-exit.sh:1) ensures the disposable VPS has the temporary east-west forwarding/NAT state before validation
-  - [scripts/s-router-test-rebuild-loop.sh](/home/deadbeef/github/scripts/s-router-test-rebuild-loop.sh:1) now applies that temporary external state and probes hostile public egress after the host returns
-- The example-shaped three-site lab data is now copied into `network-labs`, but the live harness still consumes the local `nixos` copy:
-  - the rebuild loop only syncs the `nixos` tree to the launcher side
-  - so `s-router-test` cannot yet import the sibling `network-labs/examples/s-router-test-three-site` tree directly without also changing the launcher sync boundary
-  - that means the `network-labs` example is currently canonical documentation/test data, while the synced local copy is still the live runtime source
+- Fix hostile IPv6 route selection on the returned host so public IPv6 uses the
+  routed `2a01:4f8:1c17:b337::/64` path instead of `nebula1 table 100` with the
+  ULA source.
+- Then stop trying to rescue that path with more local glue and move the public
+  exit to an honest upstream-owned design:
+  - renderer/control-plane-owned runtime semantics
+  - router-owned terminate-on path
+  - no local post-boot repair services for hostile GUA routing

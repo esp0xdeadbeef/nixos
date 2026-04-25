@@ -15,24 +15,39 @@ The goal is not just to boot a pretty demo. The goal is to keep one place where
 multi-WAN, multi-enterprise, DMZ ingress, and overlay direction can be validated
 without changing the architectural model.
 
-## Profile Layout
+## Canonical Model
 
-Current profile :
+`s-router-test` is now a renderer consumer, not the canonical home of the
+active topology model.
 
-- `dual-wan-branch`
-  Two enterprises in one VM:
-  - enterprise A: dual uplink, DMZ, overlay termination intent
-  - enterprise B: single uplink, branch-side overlay termination intent
+The ownership rule is explicit:
 
-The active model now lives directly in the root files:
+- `network-*` repositories are responsible for emitting the control-plane and
+  renderer-consumable schemas/runtime plans
+- `s-router-test` is responsible only for consuming those emitted results and
+  materializing disposable emulated nodes around them for validation
+- if `s-router-test` starts inventing schema, route policy, overlay ownership,
+  or runtime semantics locally, that is a regression in the wrong layer
 
-- [intent.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/intent.nix:1)
-- [inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/inventory.nix:1)
+The authoritative examples live in the locked `network-labs` input:
 
-Compatibility wrappers still exist for mode selection and older references:
+- BGP:
+  [examples/tri-site-dual-wan-overlay-integration-bgp](/home/deadbeef/github/network-labs/examples/tri-site-dual-wan-overlay-integration-bgp)
+- static:
+  [examples/tri-site-dual-wan-overlay-integration-static](/home/deadbeef/github/network-labs/examples/tri-site-dual-wan-overlay-integration-static)
 
-- [bgp-inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/bgp-inventory.nix:1)
-- [static-inventory.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/static-inventory.nix:1)
+`s-router-test` consumes those examples directly from
+[default.nix](/home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-test/default.nix:1):
+
+- intent:
+  `inputs.network-labs/examples/tri-site-dual-wan-overlay-integration-bgp/intent.nix`
+- inventory:
+  `inputs.network-labs/examples/tri-site-dual-wan-overlay-integration-static/inventory-base.nix`
+
+Both canonical examples have been compiled through both consumers:
+
+- `inventory-nixos.nix` through `network-renderer-nixos`
+- `inventory-clab.nix` through `network-renderer-containerlab-linux-backend`
 
 ## Recommended Modeling Pattern
 
@@ -177,7 +192,7 @@ That keeps the decrypt credential off-host except during the explicit unlock
 window while still letting the test harness reissue certs automatically after
 the operator or bot has authenticated.
 
-## Remote Helper
+## Remote Helpers
 
 For disposable live validation nodes, use:
 
@@ -195,6 +210,21 @@ Example:
 That is useful for the temporary Hetzner validation box and other disposable
 live probes where ad hoc SSH quoting was getting in the way of repeatable
 checks.
+
+For commands inside `s-router-test` containers, use:
+
+- [scripts/exec-in-s-router-test-machine.sh](/home/deadbeef/github/scripts/exec-in-s-router-test-machine.sh:1)
+
+Example:
+
+```bash
+./scripts/exec-in-s-router-test-machine.sh hostile-node01 ip -6 route get 2606:4700:4700::1111
+./scripts/exec-in-s-router-test-machine.sh b-router-core ip rule
+```
+
+That helper already does the correct host-side `sudo systemd-run --machine
+--pipe` invocation, so the validation workflow does not need to rediscover the
+right transport each time.
 
 ## Current Lab Direction
 
@@ -234,6 +264,24 @@ That means the previous “this VPS cannot possibly do non-NAT hostile IPv6”
 statement is no longer true as a hard external limitation. The remaining work is
 to model and validate the routed-prefix path correctly through the `network-*`
 chain and the disposable VPS configuration.
+
+Current verified VPS state:
+
+- `eth0` carries:
+  - `2a01:4f8:c013:628b::1/64`
+  - `2a01:4f8:1c17:b337::1/128`
+- the hostile delegated `/64` is routed back over Nebula:
+  - `2a01:4f8:1c17:b337::/64 via fd42:dead:beef:ee::30 dev nebula0`
+- IPv6 NAT66 is not present there
+
+Current returned-host failure:
+
+- `hostile-node01` gets SLAAC GUA addresses from `2a01:4f8:1c17:b337::/64`
+- hostile DNS works
+- but public IPv6 still times out on the current returned host because route
+  selection still prefers the client-local overlay table:
+  - `ip -6 route get 2606:4700:4700::1111`
+  - `via fd42:dead:beef:ee::254 dev nebula1 table 100 src fd42:dead:beef:ee::30`
 
 ## Production Gate
 
