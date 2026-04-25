@@ -29,6 +29,9 @@
 nixos-network-compiler = {
   url = "github:esp0xdeadbeef/nixos-network-compiler";
 };
+nixos-network-nebula = {
+  url = "github:esp0xdeadbeef/nixos-network-nebula";
+};
 
 network-forwarding-model = {
   url = "github:esp0xdeadbeef/network-forwarding-model";
