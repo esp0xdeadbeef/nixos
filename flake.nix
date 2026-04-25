@@ -26,11 +26,11 @@
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
-nixos-network-compiler = {
-  url = "github:esp0xdeadbeef/nixos-network-compiler";
+network-renderer-nebula = {
+  url = "github:esp0xdeadbeef/network-renderer-nebula";
 };
-nixos-network-nebula = {
-  url = "github:esp0xdeadbeef/nixos-network-nebula";
+network-compiler = {
+  url = "github:esp0xdeadbeef/network-compiler";
 };
 
 network-forwarding-model = {
