@@ -10,6 +10,10 @@
   ...
 }:
 
+let
+  codexUser = "deadbeef";
+  npmGlobalPrefix = "/home/${codexUser}/.npm-global";
+in
 {
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
@@ -18,9 +22,15 @@
     inputs.home-manager.nixosModules.home-manager
     inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops
+    "${outPath}/library/02-window-manager-i3"
+    "${outPath}/library/01-general"
 
     ./disko.nix
   ];
+  boot.initrd.kernelModules = [ ];
+  boot.kernelModules = [ "kvm-intel" ];
+  boot.extraModulePackages = [ ];
+
 
   networking.hostName = "codex-jail";
 
@@ -85,6 +95,8 @@
   systemd.tmpfiles.rules = [
     "d /persist/etc 0755 root root -"
     "d /persist/etc/ssh 0755 root root -"
+    "d /home/${codexUser}/.npm-global 0755 ${codexUser} users -"
+    "d /home/${codexUser}/.npm-global/bin 0755 ${codexUser} users -"
   ];
 
   users.mutableUsers = false;
@@ -167,13 +179,67 @@
     nodejs
   ];
 
+  environment.variables = {
+    NPM_CONFIG_PREFIX = npmGlobalPrefix;
+  };
+
   services.xserver.enable = false;
 
   programs.zsh.enable = true;
 
+  environment.shellInit = ''
+    export PATH="${npmGlobalPrefix}/bin:$PATH"
+  '';
+
   environment.interactiveShellInit = ''
     ZSH_THEME=agnoster
   '';
+
+  systemd.services.install-latest-codex = {
+    description = "Install latest OpenAI Codex npm package";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network-online.target" "persist.mount" ];
+    wants = [ "network-online.target" ];
+
+    path = [
+      pkgs.nodejs
+      pkgs.bash
+      pkgs.coreutils
+    ];
+
+    serviceConfig = {
+      Type = "oneshot";
+      User = codexUser;
+      Group = "users";
+      Environment = [
+        "HOME=/home/${codexUser}"
+        "NPM_CONFIG_PREFIX=${npmGlobalPrefix}"
+        "PATH=${npmGlobalPrefix}/bin:${lib.makeBinPath [ pkgs.nodejs pkgs.bash pkgs.coreutils ]}"
+      ];
+    };
+
+    script = ''
+      mkdir -p "${npmGlobalPrefix}"
+      npm config set prefix "${npmGlobalPrefix}"
+      npm install --global @openai/codex@latest
+      hash -r
+      codex --version
+    '';
+  };
+
+  home-manager.useGlobalPkgs = true;
+  home-manager.useUserPackages = true;
+  home-manager.users.${codexUser} = {
+    programs.zsh = {
+      enable = true;
+
+      initContent = ''
+        export PATH="${npmGlobalPrefix}/bin:$PATH"
+      '';
+    };
+
+    home.stateVersion = "24.11";
+  };
 
   environment.persistence."/persist" = {
     hideMounts = true;
@@ -190,5 +256,5 @@
     ];
   };
 
-  system.stateVersion = "25.11";
+  system.stateVersion = "24.11";
 }

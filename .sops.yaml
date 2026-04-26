@@ -21,7 +21,7 @@ keys:
   - &s-router-legacy-core age15vvnx3wd06juu0fc3ywykzdukf7mft2xswl3pmycvtjtvl5unpcq5tdl9l
   - &s-router-access age1e5jk0alk58pksmvqtvfkhwv8prlyd748m8jn7aq5jp88yjfwl9zqx0yn6l
   - &s-router-test age1ry9jff7wmz6aenhhvna4qk280jtnruhhffzwyd6uwa2dljy0p5wqajh9p9
-  - &codex-jail age1elgxkt3su7axumue5pml67r6qadnxlssdeam4vpu25eut4t6c59st8zuzc
+  - &codex-jail age1zc8qevlgymsjweav076vk65ae6ef4n9x8fklv6ue45xl4czrqcpqdpepc3
   
   
 
