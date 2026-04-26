@@ -24,6 +24,102 @@ let
     };
 in
 {
+  branch-node01 = {
+    autoStart = true;
+    privateNetwork = true;
+    hostBridge = "branch";
+
+    config =
+      {
+        pkgs,
+        ...
+      }:
+      {
+        networking.hostName = "branch-node01";
+        system.stateVersion = "25.11";
+        networking.useNetworkd = true;
+        systemd.network.enable = true;
+        networking.useDHCP = false;
+        networking.useHostResolvConf = false;
+        services.resolved.enable = true;
+
+        systemd.network.networks."10-eth0" = {
+          matchConfig.Name = "eth0";
+          networkConfig = {
+            DHCP = "ipv4";
+            IPv6AcceptRA = true;
+            DNS = [
+              "10.60.10.1"
+              "fd42:dead:feed:10::1"
+            ];
+            Domains = [ "lan." ];
+          };
+        };
+
+        environment.systemPackages = [
+          pkgs.bind
+          pkgs.curl
+          pkgs.iproute2
+          pkgs.iputils
+          pkgs.python3
+          pkgs.traceroute
+        ];
+
+        networking.firewall.enable = true;
+        networking.firewall.allowedTCPPorts = [ 8081 ];
+
+        systemd.services.branch-overlay-web = {
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig = {
+            ExecStart = "${pkgs.python3}/bin/python -m http.server 8081 --bind 0.0.0.0";
+            Restart = "always";
+          };
+        };
+      };
+  };
+
+  hostile-node01 = {
+    autoStart = true;
+    privateNetwork = true;
+    hostBridge = "hostile";
+
+    config =
+      {
+        pkgs,
+        ...
+      }:
+      {
+        networking.hostName = "hostile-node01";
+        system.stateVersion = "25.11";
+        networking.useNetworkd = true;
+        systemd.network.enable = true;
+        networking.useDHCP = false;
+        networking.useHostResolvConf = false;
+        services.resolved.enable = true;
+
+        systemd.network.networks."10-eth0" = {
+          matchConfig.Name = "eth0";
+          networkConfig = {
+            DHCP = "ipv4";
+            IPv6AcceptRA = true;
+            DNS = [
+              "10.70.10.1"
+              "fd42:dead:feed:70::1"
+            ];
+            Domains = [ "lan." ];
+          };
+        };
+
+        environment.systemPackages = [
+          pkgs.bind
+          pkgs.curl
+          pkgs.iproute2
+          pkgs.iputils
+          pkgs.traceroute
+        ];
+      };
+  };
+
   admin-test = {
     autoStart = true;
     privateNetwork = true;

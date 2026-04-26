@@ -1,6 +1,8 @@
 {
   lib,
   nebulaRuntimePlan,
+  renderedContainers,
+  mkNebulaRuntimeAddon,
   mkNebulaNode,
   mkNebulaProfileMount,
 }:
@@ -252,6 +254,44 @@ let
   profileToModules = profile:
     if profile == "core-client" then
       coreClientContainer
+    else if profile == "core-router-nebula" then
+      {
+        inPlace = true;
+        firewallModule = {
+          networking.firewall.enable = true;
+          networking.firewall.allowedTCPPorts = [ 4242 ];
+          networking.firewall.allowedUDPPorts = [ 4242 ];
+        };
+        extraModules = [
+          ({ pkgs, ... }: {
+            systemd.services.nebula-runtime-forwarding = {
+              description = "Allow routed traffic between upstream and runtime Nebula";
+              wantedBy = [ "multi-user.target" ];
+              after = [ "network-online.target" "nebula-runtime.service" ];
+              wants = [ "network-online.target" "nebula-runtime.service" ];
+              serviceConfig = {
+                Type = "oneshot";
+                RemainAfterExit = true;
+              };
+              path = with pkgs; [
+                gnugrep
+                nftables
+              ];
+              script = ''
+                set -euo pipefail
+
+                if ! nft list chain inet router forward | grep -Fq "s-router-test-runtime-nebula-egress"; then
+                  nft insert rule inet router forward iifname "upstream" oifname "nebula1" accept comment "s-router-test-runtime-nebula-egress"
+                fi
+
+                if ! nft list chain inet router forward | grep -Fq "s-router-test-runtime-nebula-return"; then
+                  nft insert rule inet router forward iifname "nebula1" oifname "upstream" accept comment "s-router-test-runtime-nebula-return"
+                fi
+              '';
+            };
+          })
+        ];
+      }
     else if profile == "branch-web" then
       branchWebContainer
     else if profile == "hostile-exit" then
@@ -260,6 +300,48 @@ let
       storageClientContainer
     else
       throw "Unsupported overlay runtime node container profile: ${profile}";
+
+  mkOverlayAugment = nodeName: nodeSpec:
+    let
+      containerSpec = nodeSpec.materialization.container or (throw "nebulaRuntimePlan.nodes.${nodeName}.materialization.container is required");
+      profileSpec = profileToModules (containerSpec.profile or (throw "overlayRuntimeNodes.${nodeName}.container.profile is required"));
+      targetContainer = containerSpec.targetContainer or null;
+      baseContainer =
+        if builtins.isString targetContainer && builtins.hasAttr targetContainer renderedContainers then
+          renderedContainers.${targetContainer}
+        else
+          { };
+      baseConfig =
+        if builtins.isAttrs baseContainer && builtins.hasAttr "config" baseContainer then
+          baseContainer.config
+        else
+          { };
+    in
+    if builtins.isString targetContainer && targetContainer != "" then
+      {
+        ${targetContainer} = {
+          enableTun = true;
+          bindMounts = mkNebulaProfileMount nodeName;
+          config =
+            {
+              ...
+            }:
+            {
+              imports = [
+                baseConfig
+                (mkNebulaRuntimeAddon {
+                  inherit nodeName;
+                  firewallModule = profileSpec.firewallModule or { };
+                  extraModules = profileSpec.extraModules or [ ];
+                })
+              ];
+            };
+        };
+      }
+    else
+      {
+        ${nodeName} = mkOverlayContainer nodeName nodeSpec;
+      };
 
   mkOverlayContainer = nodeName: nodeSpec:
     let
@@ -274,10 +356,16 @@ let
       bindMounts = mkNebulaProfileMount nodeName;
 
       config = mkNebulaNode {
+        inherit nodeName;
         networkModule = profileSpec.networkModule;
         firewallModule = profileSpec.firewallModule or { };
         extraModules = profileSpec.extraModules or [ ];
       };
     };
 in
-lib.mapAttrs mkOverlayContainer (nebulaRuntimePlan.nodes or { })
+lib.foldl'
+  lib.recursiveUpdate
+  { }
+  (map
+    (nodeName: mkOverlayAugment nodeName (nebulaRuntimePlan.nodes.${nodeName}))
+    (builtins.attrNames (nebulaRuntimePlan.nodes or { })))

@@ -242,6 +242,75 @@ let
       pkgs,
       ...
     }:
+    let
+      prepareUnderlayRoutes = pkgs.writeShellScript "nebula-runtime-prepare-underlay-routes-${nodeName}" ''
+        set -euo pipefail
+        export PATH=${
+          lib.makeBinPath [
+            pkgs.coreutils
+            pkgs.gawk
+            pkgs.gnugrep
+            pkgs.gnused
+            pkgs.iproute2
+          ]
+        }:$PATH
+
+        config="/persist/etc/nebula/config.yml"
+        [ -s "$config" ] || exit 1
+
+        ip route del 0.0.0.0/1 dev nebula1 2>/dev/null || true
+        ip route del 128.0.0.0/1 dev nebula1 2>/dev/null || true
+        ip -6 route del ::/1 dev nebula1 2>/dev/null || true
+        ip -6 route del 8000::/1 dev nebula1 2>/dev/null || true
+
+        overlay_hosts="$(
+          grep -E '^[[:space:]]*-[[:space:]]*"[^"]+"' "$config" \
+            | sed -E 's/^[[:space:]]*-[[:space:]]*"([^"]+)".*/\1/' \
+            | grep -Ev '^(\[[^]]+\]:[0-9]+|[^:]+:[0-9]+)$' \
+            | grep -v '^$' \
+            | sort -u
+        )"
+
+        for host in $overlay_hosts; do
+          if printf '%s' "$host" | grep -q ':'; then
+            ip -6 route del "$host/128" 2>/dev/null || true
+          else
+            ip route del "$host/32" 2>/dev/null || true
+          fi
+        done
+
+        endpoint_hosts="$(
+          grep -E '^[[:space:]]*-[[:space:]]*"[^"]+"' "$config" \
+            | sed -E 's/^[[:space:]]*-[[:space:]]*"([^"]+)".*/\1/' \
+            | grep -E '^(\[[^]]+\]:[0-9]+|[^:]+:[0-9]+)$' \
+            | sed -E 's/^\[([^]]+)\]:[0-9]+$/\1/; s/^([^:]+):[0-9]+$/\1/' \
+            | grep -v '^$' \
+            | sort -u
+        )"
+
+        for endpoint in $endpoint_hosts; do
+          if printf '%s' "$endpoint" | grep -q ':'; then
+            route="$(ip -6 route get "$endpoint" 2>/dev/null || true)"
+            dev="$(printf '%s\n' "$route" | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')"
+            via="$(printf '%s\n' "$route" | awk '{ for (i = 1; i <= NF; i++) if ($i == "via") { print $(i + 1); exit } }')"
+            if [ -n "$dev" ] && [ -n "$via" ]; then
+              ip -6 route replace "$endpoint/128" via "$via" dev "$dev"
+            elif [ -n "$dev" ]; then
+              ip -6 route replace "$endpoint/128" dev "$dev"
+            fi
+          else
+            route="$(ip -4 route get "$endpoint" 2>/dev/null || true)"
+            dev="$(printf '%s\n' "$route" | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')"
+            via="$(printf '%s\n' "$route" | awk '{ for (i = 1; i <= NF; i++) if ($i == "via") { print $(i + 1); exit } }')"
+            if [ -n "$dev" ] && [ -n "$via" ]; then
+              ip route replace "$endpoint/32" via "$via" dev "$dev"
+            elif [ -n "$dev" ]; then
+              ip route replace "$endpoint/32" dev "$dev"
+            fi
+          fi
+        done
+      '';
+    in
     {
       systemd.tmpfiles.rules = [
         "d /persist/etc/nebula 0700 root root -"
@@ -250,10 +319,13 @@ let
       systemd.services.nebula-runtime = {
         description = "Runtime Nebula daemon for ${nodeName}";
         wantedBy = [ "multi-user.target" ];
-        wants = [ "network-online.target" ];
-        after = [ "network-online.target" ];
+        wants = [ "network.target" ];
+        after = [ "network.target" ];
         serviceConfig = {
-          ExecStartPre = "${pkgs.bash}/bin/bash -lc 'for _ in $(seq 1 120); do [ -s /persist/etc/nebula/config.yml ] && exit 0; sleep 1; done; exit 1'";
+          ExecStartPre = [
+            "${pkgs.bash}/bin/bash -lc 'for _ in $(seq 1 120); do [ -s /persist/etc/nebula/config.yml ] && exit 0; sleep 1; done; exit 1'"
+            "${prepareUnderlayRoutes}"
+          ];
           ExecStart = "${pkgs.nebula}/bin/nebula -config /persist/etc/nebula/config.yml";
           Restart = "always";
           RestartSec = 2;
@@ -269,8 +341,40 @@ let
       };
     };
 
+  mkNebulaRuntimeAddon =
+    {
+      nodeName,
+      firewallModule ? { },
+      extraModules ? [ ],
+    }:
+    {
+      pkgs,
+      ...
+    }:
+    {
+      imports = extraModules ++ [
+        firewallModule
+        (mkNebulaRuntimeService nodeName)
+      ];
+
+      systemd.network.wait-online.enable = false;
+
+      environment.systemPackages = with pkgs; [
+        bind
+        curl
+        iproute2
+        iputils
+        jq
+        nebula
+        netcat-openbsd
+        tcpdump
+        traceroute
+      ];
+    };
+
   mkNebulaNode =
     {
+      nodeName ? "overlay-node",
       networkModule,
       firewallModule ? { },
       extraModules ? [ ],
@@ -285,7 +389,7 @@ let
       imports = extraModules ++ [
         networkModule
         firewallModule
-        (mkNebulaRuntimeService "overlay-node")
+        (mkNebulaRuntimeService nodeName)
       ];
 
       networking.useNetworkd = true;
@@ -318,6 +422,7 @@ in
 {
   inherit
     mkDmzEndpoint
+    mkNebulaRuntimeAddon
     mkNebulaNode
     mkNebulaProfileMount
     mkStaticTenantEndpoint

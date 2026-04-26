@@ -346,7 +346,8 @@ else
           cert_cidr6="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].certCidr6')"
           groups_csv="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].groupsCsv')"
           unsafe_networks="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].unsafeRoutes | map(.route) | join(",")')"
-          if [ "$node_name" = "hostile-node01" ] && [ -s /run/secrets/subnet-ipv6 ]; then
+          target_container="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].materialization.container.targetContainer // empty')"
+          if { [ "$node_name" = "hostile-node01" ] || [ "$target_container" = "b-router-core" ]; } && [ -s /run/secrets/subnet-ipv6 ]; then
             delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
             if [ -n "$delegated_prefix" ]; then
               if [ -n "$unsafe_networks" ]; then
@@ -363,7 +364,11 @@ else
           cert_base_name="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].certBaseName')"
           cert_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].certNetworks | join(",")')"
           unsafe_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].unsafeNetworks | join(",")')"
-          hostile_overlay_id="$(printf '%s' "$runtime_nodes_json" | jq -r '.["hostile-node01"].overlayId // empty')"
+          hostile_overlay_id="$(
+            printf '%s' "$runtime_nodes_json" \
+              | jq -r 'to_entries[] | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core")) | .value.overlayId' \
+              | head -n1
+          )"
           if [ -s /run/secrets/subnet-ipv6 ] && [ -n "$hostile_overlay_id" ]; then
             delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
             if [ -n "$delegated_prefix" ]; then
@@ -414,7 +419,8 @@ else
                   | map(
                       "    - route: \(.route)\n      via: "
                       + (if (.route | contains(":")) then "__LIGHTHOUSE_IPV6__" else "__LIGHTHOUSE_IPV4__" end)
-                      + "\n      mtu: 1300\n      install: false"
+                      + "\n      mtu: 1300\n      install: "
+                      + (if (.install // true) then "true" else "false" end)
                     )
                   | join("\n")
                 '
@@ -428,7 +434,8 @@ else
                 '
           )"
 
-          if [ "$profile_name" = "hostile-node01" ] && [ -s /run/secrets/subnet-ipv6 ]; then
+          target_container="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].materialization.container.targetContainer // empty')"
+          if { [ "$profile_name" = "hostile-node01" ] || [ "$target_container" = "b-router-core" ]; } && [ -s /run/secrets/subnet-ipv6 ]; then
             delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
             if [ -n "$delegated_prefix" ]; then
               extra_route_yaml="    - route: $delegated_prefix
@@ -551,7 +558,38 @@ EOF
             overlay_networks4_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks4Csv')"
             overlay_networks6_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayNetworks6Csv')"
             unsafe_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].unsafeNetworks | join(",")')"
-            hostile_overlay_id="$(printf '%s' "$runtime_nodes_json" | jq -r '.["hostile-node01"].overlayId // empty')"
+            unsafe_gateway4=""
+            unsafe_gateway6=""
+            delegated_prefix=""
+            hostile_overlay_id="$(
+              printf '%s' "$runtime_nodes_json" \
+                | jq -r 'to_entries[] | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core")) | .value.overlayId' \
+                | head -n1
+            )"
+            if [ -n "$hostile_overlay_id" ]; then
+              unsafe_gateway4="$(
+                printf '%s' "$runtime_nodes_json" \
+                  | jq -r --arg overlay "$hostile_overlay_id" '
+                      to_entries[]
+                      | select(.value.overlayId == $overlay)
+                      | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core"))
+                      | .value.certCidr4
+                      | sub("/.*$"; "")
+                    ' \
+                  | head -n1
+              )"
+              unsafe_gateway6="$(
+                printf '%s' "$runtime_nodes_json" \
+                  | jq -r --arg overlay "$hostile_overlay_id" '
+                      to_entries[]
+                      | select(.value.overlayId == $overlay)
+                      | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core"))
+                      | .value.certCidr6
+                      | sub("/.*$"; "")
+                    ' \
+                  | head -n1
+              )"
+            fi
             if [ -s /run/secrets/subnet-ipv6 ] && [ -n "$hostile_overlay_id" ]; then
               delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
               if [ -n "$delegated_prefix" ]; then
@@ -564,6 +602,32 @@ EOF
                   fi
                 fi
               fi
+            fi
+            unsafe_routes_yaml=""
+            if [ -n "$unsafe_networks" ] && { [ -n "$unsafe_gateway4" ] || [ -n "$unsafe_gateway6" ]; }; then
+              while read -r cidr; do
+                [ -n "$cidr" ] || continue
+                [ -n "$delegated_prefix" ] || continue
+                [ "$cidr" = "$delegated_prefix" ] || continue
+                if printf '%s' "$cidr" | grep -q ':'; then
+                  [ -n "$unsafe_gateway6" ] || continue
+                  via="$unsafe_gateway6"
+                else
+                  [ -n "$unsafe_gateway4" ] || continue
+                  via="$unsafe_gateway4"
+                fi
+
+                route_yaml="    - route: $cidr
+      via: $via
+      mtu: 1300
+      install: true"
+                if [ -n "$unsafe_routes_yaml" ]; then
+                  unsafe_routes_yaml="$unsafe_routes_yaml
+$route_yaml"
+                else
+                  unsafe_routes_yaml="$route_yaml"
+                fi
+              done < <(printf '%s\n' "$unsafe_networks" | tr ',' '\n' | sed '/^$/d')
             fi
             unsafe_fw_rules="$(
               printf '%s\n' "$unsafe_networks" \
@@ -595,6 +659,11 @@ listen:
 tun:
   dev: $interface_name
   drop_multicast: false
+$(if [ -n "$unsafe_routes_yaml" ]; then cat <<UNSAFEREMOTE
+  unsafe_routes:
+$unsafe_routes_yaml
+UNSAFEREMOTE
+fi)
 
 firewall:
   outbound:

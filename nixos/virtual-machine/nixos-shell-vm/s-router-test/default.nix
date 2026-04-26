@@ -8,6 +8,7 @@
 
 let
   api = inputs.network-renderer-nixos.lib;
+  nebulaApi = inputs.network-renderer-nebula.libBySystem.x86_64-linux;
 
   identity = {
     enterpriseName = "esp0xdeadbeef";
@@ -96,8 +97,8 @@ let
     };
   };
 
-  nebulaRuntimePlan = api.overlayRuntime.nebulaPlan {
-    renderedHostNetwork = renderedHostNetworkBase;
+  nebulaRuntimePlan = nebulaApi.renderer.buildNebulaPlan {
+    controlPlane = builtHost.controlPlaneOut or { };
     inventory = builtHost.globalInventory or { };
   };
 
@@ -116,8 +117,8 @@ let
   };
 
   overlayContainers = import ./modules/overlay-containers.nix {
-    inherit lib nebulaRuntimePlan;
-    inherit (builders) mkNebulaNode mkNebulaProfileMount;
+    inherit lib nebulaRuntimePlan renderedContainers;
+    inherit (builders) mkNebulaNode mkNebulaProfileMount mkNebulaRuntimeAddon;
   };
 
   hostileGuaOverrides = import ./modules/hostile-gua-overrides.nix {
@@ -185,6 +186,12 @@ in
       containers = builtins.attrNames renderedContainers;
     };
 
+  environment.etc."network-renderer/network-renderer-nebula.json".text =
+    builtins.toJSON {
+      overlays = builtins.attrNames (nebulaRuntimePlan.overlays or { });
+      nodes = builtins.attrNames (nebulaRuntimePlan.nodes or { });
+    };
+
   networking.useNetworkd = true;
   systemd.network.enable = true;
   systemd.network.wait-online.enable = false;
@@ -209,8 +216,14 @@ in
       };
 
   containers =
-    (lib.recursiveUpdate (lib.recursiveUpdate renderedContainers hostileGuaOverrides) storageRouteOverrides)
-    // testContainers
-    // overlayContainers
-    // dmzContainers;
+    lib.foldl'
+      lib.recursiveUpdate
+      renderedContainers
+      [
+        hostileGuaOverrides
+        storageRouteOverrides
+        testContainers
+        overlayContainers
+        dmzContainers
+      ];
 }
