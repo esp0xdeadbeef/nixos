@@ -186,6 +186,7 @@ in
     neovim
     tmux
     tmuxp
+    sops
     curl
     wget
     jq
