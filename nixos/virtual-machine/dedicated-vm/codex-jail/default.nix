@@ -25,7 +25,10 @@ in
     "${outPath}/library/02-window-manager-i3"
     "${outPath}/library/01-general"
     "${outPath}/library/01-general/system/garbage-collection.nix"
+   
+    "${outPath}/library/01-general/system/autoupdate.nix"
 
+    ./codex
     ./disko.nix
   ];
   boot.initrd.kernelModules = [ ];
@@ -239,7 +242,7 @@ in
       '';
     };
 
-    home.stateVersion = "24.11";
+    home.stateVersion = "25.11";
   };
 
   environment.persistence."/persist" = {
@@ -257,5 +260,5 @@ in
     ];
   };
 
-  system.stateVersion = "24.11";
+  system.stateVersion = "25.11";
 }
