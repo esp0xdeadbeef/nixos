@@ -22,12 +22,9 @@ in
     inputs.home-manager.nixosModules.home-manager
     inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops
-    "${outPath}/library/02-window-manager-i3"
-    "${outPath}/library/01-general"
-    "${outPath}/library/01-general/system/garbage-collection.nix"
-   
-    "${outPath}/library/01-general/system/autoupdate.nix"
 
+    "${outPath}/library/01-general/system/garbage-collection.nix"
+    "${outPath}/library/01-general/system/autoupdate.nix"
     ./codex
     ./disko.nix
   ];
@@ -187,7 +184,7 @@ in
     NPM_CONFIG_PREFIX = npmGlobalPrefix;
   };
 
-  #services.xserver.enable = false;
+  services.xserver.enable = false;
 
   programs.zsh.enable = true;
 
