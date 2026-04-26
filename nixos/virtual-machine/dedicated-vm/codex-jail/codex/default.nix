@@ -30,6 +30,7 @@ in
 
   systemd.services.install-latest-codex = {
     description = "Install latest OpenAI Codex CLI";
+
     wantedBy = [ "multi-user.target" ];
     after = [
       "network-online.target"
