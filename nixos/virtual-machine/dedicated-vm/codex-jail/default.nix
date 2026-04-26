@@ -65,6 +65,9 @@ in
 
   sops.defaultSopsFile = "${outPath}/secrets/${name}.yaml";
   sops.secrets.deadbeef-passwd.neededForUsers = true;
+  sops.secrets.gh-token = {
+    owner = codexUser;
+  };
 
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = lib.mkForce false;

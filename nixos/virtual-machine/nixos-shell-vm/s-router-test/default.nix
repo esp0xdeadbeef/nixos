@@ -17,10 +17,8 @@ let
   };
 
   fabric = {
-    intentPath =
-      "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-bgp/intent.nix";
-    inventoryPath =
-      "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-static/inventory-base.nix";
+    intentPath = "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-bgp/intent.nix";
+    inventoryPath = "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-static/inventory-base.nix";
   };
 
   sliceArgs = {
@@ -44,11 +42,9 @@ let
     file = "nixos/virtual-machine/nixos-shell-vm/s-router-test/default.nix";
   };
 
-  resolvedHostContext =
-    (builtHost.hostContext or { })
-    // {
-      hostname = identity.boxName;
-    };
+  resolvedHostContext = (builtHost.hostContext or { }) // {
+    hostname = identity.boxName;
+  };
 
   renderedHost = api.host.build sliceArgs;
 
@@ -83,12 +79,8 @@ let
     bridgeNameMap = renderedBridges.bridgeNameMap or { };
     bridges = renderedBridges.bridges or { };
     sites = builtHost.renderedHost.sites or { };
-    netdevs =
-      (renderedHost.netdevs or { })
-      // (renderedBridges.netdevs or { });
-    networks =
-      (renderedHost.networks or { })
-      // (renderedBridges.networks or { });
+    netdevs = (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
+    networks = (renderedHost.networks or { }) // (renderedBridges.networks or { });
     containers = renderedContainers;
     debug = {
       host = renderedHost.debug or { };
@@ -102,13 +94,11 @@ let
     inventory = builtHost.globalInventory or { };
   };
 
-  renderedHostNetwork =
-    renderedHostNetworkBase
-    // {
-      overlayRuntime = {
-        nebula = nebulaRuntimePlan;
-      };
+  renderedHostNetwork = renderedHostNetworkBase // {
+    overlayRuntime = {
+      nebula = nebulaRuntimePlan;
     };
+  };
 
   builders = import ./modules/container-builders.nix { inherit lib pkgs; };
 
@@ -127,7 +117,8 @@ let
 
   storageRouteOverrides = import ./modules/site-c-storage-route-overrides.nix {
     inherit lib pkgs;
-    siteCStorageOverlay = (nebulaRuntimePlan.overlays or { })."esp0xdeadbeef::site-c::site-c-storage" or null;
+    siteCStorageOverlay =
+      (nebulaRuntimePlan.overlays or { })."esp0xdeadbeef::site-c::site-c-storage" or null;
     baseContainer = renderedContainers."c-router-policy" or null;
   };
 
@@ -178,19 +169,17 @@ in
     inherit renderedHostNetwork;
   };
 
-  environment.etc."network-renderer/network-renderer-nixos.json".text =
-    builtins.toJSON {
-      inherit identity fabric;
-      host = renderedHost.debug or { };
-      bridges = renderedBridges.debug or { };
-      containers = builtins.attrNames renderedContainers;
-    };
+  environment.etc."network-renderer/network-renderer-nixos.json".text = builtins.toJSON {
+    inherit identity fabric;
+    host = renderedHost.debug or { };
+    bridges = renderedBridges.debug or { };
+    containers = builtins.attrNames renderedContainers;
+  };
 
-  environment.etc."network-renderer/network-renderer-nebula.json".text =
-    builtins.toJSON {
-      overlays = builtins.attrNames (nebulaRuntimePlan.overlays or { });
-      nodes = builtins.attrNames (nebulaRuntimePlan.nodes or { });
-    };
+  environment.etc."network-renderer/network-renderer-nebula.json".text = builtins.toJSON {
+    overlays = builtins.attrNames (nebulaRuntimePlan.overlays or { });
+    nodes = builtins.attrNames (nebulaRuntimePlan.nodes or { });
+  };
 
   networking.useNetworkd = true;
   systemd.network.enable = true;
@@ -198,32 +187,30 @@ in
   networking.useDHCP = false;
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce false;
-  systemd.network.netdevs =
-    (renderedHost.netdevs or { })
-    // (renderedBridges.netdevs or { });
+  systemd.network.netdevs = (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
 
   # Management uplink (eth0.2 -> vlan2) should get DHCPv4 so the host itself
   # has connectivity. `mgmt` is a tenant L2 bridge (VLAN 330), not the host mgmt
   # uplink; expect the host address on `vlan2` instead.
   systemd.network.networks =
-    lib.recursiveUpdate
-      (
-        (renderedHost.networks or { })
-        // (renderedBridges.networks or { })
-      )
+    lib.recursiveUpdate ((renderedHost.networks or { }) // (renderedBridges.networks or { }))
       {
         "30-vlan2".networkConfig.DHCP = "ipv4";
       };
 
-  containers =
-    lib.foldl'
-      lib.recursiveUpdate
-      renderedContainers
-      [
-        hostileGuaOverrides
-        storageRouteOverrides
-        testContainers
-        overlayContainers
-        dmzContainers
-      ];
+  containers = lib.foldl' lib.recursiveUpdate renderedContainers [
+    hostileGuaOverrides
+    storageRouteOverrides
+    testContainers
+    overlayContainers
+    dmzContainers
+  ];
+  users.users.root.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
+  ];
+users.users.deadbeef.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
+  ];
+
+
 }
