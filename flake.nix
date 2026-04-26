@@ -149,6 +149,7 @@ network-renderer-nixos = {
         "nixos/laptop"
         "nixos/server"
         "nixos/virtual-machine/nixos-shell-vm"
+        "nixos/virtual-machine/dedicated-vm"
       ];
 
       # List direct subdirectories
