@@ -35,10 +35,9 @@
   environment.systemPackages = with pkgs; [
     nix-index
     arandr
-    fast-cli
     alacritty
     navi
-    nixfmt-rfc-style
+    nixfmt
     pulseaudio
     feroxbuster
     nuclei

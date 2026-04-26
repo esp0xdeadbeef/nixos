@@ -3,7 +3,7 @@
   environment.systemPackages = with pkgs; [
     playerctl
     i3status-rust
-    light
+    brightnessctl
     alacritty
     betterlockscreen
     ksnip

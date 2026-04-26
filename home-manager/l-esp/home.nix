@@ -9,21 +9,17 @@ args@{
 }:
 let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
-  unstablePkgs = import inputs.nixpkgs-unstable {
-    system = pkgs.stdenv.hostPlatform.system;
-
-    config.allowUnfree = true;
-  };
+  unstablePkgs = pkgs.unstable;
   stablePkgs = import inputs.nixpkgs-stable {
+    system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
 in
 {
   home.activation.debugArgs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     # this will log in journalctl -u home-manager-deadbeef.service -e
-
     echo "[+] Home Manager activation: showing specialArgs"
-    echo "    -> ${lib.concatStringsSep " " (builtins.attrNames args)}"
+    echo " -> ${lib.concatStringsSep " " (builtins.attrNames args)}"
   '';
 
   # You can import other home-manager modules here
@@ -44,14 +40,13 @@ in
     #./projects/osee/create-x2go-profile.nix
     #./projects/osee/start-lxc.nix
     #./projects/osee/vm-settings-resize-guest.nix
-
     ../01-general/darkmode/config.nix
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
     ../01-general/virt-manager-config/default.nix
-
     ../02-window-manager-i3/i3/packages.nix
     ../02-window-manager-i3/i3status-rust/packages.nix
+
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
 
@@ -59,19 +54,18 @@ in
     # inputs.zen-browser.homeModules.beta
     # or inputs.zen-browser.homeModules.twilight
     # or inputs.zen-browser.homeModules.twilight-official
-    ./configs/minecraft
 
+    ./configs/minecraft
   ];
 
   # programs.zen-browser.enable = true;
+
   sops = {
     defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
-
     age = {
       sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
       generateKey = true;
     };
-
   };
 
   nixpkgs = {
@@ -92,13 +86,16 @@ in
       #   });
       # })
     ];
+
     # Configure your nixpkgs instance
     config = {
       # Disable if you don't want unfree packages
       allowUnfree = true;
     };
   };
+
   home.enableNixpkgsReleaseCheck = false;
+
   home = {
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
@@ -118,6 +115,7 @@ in
         ffuf
         distrobox
       ];
+
       unstable = with unstablePkgs; [
         vscode
         # firefox
@@ -135,7 +133,7 @@ in
     mutableExtensionsDir = true;
   };
 
-  # Enable home-manager 
+  # Enable home-manager
   programs.home-manager.enable = true;
 
   # Nicely reload system units when changing configs
@@ -143,5 +141,4 @@ in
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "24.11";
-
 }

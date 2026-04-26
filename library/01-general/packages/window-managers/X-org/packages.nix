@@ -9,7 +9,7 @@
     kind
     podman-compose
 
-    xorg.xkill
+    xkill
 
   ];
 }

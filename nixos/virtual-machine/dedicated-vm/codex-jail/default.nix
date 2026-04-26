@@ -24,6 +24,7 @@ in
     inputs.sops-nix.nixosModules.sops
     "${outPath}/library/02-window-manager-i3"
     "${outPath}/library/01-general"
+    "${outPath}/library/01-general/system/garbage-collection.nix"
 
     ./disko.nix
   ];

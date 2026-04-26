@@ -59,7 +59,8 @@
       acceleration = "cuda";
     })
   ];
-  services.ollama.acceleration = "cuda";
+  #services.ollama.acceleration = "cuda";
+  services.ollama.package = pkgs.ollama-cuda;
 
   # # Install CUDA toolkit and user-land tools (nvidia-smi, settings)
   # environment.systemPackages = with pkgs; [

@@ -94,7 +94,7 @@
       fastfetch
 
       # rfc formatter:
-      nixfmt-rfc-style
+      nixfmt
 
       # network port scan tool
       nmap

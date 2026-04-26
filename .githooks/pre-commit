@@ -9,7 +9,7 @@ mapfile -d '' changed < <(
 
 echo "[hook] formatting staged nix files..."
 
-nix shell nixpkgs#nixfmt-rfc-style nixpkgs#nix --command bash <<'EOF'
+nix shell nixpkgs#nixfmt nixpkgs#nix --command bash <<'EOF'
 set -euo pipefail
 
 while IFS= read -r -d '' f; do

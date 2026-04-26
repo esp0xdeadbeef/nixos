@@ -76,8 +76,8 @@
       # brightness
 
       # Screen brightness controls:
-      bindsym XF86MonBrightnessUp exec --no-startup-id "${pkgs.light}/bin/light -A 10"
-      bindsym XF86MonBrightnessDown exec --no-startup-id "${pkgs.light}/bin/light -U 10"
+      bindsym XF86MonBrightnessUp exec --no-startup-id "${pkgs.brightnessctl}/bin/brightnessctl set +10%"
+      bindsym XF86MonBrightnessDown exec --no-startup-id "${pkgs.brightnessctl}/bin/brightnessctl set 10%-"
 
       # Use Mouse+$mod to drag floating windows to their wanted position
       floating_modifier $mod
@@ -292,7 +292,7 @@
       }
       #bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
 
-      bindsym $mod+i exec ${pkgs.xfce.thunar}/bin/thunar
+      bindsym $mod+i exec ${pkgs.thunar}/bin/thunar
       #bindsym $mod+F4 exec discord-canary
       bindsym $mod+F4 exec ${pkgs.discord}/bin/discord
       #bindsym Control+Shift+c [class="Firefox"] exec xdotool key --clearmodifiers ctrl+c

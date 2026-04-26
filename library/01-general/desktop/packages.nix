@@ -52,13 +52,12 @@ in
       #hyprland
       #rofi
       #autorandr
-      fast-cli
       #cudaPackages.cudatoolkit
       alacritty
       #flameshot
       #google-chrome
       navi
-      nixfmt-rfc-style
+      nixfmt
       pulseaudio
       feroxbuster
       nuclei
@@ -94,7 +93,6 @@ in
       pciutils
       autotiling
       lshw
-      neofetch
 
       # virtualization:
       podman
