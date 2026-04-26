@@ -1,5 +1,3 @@
-# This is your system's configuration file.
-# Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
 {
   inputs,
   outputs,
@@ -11,58 +9,31 @@
   modulesPath,
   ...
 }:
-{
-  # You can import other NixOS modules here
-imports = [
-    # If you want to use modules your own flake exports (from modules/nixos):
-    # outputs.nixosModules.example
-(modulesPath + "/profiles/qemu-guest.nix")
 
-    # Or modules from other flakes (such as nixos-hardware):
-    inputs.lanzaboote.nixosModules.lanzaboote
+{
+  imports = [
+    (modulesPath + "/profiles/qemu-guest.nix")
 
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
+    inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops
 
-    # still need to destill this:
-    "${outPath}/library/01-general"
-    "${outPath}/library/02-window-manager-i3"
-    # autologin for this vm
-    "${outPath}/library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix"
+    ./disko.nix
   ];
 
+  networking.hostName = "codex-jail";
+
   nixpkgs = {
-    # You can add overlays here
     overlays = [
-      # Add overlays your own flake exports (from overlays and pkgs dir):
       outputs.overlays.additions
       outputs.overlays.modifications
       outputs.overlays.unstable-packages
-
-      # You can also add overlays exported from other flakes:
-      # neovim-nightly-overlay.overlays.default
-
-      # Or define it inline, for example:
-      # (final: prev: {
-      #   hi = final.hello.overrideAttrs (oldAttrs: {
-      #     patches = [ ./change-hello-to-hi.patch ];
-      #   });
-      # })
     ];
-    # Configure your nixpkgs instance
-    config = {
-      # Disable if you don't want unfree packages
-      allowUnfree = true;
-    };
-    # specify that it is aarch64-linux:
+
+    config.allowUnfree = true;
     hostPlatform = "x86_64-linux";
   };
-  
-
-  sops.secrets."deadbeef-passwd" = {
-  neededForUsers = true;
-};
 
   nix =
     let
@@ -70,71 +41,97 @@ imports = [
     in
     {
       settings = {
-        # Enable flakes and new 'nix' command
         experimental-features = "nix-command flakes";
-        # Opinionated: disable global registry
         flake-registry = "";
-        # Workaround for https://github.com/NixOS/nix/issues/9574
         nix-path = config.nix.nixPath;
       };
-      # Opinionated: disable channels
+
       channel.enable = false;
 
-      # Opinionated: make flake registry and nix path match flake inputs
       registry = lib.mapAttrs (_: flake: { inherit flake; }) flakeInputs;
       nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
     };
 
-  # FIXME: Add the rest of your current configuration
+  sops.defaultSopsFile = "${outPath}/secrets/${name}.yaml";
+  sops.secrets.deadbeef-passwd.neededForUsers = true;
 
-  networking.hostName = "s-codex-jail";
+  boot.loader.systemd-boot.enable = lib.mkForce false;
+  boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
 
-  # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
+  boot.loader.grub.enable = lib.mkForce true;
+  boot.loader.grub.efiSupport = lib.mkForce false;
+  boot.loader.grub.device = lib.mkForce "nodev";
+  boot.loader.grub.devices = lib.mkForce [ ];
+  boot.loader.grub.mirroredBoots = lib.mkForce [
+    {
+      devices = [ "/dev/vda" ];
+      path = "/boot";
+    }
+  ];
+  boot.loader.grub.useOSProber = lib.mkForce false;
+
+  boot.initrd.availableKernelModules = [
+    "ata_piix"
+    "uhci_hcd"
+    "virtio_pci"
+    "virtio_scsi"
+    "sd_mod"
+    "sr_mod"
+  ];
+
+  fileSystems."/boot".neededForBoot = true;
+  fileSystems."/persist".neededForBoot = true;
+
+  systemd.tmpfiles.rules = [
+    "d /persist/etc 0755 root root -"
+    "d /persist/etc/ssh 0755 root root -"
+  ];
+
+  users.mutableUsers = false;
+
   users.users = {
-    # FIXME: Replace with your username
-    deadbeef = {
-      # TODO: You can set an initial password for your user.
-      # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
-      # Be sure to change it (using passwd) after rebooting!
-      # initialPassword = " ";
-      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+    root = {
+      hashedPassword = "!";
+    };
 
+    deadbeef = {
       isNormalUser = true;
+      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+      extraGroups = [ "wheel" ];
+
       openssh.authorizedKeys.keys = [
-        # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
       ];
-      # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
-      extraGroups = [ "wheel" ];
+
+      shell = pkgs.zsh;
     };
   };
 
-  # This setups a SSH server. Very important if you're setting up a headless system.
-  # Feel free to remove if you don't need it.
   services.openssh = {
     enable = true;
+
+    hostKeys = [
+      {
+        path = "/persist/etc/ssh/ssh_host_ed25519_key";
+        type = "ed25519";
+      }
+      {
+        path = "/persist/etc/ssh/ssh_host_rsa_key";
+        bits = 4096;
+        type = "rsa";
+      }
+    ];
+
     settings = {
-      # Opinionated: forbid root login through SSH.
-      PermitRootLogin = "no";
-      # Opinionated: use keys only.
-      # Remove if you want to SSH using passwords
+      PermitRootLogin = "prohibit-password";
       PasswordAuthentication = true;
+      KbdInteractiveAuthentication = true;
     };
   };
 
-  # networking.hostName = "s-router-vpn-1";
-  # services.openssh.enable = true;
-  services.xserver.enable = true;
-  # services.displayManager.sddm.enable = true;
-  # services.desktopManager.plasma6.enable = true;
-
-  # Set systemd-boot configuration limit
-  boot.loader.systemd-boot.configurationLimit = 2;
-
-  environment.interactiveShellInit = ''
-    ZSH_THEME=agnoster
-  '';
+  services.getty.autologinUser = lib.mkForce "deadbeef";
+  services.displayManager.autoLogin.enable = lib.mkForce false;
 
   security.sudo.enable = true;
   security.sudo.extraRules = [
@@ -148,6 +145,50 @@ imports = [
       ];
     }
   ];
-  # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "24.11";
+
+  environment.systemPackages = with pkgs; [
+    git
+    vim
+    neovim
+    tmux
+    curl
+    wget
+    jq
+    ripgrep
+    fd
+    htop
+    pciutils
+    usbutils
+    lsof
+    file
+    gcc
+    gdb
+    python3
+    nodejs
+  ];
+
+  services.xserver.enable = false;
+
+  programs.zsh.enable = true;
+
+  environment.interactiveShellInit = ''
+    ZSH_THEME=agnoster
+  '';
+
+  environment.persistence."/persist" = {
+    hideMounts = true;
+
+    directories = [
+      "/var/lib/nixos"
+      "/var/lib/systemd"
+      "/var/log"
+      "/home/deadbeef"
+    ];
+
+    files = [
+      "/etc/machine-id"
+    ];
+  };
+
+  system.stateVersion = "25.11";
 }
