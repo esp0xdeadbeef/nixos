@@ -63,11 +63,6 @@ in
       nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
     };
 
-  sops.defaultSopsFile = "${outPath}/secrets/${name}.yaml";
-  sops.secrets.deadbeef-passwd.neededForUsers = true;
-  sops.secrets.gh-token = {
-    owner = codexUser;
-  };
 
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
@@ -101,8 +96,33 @@ in
     "d /persist/etc/ssh 0755 root root -"
   ];
 
-  users.mutableUsers = false;
+sops = {
+  defaultSopsFile = "${outPath}/secrets/${name}.yaml";
 
+  age.sshKeyPaths = [
+    "/persist/etc/ssh/ssh_host_ed25519_key"
+  ];
+
+  secrets = {
+    deadbeef-passwd = {
+      neededForUsers = true;
+    };
+
+    gh-token = {
+      owner = codexUser;
+      group = "users";
+      mode = "0400";
+      path = "/run/secrets/gh-token";
+    };
+
+    hetzner-token = {
+      owner = codexUser;
+      group = "users";
+      mode = "0400";
+      path = "/run/secrets/hetzner-token";
+    };
+  };
+};
   users.users = {
     root = {
       hashedPassword = "!";
