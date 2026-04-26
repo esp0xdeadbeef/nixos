@@ -183,7 +183,7 @@ in
     NPM_CONFIG_PREFIX = npmGlobalPrefix;
   };
 
-  services.xserver.enable = false;
+  #services.xserver.enable = false;
 
   programs.zsh.enable = true;
 
