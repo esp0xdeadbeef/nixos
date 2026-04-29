@@ -9,10 +9,11 @@ args@{
 }:
 let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
-  unstablePkgs = import inputs.nixpkgs-unstable {
-    system = pkgs.stdenv.hostPlatform.system;
-    config.allowUnfree = true;
-  };
+  #unstablePkgs = import inputs.nixpkgs-unstable {
+  #  system = pkgs.stdenv.hostPlatform.system;
+  #  config.allowUnfree = true;
+  #};
+  unstablePkgs = pkgs.unstable;
   stablePkgs = import inputs.nixpkgs-stable {
     config.allowUnfree = true;
   };
@@ -115,7 +116,7 @@ in
         # firefox
         exploitdb
         netexec
-        #certipy
+        certipy
         teams-for-linux
         slack
         (burpsuite.override { proEdition = true; })
