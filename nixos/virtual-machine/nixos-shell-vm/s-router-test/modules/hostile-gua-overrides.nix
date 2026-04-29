@@ -1,20 +1,26 @@
 {
-  baseContainer ? null,
+  lib,
+  renderedContainers ? { },
+  hetznerAccessPrefixSecretNames ? [ ],
 }:
-{
-  b-router-access-hostile =
-    (if builtins.isAttrs baseContainer then baseContainer else { })
+let
+  secretMounts =
+    lib.genAttrs
+      (builtins.map (secretName: "/run/secrets/${secretName}") hetznerAccessPrefixSecretNames)
+      (secretPath: {
+        hostPath = secretPath;
+        isReadOnly = true;
+      });
+in
+lib.mapAttrs
+  (_containerName: container:
+    container
     // {
       bindMounts =
-        (if builtins.isAttrs baseContainer && builtins.isAttrs (baseContainer.bindMounts or null) then
-          baseContainer.bindMounts
+        (if builtins.isAttrs (container.bindMounts or null) then
+          container.bindMounts
         else
           { })
-        // {
-          "/run/secrets/subnet-ipv6" = {
-            hostPath = "/run/secrets/subnet-ipv6";
-            isReadOnly = true;
-          };
-        };
-    };
-}
+        // secretMounts;
+    })
+  renderedContainers

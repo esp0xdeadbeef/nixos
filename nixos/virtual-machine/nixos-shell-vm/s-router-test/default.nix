@@ -94,6 +94,46 @@ let
     inventory = builtHost.globalInventory or { };
   };
 
+  controlPlaneData =
+    if builtins.isAttrs (((builtHost.controlPlaneOut or { }).control_plane_model or { }).data or null) then
+      (builtHost.controlPlaneOut.control_plane_model.data or { })
+    else
+      ((builtHost.controlPlaneOut or { }).data or { });
+
+  controlPlaneRuntimeTargets =
+    lib.foldlAttrs
+      (
+        enterpriseAcc: _enterpriseName: enterpriseSites:
+        enterpriseAcc
+        // lib.foldlAttrs
+          (
+            siteAcc: _siteName: siteData:
+            siteAcc // (siteData.runtimeTargets or { })
+          )
+          { }
+          enterpriseSites
+      )
+      { }
+      controlPlaneData;
+
+  hetznerAccessPrefixSecretNames =
+    lib.sort builtins.lessThan (
+      lib.unique (
+        lib.filter
+          (name: builtins.isString name && name != "")
+          (
+            lib.mapAttrsToList
+              (_targetName: target: (target.externalValidation or { }).delegatedPrefixSecretName or "")
+              controlPlaneRuntimeTargets
+          )
+      )
+    );
+
+  hetznerAccessNodeNames =
+    builtins.map
+      (secretName: lib.removePrefix "access-node-ipv6-prefix-" secretName)
+      hetznerAccessPrefixSecretNames;
+
   renderedHostNetwork = renderedHostNetworkBase // {
     overlayRuntime = {
       nebula = nebulaRuntimePlan;
@@ -112,7 +152,7 @@ let
   };
 
   hostileGuaOverrides = import ./modules/hostile-gua-overrides.nix {
-    baseContainer = renderedContainers."b-router-access-hostile" or null;
+    inherit lib renderedContainers hetznerAccessPrefixSecretNames;
   };
 
   storageRouteOverrides = import ./modules/site-c-storage-route-overrides.nix {
@@ -167,6 +207,7 @@ in
     forwardingOut = builtHost.forwardingOut or { };
     controlPlaneOut = builtHost.controlPlaneOut or { };
     inherit renderedHostNetwork;
+    inherit hetznerAccessNodeNames hetznerAccessPrefixSecretNames;
   };
 
   environment.etc."network-renderer/network-renderer-nixos.json".text = builtins.toJSON {
@@ -180,6 +221,9 @@ in
     overlays = builtins.attrNames (nebulaRuntimePlan.overlays or { });
     nodes = builtins.attrNames (nebulaRuntimePlan.nodes or { });
   };
+
+  environment.etc."s-router-test/hetzner-access-ipv6-nodes".text =
+    lib.concatLines hetznerAccessNodeNames;
 
   networking.useNetworkd = true;
   systemd.network.enable = true;

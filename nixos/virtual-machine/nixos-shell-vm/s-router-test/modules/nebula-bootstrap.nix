@@ -341,21 +341,54 @@ else
           exit 1
         fi
 
+        access_prefixes_all() {
+          for prefix_file in /run/secrets/access-node-ipv6-prefix-*; do
+            [ -s "$prefix_file" ] || continue
+            tr -d '[:space:]' <"$prefix_file"
+            printf '\n'
+          done
+        }
+        access_prefix_for_node() {
+          local node="$1"
+          local prefix_file="/run/secrets/access-node-ipv6-prefix-$node"
+          if [ -s "$prefix_file" ]; then
+            tr -d '[:space:]' <"$prefix_file"
+          fi
+        }
+        node_has_default_exit_routes() {
+          local node="$1"
+          printf '%s' "$runtime_nodes_json" \
+            | jq -e --arg n "$node" '
+                any(.[$n].unsafeRoutes[]?; .route == "0.0.0.0/1" or .route == "128.0.0.0/1" or .route == "::/1" or .route == "8000::/1")
+              ' >/dev/null
+        }
+        append_csv() {
+          local csv="$1"
+          local value="$2"
+          [ -n "$value" ] || {
+            printf '%s' "$csv"
+            return
+          }
+          if [ -n "$csv" ]; then
+            printf '%s,%s' "$csv" "$value"
+          else
+            printf '%s' "$value"
+          fi
+        }
+
         printf '%s' "$runtime_nodes_json" | jq -r 'keys[]' | while read -r node_name; do
           cert_cidr4="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].certCidr4')"
           cert_cidr6="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].certCidr6')"
           groups_csv="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].groupsCsv')"
           unsafe_networks="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].unsafeRoutes | map(.route) | join(",")')"
-          target_container="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$node_name" '.[$n].materialization.container.targetContainer // empty')"
-          if { [ "$node_name" = "hostile-node01" ] || [ "$target_container" = "b-router-core" ]; } && [ -s /run/secrets/subnet-ipv6 ]; then
-            delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
-            if [ -n "$delegated_prefix" ]; then
-              if [ -n "$unsafe_networks" ]; then
-                unsafe_networks="$unsafe_networks,$delegated_prefix"
-              else
-                unsafe_networks="$delegated_prefix"
-              fi
-            fi
+          delegated_prefix="$(access_prefix_for_node "$node_name")"
+          if [ -n "$delegated_prefix" ]; then
+            unsafe_networks="$(append_csv "$unsafe_networks" "$delegated_prefix")"
+          fi
+          if node_has_default_exit_routes "$node_name"; then
+            while read -r delegated_prefix; do
+              unsafe_networks="$(append_csv "$unsafe_networks" "$delegated_prefix")"
+            done < <(access_prefixes_all)
           fi
           issue_node_cert "$node_name" "$cert_cidr4,$cert_cidr6" "$groups_csv" "$unsafe_networks"
         done
@@ -366,20 +399,21 @@ else
           unsafe_networks="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].unsafeNetworks | join(",")')"
           hostile_overlay_id="$(
             printf '%s' "$runtime_nodes_json" \
-              | jq -r 'to_entries[] | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core")) | .value.overlayId' \
+              | jq -r '
+                  to_entries[]
+                  | select(
+                      any(.value.unsafeRoutes[]?; .route == "0.0.0.0/1" or .route == "128.0.0.0/1" or .route == "::/1" or .route == "8000::/1")
+                    )
+                  | .value.overlayId
+                ' \
               | head -n1
           )"
-          if [ -s /run/secrets/subnet-ipv6 ] && [ -n "$hostile_overlay_id" ]; then
-            delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
-            if [ -n "$delegated_prefix" ]; then
-              lighthouse_overlay_ids_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayIds | join(",")')"
-              if printf '%s\n' "$lighthouse_overlay_ids_csv" | tr ',' '\n' | grep -Fxq "$hostile_overlay_id"; then
-                if [ -n "$unsafe_networks" ]; then
-                  unsafe_networks="$unsafe_networks,$delegated_prefix"
-                else
-                  unsafe_networks="$delegated_prefix"
-                fi
-              fi
+          if [ -n "$hostile_overlay_id" ]; then
+            lighthouse_overlay_ids_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayIds | join(",")')"
+            if printf '%s\n' "$lighthouse_overlay_ids_csv" | tr ',' '\n' | grep -Fxq "$hostile_overlay_id"; then
+              while read -r delegated_prefix; do
+                unsafe_networks="$(append_csv "$unsafe_networks" "$delegated_prefix")"
+              done < <(access_prefixes_all)
             fi
           fi
           issue_node_cert "$cert_base_name" "$cert_networks" "lab,lighthouse" "$unsafe_networks"
@@ -412,6 +446,9 @@ else
           lighthouse_endpoint="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.endpoint')"
           lighthouse_endpoint6="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.endpoint6')"
           lighthouse_port="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].lighthouse.port')"
+          if [ -s /run/secrets/hetzner-public-ipv4 ]; then
+            lighthouse_endpoint="$(tr -d '[:space:]' </run/secrets/hetzner-public-ipv4)"
+          fi
           unsafe_routes_yaml="$(
             printf '%s' "$runtime_nodes_json" \
               | jq -r --arg n "$profile_name" '
@@ -434,10 +471,9 @@ else
                 '
           )"
 
-          target_container="$(printf '%s' "$runtime_nodes_json" | jq -r --arg n "$profile_name" '.[$n].materialization.container.targetContainer // empty')"
-          if { [ "$profile_name" = "hostile-node01" ] || [ "$target_container" = "b-router-core" ]; } && [ -s /run/secrets/subnet-ipv6 ]; then
-            delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
-            if [ -n "$delegated_prefix" ]; then
+          if node_has_default_exit_routes "$profile_name"; then
+            while read -r delegated_prefix; do
+              [ -n "$delegated_prefix" ] || continue
               extra_route_yaml="    - route: $delegated_prefix
       via: $lighthouse_ip6
       mtu: 1300
@@ -458,7 +494,7 @@ $extra_fw_rule"
               else
                 unsafe_fw_rules="$extra_fw_rule"
               fi
-            fi
+            done < <(access_prefixes_all)
           fi
 
           if [ -n "$unsafe_routes_yaml" ]; then
@@ -544,8 +580,20 @@ EOF
           best_effort_restart_nebula_runtime "$node_name"
         done
 
-        if ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
-          -i "$root_ssh_dir/id_ed25519" root@46.224.173.254 true 2>/dev/null; then
+        remote_hetzner_host=""
+        if [ -s /run/secrets/hetzner-public-ipv4 ]; then
+          remote_hetzner_host="$(tr -d '[:space:]' </run/secrets/hetzner-public-ipv4)"
+        fi
+
+        if [ -n "$remote_hetzner_host" ] && ${pkgs.openssh}/bin/ssh \
+          -o BatchMode=yes \
+          -o ConnectTimeout=10 \
+          -o IdentitiesOnly=yes \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          -o GlobalKnownHostsFile=/dev/null \
+          -i "$root_ssh_dir/id_ed25519" \
+          "root@$remote_hetzner_host" true 2>/dev/null; then
           remote_state_dir="/root/nebula-s-router-test"
           remote_profile_dir="$remote_state_dir/profile"
           remote_bin_dir="$remote_state_dir/bin"
@@ -563,7 +611,13 @@ EOF
             delegated_prefix=""
             hostile_overlay_id="$(
               printf '%s' "$runtime_nodes_json" \
-                | jq -r 'to_entries[] | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core")) | .value.overlayId' \
+                | jq -r '
+                    to_entries[]
+                    | select(
+                        any(.value.unsafeRoutes[]?; .route == "0.0.0.0/1" or .route == "128.0.0.0/1" or .route == "::/1" or .route == "8000::/1")
+                      )
+                    | .value.overlayId
+                  ' \
                 | head -n1
             )"
             if [ -n "$hostile_overlay_id" ]; then
@@ -572,7 +626,7 @@ EOF
                   | jq -r --arg overlay "$hostile_overlay_id" '
                       to_entries[]
                       | select(.value.overlayId == $overlay)
-                      | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core"))
+                      | select(any(.value.unsafeRoutes[]?; .route == "0.0.0.0/1" or .route == "128.0.0.0/1" or .route == "::/1" or .route == "8000::/1"))
                       | .value.certCidr4
                       | sub("/.*$"; "")
                     ' \
@@ -583,32 +637,28 @@ EOF
                   | jq -r --arg overlay "$hostile_overlay_id" '
                       to_entries[]
                       | select(.value.overlayId == $overlay)
-                      | select((.key == "hostile-node01") or (.value.materialization.container.targetContainer // "" == "b-router-core"))
+                      | select(any(.value.unsafeRoutes[]?; .route == "0.0.0.0/1" or .route == "128.0.0.0/1" or .route == "::/1" or .route == "8000::/1"))
                       | .value.certCidr6
                       | sub("/.*$"; "")
                     ' \
                   | head -n1
               )"
             fi
-            if [ -s /run/secrets/subnet-ipv6 ] && [ -n "$hostile_overlay_id" ]; then
-              delegated_prefix="$(tr -d '[:space:]' </run/secrets/subnet-ipv6)"
-              if [ -n "$delegated_prefix" ]; then
-                lighthouse_overlay_ids_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayIds | join(",")')"
-                if printf '%s\n' "$lighthouse_overlay_ids_csv" | tr ',' '\n' | grep -Fxq "$hostile_overlay_id"; then
-                  if [ -n "$unsafe_networks" ]; then
-                    unsafe_networks="$unsafe_networks,$delegated_prefix"
-                  else
-                    unsafe_networks="$delegated_prefix"
-                  fi
-                fi
+            delegated_prefixes=""
+            if [ -n "$hostile_overlay_id" ]; then
+              lighthouse_overlay_ids_csv="$(printf '%s' "$lighthouses_json" | jq -r --arg n "$lighthouse_id" '.[$n].overlayIds | join(",")')"
+              if printf '%s\n' "$lighthouse_overlay_ids_csv" | tr ',' '\n' | grep -Fxq "$hostile_overlay_id"; then
+                delegated_prefixes="$(access_prefixes_all)"
+                while read -r delegated_prefix; do
+                  unsafe_networks="$(append_csv "$unsafe_networks" "$delegated_prefix")"
+                done <<< "$delegated_prefixes"
               fi
             fi
             unsafe_routes_yaml=""
             if [ -n "$unsafe_networks" ] && { [ -n "$unsafe_gateway4" ] || [ -n "$unsafe_gateway6" ]; }; then
               while read -r cidr; do
                 [ -n "$cidr" ] || continue
-                [ -n "$delegated_prefix" ] || continue
-                [ "$cidr" = "$delegated_prefix" ] || continue
+                printf '%s\n' "$delegated_prefixes" | grep -Fxq "$cidr" || continue
                 if printf '%s' "$cidr" | grep -q ':'; then
                   [ -n "$unsafe_gateway6" ] || continue
                   via="$unsafe_gateway6"
@@ -677,17 +727,25 @@ firewall:
 $(if [ -n "$unsafe_fw_rules" ]; then printf '%s\n' "$unsafe_fw_rules"; fi)
 EOF
 
-            ${pkgs.openssh}/bin/scp -q -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
-              -i "$root_ssh_dir/id_ed25519" \
+            ssh_remote_opts=(
+              -o BatchMode=yes
+              -o ConnectTimeout=10
+              -o IdentitiesOnly=yes
+              -o StrictHostKeyChecking=no
+              -o UserKnownHostsFile=/dev/null
+              -o GlobalKnownHostsFile=/dev/null
+              -i "$root_ssh_dir/id_ed25519"
+            )
+
+            ${pkgs.openssh}/bin/scp -q "''${ssh_remote_opts[@]}" \
               "$pki_dir/ca.crt" \
               "$pki_dir/$cert_base_name.crt" \
               "$pki_dir/$cert_base_name.key" \
               "$profiles_dir/$cert_base_name.config.yml" \
-              root@46.224.173.254:/root/ \
+              "root@$remote_hetzner_host:/root/" \
               </dev/null
 
-            ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
-              -i "$root_ssh_dir/id_ed25519" root@46.224.173.254 "
+            ${pkgs.openssh}/bin/ssh "''${ssh_remote_opts[@]}" "root@$remote_hetzner_host" "
                 set -euo pipefail
                 remote_state_dir='$remote_state_dir'
                 remote_profile_dir='$remote_profile_dir'
