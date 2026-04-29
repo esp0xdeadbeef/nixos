@@ -116,7 +116,7 @@ in
         # firefox
         exploitdb
         netexec
-        certipy
+        #certipy
         teams-for-linux
         slack
         (burpsuite.override { proEdition = true; })
