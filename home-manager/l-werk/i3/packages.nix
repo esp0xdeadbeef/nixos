@@ -5,6 +5,9 @@
   sopsSecrets,
   ...
 }:
+let
+  thunar = pkgs.thunar or pkgs.xfce.thunar;
+in
 
 {
   sops = {
@@ -292,7 +295,7 @@
       }
       #bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
 
-      bindsym $mod+i exec ${pkgs.thunar}/bin/thunar
+      bindsym $mod+i exec ${thunar}/bin/thunar
       #bindsym $mod+F4 exec discord-canary
       bindsym $mod+F4 exec ${pkgs.discord}/bin/discord
       #bindsym Control+Shift+c [class="Firefox"] exec xdotool key --clearmodifiers ctrl+c
