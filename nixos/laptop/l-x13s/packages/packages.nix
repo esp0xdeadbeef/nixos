@@ -48,7 +48,6 @@
     dunst
     unzip
     sqlmap
-    certipy
     enum4linux
     enum4linux-ng
     metasploit

@@ -5,6 +5,9 @@
   sopsSecrets,
   ...
 }:
+let
+  thunar = pkgs.thunar or pkgs.xfce.thunar;
+in
 
 {
   sops = {
@@ -283,7 +286,7 @@
       }
       bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
 
-      bindsym $mod+i exec ${pkgs.thunar}/bin/thunar
+      bindsym $mod+i exec ${thunar}/bin/thunar
       bindsym $mod+F4 exec ${pkgs.legcord}/bin/legcord
 
       bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
