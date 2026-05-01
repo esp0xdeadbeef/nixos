@@ -52,6 +52,10 @@ in
       description = "s-router-test VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-test"}";
     })
+    (mkVM "s-router-test-clients" {
+      description = "s-router-test-clients VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-test-clients"}";
+    })
     (mkVM "s-router-vpn-egress" {
       description = "VPN-egress VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-vpn-egress"}";
