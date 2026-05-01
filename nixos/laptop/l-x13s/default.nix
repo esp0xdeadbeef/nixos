@@ -24,6 +24,8 @@
     inputs.home-manager.nixosModules.home-manager
 
     # inputs.nixos-x13s.nixosModules.default
+    "${outPath}/library/01-general/system/garbage-collection.nix"
+    "${outPath}/library/01-general/system/autoupdate.nix"
   ];
 
   home-manager = {
