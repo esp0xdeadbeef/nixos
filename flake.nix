@@ -5,17 +5,21 @@
     nixpkgs-stable = {
       url = "github:nixos/nixpkgs/nixos-25.11";
     };
+
     nixpkgs-unstable = {
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
+
     nixpkgs = {
       # url = "github:nixos/nixpkgs/nixos-24.11";
       url = "github:nixos/nixpkgs/nixos-25.11";
       #url = "github:nixos/nixpkgs/nixos-unstable";
     };
+
     systems = {
       url = "github:nix-systems/default-linux";
     };
+
     kickstart-nix-nvim = {
       url = "github:nix-community/kickstart-nix.nvim";
       # do NOT make nixpkgs follow your main nixpkgs; it breaks wrapNeovimUnstable
@@ -26,9 +30,11 @@
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
+
     network-renderer-nebula = {
       url = "github:esp0xdeadbeef/network-renderer-nebula";
     };
+
     network-compiler = {
       url = "github:esp0xdeadbeef/network-compiler";
     };
@@ -45,12 +51,15 @@
     network-renderer-nixos = {
       url = "github:esp0xdeadbeef/network-renderer-nixos";
     };
+
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
     };
+
     nixvim = {
       url = "github:nix-community/nixvim";
     };
+
     khanelivim = {
       url = "github:khaneliman/khanelivim";
     };
@@ -70,6 +79,7 @@
     #  url = "github:nix-community/home-manager";
     #  inputs.nixpkgs.follows = "nixpkgs";
     #};
+
     home-manager = {
       url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -86,8 +96,18 @@
       url = "github:nixos/nixos-hardware";
       # inputs.nixpkgs.follows = "nixpkgs";
     };
+
     nixos-hardware = {
       url = "github:nixos/nixos-hardware";
+      # inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # X13s-only hardware module from:
+    # https://github.com/NixOS/nixos-hardware/pull/1751
+    #
+    # This avoids dragging every other host onto the unmerged PR branch.
+    nixos-hardware-x13s = {
+      url = "github:BrainWart/nixos-hardware/x13s-updates";
       # inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -111,13 +131,15 @@
       url = "github:epetousis/nixos-aarch64-widevine";
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
+
     # nixos-x13s branch to follow:
     nixos-x13s = {
       url = "github:BrainWart/x13s-nixos";
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
+
     # integrated:
-    # nix run github:Mic92/nixos-shell --  --flake .#vm
+    # nix run github:Mic92/nixos-shell -- --flake .#vm
     nixos-shell = {
       url = "github:Mic92/nixos-shell";
     };
@@ -145,6 +167,16 @@
       forAllSystems = lib.genAttrs systems;
 
       root = self.outPath;
+
+      # Host architecture overrides.
+      #
+      # Most hosts are x86_64. The ThinkPad X13s is Qualcomm ARM64, so evaluating
+      # it as x86_64-linux is wrong.
+      hostSystems = {
+        l-x13s = "aarch64-linux";
+      };
+
+      hostSystemFor = name: hostSystems.${name} or "x86_64-linux";
 
       # ------------------------------------------------------------
       # STRUCTURAL HOST ROOTS (semantic, stable)
@@ -195,7 +227,6 @@
             # include everything EXCEPT other hosts and .git
             !(inOther || inGit);
         };
-
     in
     {
       lib = {
@@ -211,6 +242,7 @@
       formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
 
       overlays = if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { };
+
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
 
       homeManagerModules =
@@ -222,7 +254,8 @@
       nixosConfigurations = lib.mapAttrs (
         name: path:
         nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
+          system = hostSystemFor name;
+
           specialArgs = {
             inherit
               inputs
@@ -232,6 +265,7 @@
               ;
             outPath = self.outPath;
           };
+
           modules = [
             (./. + "/${path}")
           ];
