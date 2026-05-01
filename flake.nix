@@ -26,25 +26,25 @@
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
-network-renderer-nebula = {
-  url = "github:esp0xdeadbeef/network-renderer-nebula";
-};
-network-compiler = {
-  url = "github:esp0xdeadbeef/network-compiler";
-};
+    network-renderer-nebula = {
+      url = "github:esp0xdeadbeef/network-renderer-nebula";
+    };
+    network-compiler = {
+      url = "github:esp0xdeadbeef/network-compiler";
+    };
 
-network-forwarding-model = {
-  url = "github:esp0xdeadbeef/network-forwarding-model";
-};
+    network-forwarding-model = {
+      url = "github:esp0xdeadbeef/network-forwarding-model";
+    };
 
-network-control-plane-model = {
-  url = "github:esp0xdeadbeef/network-control-plane-model";
-  inputs.nixpkgs.follows = "nixpkgs";
-};
+    network-control-plane-model = {
+      url = "github:esp0xdeadbeef/network-control-plane-model";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
-network-renderer-nixos = {
-  url = "github:esp0xdeadbeef/network-renderer-nixos";
-};
+    network-renderer-nixos = {
+      url = "github:esp0xdeadbeef/network-renderer-nixos";
+    };
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
     };
@@ -71,9 +71,9 @@ network-renderer-nixos = {
     #  inputs.nixpkgs.follows = "nixpkgs";
     #};
     home-manager = {
-  url = "github:nix-community/home-manager/release-25.11";
-  inputs.nixpkgs.follows = "nixpkgs";
-};
+      url = "github:nix-community/home-manager/release-25.11";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # sops:
     sops-nix = {
