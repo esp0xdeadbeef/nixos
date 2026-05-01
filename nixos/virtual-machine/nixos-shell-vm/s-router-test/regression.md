@@ -23,6 +23,28 @@
   checks now that those endpoint containers live in `s-router-test-clients`.
 - Hetzner validator resources were cleaned up after testing:
   server `128785279` and its floating IPv6 allocation were removed.
+- `network-renderer-nebula` renders the Hetzner lighthouse NixOS module. The
+  bootstrap no longer creates remote systemd units, downloads Nebula with curl,
+  or mutates remote iptables/ip6tables.
+- `s-router-test` consumes `network-renderer-nebula`'s bootstrap module; the
+  stale local `modules/nebula-bootstrap.nix` copy was removed.
+- `hetzner-nebula-prodtest-01` was installed with `nixos-anywhere` from
+  `nixosConfigurations.s-router-hetzner-anywhere` after the spawn script wrote
+  generated runtime IPs, floating prefixes, and SSH keys into `runtime.nix`.
+- Latest full loop: `./scripts/s-router-test-rebuild-loop.sh s-router-test`
+  passed. `nixos-anywhere` completed, the NixOS Hetzner validator returned with
+  IPv6 routing, `s-router-test` rebooted, local build passed, normalized
+  renderer JSON matched the running system, Nebula CA/profile issuance
+  succeeded, validation became `ready=true`, site-C probe passed, hostile
+  public-egress probe passed, and Hetzner resources were cleaned up.
+- Latest running `s-router-test` system:
+  `/nix/store/bxr2drg5qnhdxngdgvwbdpczhasyvv26-nixos-system-s-router-test-25.11.20260429.755f5aa`.
+- Latest local nixos-shell build:
+  `/nix/store/v26dg089fi3d68vsl4ibdi6gz96gh549-nixos-vm`.
+- `/run/s88-network-validation/status.json` and `stable.json` both reported
+  `ready=true`; branch and hostile access DNS checks were `ok` for A and AAAA.
+- Hetzner cleanup verified zero remaining servers and zero floating IPv6
+  allocations for the latest run name `s-router-test-rebuild-loop-1777668985`.
 
 ## fixed but only locally tested
 
@@ -39,50 +61,37 @@
 
 ## implemented but not yet live-validated
 
-- The NixOS fabric input fix was used for the live run, but NixOS is local-only
-  and was not pushed.
 - Cross-VM client-to-router traffic was not validated; the current verification
   proves the router VM split and the standalone client fixture VM.
-- `network-renderer-nebula` now renders a declarative Hetzner lighthouse NixOS
-  module. The bootstrap no longer creates remote systemd units, downloads
-  Nebula with curl, or mutates remote iptables/ip6tables.
-- `nixos` now has `s-router-hetzner-anywhere`, a `nixos-anywhere` host for
-  `hetzner-nebula-prodtest-01`. Its `runtime.nix` is generated from the Hetzner
-  spawn output before deployment and fails evaluation while placeholders remain.
-- `network-codex-agent/scripts/s-router-test-rebuild-loop.sh` now writes that
-  runtime config and installs the Hetzner validator with `nixos-anywhere` before
-  rebuilding `s-router-test`.
+- `runtime.nix` for `s-router-hetzner-anywhere` is intentionally committed with
+  placeholders and fails evaluation until the rebuild loop writes concrete
+  Hetzner runtime values.
+- Placeholder `s-router-hetzner-anywhere` eval was checked and fails loudly on
+  missing `authorizedKeys`, as intended.
 
 ## still broken
 
-- Production readiness is blocked: `/run/s88-network-validation/status.json`
-  and `stable.json` both report `ready=false`.
-- `b-router-access-branch` and `b-router-access-hostile` have active DNS
-  services but fail A and AAAA lookups.
-- Direct checks show both branch access routers forward to `10.20.10.1` and
-  `fd42:dead:beef:10::1`, but pings to those forwarders time out.
-- Site-A mgmt DNS itself answers locally, so the failure is branch-to-site-A
-  DNS reachability, not Unbound on `s-router-access-mgmt`.
+- No current blocker from the latest `s-router-test` loop. The remaining gap is
+  broader than this change: cross-VM client-to-router validation still needs a
+  dedicated run with `s-router-test-clients`.
 
 ## pending or unknown
 
-- Full production DNS, overlay, routing, firewall, lane-preservation, and
-  leak-prevention gate remains incomplete because branch DNS is broken.
-- External inbound delegated IPv6 was not re-tested after this run because the
-  production gate already failed on stable DNS validation.
+- External inbound delegated IPv6 was not re-tested in this run; the loop
+  verified hosted NixOS validator install, Nebula profile issuance, host
+  validation readiness, site-C probe, and hostile public egress.
 - `hostile-node02` is not present in the current running container set.
 
 ## next concrete debugging target
 
-- Fix local service-origin routing for branch DNS forwarders in the owning
-  `network-*` layer. The rendered routes to the site-A DNS prefixes exist in
-  ingress policy tables, but locally-originated Unbound traffic has no `iif` and
-  falls through to a main table with no route.
+- Run a focused external inbound delegated-IPv6 probe against the new NixOS
+  Hetzner validator path when `hostile-node02` is present in the client VM.
 
 ## assumptions in the wrong layer
 
-- Local `s-router-test` helpers still materialize runtime overlay/bootstrap and
-  route behavior that should remain owned by CPM and renderers.
+- The old local `s-router-test` Nebula bootstrap module and Hetzner
+  east-west-exit shell mutation helper were removed. Remaining temporary
+  underlay endpoint route prep still needs ownership review.
 - The wrapper `scripts/exec-in-s-router-test-machine.sh` points to
   `/home/deadbeef/github/network-codex-agent/scripts/exec-on-remote.sh`, which is absent in this
   checkout; production validation used the repo-local remote wrapper directly.

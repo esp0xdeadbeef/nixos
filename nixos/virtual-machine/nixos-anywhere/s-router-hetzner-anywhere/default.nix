@@ -22,6 +22,12 @@ let
       throw "s-router-hetzner-anywhere: runtime.nix must set ${name} before deployment"
     else
       value;
+  floatingIPv6HostAddress =
+    prefix:
+    if lib.hasSuffix "::/64" prefix then
+      "${lib.removeSuffix "::/64" prefix}::1/128"
+    else
+      throw "s-router-hetzner-anywhere: floating IPv6 prefix must be canonical ::/64: ${prefix}";
 in
 {
   imports = [
@@ -52,7 +58,7 @@ in
         };
         address = [
           (require "publicIPv6Address" runtime.publicIPv6Address)
-        ];
+        ] ++ map floatingIPv6HostAddress runtime.floatingIPv6Prefixes;
         routes = [
           { Gateway = "fe80::1"; }
         ];
