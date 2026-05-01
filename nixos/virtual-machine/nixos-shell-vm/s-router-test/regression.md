@@ -6,14 +6,23 @@
   route retention, and host-veth consumer sufficiency uses CIDR containment
   instead of string-only route matching.
 - Live rebuild loop reached SSH return on
-  `/nix/store/887yvy67110s9jhpzd8f7nirjdr5a0h5-nixos-system-s-router-test-25.11.20260429.755f5aa`.
+  `/nix/store/kgkkvzf89yszi4d8h5s2pqr5ik7d594a-nixos-system-s-router-test-25.11.20260429.755f5aa`.
 - Local build passed with expected system hash
-  `6hrknjnkr21fhz5ysa62wqa2hlykdw3r`; normalized renderer JSON matched the
+  `6kb4p7qrzy5idzgr3jqgiq71i02mgq3s`; normalized renderer JSON matched the
   running generation.
-- Site-C streaming probe passed for IPv4 and IPv6 TCP 8009.
-- Hostile public IPv6 egress probe passed through Hetzner.
+- `s-router-test` now materializes router/overlay containers only; endpoint
+  fixtures are absent from its expected validation container set.
+- `s-router-test-clients` rebuilt and rebooted to
+  `/nix/store/mzms5r5vw602brm2wkkvyp0zkljfg578-nixos-system-s-router-test-clients-25.11.20260429.755f5aa`.
+- All `s-router-test-clients` endpoint containers were running after reboot,
+  including `hostile-node01`, `streaming-cast-01`, `nas-node01`, and
+  `printer-node01`.
+- Client fixture services checked live: `streaming-cast-01`
+  `fake-googlecast.socket` active and `dmzweb01` `dmz-web` active.
+- Router-side site-C streaming and hostile public-egress probes skip endpoint
+  checks now that those endpoint containers live in `s-router-test-clients`.
 - Hetzner validator resources were cleaned up after testing:
-  server `128780349`, floating IPv6 `128943800`.
+  server `128785279` and its floating IPv6 allocation were removed.
 
 ## fixed but only locally tested
 
@@ -27,15 +36,22 @@
 - `s-router-test/default.nix` now uses
   `network-labs/examples/s-router-test-three-site/{intent.nix,inventory-nixos.nix}`
   so Hetzner delegated-prefix secret names are derived from CPM output.
-- Endpoint and DMZ fixture containers were moved out of `s-router-test` into
-  `s-router-test-clients`; the client VM builds locally as
-  `/nix/store/syf6bh6bqngl5rjcrddrfx8kfnmxkgam-nixos-vm`.
 
 ## implemented but not yet live-validated
 
 - The NixOS fabric input fix was used for the live run, but NixOS is local-only
   and was not pushed.
-- The client split has not been live-validated with both VMs running together.
+- Cross-VM client-to-router traffic was not validated; the current verification
+  proves the router VM split and the standalone client fixture VM.
+- `network-renderer-nebula` now renders a declarative Hetzner lighthouse NixOS
+  module. The bootstrap no longer creates remote systemd units, downloads
+  Nebula with curl, or mutates remote iptables/ip6tables.
+- `nixos` now has `s-router-hetzner-anywhere`, a `nixos-anywhere` host for
+  `hetzner-nebula-prodtest-01`. Its `runtime.nix` is generated from the Hetzner
+  spawn output before deployment and fails evaluation while placeholders remain.
+- `network-codex-agent/scripts/s-router-test-rebuild-loop.sh` now writes that
+  runtime config and installs the Hetzner validator with `nixos-anywhere` before
+  rebuilding `s-router-test`.
 
 ## still broken
 
@@ -68,5 +84,5 @@
 - Local `s-router-test` helpers still materialize runtime overlay/bootstrap and
   route behavior that should remain owned by CPM and renderers.
 - The wrapper `scripts/exec-in-s-router-test-machine.sh` points to
-  `/home/deadbeef/github/scripts/exec-on-remote.sh`, which is absent in this
+  `/home/deadbeef/github/network-codex-agent/scripts/exec-on-remote.sh`, which is absent in this
   checkout; production validation used the repo-local remote wrapper directly.

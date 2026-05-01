@@ -1,9 +1,8 @@
-{
-  inputs,
-  lib,
-  outPath,
-  pkgs,
-  ...
+{ inputs
+, lib
+, outPath
+, pkgs
+, ...
 }:
 
 let
@@ -100,17 +99,19 @@ let
 
   routerNebulaRuntimePlan = nebulaRuntimePlan // {
     nodes = builtins.removeAttrs (nebulaRuntimePlan.nodes or { }) clientRuntimeNodeNames;
-    overlays = lib.mapAttrs (
-      _overlayId: overlay:
-      overlay
-      // {
-        runtimeNodes =
-          if builtins.isAttrs (overlay.runtimeNodes or null) then
-            builtins.removeAttrs overlay.runtimeNodes clientRuntimeNodeNames
-          else
-            overlay.runtimeNodes or { };
-      }
-    ) (nebulaRuntimePlan.overlays or { });
+    overlays = lib.mapAttrs
+      (
+        _overlayId: overlay:
+          overlay
+            // {
+            runtimeNodes =
+              if builtins.isAttrs (overlay.runtimeNodes or null) then
+                builtins.removeAttrs overlay.runtimeNodes clientRuntimeNodeNames
+              else
+                overlay.runtimeNodes or { };
+          }
+      )
+      (nebulaRuntimePlan.overlays or { });
   };
 
   controlPlaneData =
@@ -123,14 +124,14 @@ let
     lib.foldlAttrs
       (
         enterpriseAcc: _enterpriseName: enterpriseSites:
-        enterpriseAcc
-        // lib.foldlAttrs
-          (
-            siteAcc: _siteName: siteData:
-            siteAcc // (siteData.runtimeTargets or { })
-          )
-          { }
-          enterpriseSites
+          enterpriseAcc
+          // lib.foldlAttrs
+            (
+              siteAcc: _siteName: siteData:
+                siteAcc // (siteData.runtimeTargets or { })
+            )
+            { }
+            enterpriseSites
       )
       { }
       controlPlaneData;
@@ -184,8 +185,8 @@ in
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     "${inputs.network-renderer-nixos}/s88/ControlModule/module/host-validation.nix"
     ./sops.nix
-    (import ./modules/nebula-bootstrap.nix {
-      inherit lib pkgs;
+    (nebulaApi.renderer.buildNebulaBootstrapNixosModule {
+      inherit pkgs;
       nebulaRuntimePlan = routerNebulaRuntimePlan;
     })
   ];
@@ -263,7 +264,7 @@ in
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
   ];
-users.users.deadbeef.openssh.authorizedKeys.keys = [
+  users.users.deadbeef.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
   ];
 

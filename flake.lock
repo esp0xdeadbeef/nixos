@@ -765,11 +765,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1777652244,
-        "narHash": "sha256-SY+3xMNyQF3Xyvywf8LK4OgPe/4hn+Qor8yG8QJzefI=",
+        "lastModified": 1777664802,
+        "narHash": "sha256-bQhMEImpC45sWn4M2Pk68rC4/MhzyUbDBPh/HTj776E=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "9e06abbc403a9455773f134ce16416d24e97d4aa",
+        "rev": "f8785d72a6fb611bd4612380210259d24bcafb4f",
         "type": "github"
       },
       "original": {
@@ -810,11 +810,11 @@
         "nixpkgs-network": "nixpkgs-network_12"
       },
       "locked": {
-        "lastModified": 1777652244,
-        "narHash": "sha256-SY+3xMNyQF3Xyvywf8LK4OgPe/4hn+Qor8yG8QJzefI=",
+        "lastModified": 1777664802,
+        "narHash": "sha256-bQhMEImpC45sWn4M2Pk68rC4/MhzyUbDBPh/HTj776E=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "9e06abbc403a9455773f134ce16416d24e97d4aa",
+        "rev": "f8785d72a6fb611bd4612380210259d24bcafb4f",
         "type": "github"
       },
       "original": {
@@ -1231,11 +1231,11 @@
         "nixpkgs": "nixpkgs_8"
       },
       "locked": {
-        "lastModified": 1777645073,
-        "narHash": "sha256-vTDCS8LwHdm1YXUEmNHI0byYKR7W+PCIqLE1MxTAThY=",
+        "lastModified": 1777666783,
+        "narHash": "sha256-Qifc1DwlNVEzoXfa1yvT+tcH++9eP7z1gIKpBYRhRCw=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nebula",
-        "rev": "88e371867b05a4ad54995962d1fed4269aab9592",
+        "rev": "803e16fa7340135b408a05fceb53fb2bbdeda47d",
         "type": "github"
       },
       "original": {
@@ -1253,11 +1253,11 @@
         "nixpkgs": "nixpkgs_11"
       },
       "locked": {
-        "lastModified": 1777654940,
-        "narHash": "sha256-U0BcC9UvK7YzbTgjr9C7wVixpB5EiSh0Hm+E4xz8w/8=",
+        "lastModified": 1777664833,
+        "narHash": "sha256-0bBVevkHr8n3fmnLrvT7kbW66Ev2IZ+vaupALcTKJjA=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "28830a86ceab6e72675d7a6c5367563d4d07073a",
+        "rev": "dd0e0426a9414a4f32e866a986f68611e1c23c7a",
         "type": "github"
       },
       "original": {

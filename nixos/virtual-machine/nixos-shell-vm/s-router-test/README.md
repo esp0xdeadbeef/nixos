@@ -41,9 +41,9 @@ only sees the NixOS checkout and locked flake inputs.
 Use the script wrappers instead of hand-rolled SSH quoting:
 
 ```bash
-~/github/scripts/s-router-test-rebuild-loop.sh
-~/github/scripts/exec-on-remote.sh s-router-test <cmd> [args...]
-~/github/scripts/exec-in-s-router-test-machine.sh <container> <cmd> [args...]
+~/github/network-codex-agent/scripts/s-router-test-rebuild-loop.sh
+~/github/network-codex-agent/scripts/exec-on-remote.sh s-router-test <cmd> [args...]
+~/github/network-codex-agent/scripts/exec-in-s-router-test-machine.sh <container> <cmd> [args...]
 ```
 
 The rebuild loop syncs the NixOS tree to the launcher workspace, builds through
@@ -65,12 +65,18 @@ The intended hostile IPv6 design is routed GUA, not NAT66:
 
 Current external validator:
 
-- host: `46.224.173.254`
+- host role: `hetzner-nebula-prodtest-01`
 - user: `root`
-- expected hostile return route: `2a01:4f8:1c17:b337::/64 via fd42:dead:beef:ee::2 dev nebula0`
+- NixOS flake host: `s-router-hetzner-anywhere`
+- runtime addresses and delegated prefixes are generated from
+  `network-codex-agent/scripts/s-router-test-hetzner-spawn.sh` before
+  `nixos-anywhere` evaluates the host
+- expected hostile return route: delegated hostile GUA prefix via
+  `fd42:dead:beef:ee::2 dev nebula0`
 
-The validator is disposable. Any manual state on it is temporary validation
-state and must be documented in `regression.md`.
+The validator is disposable. Manual service, firewall, or route installation on
+the Debian rescue/base image is not part of the contract; the NixOS host config
+must own those settings before live validation starts.
 
 ## Production Gate
 
