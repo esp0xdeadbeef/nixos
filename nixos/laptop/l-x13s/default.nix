@@ -8,8 +8,11 @@
 }:
 {
   imports = [
+    ../../../library/02-window-manager-i3/default.nix
+
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
+    ./hardware/impermanence.nix
     ./packages/packages.nix
     ./packages/widevine.nix
 
@@ -17,6 +20,7 @@
     # https://github.com/NixOS/nixos-hardware/pull/1751
     inputs.nixos-hardware-x13s.nixosModules.lenovo-thinkpad-x13s
 
+    inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
 
     # inputs.nixos-x13s.nixosModules.default
@@ -75,6 +79,9 @@
 
   networking.hostName = "l-x13s";
   networking.networkmanager.enable = true;
+  services.autorandr.enable = lib.mkForce false;
+  security.rtkit.enable = true;
+  hardware.enableRedistributableFirmware = true;
 
   users.users = {
     deadbeef = {
@@ -83,6 +90,7 @@
 
       openssh.authorizedKeys.keys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
       ];
 
       extraGroups = [

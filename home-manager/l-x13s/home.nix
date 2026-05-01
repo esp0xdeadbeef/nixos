@@ -19,17 +19,7 @@
     # ./steam/packages.nix
     ./configs/i3/packages.nix
     ./configs/i3status-rust/packages.nix
-    inputs.sops-nix.homeManagerModules.sops
   ];
-  sops = {
-    defaultSopsFile = ../../secrets/l-x13s-default.yaml;
-
-    age = {
-      sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
-      generateKey = true;
-    };
-
-  };
   nixpkgs = {
     # You can add overlays here
     overlays = [

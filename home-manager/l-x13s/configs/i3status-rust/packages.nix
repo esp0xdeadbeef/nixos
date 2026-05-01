@@ -2,14 +2,13 @@
   config,
   lib,
   pkgs,
-  sopsSecrets,
   ...
 }:
 
 {
 
-  sops.templates.i3status-rust = {
-    content = ''
+  home.file.".config/i3status-rust/config.toml" = {
+    text = ''
       # Config for i3blocks-rs
 
       icons_format = "{icon}"
@@ -86,6 +85,5 @@
       interval = 1
       format = " $timestamp.datetime(f:'%Y-%m-%d %R:%S') "
     '';
-    path = "${config.home.homeDirectory}/.config/i3status-rust/config.toml";
   };
 }
