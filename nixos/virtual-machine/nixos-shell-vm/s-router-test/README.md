@@ -21,7 +21,8 @@ network-labs examples
 - `network-*` repositories own schema, compiler behavior, forwarding/control-plane
   data, and renderer output.
 - `network-labs` owns reusable examples.
-- `s-router-test` owns only local VM/container materialization and live probes.
+- `s-router-test` owns router VM/container materialization and live probes.
+- `s-router-test-clients` owns client endpoint and DMZ service fixtures.
 - Any local `s-router-test` helper that injects routes, firewall, delegated-prefix
   behavior, or overlay runtime policy is transitional glue and must be recorded in
   `regression.md` as wrong-layer work.
@@ -30,8 +31,7 @@ network-labs examples
 
 The active tri-site examples are in the locked `network-labs` input:
 
-- `examples/tri-site-dual-wan-overlay-integration-static`
-- `examples/tri-site-dual-wan-overlay-integration-bgp`
+- `examples/s-router-test-three-site`
 
 Do not use `../../` or `file:` path inputs for the remote rebuild path. `s-sigma`
 only sees the NixOS checkout and locked flake inputs.

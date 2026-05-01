@@ -5,6 +5,7 @@
   mkNebulaRuntimeAddon,
   mkNebulaNode,
   mkNebulaProfileMount,
+  excludedNodeNames ? [ ],
 }:
 
 let
@@ -362,10 +363,15 @@ let
         extraModules = profileSpec.extraModules or [ ];
       };
     };
+
+  overlayNodeNames =
+    lib.filter
+      (nodeName: !(builtins.elem nodeName excludedNodeNames))
+      (builtins.attrNames (nebulaRuntimePlan.nodes or { }));
 in
 lib.foldl'
   lib.recursiveUpdate
   { }
   (map
     (nodeName: mkOverlayAugment nodeName (nebulaRuntimePlan.nodes.${nodeName}))
-    (builtins.attrNames (nebulaRuntimePlan.nodes or { })))
+    overlayNodeNames)

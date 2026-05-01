@@ -17,8 +17,8 @@ let
   };
 
   fabric = {
-    intentPath = "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-bgp/intent.nix";
-    inventoryPath = "${inputs.network-labs}/examples/tri-site-dual-wan-overlay-integration-static/inventory-base.nix";
+    intentPath = "${inputs.network-labs}/examples/s-router-test-three-site/intent.nix";
+    inventoryPath = "${inputs.network-labs}/examples/s-router-test-three-site/inventory-nixos.nix";
   };
 
   sliceArgs = {
@@ -27,6 +27,10 @@ let
   };
 
   disabledContainers = { };
+  clientRuntimeNodeNames = [
+    "nas-node01"
+    "printer-node01"
+  ];
 
   commonContainerOptions = {
     autoStart = true;
@@ -94,6 +98,21 @@ let
     inventory = builtHost.globalInventory or { };
   };
 
+  routerNebulaRuntimePlan = nebulaRuntimePlan // {
+    nodes = builtins.removeAttrs (nebulaRuntimePlan.nodes or { }) clientRuntimeNodeNames;
+    overlays = lib.mapAttrs (
+      _overlayId: overlay:
+      overlay
+      // {
+        runtimeNodes =
+          if builtins.isAttrs (overlay.runtimeNodes or null) then
+            builtins.removeAttrs overlay.runtimeNodes clientRuntimeNodeNames
+          else
+            overlay.runtimeNodes or { };
+      }
+    ) (nebulaRuntimePlan.overlays or { });
+  };
+
   controlPlaneData =
     if builtins.isAttrs (((builtHost.controlPlaneOut or { }).control_plane_model or { }).data or null) then
       (builtHost.controlPlaneOut.control_plane_model.data or { })
@@ -136,18 +155,15 @@ let
 
   renderedHostNetwork = renderedHostNetworkBase // {
     overlayRuntime = {
-      nebula = nebulaRuntimePlan;
+      nebula = routerNebulaRuntimePlan;
     };
   };
 
   builders = import ./modules/container-builders.nix { inherit lib pkgs; };
 
-  testContainers = import ./modules/test-containers.nix {
-    inherit (builders) mkStaticTenantEndpoint mkTenantEndpoint;
-  };
-
   overlayContainers = import ./modules/overlay-containers.nix {
-    inherit lib nebulaRuntimePlan renderedContainers;
+    inherit lib renderedContainers;
+    nebulaRuntimePlan = routerNebulaRuntimePlan;
     inherit (builders) mkNebulaNode mkNebulaProfileMount mkNebulaRuntimeAddon;
   };
 
@@ -158,14 +174,10 @@ let
   storageRouteOverrides = import ./modules/site-c-storage-route-overrides.nix {
     inherit lib pkgs;
     siteCStorageOverlay =
-      (nebulaRuntimePlan.overlays or { })."esp0xdeadbeef::site-c::site-c-storage" or null;
+      (routerNebulaRuntimePlan.overlays or { })."esp0xdeadbeef::site-c::site-c-storage" or null;
     baseContainer = renderedContainers."c-router-policy" or null;
   };
 
-  dmzContainers = import ./modules/dmz-containers.nix {
-    inherit renderedHostNetwork;
-    inherit (builders) mkDmzEndpoint;
-  };
 in
 {
   imports = [
@@ -173,7 +185,8 @@ in
     "${inputs.network-renderer-nixos}/s88/ControlModule/module/host-validation.nix"
     ./sops.nix
     (import ./modules/nebula-bootstrap.nix {
-      inherit lib pkgs nebulaRuntimePlan;
+      inherit lib pkgs;
+      nebulaRuntimePlan = routerNebulaRuntimePlan;
     })
   ];
 
@@ -218,8 +231,8 @@ in
   };
 
   environment.etc."network-renderer/network-renderer-nebula.json".text = builtins.toJSON {
-    overlays = builtins.attrNames (nebulaRuntimePlan.overlays or { });
-    nodes = builtins.attrNames (nebulaRuntimePlan.nodes or { });
+    overlays = builtins.attrNames (routerNebulaRuntimePlan.overlays or { });
+    nodes = builtins.attrNames (routerNebulaRuntimePlan.nodes or { });
   };
 
   environment.etc."s-router-test/hetzner-access-ipv6-nodes".text =
@@ -245,9 +258,7 @@ in
   containers = lib.foldl' lib.recursiveUpdate renderedContainers [
     hostileGuaOverrides
     storageRouteOverrides
-    testContainers
     overlayContainers
-    dmzContainers
   ];
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
