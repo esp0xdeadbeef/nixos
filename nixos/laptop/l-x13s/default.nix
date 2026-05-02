@@ -9,6 +9,7 @@
 }:
 {
   imports = [
+    ./wifi.nix
 
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
