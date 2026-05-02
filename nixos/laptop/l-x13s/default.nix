@@ -4,11 +4,11 @@
   lib,
   config,
   pkgs,
+  outPath,
   ...
 }:
 {
   imports = [
-    ../../../library/02-window-manager-i3/default.nix
 
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
@@ -24,8 +24,11 @@
     inputs.home-manager.nixosModules.home-manager
 
     # inputs.nixos-x13s.nixosModules.default
-    ../../../library/01-general/system/garbage-collection.nix
-    ../../../library/01-general/system/autoupdate.nix
+    "${outPath}/library/02-window-manager-i3/default.nix"
+
+    "${outPath}/library/01-general/system/garbage-collection.nix"
+    "${outPath}/library/01-general/system/autoupdate.nix"
+    "${outPath}/library/01-general/desktop/fonts.nix"
 
     inputs.sops-nix.nixosModules.sops
   ];
