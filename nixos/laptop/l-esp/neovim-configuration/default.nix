@@ -50,7 +50,7 @@
         set splitbelow
         set completeopt=menu,menuone,noselect
 
-        lua <<'EOF'
+        lua << EOF
         vim.g.mapleader = " "
         vim.g.maplocalleader = " "
 
@@ -115,7 +115,6 @@
           }
         })
 
-        local lspconfig = require("lspconfig")
         local servers = {
           "bashls",
           "jsonls",
@@ -123,14 +122,16 @@
           "nil_ls",
           "pyright",
           "ts_ls",
-          "yamlls"
+          "yamlls",
         }
 
         for _, server in ipairs(servers) do
-          lspconfig[server].setup({
-            capabilities = capabilities
+          vim.lsp.config(server, {
+            capabilities = capabilities,
           })
         end
+
+        vim.lsp.enable(servers)
 
         vim.api.nvim_create_autocmd("BufWritePre", {
           callback = function()
