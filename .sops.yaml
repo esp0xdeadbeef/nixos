@@ -25,12 +25,11 @@ keys:
   - &codex-jail age123fj9yey9cvkef5mn6cjqa2e4zrde9wa78ghlkp6vvag7qk65q3qcrat5w
   - &codex-jail-r age1zc8qevlgymsjweav076vk65ae6ef4n9x8fklv6ue45xl4czrqcpqdpepc3
   - &codex-jail-u age198xl6chpupaf6ecyqkcsg2j2mxf0s894csnxxdw6u0m4mjx7qgjqghg498
-  
-  
+  - &s-router-clab age1ry9jff7wmz6aenhhvna4qk280jtnruhhffzwyd6uwa2dljy0p5wqajh9p9
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-x13s-deadbeef
@@ -46,7 +45,7 @@ creation_rules:
 
   - path_regex: '^(secrets/)*l-esp-default-deadbeef\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -54,14 +53,14 @@ creation_rules:
 
   - path_regex: '^(secrets/)*l-esp-.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
 
   - path_regex: '^(secrets/)*l-werk-default-deadbeef\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-werk-root
@@ -69,15 +68,14 @@ creation_rules:
 
   - path_regex: '^(secrets/)*l-werk-.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-werk-root
 
-          
   - path_regex: '^(secrets/)*s-test-vm-impermanence-.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-x13s-deadbeef
@@ -88,16 +86,16 @@ creation_rules:
 
   - path_regex: '^(secrets/)*s-sigma-nixos-.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-sigma-nixos-proxmox-replacement
-          
+
   - path_regex: '^(secrets/)*s-sigma.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -106,7 +104,7 @@ creation_rules:
 
   - path_regex: '^(secrets/)*s-router-vpn-impermanence-.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-x13s-deadbeef
@@ -116,7 +114,7 @@ creation_rules:
 
   - path_regex: '^(secrets/)*s-router-impermanence-.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-x13s-deadbeef
@@ -126,7 +124,7 @@ creation_rules:
 
   - path_regex: '^(secrets/)*l-x13s-.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-deadbeef
@@ -134,10 +132,9 @@ creation_rules:
           - *l-x13s-deadbeef
           - *l-x13s-root
 
-
   - path_regex: '^(secrets/)*s-lxc-router.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-x13s-deadbeef
@@ -146,7 +143,7 @@ creation_rules:
           - *s-lxc-router-root
   - path_regex: '^(secrets/)*s-gameserver.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -154,7 +151,7 @@ creation_rules:
           - *s-gameserver
   - path_regex: '^(secrets/)*s-routers.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -164,19 +161,18 @@ creation_rules:
           - *s-router-core
           - *s-router-access
 
-
   - path_regex: '^(secrets/)*s-router-edge.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-edge
           - *s-router-legacy-edge
-  - path_regex: 'vlan2-hostnames-servers.json.age'
+  - path_regex: "vlan2-hostnames-servers.json.age"
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -186,7 +182,7 @@ creation_rules:
 
   - path_regex: '^(secrets/)*s-router-legacy-edge.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -195,7 +191,7 @@ creation_rules:
           - *s-router-legacy-edge
   - path_regex: '^(secrets/)*s-router-legacy-core.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -203,9 +199,9 @@ creation_rules:
           - *s-router-core
           - *s-router-legacy-core
 
-  - path_regex: 'isc_export_lan.csv.age'
+  - path_regex: "isc_export_lan.csv.age"
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -213,10 +209,9 @@ creation_rules:
           - *s-router-edge
           - *s-router-legacy-edge
 
-
   - path_regex: '^(secrets/)*s-infra.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -224,7 +219,7 @@ creation_rules:
           - *s-infra
   - path_regex: '^(secrets/)*s-nebula.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -232,7 +227,7 @@ creation_rules:
           - *s-nebula
   - path_regex: '^(secrets/)*s-test.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -240,7 +235,7 @@ creation_rules:
           - *s-test
   - path_regex: '^(secrets/)*s-router-core.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -248,7 +243,7 @@ creation_rules:
           - *s-router-core
   - path_regex: '^(secrets/)*s-router-upstream-selector.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -256,7 +251,7 @@ creation_rules:
           - *s-router-upstream-selector
   - path_regex: '^(secrets/)*s-router-access.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -264,7 +259,18 @@ creation_rules:
           - *s-router-access
   - path_regex: '^(secrets/)*s-router-test.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-test
+          - *codex-jail
+          - *codex-jail-u
+          - *codex-jail-r
+  - path_regex: '^(secrets/)*s-router-clab.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
@@ -275,7 +281,7 @@ creation_rules:
           - *codex-jail-r
   - path_regex: '^(secrets/)*codex-jail.*\.(env|ya?ml)$'
     input_type: env
-    encrypted_regex: '.*'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
