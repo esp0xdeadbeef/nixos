@@ -18,6 +18,7 @@
           gruvbox-nvim
           indent-blankline-nvim
           lualine-nvim
+          markdown-preview-nvim
           neo-tree-nvim
           nui-nvim
           nvim-lspconfig
@@ -54,22 +55,63 @@
         vim.g.mapleader = " "
         vim.g.maplocalleader = " "
 
-        vim.keymap.set("n", "<leader>w", "<cmd>write<cr>")
-        vim.keymap.set("n", "<leader>q", "<cmd>quit<cr>")
-        vim.keymap.set("n", "<leader>e", "<cmd>Neotree toggle<cr>")
-        vim.keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<cr>")
-        vim.keymap.set("n", "<leader>fg", "<cmd>Telescope live_grep<cr>")
-        vim.keymap.set("n", "<leader>fb", "<cmd>Telescope buffers<cr>")
-        vim.keymap.set("n", "<leader>fh", "<cmd>Telescope help_tags<cr>")
-        vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action)
-        vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename)
-        vim.keymap.set("n", "gd", vim.lsp.buf.definition)
-        vim.keymap.set("n", "gr", vim.lsp.buf.references)
-        vim.keymap.set("n", "K", vim.lsp.buf.hover)
-        vim.keymap.set("n", "[d", vim.diagnostic.goto_prev)
-        vim.keymap.set("n", "]d", vim.diagnostic.goto_next)
+        local function force_black_background()
+          local groups = {
+            "Normal",
+            "NormalNC",
+            "NormalFloat",
+            "FloatBorder",
+            "SignColumn",
+            "EndOfBuffer",
+            "LineNr",
+            "CursorLineNr",
+            "FoldColumn",
+            "StatusLine",
+            "StatusLineNC",
+            "VertSplit",
+            "WinSeparator",
+            "TabLine",
+            "TabLineFill",
+            "Pmenu",
+            "PmenuSel",
+          }
+
+          for _, group in ipairs(groups) do
+            vim.api.nvim_set_hl(0, group, { bg = "#000000" })
+          end
+        end
+
+        local function map_if_free(mode, lhs, rhs, opts)
+          local existing = vim.fn.maparg(lhs, mode)
+          if existing ~= nil and existing ~= "" then
+            vim.notify("Skipping keymap " .. lhs .. " because it already exists", vim.log.levels.WARN)
+            return
+          end
+
+          vim.keymap.set(mode, lhs, rhs, opts)
+        end
+
+        vim.keymap.set("n", "<leader>w", "<cmd>write<cr>", { desc = "Write file" })
+        vim.keymap.set("n", "<leader>q", "<cmd>quit<cr>", { desc = "Quit" })
+        vim.keymap.set("n", "<leader>e", "<cmd>Neotree toggle<cr>", { desc = "Toggle file explorer" })
+        vim.keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<cr>", { desc = "Find files" })
+        vim.keymap.set("n", "<leader>fg", "<cmd>Telescope live_grep<cr>", { desc = "Live grep" })
+        vim.keymap.set("n", "<leader>fb", "<cmd>Telescope buffers<cr>", { desc = "Buffers" })
+        vim.keymap.set("n", "<leader>fh", "<cmd>Telescope help_tags<cr>", { desc = "Help tags" })
+        vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { desc = "Code action" })
+        vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "Rename symbol" })
+        vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "Go to definition" })
+        vim.keymap.set("n", "gr", vim.lsp.buf.references, { desc = "Go to references" })
+        vim.keymap.set("n", "K", vim.lsp.buf.hover, { desc = "Hover" })
+        vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { desc = "Previous diagnostic" })
+        vim.keymap.set("n", "]d", vim.diagnostic.goto_next, { desc = "Next diagnostic" })
 
         vim.cmd.colorscheme("gruvbox")
+        force_black_background()
+
+        vim.api.nvim_create_autocmd("ColorScheme", {
+          callback = force_black_background,
+        })
 
         require("which-key").setup({})
         require("gitsigns").setup({})
@@ -91,6 +133,19 @@
 
         require("telescope").setup({})
         pcall(require("telescope").load_extension, "fzf")
+
+        vim.g.mkdp_auto_start = 0
+        vim.g.mkdp_auto_close = 1
+        vim.g.mkdp_refresh_slow = 0
+        vim.g.mkdp_command_for_global = 0
+        vim.g.mkdp_open_to_the_world = 0
+        vim.g.mkdp_open_ip = "127.0.0.1"
+        vim.g.mkdp_browser = ""
+        vim.g.mkdp_echo_preview_url = 1
+        vim.g.mkdp_theme = "dark"
+
+        map_if_free("n", "<leader>M", "<cmd>MarkdownPreview<cr>", { desc = "Markdown preview open" })
+        map_if_free("n", "<leader>m", "<cmd>MarkdownPreviewStop<cr>", { desc = "Markdown preview close" })
 
         require("nvim-treesitter.configs").setup({
           highlight = {
@@ -141,6 +196,8 @@
             })
           end
         })
+
+        force_black_background()
         EOF
       '';
     };
