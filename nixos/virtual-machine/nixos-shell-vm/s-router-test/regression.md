@@ -1,97 +1,75 @@
 # s-router-test regression state
 
+Last updated: 2026-05-02.
+
 ## fixed and live-verified
 
-- `network-renderer-nixos` tests now use current rendered node ids for overlay
-  route retention, and host-veth consumer sufficiency uses CIDR containment
-  instead of string-only route matching.
-- Live rebuild loop reached SSH return on
-  `/nix/store/kgkkvzf89yszi4d8h5s2pqr5ik7d594a-nixos-system-s-router-test-25.11.20260429.755f5aa`.
-- Local build passed with expected system hash
-  `6kb4p7qrzy5idzgr3jqgiq71i02mgq3s`; normalized renderer JSON matched the
-  running generation.
-- `s-router-test` now materializes router/overlay containers only; endpoint
-  fixtures are absent from its expected validation container set.
-- `s-router-test-clients` rebuilt and rebooted to
-  `/nix/store/mzms5r5vw602brm2wkkvyp0zkljfg578-nixos-system-s-router-test-clients-25.11.20260429.755f5aa`.
-- All `s-router-test-clients` endpoint containers were running after reboot,
-  including `hostile-node01`, `streaming-cast-01`, `nas-node01`, and
-  `printer-node01`.
-- Client fixture services checked live: `streaming-cast-01`
-  `fake-googlecast.socket` active and `dmzweb01` `dmz-web` active.
-- Router-side site-C streaming and hostile public-egress probes skip endpoint
-  checks now that those endpoint containers live in `s-router-test-clients`.
-- Hetzner validator resources were cleaned up after testing:
-  server `128785279` and its floating IPv6 allocation were removed.
-- `network-renderer-nebula` renders the Hetzner lighthouse NixOS module. The
-  bootstrap no longer creates remote systemd units, downloads Nebula with curl,
-  or mutates remote iptables/ip6tables.
-- `s-router-test` consumes `network-renderer-nebula`'s bootstrap module; the
-  stale local `modules/nebula-bootstrap.nix` copy was removed.
-- `hetzner-nebula-prodtest-01` was installed with `nixos-anywhere` from
-  `nixosConfigurations.s-router-hetzner-anywhere` after the spawn script wrote
-  generated runtime IPs, floating prefixes, and SSH keys into `runtime.nix`.
-- Latest full loop: `./scripts/s-router-test-rebuild-loop.sh s-router-test`
-  passed. `nixos-anywhere` completed, the NixOS Hetzner validator returned with
-  IPv6 routing, `s-router-test` rebooted, local build passed, normalized
-  renderer JSON matched the running system, Nebula CA/profile issuance
-  succeeded, validation became `ready=true`, site-C probe passed, hostile
-  public-egress probe passed, and Hetzner resources were cleaned up.
-- Latest running `s-router-test` system:
-  `/nix/store/bxr2drg5qnhdxngdgvwbdpczhasyvv26-nixos-system-s-router-test-25.11.20260429.755f5aa`.
-- Latest local nixos-shell build:
-  `/nix/store/v26dg089fi3d68vsl4ibdi6gz96gh549-nixos-vm`.
-- `/run/s88-network-validation/status.json` and `stable.json` both reported
-  `ready=true`; branch and hostile access DNS checks were `ok` for A and AAAA.
-- Hetzner cleanup verified zero remaining servers and zero floating IPv6
-  allocations for the latest run name `s-router-test-rebuild-loop-1777668985`.
+- `network-renderer-nebula` owns Nebula bootstrap/runtime materialization;
+  `s-router-test` consumes the rendered module instead of carrying a local
+  bootstrap implementation.
+- `s-router-test` and `s-router-test-clients` were split so router containers
+  stay on the router VM and endpoint fixtures live in the client VM.
+- Earlier full `s-router-test` loop reached `ready=true`, passed site-C probing,
+  passed hostile IPv4 public egress, and cleaned Hetzner resources.
 
 ## fixed but only locally tested
 
-- `network-labs` examples now bind explicit WAN groups where strict rendering
-  requires consumer-side `wanGroupToUplink`.
-- `network-forwarding-model` hostile DNS test no longer expects deployment GUA
-  prefixes in the forwarding layer.
-- `network-control-plane-model` stale fixture tests were updated for current
-  `inventory-nixos.nix` example shape and current transit endpoint route
-  behavior.
-- `s-router-test/default.nix` now uses
-  `network-labs/examples/s-router-test-three-site/{intent.nix,inventory-nixos.nix}`
-  so Hetzner delegated-prefix secret names are derived from CPM output.
+- `network-renderer-nixos` now exposes a host artifact module that installs full
+  renderer/debug artifacts under `/etc/network-artifacts` plus a renderer
+  summary under `/etc/network-renderer`.
+- Renderer regression tests passed:
+  `tests/test-host-build-artifact-module.sh` and
+  `tests/test-host-build-container-selection.sh`.
+- Commit pushed: `network-renderer-nixos` `2419350`
+  (`install full renderer artifacts`).
 
 ## implemented but not yet live-validated
 
-- Cross-VM client-to-router traffic was not validated; the current verification
-  proves the router VM split and the standalone client fixture VM.
-- `runtime.nix` for `s-router-hetzner-anywhere` is intentionally committed with
-  placeholders and fails evaluation until the rebuild loop writes concrete
-  Hetzner runtime values.
-- Placeholder `s-router-hetzner-anywhere` eval was checked and fails loudly on
-  missing `authorizedKeys`, as intended.
+- `s-router-test` and `s-router-test-clients` import
+  `builtHost.artifactModule`; `nixos/flake.lock` was bumped locally to consume
+  renderer commit `2419350`.
+- Background rebuild loops are running for both VMs. The currently reachable
+  `s-router-test` generation is still the pre-artifact generation:
+  `/nix/store/yn9myklvw608pmc9w1cg5ia7mbgrlkc2-nixos-system-s-router-test-25.11.20260429.755f5aa`.
+- `/etc/network-artifacts` is therefore not yet present on the reachable router
+  VM; verify again after the background loops finish.
 
 ## still broken
 
-- No current blocker from the latest `s-router-test` loop. The remaining gap is
-  broader than this change: cross-VM client-to-router validation still needs a
-  dedicated run with `s-router-test-clients`.
+- Hostile DNS is not healthy in the currently reachable generation.
+- `b-router-access-hostile` runs Unbound and listens on `10.70.10.1`,
+  `fd42:dead:feed:70::1`, localhost IPv4, and localhost IPv6.
+- Queries to local Unbound return immediate `SERVFAIL`; tcpdump on
+  `b-router-access-hostile` `transit` sees zero packets for those Unbound
+  queries.
+- Raw `dig @10.20.10.1` and `dig @fd42:dead:beef:10::1` from
+  `b-router-access-hostile` do send packets out `transit`, but both time out.
+- `b-router-downstream-selector`, `b-router-policy`, and
+  `b-router-upstream-selector` have explicit hostile/east-west forwarding rules
+  and policy routes; the next failure boundary is the hop after access emits
+  raw DNS toward the site DNS provider.
 
 ## pending or unknown
 
-- External inbound delegated IPv6 was not re-tested in this run; the loop
-  verified hosted NixOS validator install, Nebula profile issuance, host
-  validation readiness, site-C probe, and hostile public egress.
-- `hostile-node02` is not present in the current running container set.
+- Cross-VM endpoint-to-router DNS from `s-router-test-clients` is pending until
+  the current client rebuild returns.
+- External hostile delegated IPv6 inbound via Hetzner is pending for the current
+  lock graph.
+- Artifact installation on both VMs is pending background loop completion.
 
 ## next concrete debugging target
 
-- Run a focused external inbound delegated-IPv6 probe against the new NixOS
-  Hetzner validator path when `hostile-node02` is present in the client VM.
+- Trace one raw DNS packet from `b-router-access-hostile transit` through
+  `b-router-downstream-selector access-hostile`, `b-router-policy
+  downstr-hostile/up-hostile-ew`, `b-router-upstream-selector pol-hostile-ew`,
+  and `b-router-core-nebula`.
+- If the packet reaches `b-router-core-nebula`, debug Nebula/east-west return.
+  If it stops earlier, patch the owning CPM/renderer layer, not local VM glue.
 
 ## assumptions in the wrong layer
 
-- The old local `s-router-test` Nebula bootstrap module and Hetzner
-  east-west-exit shell mutation helper were removed. Remaining temporary
-  underlay endpoint route prep still needs ownership review.
-- The wrapper `scripts/exec-in-s-router-test-machine.sh` points to
-  `/home/deadbeef/github/network-codex-agent/scripts/exec-on-remote.sh`, which is absent in this
-  checkout; production validation used the repo-local remote wrapper directly.
+- Any local helper that injects routes, resolver policy, firewall exceptions, or
+  overlay runtime behavior remains suspect and must move to CPM or the relevant
+  renderer once proven.
+- Full artifact/debug bundle installation belongs in `network-renderer-nixos`;
+  the VM harness should only import the rendered module.
