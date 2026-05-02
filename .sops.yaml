@@ -1,5 +1,6 @@
 keys:
-  - &l-x13s-deadbeef age1xm8ftcjlqsns5a4m74593hur7ltuxh2wqcrsl6ja2vqee664dclsq4yrkv
+  - &l-x13s-deadbeef age1a5nn59ea7ut9kw2gu20nv067ptd06zr53vdehlus2mrdgnpny4lsu25nrz
+  - &l-x13s-root age15z0s6nul3tyn96acegegjsh0rjhalwt2un0vxlltk98qan5aratqfumu56
   - &l-werk-root age1lm7ug2rpxh29qu9h38yecqnsu69g6p2qy2v2eesp4uhc43z0x9qs28cwlw
   - &l-werk-deadbeef age1z6k6e4ywawn44u83tmwv9304ufaq4ahteszuadechj34jcp9tusqevrm6d
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
@@ -33,6 +34,7 @@ creation_rules:
     key_groups:
       - age:
           - *l-x13s-deadbeef
+          - *l-x13s-root
           - *l-werk-root
           - *l-werk-deadbeef
           - *l-esp-root
@@ -79,6 +81,7 @@ creation_rules:
     key_groups:
       - age:
           - *l-x13s-deadbeef
+          - *l-x13s-root
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-test-vm-impermanence-root
@@ -126,7 +129,10 @@ creation_rules:
     encrypted_regex: '.*'
     key_groups:
       - age:
+          - *l-esp-deadbeef
+          - *l-esp-root
           - *l-x13s-deadbeef
+          - *l-x13s-root
 
 
   - path_regex: '^(secrets/)*s-lxc-router.*\.(env|ya?ml)$'

@@ -13,6 +13,7 @@
   fileSystems."/nix".neededForBoot = true;
 
   boot.initrd.systemd.initrdBin = with pkgs; [
+    bash
     btrfs-progs
     coreutils
     findutils
@@ -33,7 +34,13 @@
       if [[ -e /btrfs_tmp/root ]]; then
           mkdir -p /btrfs_tmp/persist/old_roots
           timestamp=$(date --date="@$(stat -c %Y /btrfs_tmp/root)" "+%Y-%m-%-d_%H:%M:%S")
-          mv /btrfs_tmp/root "/btrfs_tmp/persist/old_roots/$timestamp/"
+          old_root="/btrfs_tmp/persist/old_roots/$timestamp"
+          suffix=0
+          while [[ -e "$old_root" ]]; do
+              suffix=$((suffix + 1))
+              old_root="/btrfs_tmp/persist/old_roots/''${timestamp}_$suffix"
+          done
+          mv /btrfs_tmp/root "$old_root"
       fi
 
       delete_subvolume_recursively() {
@@ -44,9 +51,17 @@
           btrfs subvolume delete "$1"
       }
 
-      for i in $(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
-          delete_subvolume_recursively "$i"
-      done
+      if [[ -d /btrfs_tmp/persist/old_roots ]]; then
+          for i in $(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
+              delete_subvolume_recursively "$i"
+          done
+
+          # The X13s initrd may not have reliable wall-clock time early in boot.
+          # Keep a bounded number of old roots even when mtime pruning cannot work.
+          while read -r i; do
+              delete_subvolume_recursively "/btrfs_tmp/persist/old_roots/$i"
+          done < <(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -r | tail -n +31)
+      fi
 
       btrfs subvolume create /btrfs_tmp/root
       umount /btrfs_tmp
@@ -115,8 +130,6 @@
         ".config/chromium"
         ".config/gh"
         ".config/google-chrome"
-        ".config/i3"
-        ".config/i3status-rust"
         ".config/legcord"
         ".config/maestral"
         ".config/obsidian"
