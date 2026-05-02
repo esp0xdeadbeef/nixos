@@ -25,7 +25,7 @@ keys:
   - &codex-jail age123fj9yey9cvkef5mn6cjqa2e4zrde9wa78ghlkp6vvag7qk65q3qcrat5w
   - &codex-jail-r age1zc8qevlgymsjweav076vk65ae6ef4n9x8fklv6ue45xl4czrqcpqdpepc3
   - &codex-jail-u age198xl6chpupaf6ecyqkcsg2j2mxf0s894csnxxdw6u0m4mjx7qgjqghg498
-  - &s-router-clab age1ry9jff7wmz6aenhhvna4qk280jtnruhhffzwyd6uwa2dljy0p5wqajh9p9
+  - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -279,6 +279,7 @@ creation_rules:
           - *codex-jail
           - *codex-jail-u
           - *codex-jail-r
+          - *s-router-clab
   - path_regex: '^(secrets/)*codex-jail.*\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: ".*"
