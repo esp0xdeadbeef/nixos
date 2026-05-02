@@ -7,7 +7,6 @@
   ];
   authorizedKeys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOdAWOlRk8eN2/rb7jJMCKrI/YW4FQMlQs1nfr86TS7p root@s-router-test"
   ];
   primaryInterface = "ens3";
   primaryInterfaceMatch = "en* eth0";
