@@ -184,6 +184,7 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     "${inputs.network-renderer-nixos}/s88/ControlModule/module/host-validation.nix"
+    (builtHost.artifactModule or { })
     ./sops.nix
     (nebulaApi.renderer.buildNebulaBootstrapNixosModule {
       inherit pkgs;
@@ -222,13 +223,6 @@ in
     controlPlaneOut = builtHost.controlPlaneOut or { };
     inherit renderedHostNetwork;
     inherit hetznerAccessNodeNames hetznerAccessPrefixSecretNames;
-  };
-
-  environment.etc."network-renderer/network-renderer-nixos.json".text = builtins.toJSON {
-    inherit identity fabric;
-    host = renderedHost.debug or { };
-    bridges = renderedBridges.debug or { };
-    containers = builtins.attrNames renderedContainers;
   };
 
   environment.etc."network-renderer/network-renderer-nebula.json".text = builtins.toJSON {

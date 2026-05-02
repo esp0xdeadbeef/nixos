@@ -1,4 +1,5 @@
 {
+  inputs,
   lib,
   outPath,
   pkgs,
@@ -6,35 +7,32 @@
 }:
 
 let
-  bridges = [
-    "admin"
-    "branch"
-    "client"
-    "client2"
-    "dmz"
-    "home-users"
-    "hostile"
-    "mgmt"
-    "nas"
-    "printer"
-    "site-c-mgmt"
-    "streaming"
-  ];
+  api = inputs.network-renderer-nixos.lib;
 
-  mkBridgeNetdev = name: {
-    netdevConfig = {
-      Kind = "bridge";
-      Name = name;
-    };
+  identity = {
+    enterpriseName = "esp0xdeadbeef";
+    siteName = "site-a";
+    boxName = builtins.baseNameOf (builtins.toString ./.);
   };
 
-  mkBridgeNetwork = name: {
-    matchConfig.Name = name;
-    networkConfig = {
-      LinkLocalAddressing = "no";
-      ConfigureWithoutCarrier = true;
-    };
+  fabric = {
+    intentPath = "${inputs.network-labs}/examples/s-router-test-three-site/intent.nix";
+    inventoryPath = "${inputs.network-labs}/examples/s-router-test-three-site/inventory-nixos.nix";
   };
+
+  sliceArgs = {
+    inherit (identity) boxName;
+    inherit (fabric) intentPath inventoryPath;
+  };
+
+  builtHost = api.renderer.buildHostFromPaths {
+    inherit (fabric) intentPath inventoryPath;
+    selector = identity.boxName;
+    file = "nixos/virtual-machine/nixos-shell-vm/s-router-test-clients/default.nix";
+  };
+
+  renderedHost = api.host.build sliceArgs;
+  renderedBridges = api.bridges.build sliceArgs;
 
   builders = import ./modules/client-builders.nix { inherit lib pkgs; };
 
@@ -47,7 +45,8 @@ let
 in
 {
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config"
+    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    (builtHost.artifactModule or { })
     ./sops.nix
   ];
 
@@ -70,8 +69,12 @@ in
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce false;
 
-  systemd.network.netdevs = lib.genAttrs bridges mkBridgeNetdev;
-  systemd.network.networks = lib.genAttrs bridges mkBridgeNetwork;
+  systemd.network.netdevs = (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
+  systemd.network.networks =
+    lib.recursiveUpdate ((renderedHost.networks or { }) // (renderedBridges.networks or { }))
+      {
+        "30-vlan2".networkConfig.DHCP = "ipv4";
+      };
 
   containers = lib.foldl' lib.recursiveUpdate { } clientModules;
 
