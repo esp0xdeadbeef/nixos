@@ -1,31 +1,30 @@
 {
   inputs,
   config,
-  pkgs,
   lib,
+  pkgs,
   ...
 }:
 
 {
-  # boot.initrd.systemd.enable = true;
+  boot.initrd.systemd.enable = true;
   boot.initrd.systemd.tpm2.enable = true; # keep your TPM2 settings
 
   fileSystems."/persist".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
 
-  boot.initrd.systemd.enable = true;
-
   boot.initrd.systemd.initrdBin = with pkgs; [
-    util-linux
+    bash
     btrfs-progs
     coreutils
     findutils
+    util-linux
   ];
 
   boot.initrd.systemd.services.rotateBtrfsRoot = {
     description = "Rotate /root Btrfs subvolume and prune >30 day snapshots";
     wantedBy = [ "initrd.target" ];
-    after = [ "systemd-cryptsetup@crypted.service" ];
+    after = [ "systemd-cryptsetup@root.service" ];
     before = [ "sysroot.mount" ];
     unitConfig.DefaultDependencies = false;
     serviceConfig.Type = "oneshot";
@@ -33,12 +32,23 @@
     # a real script; systemd will write it to a temp file + run it
     script = ''
       #!${pkgs.bash}/bin/bash -euo pipefail
+
       mkdir /btrfs_tmp
-      mount /dev/mapper/crypted /btrfs_tmp
+      mount /dev/mapper/root /btrfs_tmp
+
       if [[ -e /btrfs_tmp/root ]]; then
           mkdir -p /btrfs_tmp/persist/old_roots
+
           timestamp=$(date --date="@$(stat -c %Y /btrfs_tmp/root)" "+%Y-%m-%-d_%H:%M:%S")
-          mv /btrfs_tmp/root "/btrfs_tmp/persist/old_roots/$timestamp/"
+          old_root="/btrfs_tmp/persist/old_roots/$timestamp"
+          suffix=0
+
+          while [[ -e "$old_root" ]]; do
+              suffix=$((suffix + 1))
+              old_root="/btrfs_tmp/persist/old_roots/''${timestamp}_$suffix"
+          done
+
+          mv /btrfs_tmp/root "$old_root"
       fi
 
       delete_subvolume_recursively() {
@@ -49,28 +59,28 @@
           btrfs subvolume delete "$1"
       }
 
-      for i in $(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
-          delete_subvolume_recursively "$i"
-      done
+      if [[ -d /btrfs_tmp/persist/old_roots ]]; then
+          for i in $(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
+              delete_subvolume_recursively "$i"
+          done
+
+          # The X13s initrd may not have reliable wall-clock time early in boot.
+          # Keep a bounded number of old roots even when mtime pruning cannot work.
+          while read -r i; do
+              delete_subvolume_recursively "/btrfs_tmp/persist/old_roots/$i"
+          done < <(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -r | tail -n +31)
+      fi
 
       btrfs subvolume create /btrfs_tmp/root
       umount /btrfs_tmp
     '';
   };
 
-  services.openssh = {
-    hostKeys = [
-      {
-        type = "ed25519";
-        path = "/persist/etc/ssh/ssh_host_ed25519_key";
-      }
-      {
-        type = "rsa";
-        bits = 4096;
-        path = "/persist/etc/ssh/ssh_host_rsa_key";
-      }
-    ];
-  };
+  programs.fuse.userAllowOther = true;
+
+  environment.systemPackages = with pkgs; [
+    btrfs-progs
+  ];
 
   # fileSystems."/var/lib/private" = {
   #   device = "/persist/var/lib/private";
@@ -86,14 +96,18 @@
   systemd.tmpfiles.rules = [
     "d /mnt/current_pentest 0755 root root -"
   ];
+
   environment.persistence."/persist" = {
     enable = true; # NB: Defaults to true, not needed
     hideMounts = true;
+
     directories = [
       "/root"
+
       # "/var/lib/ollama/models" # AI models
       # "/var/lib/ollama/.ollama" # AI ssh keys
       # "/var/lib/ollama"
+
       {
         # ls -la /var/lib/ollama # will output:
         # lrwxrwxrwx 1 root root 14  3 aug 05:06 /var/lib/ollama -> private/ollama
@@ -104,6 +118,7 @@
         directory = "/var/lib/private/ollama";
         mode = "0700";
       }
+
       "/var/log"
       "/var/lib/bluetooth"
       "/var/lib/nixos"
@@ -112,15 +127,18 @@
       "/etc/NetworkManager/system-connections"
       "/var/lib/libvirt" # libvirt configurations
       "/etc/nebula"
+
       {
         directory = "/var/lib/colord";
         user = "colord";
         group = "colord";
-        mode = "u=rwx,g=rx,o=";
+        mode = "0755";
       }
     ];
+
     files = [
       "/etc/machine-id"
+
       # "/var/cache/locatedb" # added it to persistent output in updatedb.nix (/persist/var/cache/locatedb); updatedb (locate <something>) history
       # {
       #   file = "/var/keys/secret_file";
@@ -134,6 +152,7 @@
       #     mode = "u=rwx,g=rx,o=";
       #   };
       # }
+
       {
         file = "/var/cache/locatedb";
         parentDirectory = {
@@ -142,6 +161,7 @@
         };
       }
     ];
+
     users.deadbeef = {
       directories = [
         "github" # custom dir for my github projects
@@ -216,10 +236,13 @@
           directory = ".local/share/keyrings";
           mode = "0700";
         }
+
         ".local/share/direnv"
+
         # used by legcord:
         ".pki/nssdb"
       ];
+
       files = [
         ".local/state/wireplumber/default-nodes"
         ".screenrc"
