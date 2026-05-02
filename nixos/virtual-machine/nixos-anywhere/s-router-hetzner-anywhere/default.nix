@@ -3,19 +3,46 @@
 , ...
 }:
 let
+  nixosRenderer = inputs.network-renderer-nixos.lib;
   runtime = import ./runtime.nix;
   system = "x86_64-linux";
   pkgsForRenderer = inputs.nixpkgs.legacyPackages.${system};
-  renderer = inputs.network-renderer-nebula.libBySystem.${system}.renderer;
-  plan = renderer.buildNebulaPlanFromPaths {
+  nebulaRenderer = inputs.network-renderer-nebula.libBySystem.${system}.renderer;
+  fabric = {
     intentPath = "${inputs.network-labs}/examples/s-router-test-three-site/intent.nix";
     inventoryPath = "${inputs.network-labs}/examples/s-router-test-three-site/inventory-nixos.nix";
   };
-  hetznerNebulaModule = renderer.buildHetznerLighthouseNixosModule {
+  builtHost = nixosRenderer.renderer.buildHostFromPaths {
+    inherit (fabric) intentPath inventoryPath;
+    selector = "s-router-hetzner-anywhere";
+    file = "nixos/virtual-machine/nixos-anywhere/s-router-hetzner-anywhere/default.nix";
+  };
+  renderedHost = nixosRenderer.host.build {
+    inherit (fabric) intentPath inventoryPath;
+    boxName = "s-router-hetzner-anywhere";
+  };
+  renderedBridges = nixosRenderer.bridges.build {
+    inherit (fabric) intentPath inventoryPath;
+    boxName = "s-router-hetzner-anywhere";
+  };
+  renderedContainers = nixosRenderer.containers.buildForBox {
+    inherit (fabric) intentPath inventoryPath;
+    boxName = "s-router-hetzner-anywhere";
+    defaults = {
+      autoStart = true;
+      additionalCapabilities = [
+        "CAP_NET_ADMIN"
+        "CAP_NET_RAW"
+      ];
+    };
+  };
+  nebulaRuntimePlan = nebulaRenderer.buildNebulaPlan {
+    controlPlane = builtHost.controlPlaneOut or { };
+    inventory = builtHost.globalInventory or { };
+  };
+  externalLighthouseModule = nebulaRenderer.buildExternalLighthouseNixosModule {
     pkgs = pkgsForRenderer;
-    nebulaRuntimePlan = plan;
-    hetznerIpv4NatCidrs = [ "10.70.10.0/24" ];
-    externalInterface = runtime.primaryInterface;
+    inherit nebulaRuntimePlan;
   };
   require = name: value:
     if value == null || value == "" || value == [ ] then
@@ -32,12 +59,13 @@ in
 {
   imports = [
     inputs.disko.nixosModules.disko
+    (builtHost.artifactModule or { })
     ./disko.nix
     ./hardware.nix
   ];
 
   config = lib.mkMerge [
-    hetznerNebulaModule
+    externalLighthouseModule
     {
 
       assertions = [
@@ -50,19 +78,23 @@ in
       networking.hostName = "hetzner-nebula-prodtest-01";
       networking.useDHCP = false;
       systemd.network.enable = true;
-      systemd.network.networks."30-wan" = {
-        matchConfig.Name = runtime.primaryInterfaceMatch;
-        networkConfig = {
-          DHCP = "ipv4";
-          IPv6AcceptRA = false;
+      systemd.network.netdevs = (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
+      systemd.network.networks = lib.recursiveUpdate
+        ((renderedHost.networks or { }) // (renderedBridges.networks or { }))
+        {
+          "30-br-wan" = {
+            networkConfig = {
+              DHCP = "ipv4";
+              IPv6AcceptRA = false;
+            };
+            address = [
+              (require "publicIPv6Address" runtime.publicIPv6Address)
+            ] ++ map floatingIPv6HostAddress runtime.floatingIPv6Prefixes;
+            routes = [
+              { Gateway = "fe80::1"; }
+            ];
+          };
         };
-        address = [
-          (require "publicIPv6Address" runtime.publicIPv6Address)
-        ] ++ map floatingIPv6HostAddress runtime.floatingIPv6Prefixes;
-        routes = [
-          { Gateway = "fe80::1"; }
-        ];
-      };
 
       boot.loader.grub = {
         enable = true;
@@ -91,6 +123,12 @@ in
       networking.firewall.allowedTCPPorts = [ 22 ];
 
       environment.etc."s-router-test/hetzner-runtime.json".text = builtins.toJSON runtime;
+      environment.etc."network-renderer/network-renderer-nebula.json".text = builtins.toJSON {
+        overlays = builtins.attrNames (nebulaRuntimePlan.overlays or { });
+        nodes = builtins.attrNames (nebulaRuntimePlan.nodes or { });
+      };
+
+      containers = renderedContainers;
 
       system.stateVersion = "25.11";
     }
