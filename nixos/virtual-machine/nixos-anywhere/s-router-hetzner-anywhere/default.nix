@@ -57,7 +57,6 @@ let
       throw "s-router-hetzner-anywhere: floating IPv6 prefix must be canonical ::/64: ${prefix}";
   publicIPv4Address = "${require "publicIPv4" runtime.publicIPv4}/32";
   publicIPv4Gateway = require "publicIPv4Gateway" (runtime.publicIPv4Gateway or null);
-  primaryInterfaceMac = require "primaryInterfaceMac" (runtime.primaryInterfaceMac or null);
   primaryInterfaceMatchConfig =
     {
       Name =
@@ -72,17 +71,10 @@ let
       ((renderedHost.networks or { }) // (renderedBridges.networks or { }));
   renderedNetdevs =
     (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
-  hetznerNetdevs =
-    lib.mapAttrs
-      (_: netdev:
-        if (netdev.netdevConfig.Name or null) == "br-wan" then
-          lib.recursiveUpdate netdev {
-            netdevConfig.MACAddress = primaryInterfaceMac;
-          }
-        else
-          netdev)
-      renderedNetdevs;
   hetznerHostNetworks = builtins.removeAttrs renderedHostNetworks [ "20-eth0" "30-br-wan" ];
+  internalWanPrefix = "172.31.254";
+  internalWanAddress = "${internalWanPrefix}.1/24";
+  internalWanForwardTarget = "${internalWanPrefix}.2";
 in
 {
   imports = [
@@ -106,20 +98,15 @@ in
       networking.hostName = "hetzner-nebula-prodtest-01";
       networking.useDHCP = false;
       systemd.network.enable = true;
-      systemd.network.netdevs = hetznerNetdevs;
+      systemd.network.netdevs = renderedNetdevs;
       systemd.network.networks = lib.recursiveUpdate
         (hetznerHostNetworks // {
-          "20-hetzner-wan-parent" =
-            (builtins.removeAttrs (renderedHostNetworks."20-eth0" or { }) [ "dhcpConfig" ])
-            // {
-              matchConfig = primaryInterfaceMatchConfig;
-              networkConfig = (renderedHostNetworks."20-eth0".networkConfig or { }) // {
-                Bridge = "br-wan";
-              };
+          "20-hetzner-public" = {
+            matchConfig = primaryInterfaceMatchConfig;
+            linkConfig = {
+              ActivationPolicy = "always-up";
+              RequiredForOnline = "routable";
             };
-        })
-        {
-          "30-br-wan" = {
             networkConfig = {
               DHCP = "no";
               IPv6AcceptRA = false;
@@ -137,7 +124,59 @@ in
               { Gateway = "fe80::1"; }
             ];
           };
+        })
+        {
+          "30-br-wan" = {
+            networkConfig = {
+              DHCP = "no";
+              DHCPServer = true;
+              IPv4Forwarding = true;
+              IPv6AcceptRA = false;
+            };
+            address = [ internalWanAddress ];
+            dhcpServerConfig = {
+              PoolOffset = 2;
+              PoolSize = 32;
+              EmitDNS = true;
+              DNS = [ "1.1.1.1" "9.9.9.9" ];
+            };
+          };
         };
+      boot.kernel.sysctl."net.ipv4.ip_forward" = lib.mkForce true;
+      systemd.services.hetzner-wan-nat = {
+        description = "SNAT br-wan and forward non-SSH public traffic";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+        path = [
+          pkgsForRenderer.coreutils
+          pkgsForRenderer.gnused
+          pkgsForRenderer.iproute2
+          pkgsForRenderer.iptables
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          wan_if="$(ip -o -4 route show default | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n 1)"
+          if [ -z "$wan_if" ]; then
+            echo "could not determine public WAN interface" >&2
+            exit 1
+          fi
+
+          iptables -t nat -C POSTROUTING -s ${internalWanPrefix}.0/24 -o "$wan_if" -j MASQUERADE 2>/dev/null \
+            || iptables -t nat -A POSTROUTING -s ${internalWanPrefix}.0/24 -o "$wan_if" -j MASQUERADE
+          iptables -C FORWARD -i br-wan -o "$wan_if" -j ACCEPT 2>/dev/null \
+            || iptables -A FORWARD -i br-wan -o "$wan_if" -j ACCEPT
+          iptables -C FORWARD -i "$wan_if" -o br-wan -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null \
+            || iptables -A FORWARD -i "$wan_if" -o br-wan -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+          iptables -t nat -C PREROUTING -i "$wan_if" -p tcp ! --dport 22 -j DNAT --to-destination ${internalWanForwardTarget} 2>/dev/null \
+            || iptables -t nat -A PREROUTING -i "$wan_if" -p tcp ! --dport 22 -j DNAT --to-destination ${internalWanForwardTarget}
+          iptables -t nat -C PREROUTING -i "$wan_if" -p udp -j DNAT --to-destination ${internalWanForwardTarget} 2>/dev/null \
+            || iptables -t nat -A PREROUTING -i "$wan_if" -p udp -j DNAT --to-destination ${internalWanForwardTarget}
+        '';
+      };
 
       boot.loader.grub = {
         enable = true;
