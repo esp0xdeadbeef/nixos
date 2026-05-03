@@ -127,9 +127,15 @@ in
         })
         {
           "30-br-wan" = {
+            matchConfig.Name = "br-wan";
+            linkConfig = {
+              ActivationPolicy = "always-up";
+              RequiredForOnline = "no";
+            };
             networkConfig = {
               DHCP = "no";
               DHCPServer = true;
+              ConfigureWithoutCarrier = true;
               IPv4Forwarding = true;
               IPv6AcceptRA = false;
             };
