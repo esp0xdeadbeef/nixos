@@ -55,6 +55,34 @@ let
       "${lib.removeSuffix "::/64" prefix}::1/128"
     else
       throw "s-router-hetzner-anywhere: floating IPv6 prefix must be canonical ::/64: ${prefix}";
+  publicIPv4Address = "${require "publicIPv4" runtime.publicIPv4}/32";
+  publicIPv4Gateway = require "publicIPv4Gateway" (runtime.publicIPv4Gateway or null);
+  primaryInterfaceMac = require "primaryInterfaceMac" (runtime.primaryInterfaceMac or null);
+  primaryInterfaceMatchConfig =
+    {
+      Name =
+        if builtins.isString (runtime.primaryInterfaceMatch or null) && runtime.primaryInterfaceMatch != "" then
+          runtime.primaryInterfaceMatch
+        else
+          "en* eth*";
+    };
+  renderedHostNetworks =
+    lib.mapAttrs
+      (_: network: builtins.removeAttrs network [ "dhcpConfig" ])
+      ((renderedHost.networks or { }) // (renderedBridges.networks or { }));
+  renderedNetdevs =
+    (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
+  hetznerNetdevs =
+    lib.mapAttrs
+      (_: netdev:
+        if (netdev.netdevConfig.Name or null) == "br-wan" then
+          lib.recursiveUpdate netdev {
+            netdevConfig.MACAddress = primaryInterfaceMac;
+          }
+        else
+          netdev)
+      renderedNetdevs;
+  hetznerHostNetworks = builtins.removeAttrs renderedHostNetworks [ "20-eth0" "30-br-wan" ];
 in
 {
   imports = [
@@ -78,19 +106,34 @@ in
       networking.hostName = "hetzner-nebula-prodtest-01";
       networking.useDHCP = false;
       systemd.network.enable = true;
-      systemd.network.netdevs = (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
+      systemd.network.netdevs = hetznerNetdevs;
       systemd.network.networks = lib.recursiveUpdate
-        ((renderedHost.networks or { }) // (renderedBridges.networks or { }))
+        (hetznerHostNetworks // {
+          "20-hetzner-wan-parent" =
+            (builtins.removeAttrs (renderedHostNetworks."20-eth0" or { }) [ "dhcpConfig" ])
+            // {
+              matchConfig = primaryInterfaceMatchConfig;
+              networkConfig = (renderedHostNetworks."20-eth0".networkConfig or { }) // {
+                Bridge = "br-wan";
+              };
+            };
+        })
         {
           "30-br-wan" = {
             networkConfig = {
-              DHCP = "ipv4";
+              DHCP = "no";
               IPv6AcceptRA = false;
             };
             address = [
+              publicIPv4Address
               (require "publicIPv6Address" runtime.publicIPv6Address)
             ] ++ map floatingIPv6HostAddress runtime.floatingIPv6Prefixes;
             routes = [
+              {
+                Destination = "${publicIPv4Gateway}/32";
+                Scope = "link";
+              }
+              { Gateway = publicIPv4Gateway; }
               { Gateway = "fe80::1"; }
             ];
           };
@@ -102,7 +145,6 @@ in
         efiSupport = true;
         efiInstallAsRemovable = true;
       };
-
       nix.settings.experimental-features = [
         "nix-command"
         "flakes"
@@ -121,6 +163,7 @@ in
       };
 
       networking.firewall.allowedTCPPorts = [ 22 ];
+      networking.firewall.checkReversePath = lib.mkForce false;
 
       environment.etc."s-router-test/hetzner-runtime.json".text = builtins.toJSON runtime;
       environment.etc."network-renderer/network-renderer-nebula.json".text = builtins.toJSON {

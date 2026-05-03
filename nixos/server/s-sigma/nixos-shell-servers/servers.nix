@@ -49,8 +49,8 @@ in
       repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
     })
     (mkVM "s-router-clab" {
-      description = "s-router-test VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-test"}";
+      description = "s-router-clab VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
     })
     (mkVM "s-router-test" {
       description = "s-router-test VM (nixos-shell)";
