@@ -40,9 +40,48 @@ let
     controlPlane = builtHost.controlPlaneOut or { };
     inventory = builtHost.globalInventory or { };
   };
+  selectedSiteKeys =
+    lib.unique (
+      lib.filter
+        (key: key != "")
+        (
+          lib.mapAttrsToList
+            (
+              _nodeName: node:
+              if (node.host or null) == "s-router-hetzner-anywhere" then
+                "${node.logicalNode.enterprise or ""}::${node.logicalNode.site or ""}"
+              else
+                ""
+            )
+            (((builtHost.globalInventory or { }).realization or { }).nodes or { })
+        )
+    );
+  isSelectedRuntimeNode =
+    _nodeName: node:
+    builtins.elem "${node.enterpriseName or ""}::${node.siteName or ""}" selectedSiteKeys;
+  selectedNebulaRuntimePlan = nebulaRuntimePlan // {
+    nodes = lib.filterAttrs isSelectedRuntimeNode (nebulaRuntimePlan.nodes or { });
+    overlays =
+      lib.filterAttrs
+        (_overlayId: overlay: builtins.elem "${overlay.enterpriseName or ""}::${overlay.siteName or ""}" selectedSiteKeys)
+        (nebulaRuntimePlan.overlays or { });
+  };
+  builders = import ../../nixos-shell-vm/s-router-test/modules/container-builders.nix {
+    inherit lib;
+    pkgs = pkgsForRenderer;
+  };
+  overlayContainers = import ../../nixos-shell-vm/s-router-test/modules/overlay-containers.nix {
+    inherit lib renderedContainers;
+    nebulaRuntimePlan = selectedNebulaRuntimePlan;
+    inherit (builders) mkNebulaNode mkNebulaProfileMount mkNebulaRuntimeAddon;
+  };
+  nebulaBootstrapModule = nebulaRenderer.buildNebulaBootstrapNixosModule {
+    pkgs = pkgsForRenderer;
+    nebulaRuntimePlan = selectedNebulaRuntimePlan;
+  };
   externalLighthouseModule = nebulaRenderer.buildExternalLighthouseNixosModule {
     pkgs = pkgsForRenderer;
-    inherit nebulaRuntimePlan;
+    nebulaRuntimePlan = selectedNebulaRuntimePlan;
   };
   require = name: value:
     if value == null || value == "" || value == [ ] then
@@ -85,8 +124,9 @@ in
   ];
 
   config = lib.mkMerge [
-    externalLighthouseModule
-    {
+	    externalLighthouseModule
+	    nebulaBootstrapModule
+	    {
 
       assertions = [
         {
@@ -211,14 +251,14 @@ in
       networking.firewall.checkReversePath = lib.mkForce false;
 
       environment.etc."s-router-test/hetzner-runtime.json".text = builtins.toJSON runtime;
-      environment.etc."network-renderer/network-renderer-nebula.json".text = builtins.toJSON {
-        overlays = builtins.attrNames (nebulaRuntimePlan.overlays or { });
-        nodes = builtins.attrNames (nebulaRuntimePlan.nodes or { });
-      };
+	      environment.etc."network-renderer/network-renderer-nebula.json".text = builtins.toJSON {
+	        overlays = builtins.attrNames (selectedNebulaRuntimePlan.overlays or { });
+	        nodes = builtins.attrNames (selectedNebulaRuntimePlan.nodes or { });
+	      };
 
-      containers = renderedContainers;
+	      containers = lib.recursiveUpdate renderedContainers overlayContainers;
 
-      system.stateVersion = "25.11";
-    }
+	      system.stateVersion = "25.11";
+	    }
   ];
 }
