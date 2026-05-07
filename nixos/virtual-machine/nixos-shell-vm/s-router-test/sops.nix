@@ -12,6 +12,7 @@ in
       pppoe-username = mkRootSecret "pppoe-username";
       pppoe-password = mkRootSecret "pppoe-password";
       hetzner-public-ipv4 = mkRootSecret "hetzner-public-ipv4";
+      hetzner-lighthouse-public-ipv4 = mkRootSecret "hetzner-lighthouse-public-ipv4";
       hetzner-public-ipv6 = mkRootSecret "hetzner-public-ipv6";
       hetzner-primary-interface-mac = mkRootSecret "hetzner-primary-interface-mac";
     }

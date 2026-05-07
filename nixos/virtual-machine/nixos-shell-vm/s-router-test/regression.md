@@ -1,75 +1,108 @@
-# s-router-test regression state
+# s-router-test Regression State
 
-Last updated: 2026-05-02.
+Last updated: 2026-05-07 19:43 UTC.
 
-## fixed and live-verified
+This file records current verified state only. Treat older claims as stale until
+revalidated through `scripts/s-router-test-rebuild-loop.sh` and live checks.
 
-- `network-renderer-nebula` owns Nebula bootstrap/runtime materialization;
-  `s-router-test` consumes the rendered module instead of carrying a local
-  bootstrap implementation.
-- `s-router-test` and `s-router-test-clients` were split so router containers
-  stay on the router VM and endpoint fixtures live in the client VM.
-- Earlier full `s-router-test` loop reached `ready=true`, passed site-C probing,
-  passed hostile IPv4 public egress, and cleaned Hetzner resources.
+Current pass: failed live rebuild. The locked chain built, deployed, rebooted,
+issued Nebula credentials, and fixed the prior site-C DNS-over-overlay failure.
+Production readiness now stops at hostile delegated IPv6 public egress from
+`s-router-test-clients`.
 
-## fixed but only locally tested
+## Fixed and Live-Verified
 
-- `network-renderer-nixos` now exposes a host artifact module that installs full
-  renderer/debug artifacts under `/etc/network-artifacts` plus a renderer
-  summary under `/etc/network-renderer`.
-- Renderer regression tests passed:
-  `tests/test-host-build-artifact-module.sh` and
-  `tests/test-host-build-container-selection.sh`.
-- Commit pushed: `network-renderer-nixos` `2419350`
-  (`install full renderer artifacts`).
+- Repository guards passed before rebuild: no plain public IP literals in NixOS
+  config, no local `s-router-test` nftables/iptables policy glue, and the
+  network repository clean guard was green.
+- Lock propagation reached NixOS local commit `8b1a439` with:
+  - CPM `7d63aba`
+  - containerlab renderer `fbad7d2`
+  - Nebula renderer `2846f3a`
+  - NixOS renderer `cf377b7`
+- `s-router-test`, `s-router-test-clients`, and Hetzner toplevel builds passed.
+  Both local SSH targets returned after reboot, and the post-reboot renderer
+  JSON matched the local build.
+- Hetzner deploy completed, Nebula CA unlock/profile issuance completed, and
+  `s88-network-validation` started with a snapshot.
+- Site-C DNS-over-overlay now passes from `b-router-access-hostile` for both
+  families:
+  - `dig -b 10.70.10.1 @10.90.10.1 example.com A`
+  - `dig -b fd42:dead:feed:70::1 @fd42:dead:cafe:10::1 example.com AAAA`
+- The branch hostile path to site-C DNS selects Nebula as intended:
+  `b-router-core-nebula` routes `10.90.10.1` and
+  `fd42:dead:cafe:10::1` through `nebula1`.
+- CPM service-ingress route augmentation fixed the previous site-C lighthouse
+  loop. Public Nebula packets now reach the site-C lighthouse path far enough
+  for DNS-over-overlay to work.
 
-## implemented but not yet live-validated
+## Fixed but Only Locally Tested
 
-- `s-router-test` and `s-router-test-clients` import
-  `builtHost.artifactModule`; `nixos/flake.lock` was bumped locally to consume
-  renderer commit `2419350`.
-- Background rebuild loops are running for both VMs. The currently reachable
-  `s-router-test` generation is still the pre-artifact generation:
-  `/nix/store/yn9myklvw608pmc9w1cg5ia7mbgrlkc2-nixos-system-s-router-test-25.11.20260429.755f5aa`.
-- `/etc/network-artifacts` is therefore not yet present on the reachable router
-  VM; verify again after the background loops finish.
+- CPM service-ingress route augmentation is covered by
+  `tests/test-public-overlay-service-binding.sh`; focused CPM DNS/service route
+  tests and full `tests/test-passing-fixtures.sh` passed before downstream lock
+  propagation.
+- `network-renderer-nixos` consumed CPM `7d63aba`; focused DNS/service tests
+  and full `tests/test-passing-fixtures.sh` passed.
+- `network-renderer-containerlab-linux-backend`
+  `tests/test-dns-service-policy-routes.sh` passed after its lock bump.
 
-## still broken
+## Still Broken
 
-- Hostile DNS is not healthy in the currently reachable generation.
-- `b-router-access-hostile` runs Unbound and listens on `10.70.10.1`,
-  `fd42:dead:feed:70::1`, localhost IPv4, and localhost IPv6.
-- Queries to local Unbound return immediate `SERVFAIL`; tcpdump on
-  `b-router-access-hostile` `transit` sees zero packets for those Unbound
-  queries.
-- Raw `dig @10.20.10.1` and `dig @fd42:dead:beef:10::1` from
-  `b-router-access-hostile` do send packets out `transit`, but both time out.
-- `b-router-downstream-selector`, `b-router-policy`, and
-  `b-router-upstream-selector` have explicit hostile/east-west forwarding rules
-  and policy routes; the next failure boundary is the hop after access emits
-  raw DNS toward the site DNS provider.
+- Latest verified live failure: hostile delegated IPv6 public egress from
+  `hostile-node01` on `s-router-test-clients`.
+- Endpoint facts:
+  - `hostile-node01` has IPv4 internet working.
+  - It receives delegated IPv6 addresses in `2a01:4f9:c01f:ab::/64`.
+  - `ip -6 route get 2606:4700:4700::1111` selects `dev eth0` via RA from
+    `b-router-access-hostile`.
+  - `ping -6 2606:4700:4700::1111` loses all packets.
+- Branch-side routing is coherent:
+  - `b-router-access-hostile` forwards delegated-source traffic to `transit`.
+  - `b-router-policy`, from `downstr-hostile`, selects `up-hostile-ew`.
+  - `b-router-upstream-selector`, from `pol-hostile-ew`, selects
+    `core-nebula`.
+- Site-C delegated-prefix route activation is wrong:
+  - The rendered dynamic route services exist in `c-router-core`,
+    `c-router-upstream-selector`, and `c-router-nebula-core`.
+  - The Hetzner runtime secret tree did not copy
+    `access-node-ipv6-prefix-*` files to the validator, so those services
+    no-op and only placeholder ULA routes remain active.
+  - This is a `network-codex-agent` runtime injection bug. The model/rendered
+    route services cannot install the real delegated public prefix when their
+    runtime secret input is missing.
 
-## pending or unknown
+## Implemented but Not Yet Live-Validated
 
-- Cross-VM endpoint-to-router DNS from `s-router-test-clients` is pending until
-  the current client rebuild returns.
-- External hostile delegated IPv6 inbound via Hetzner is pending for the current
-  lock graph.
-- Artifact installation on both VMs is pending background loop completion.
+- A failing `network-codex-agent` regression now checks that the Hetzner
+  runtime extra-files secret tree contains per-access
+  `access-node-ipv6-prefix-*` files derived from routed IPv6 assignments.
 
-## next concrete debugging target
+## Pending / Unknown
 
-- Trace one raw DNS packet from `b-router-access-hostile transit` through
-  `b-router-downstream-selector access-hostile`, `b-router-policy
-  downstr-hostile/up-hostile-ew`, `b-router-upstream-selector pol-hostile-ew`,
-  and `b-router-core-nebula`.
-- If the packet reaches `b-router-core-nebula`, debug Nebula/east-west return.
-  If it stops earlier, patch the owning CPM/renderer layer, not local VM glue.
+- Finish and validate the runtime secret-tree fix, then rerun
+  `scripts/s-router-test-rebuild-loop.sh` and recheck:
+  - hostile delegated IPv6 public egress
+  - IPv4 public egress
+  - DNS leak prevention
+  - Nebula reachability
+  - nftables lane policy
+  - `s-router-clab` gate
 
-## assumptions in the wrong layer
+## Next Concrete Debugging Target
 
-- Any local helper that injects routes, resolver policy, firewall exceptions, or
-  overlay runtime behavior remains suspect and must move to CPM or the relevant
-  renderer once proven.
-- Full artifact/debug bundle installation belongs in `network-renderer-nixos`;
-  the VM harness should only import the rendered module.
+- Fix Hetzner runtime secret-tree generation so it writes the routed IPv6
+  assignment JSON into per-access `access-node-ipv6-prefix-*` secret files.
+  The expected post-rebuild proof is that site-C containers have those files
+  under `/run/secrets`, install routes for the actual delegated public `/64`
+  prefixes, and `hostile-node01` can reach IPv6 internet through the modeled
+  Nebula return path.
+
+## Assumptions in the Wrong Layer
+
+- Scripts may wait, deploy, clean up, and validate. They must not invent routes,
+  DNS policy, nftables policy, bridge/macvlan allocation, or overlay runtime
+  behavior.
+- Renderers may only emit explicit CPM/provider output. Any future fix that
+  reparses `intent.nix`, `inventory*.nix`, names, roles, or provider strings in
+  a renderer is a wrong-layer regression.
