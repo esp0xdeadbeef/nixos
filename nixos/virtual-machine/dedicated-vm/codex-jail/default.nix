@@ -200,6 +200,7 @@ in
     gcc
     gdb
     python3
+    ruff
     nodejs
     gh
   ];
