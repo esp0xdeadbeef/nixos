@@ -7,9 +7,11 @@
   imports = [
     ./networking.nix
     ./dns.nix
+    ./deploy.nix
   ];
 
   networking.firewall.enable = false;
+  environment.etc.hosts.enable = false;
 
   services.openssh = {
     enable = true;
@@ -47,6 +49,18 @@
   virtualisation.docker = {
     enable = true;
     autoPrune.enable = true;
+  };
+
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
+
+  environment.variables = {
+    CLAB_RENDERER_REPO = "/run/s-router-clab/inputs/network-renderer-containerlab-linux-backend";
+    CLAB_NETWORK_LABS = "/run/s-router-clab/inputs/network-labs";
+    CLAB_CONTROL_PLANE_MODEL = "/run/s-router-clab/inputs/network-control-plane-model";
+    CLAB_FRR_TOOLING_CACHE_DIR = "/persist/docker-image-cache/network-renderer-containerlab-linux-backend";
   };
 
   system.stateVersion = "25.11";

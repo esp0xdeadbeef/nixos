@@ -2,6 +2,7 @@
   config,
   pkgs,
   lib,
+  inputs,
   vmRoot,
   ...
 }:
@@ -9,16 +10,29 @@
   containers."${config.networking.hostName}-container" = {
     autoStart = true;
     privateNetwork = true;
-    hostAddress = "10.233.222.1";
-    localAddress = "10.233.222.2";
 
     extraVeths = {
-      veth2.hostBridge = "vlan2";
+      mgmt0 = {
+        hostAddress = "10.233.222.1";
+        localAddress = "10.233.222.2";
+      };
     };
 
     bindMounts."/persist" = {
       hostPath = "/persist";
       isReadOnly = false;
+    };
+    bindMounts."/run/s-router-clab/inputs/network-renderer-containerlab-linux-backend" = {
+      hostPath = "${inputs.network-renderer-containerlab-linux-backend}";
+      isReadOnly = true;
+    };
+    bindMounts."/run/s-router-clab/inputs/network-labs" = {
+      hostPath = "${inputs.network-labs}";
+      isReadOnly = true;
+    };
+    bindMounts."/run/s-router-clab/inputs/network-control-plane-model" = {
+      hostPath = "${inputs.network-control-plane-model}";
+      isReadOnly = true;
     };
     # podman
     bindMounts."/var/lib/containers" = {
