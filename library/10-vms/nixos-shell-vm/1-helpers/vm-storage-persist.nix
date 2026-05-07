@@ -25,4 +25,6 @@
     fsType = "tmpfs";
     options = [ "mode=755" ];
   };
+
+  virtualisation.vmVariant.system.stateVersion = lib.mkDefault config.system.stateVersion;
 }
