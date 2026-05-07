@@ -52,6 +52,10 @@
       url = "github:esp0xdeadbeef/network-renderer-nixos";
     };
 
+    network-renderer-containerlab-linux-backend = {
+      url = "github:esp0xdeadbeef/network-renderer-containerlab-linux-backend";
+    };
+
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
     };
