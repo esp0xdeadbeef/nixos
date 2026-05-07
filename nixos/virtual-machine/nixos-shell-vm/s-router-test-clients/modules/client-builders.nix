@@ -4,8 +4,19 @@ let
   basePackages = with pkgs; [
     bind
     curl
+    ethtool
     iproute2
     iputils
+    jq
+    lsof
+    mtr
+    netcat-openbsd
+    nftables
+    procps
+    ripgrep
+    socat
+    strace
+    tcpdump
     traceroute
   ];
 

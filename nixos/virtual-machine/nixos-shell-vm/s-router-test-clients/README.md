@@ -15,8 +15,12 @@ The box currently materializes:
 
 - site-a admin/client DHCP endpoints
 - branch and hostile DHCP endpoints
-- site-c home, NAS, printer, and streaming endpoints
 - DMZ service fixtures for Nebula, WireGuard, and HTTP
+
+Site-C access routers are realized on the Hetzner validation host in the current
+lab inventory. Site-C endpoint fixtures must live with that modeled access
+fabric, or be introduced through explicit inventory/model placement, before
+this client box materializes them.
 
 ## Boundary
 
