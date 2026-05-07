@@ -212,17 +212,17 @@ in
   #  sudo cat /run/secrets/gh-token | gh auth login --with-token
   #  gh auth setup-git
   #'';
-environment.interactiveShellInit = ''
-  ZSH_THEME=agnoster
+  environment.interactiveShellInit = ''
+    ZSH_THEME=agnoster
 
-  if [ -r /run/secrets/gh-token ]; then
-    export GH_TOKEN="$(cat /run/secrets/gh-token)"
-    export GITHUB_TOKEN="$GH_TOKEN"
+    if [ -r /run/secrets/gh-token ]; then
+      export GH_TOKEN="$(cat /run/secrets/gh-token)"
+      export GITHUB_TOKEN="$GH_TOKEN"
 
-    git config --global credential.https://github.com.helper '!gh auth git-credential' >/dev/null 2>&1 || true
-    git config --global credential.https://gist.github.com.helper '!gh auth git-credential' >/dev/null 2>&1 || true
-  fi
-'';
+      git config --global credential.https://github.com.helper '!gh auth git-credential' >/dev/null 2>&1 || true
+      git config --global credential.https://gist.github.com.helper '!gh auth git-credential' >/dev/null 2>&1 || true
+    fi
+  '';
 
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
