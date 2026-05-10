@@ -30,24 +30,24 @@ in
       description = "s-router-core VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-legacy-core"}";
     })
-    (mkVM "s-router-core" {
-      description = "s-router-core VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
-    })
+    # (mkVM "s-router-core" {
+    #   description = "s-router-core VM (nixos-shell)";
+    #   repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
+    # })
     #(mkVM "s-router-upstream-selector" {
     #  description = "s-router-upstream-selector VM (nixos-shell)";
     #  repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
     #})
 
-    (mkVM "s-router-policy" {
-      description = "s-router-policy VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-policy"}";
-    })
+    # (mkVM "s-router-policy" {
+    #   description = "s-router-policy VM (nixos-shell)";
+    #   repository = "path:${self.lib.vmSourceForHost "s-router-policy"}";
+    # })
 
-    (mkVM "s-router-access" {
-      description = "s-router-access VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
-    })
+    # (mkVM "s-router-access" {
+    #   description = "s-router-access VM (nixos-shell)";
+    #   repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
+    # })
     (mkVM "s-router-clab" {
       description = "s-router-clab VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
