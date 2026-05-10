@@ -39,9 +39,9 @@ in
     #  repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
     #})
 
-    (mkVM "s-router-policy-only" {
-      description = "s-router-policy-only VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-policy-only"}";
+    (mkVM "s-router-policy" {
+      description = "s-router-policy VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-policy"}";
     })
 
     (mkVM "s-router-access" {

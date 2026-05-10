@@ -41,7 +41,7 @@ only sees the NixOS checkout and locked flake inputs.
 Use the script wrappers instead of hand-rolled SSH quoting:
 
 ```bash
-~/github/network-codex-agent/scripts/s-router-test-rebuild-loop.sh
+~/github/network-codex-agent/scripts/s-router-full-lab-rebuild-loop.sh
 ~/github/network-codex-agent/scripts/exec-on-remote.sh s-router-test <cmd> [args...]
 ~/github/network-codex-agent/scripts/exec-in-s-router-test-machine.sh <container> <cmd> [args...]
 ```

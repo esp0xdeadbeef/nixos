@@ -247,7 +247,7 @@
 
     topology = {
       nodes = {
-        s-router-core-wan = {
+        s-router-core = {
           role = "core";
 
           uplinks = {
@@ -262,7 +262,7 @@
           role = "upstream-selector";
         };
 
-        s-router-policy-only = {
+        s-router-policy = {
           role = "policy";
         };
 
@@ -303,15 +303,15 @@
 
       links = [
         [
-          "s-router-core-wan"
+          "s-router-core"
           "s-router-upstream-selector"
         ]
         [
           "s-router-upstream-selector"
-          "s-router-policy-only"
+          "s-router-policy"
         ]
         [
-          "s-router-policy-only"
+          "s-router-policy"
           "s-router-downstream-selector"
         ]
         [

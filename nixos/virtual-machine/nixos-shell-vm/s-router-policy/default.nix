@@ -37,7 +37,7 @@ let
   builtHost = api.renderer.buildHostFromPaths {
     inherit (fabric) intentPath inventoryPath;
     selector = identity.boxName;
-    file = "nixos/virtual-machine/nixos-shell-vm/s-router-policy-only/default.nix";
+    file = "nixos/virtual-machine/nixos-shell-vm/s-router-policy/default.nix";
   };
 
   resolvedHostContext =

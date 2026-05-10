@@ -114,8 +114,6 @@ let
     runtimeListenHosts = {
       c-router-nebula-core = internalWanForwardTarget;
     };
-    externalRemoteLighthouseEndpoint4 = siteCDmzLighthouseEndpoint4;
-    externalRemoteLighthouseEndpoint6 = "";
   };
   externalLighthouseModule = nebulaRenderer.buildExternalLighthouseNixosModule {
     pkgs = pkgsForRenderer;
@@ -128,11 +126,16 @@ let
       value;
   publicIPv4Gateway = require "publicIPv4Gateway" (runtime.publicIPv4Gateway or null);
   runtimeSecretsDir = "/persist/s-router-test-runtime";
+  operatorAuthorizedKeys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
+  ];
   publicIPv4SecretPath = "${runtimeSecretsDir}/hetzner-public-ipv4";
   lighthousePublicIPv4SecretPath = "${runtimeSecretsDir}/hetzner-lighthouse-public-ipv4";
   publicIPv6SecretPath = "${runtimeSecretsDir}/hetzner-public-ipv6";
   publicIPv6AddressSecretPath = "${runtimeSecretsDir}/hetzner-public-ipv6-address";
   routedIPv6PrefixesSecretPath = "${runtimeSecretsDir}/hetzner-routed-ipv6-prefixes";
+  rootPasswordHashPath = "${runtimeSecretsDir}/hetzner-root-password-hash";
   primaryInterfaceMac = require "primaryInterfaceMac" (runtime.primaryInterfaceMac or null);
   primaryInterfaceFallback = require "primaryInterface" (runtime.primaryInterface or null);
   primaryInterfaceMatchConfig = {
@@ -145,8 +148,12 @@ let
   renderedNetdevs =
     (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
   hetznerHostNetworks = builtins.removeAttrs renderedHostNetworks [ "20-eth0" "30-br-wan" ];
+  internalWan = import ./hetzner-internal-wan.nix {
+    inherit lib;
+    inventory = builtHost.globalInventory or { };
+    hostName = "s-router-hetzner-anywhere";
+  };
   internalWanPrefix = "172.31.254";
-  internalWanAddress = "${internalWanPrefix}.1/24";
   internalWanForwardTarget = "${internalWanPrefix}.4";
   renderedAndOverlayContainers = lib.recursiveUpdate renderedContainers overlayContainers;
   accessPrefixRuntimeSecrets = import ./access-prefix-runtime-secrets.nix {
@@ -206,8 +213,14 @@ let
             DHCP = "no";
             IPv6AcceptRA = false;
           };
-          address = [ "${internalWanPrefix}.3/24" ];
-          routes = [ { Gateway = "${internalWanPrefix}.1"; } ];
+          address = [
+            internalWan.coreAddress4
+            internalWan.coreAddress6
+          ];
+          routes = [
+            { Gateway = internalWan.coreGateway4; }
+            { Gateway = internalWan.coreGateway6; }
+          ];
         };
       };
     };
@@ -216,6 +229,7 @@ in
 {
   imports = [
     inputs.disko.nixosModules.disko
+    inputs.impermanence.nixosModules.impermanence
     (builtHost.artifactModule or { })
     ../disko.nix
     ../hardware.nix
@@ -235,6 +249,32 @@ in
       ];
 
       networking.hostName = "hetzner-nebula-prodtest-01";
+      fileSystems."/boot".neededForBoot = true;
+      fileSystems."/nix".neededForBoot = true;
+      fileSystems."/persist".neededForBoot = true;
+      environment.persistence."/persist" = {
+        hideMounts = true;
+        directories = [
+          "/root/.ssh"
+          "/var/lib/nixos"
+          "/var/lib/systemd"
+        ];
+        files = [
+          "/etc/machine-id"
+        ];
+      };
+      system.activationScripts.prepareHetznerImpermanenceMachineId = {
+        deps = [ "createPersistentStorageDirs" ];
+        text = ''
+          if [ -e /etc/machine-id ] && [ ! -e /persist/etc/machine-id ]; then
+            install -D -m 0444 /etc/machine-id /persist/etc/machine-id
+            rm -f /etc/machine-id
+          fi
+        '';
+      };
+      system.activationScripts.persist-files.deps = [
+        "prepareHetznerImpermanenceMachineId"
+      ];
       networking.useDHCP = false;
       systemd.network.enable = true;
       systemd.network.netdevs = renderedNetdevs;
@@ -272,9 +312,13 @@ in
               DHCPServer = true;
               ConfigureWithoutCarrier = true;
               IPv4Forwarding = true;
+              IPv6Forwarding = true;
               IPv6AcceptRA = false;
             };
-            address = [ internalWanAddress ];
+            address = [
+              internalWan.hostAddress4
+              internalWan.hostAddress6
+            ];
             dhcpServerConfig = {
               PoolOffset = 10;
               PoolSize = 32;
@@ -283,6 +327,10 @@ in
           };
         };
       systemd.tmpfiles.rules = [
+        "d /persist/etc 0755 root root -"
+        "d /persist/etc/ssh 0755 root root -"
+        "d /persist/root 0700 root root -"
+        "d /persist/root/.ssh 0700 root root -"
         "d ${runtimeSecretsDir} 0700 root root -"
         "d /run/secrets 0700 root root -"
         "L+ /run/secrets/hetzner-lighthouse-public-ipv4 - - - - ${lighthousePublicIPv4SecretPath}"
@@ -323,6 +371,7 @@ in
           fi
 
           public4="$(tr -d '\n' < ${publicIPv4SecretPath})"
+          public6_prefix="$(tr -d '\n' < ${publicIPv6SecretPath})"
           public6_addr="$(tr -d '\n' < ${publicIPv6AddressSecretPath})"
 
           ip address replace "$public4/32" dev "$primary_if"
@@ -336,9 +385,13 @@ in
           if [ -s ${routedIPv6PrefixesSecretPath} ]; then
             while IFS= read -r prefix; do
               [ -n "$prefix" ] || continue
+              if [ "$prefix" = "$public6_prefix" ]; then
+                continue
+              fi
               case "$prefix" in
                 *::/64)
                   ip address replace "''${prefix%::/64}::1/128" dev "$primary_if"
+                  ip -6 route replace "$prefix" via ${internalWan.coreAddress6Bare} dev br-wan onlink
                   ;;
               esac
             done < ${routedIPv6PrefixesSecretPath}
@@ -360,11 +413,25 @@ in
         "flakes"
       ];
 
-      users.users.root.openssh.authorizedKeys.keys =
-        require "authorizedKeys" runtime.authorizedKeys;
+      users.users.root = {
+        hashedPasswordFile = rootPasswordHashPath;
+        openssh.authorizedKeys.keys =
+          lib.unique (operatorAuthorizedKeys ++ require "authorizedKeys" runtime.authorizedKeys);
+      };
 
       services.openssh = {
         enable = true;
+        hostKeys = [
+          {
+            type = "ed25519";
+            path = "/persist/etc/ssh/ssh_host_ed25519_key";
+          }
+          {
+            type = "rsa";
+            bits = 4096;
+            path = "/persist/etc/ssh/ssh_host_rsa_key";
+          }
+        ];
         settings = {
           PermitRootLogin = "prohibit-password";
           PasswordAuthentication = false;
@@ -388,6 +455,7 @@ in
         lsof
         mtr
         netcat-openbsd
+        neovim
         nftables
         procps
         ripgrep
@@ -395,6 +463,7 @@ in
         strace
         tcpdump
         traceroute
+        vim
       ];
 
       environment.etc."s-router-test/hetzner-runtime.json".text = builtins.toJSON (

@@ -67,79 +67,6 @@
             vlan = 30;
             parentUplink = "trunk";
           };
-        };
-      };
-
-      s-router-core = {
-        wanUplink = "upstream-core";
-
-        uplinks = {
-          management = {
-            parent = "eth0";
-            mode = "vlan";
-            vlan = 2;
-            bridge = "vlan2";
-          };
-
-          upstream-core = {
-            parent = "eth0";
-            mode = "vlan";
-            vlan = 5;
-            bridge = "br-upstream";
-
-            ipv4 = {
-              method = "dhcp";
-            };
-
-            ipv6 = {
-              method = "slaac";
-            };
-          };
-
-          fabric = {
-            parent = "eth0";
-            mode = "vlan";
-            vlan = 200;
-            bridge = "br-fabric";
-          };
-        };
-
-      };
-
-      s-router-policy-only = {
-        uplinks = {
-          management = {
-            parent = "eth0";
-            mode = "vlan";
-            vlan = 2;
-            bridge = "vlan2";
-          };
-
-          trunk = {
-            parent = "eth0";
-            bridge = "br-fabric";
-            mode = "trunk";
-          };
-        };
-
-        transitBridges = {
-          tr100 = {
-            name = "tr100";
-            vlan = 100;
-            parentUplink = "trunk";
-          };
-
-          tr101 = {
-            name = "tr101";
-            vlan = 101;
-            parentUplink = "trunk";
-          };
-
-          tr102 = {
-            name = "tr102";
-            vlan = 102;
-            parentUplink = "trunk";
-          };
 
           tr103 = {
             name = "tr103";
@@ -158,10 +85,102 @@
             vlan = 105;
             parentUplink = "trunk";
           };
+        };
+      };
 
-          tr200 = {
-            name = "tr200";
+      s-router-core = {
+        wanUplink = "upstream-core";
+
+        uplinks = {
+          management = {
+            parent = "eth0";
+            mode = "vlan";
+            vlan = 2;
+            bridge = "vlan2";
+          };
+
+          upstream-core = {
+            parent = "eth0";
+            mode = "pppoe";
+            vlan = 5;
+            bridge = "br-upstream";
+
+            ipv4 = {
+              method = "pppoe";
+            };
+
+            ipv6 = {
+              method = "pppoe";
+            };
+
+            pppoe = {
+              interface = "ppp0";
+              usernameSecret = "/run/secrets/pppoe-username";
+              passwordSecret = "/run/secrets/pppoe-password";
+            };
+          };
+
+          fabric = {
+            parent = "eth0";
+            mode = "vlan";
             vlan = 200;
+            bridge = "br-fabric";
+          };
+        };
+
+        transitBridges = {
+          tr201 = {
+            name = "tr201";
+            vlan = 201;
+            parentUplink = "fabric";
+          };
+
+          tr202 = {
+            name = "tr202";
+            vlan = 202;
+            parentUplink = "fabric";
+          };
+
+          tr203 = {
+            name = "tr203";
+            vlan = 203;
+            parentUplink = "fabric";
+          };
+        };
+      };
+
+      s-router-policy = {
+        uplinks = {
+          management = {
+            parent = "eth0";
+            mode = "vlan";
+            vlan = 2;
+            bridge = "vlan2";
+          };
+
+          trunk = {
+            parent = "eth0";
+            bridge = "br-fabric";
+            mode = "trunk";
+          };
+        };
+
+        transitBridges = {
+          tr103 = {
+            name = "tr103";
+            vlan = 103;
+            parentUplink = "trunk";
+          };
+
+          tr104 = {
+            name = "tr104";
+            vlan = 104;
+            parentUplink = "trunk";
+          };
+
+          tr105 = {
+            name = "tr105";
+            vlan = 105;
             parentUplink = "trunk";
           };
 
@@ -189,25 +208,19 @@
 
   realization = {
     nodes = {
-      esp0xdeadbeef-site-a-s-router-core-wan = {
+      esp0xdeadbeef-site-a-s-router-core = {
         host = "s-router-core";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
-          name = "s-router-core-wan";
+          name = "s-router-core";
         };
-
-        containers = {
-          default = {
-            runtimeName = "s-router-core-wan";
-          };
-        };
-
         ports = {
           upstream-selector = {
-            link = "p2p-s-router-core-wan-s-router-upstream-selector";
+            link = "p2p-s-router-core-s-router-upstream-selector";
+            adapterName = "p2p-s-router-core-upstream-selector-core";
             attach = {
               kind = "bridge";
               bridge = "br-fabric";
@@ -240,16 +253,10 @@
           site = "site-a";
           name = "s-router-access-admin";
         };
-
-        containers = {
-          default = {
-            runtimeName = "s-router-access-admin";
-          };
-        };
-
         ports = {
           transit-downstream-selector = {
             link = "p2p-s-router-access-admin-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-admin-downstream-access";
             attach = {
               kind = "bridge";
               bridge = "tr100";
@@ -309,16 +316,10 @@
           site = "site-a";
           name = "s-router-access-client";
         };
-
-        containers = {
-          default = {
-            runtimeName = "s-router-access-client";
-          };
-        };
-
         ports = {
           transit-downstream-selector = {
             link = "p2p-s-router-access-client-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-client-downstream-access";
             attach = {
               kind = "bridge";
               bridge = "tr102";
@@ -378,16 +379,10 @@
           site = "site-a";
           name = "s-router-access-mgmt";
         };
-
-        containers = {
-          default = {
-            runtimeName = "s-router-access-mgmt";
-          };
-        };
-
         ports = {
           transit-downstream-selector = {
             link = "p2p-s-router-access-mgmt-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-mgmt-downstream-access";
             attach = {
               kind = "bridge";
               bridge = "tr101";
@@ -438,25 +433,19 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-policy-only = {
-        host = "s-router-policy-only";
+      esp0xdeadbeef-site-a-s-router-policy = {
+        host = "s-router-policy";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
           site = "site-a";
-          name = "s-router-policy-only";
+          name = "s-router-policy";
         };
-
-        containers = {
-          default = {
-            runtimeName = "s-router-policy-only";
-          };
-        };
-
         ports = {
           upstream-admin = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-wan";
+            link = "p2p-s-router-policy-s-router-upstream-selector--access-s-router-access-admin--uplink-wan";
+            adapterName = "p2p-s-router-policy-s-router-upstream-selector-access-s-router-access-admin-uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr201";
@@ -467,7 +456,8 @@
           };
 
           upstream-client = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-wan";
+            link = "p2p-s-router-policy-s-router-upstream-selector--access-s-router-access-client--uplink-wan";
+            adapterName = "p2p-s-router-policy-s-router-upstream-selector-access-s-router-access-client-uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr202";
@@ -478,7 +468,8 @@
           };
 
           upstream-mgmt = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-wan";
+            link = "p2p-s-router-policy-s-router-upstream-selector--access-s-router-access-mgmt--uplink-wan";
+            adapterName = "p2p-s-router-policy-s-router-upstream-selector-access-s-router-access-mgmt-uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr203";
@@ -489,7 +480,8 @@
           };
 
           downstream-admin = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin";
+            link = "p2p-s-router-downstream-selector-s-router-policy--access-s-router-access-admin";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-access-s-router-access-admin";
             attach = {
               kind = "bridge";
               bridge = "tr103";
@@ -500,7 +492,8 @@
           };
 
           downstream-client = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client";
+            link = "p2p-s-router-downstream-selector-s-router-policy--access-s-router-access-client";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-access-s-router-access-client";
             attach = {
               kind = "bridge";
               bridge = "tr104";
@@ -511,7 +504,8 @@
           };
 
           downstream-mgmt = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt";
+            link = "p2p-s-router-downstream-selector-s-router-policy--access-s-router-access-mgmt";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-access-s-router-access-mgmt";
             attach = {
               kind = "bridge";
               bridge = "tr105";
@@ -524,7 +518,7 @@
       };
 
       esp0xdeadbeef-site-a-s-router-upstream-selector = {
-        host = "s-router-policy-only";
+        host = "s-router-core";
         platform = "nixos-container";
 
         logicalNode = {
@@ -532,19 +526,13 @@
           site = "site-a";
           name = "s-router-upstream-selector";
         };
-
-        containers = {
-          default = {
-            runtimeName = "s-router-upstream-selector";
-          };
-        };
-
         ports = {
           core = {
-            link = "p2p-s-router-core-wan-s-router-upstream-selector";
+            link = "p2p-s-router-core-s-router-upstream-selector";
+            adapterName = "p2p-s-router-core-upstream-selector-upstream";
             attach = {
               kind = "bridge";
-              bridge = "tr200";
+              bridge = "br-fabric";
             };
             interface = {
               name = "core";
@@ -552,7 +540,8 @@
           };
 
           policy-admin = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-admin--uplink-wan";
+            link = "p2p-s-router-policy-s-router-upstream-selector--access-s-router-access-admin--uplink-wan";
+            adapterName = "p2p-s-router-policy-s-router-upstream-selector-access-s-router-access-admin-uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr201";
@@ -563,7 +552,8 @@
           };
 
           policy-client = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-client--uplink-wan";
+            link = "p2p-s-router-policy-s-router-upstream-selector--access-s-router-access-client--uplink-wan";
+            adapterName = "p2p-s-router-policy-s-router-upstream-selector-access-s-router-access-client-uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr202";
@@ -574,7 +564,8 @@
           };
 
           policy-mgmt = {
-            link = "p2p-s-router-policy-only-s-router-upstream-selector--access-s-router-access-mgmt--uplink-wan";
+            link = "p2p-s-router-policy-s-router-upstream-selector--access-s-router-access-mgmt--uplink-wan";
+            adapterName = "p2p-s-router-policy-s-router-upstream-selector-access-s-router-access-mgmt-uplink-wan";
             attach = {
               kind = "bridge";
               bridge = "tr203";
@@ -587,7 +578,7 @@
       };
 
       esp0xdeadbeef-site-a-s-router-downstream-selector = {
-        host = "s-router-policy-only";
+        host = "s-router-access";
         platform = "nixos-container";
 
         logicalNode = {
@@ -595,16 +586,10 @@
           site = "site-a";
           name = "s-router-downstream-selector";
         };
-
-        containers = {
-          default = {
-            runtimeName = "s-router-downstream-selector";
-          };
-        };
-
         ports = {
           policy-admin = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-admin";
+            link = "p2p-s-router-downstream-selector-s-router-policy--access-s-router-access-admin";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-access-s-router-access-admin";
             attach = {
               kind = "bridge";
               bridge = "tr103";
@@ -615,7 +600,8 @@
           };
 
           policy-client = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-client";
+            link = "p2p-s-router-downstream-selector-s-router-policy--access-s-router-access-client";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-access-s-router-access-client";
             attach = {
               kind = "bridge";
               bridge = "tr104";
@@ -626,7 +612,8 @@
           };
 
           policy-mgmt = {
-            link = "p2p-s-router-downstream-selector-s-router-policy-only--access-s-router-access-mgmt";
+            link = "p2p-s-router-downstream-selector-s-router-policy--access-s-router-access-mgmt";
+            adapterName = "p2p-s-router-downstream-selector-s-router-policy-access-s-router-access-mgmt";
             attach = {
               kind = "bridge";
               bridge = "tr105";
@@ -638,6 +625,7 @@
 
           access-admin = {
             link = "p2p-s-router-access-admin-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-admin-downstream-selector";
             attach = {
               kind = "bridge";
               bridge = "tr100";
@@ -649,6 +637,7 @@
 
           access-client = {
             link = "p2p-s-router-access-client-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-client-downstream-selector";
             attach = {
               kind = "bridge";
               bridge = "tr102";
@@ -660,6 +649,7 @@
 
           access-mgmt = {
             link = "p2p-s-router-access-mgmt-s-router-downstream-selector";
+            adapterName = "p2p-s-router-access-mgmt-downstream-selector";
             attach = {
               kind = "bridge";
               bridge = "tr101";
@@ -686,21 +676,16 @@
         wanUplink = "upstream-core";
       };
 
-      s-router-core-wan = {
-        deploymentHost = "s-router-core";
-      };
-
-      s-router-policy-only = {
-        containerName = "s-router-policy-only-container";
-        deploymentHost = "s-router-policy-only";
+      s-router-policy = {
+        deploymentHost = "s-router-policy";
       };
 
       s-router-upstream-selector = {
-        deploymentHost = "s-router-policy-only";
+        deploymentHost = "s-router-core";
       };
 
       s-router-downstream-selector = {
-        deploymentHost = "s-router-policy-only";
+        deploymentHost = "s-router-access";
       };
     };
   };

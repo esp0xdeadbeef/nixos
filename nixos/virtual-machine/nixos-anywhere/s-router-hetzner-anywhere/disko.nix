@@ -22,12 +22,37 @@
         root = {
           size = "100%";
           content = {
-            type = "filesystem";
-            format = "ext4";
-            mountpoint = "/";
+            type = "btrfs";
+            extraArgs = [ "-f" ];
+            subvolumes = {
+              "/nix" = {
+                mountpoint = "/nix";
+                mountOptions = [
+                  "compress=zstd"
+                  "noatime"
+                ];
+              };
+              "/persist" = {
+                mountpoint = "/persist";
+                mountOptions = [
+                  "compress=zstd"
+                  "noatime"
+                ];
+              };
+            };
           };
         };
       };
     };
+  };
+
+  fileSystems."/" = {
+    device = "none";
+    fsType = "tmpfs";
+    options = [
+      "defaults"
+      "size=2G"
+      "mode=755"
+    ];
   };
 }
