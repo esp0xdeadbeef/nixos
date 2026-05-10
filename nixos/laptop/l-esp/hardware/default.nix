@@ -1,4 +1,5 @@
 { pkgs, ... }:
+
 {
   imports = [
     ./audio.nix
@@ -9,6 +10,7 @@
     ./lanzaboote.nix
     ./nvidia.nix
     ./steam.nix
-    ./swap-and-tmpfs.nix
+    ./suspend-to-disk.nix
+    ./tmpfs.nix
   ];
 }
