@@ -1,95 +1,62 @@
 # s-router-hetzner-anywhere Regression State
 
-Last updated: 2026-05-10 17:56 UTC.
+Last updated: 2026-05-12 00:55 UTC.
 
-Current external pass: failed. The latest locked full-lab run installed NixOS
-with `nixos-anywhere`, rebooted, and then never returned on SSH. Hetzner still
-reported the server as running, but `ssh root@204.168.245.145` returned
-`Connection refused`.
-Console login with the generated `pw.txt` password showed the direct cause:
-`sshd.service` failed because `/etc/ssh/sshd_config` did not exist.
+This file is current-state evidence only. Older entries are stale until
+reverified.
 
 ## Fixed and Live-Verified
 
-- Hetzner cleanup watchdog deletion is live-verified for the 2026-05-10
-  floating-IP leak. After `pkill sleep`, the old watchdog deleted the server
-  but left floating IPs `130193580` and `130193581`. The corrected watchdog
-  explicitly unassigned/deleted remaining floating IPs and the Hetzner API then
-  showed no servers and no floating IPs.
-- Earlier manual CA/profile issuance proved `c-router-lighthouse` and
-  `c-router-nebula-core` can start once `/persist/etc/nebula/config.yml`
-  exists, but that is not a current automatic pass.
+- Hetzner validation cleanup is currently verified through the repo watchdog
+  script. It deleted the last aborted validator server and floating IPs, then a
+  second immediate watchdog run finished with no visible resources remaining.
 
 ## Fixed but Only Locally Tested
 
-- `network-codex-agent` refuses `nixos-rebuild switch` reuse unless the remote
-  validator already has tmpfs `/`, btrfs `/nix`, and btrfs `/persist`.
-- The cleanup watchdog re-queries Hetzner after deletion and exits non-zero if
-  any matching server or floating IP remains visible.
-- The cleanup watchdog now tolerates `pkill sleep` for every sleep in the
-  script, not only the initial deadline sleep. It also retries deletion of all
-  still-visible resources and explicitly unassigns floating IPs before
-  deleting them. This covers both observed failures: interrupted later sleeps
-  under `set -e`, and Hetzner 422 responses while server deletion is still
-  detaching floating IPs.
-- The full-lab loop now waits for the Hetzner deploy result before finalizing
-  slower CLAB VM matrix jobs, so a real external deploy failure is not hidden.
-- The interrupt path now exits through `main_cleanup`, so QEMU/CLAB/background
-  job trees are terminated instead of only running Hetzner cleanup.
-- A generated UUIDv4 root console password is now written to the local runtime
-  `pw.txt`, while only a SHA-512 hash is copied into the Hetzner NixOS
-  extra-files. SSH password authentication remains disabled. Focused checks:
-  `tests/test-s-router-test-hetzner-console-password.sh`,
-  `tests/test-s-router-test-hetzner-deploy-guards.sh`, and
-  `tests/test-s-router-hetzner-impermanence-contract.sh`.
-- Hetzner SSH impermanence now follows the working l-esp/l-werk/s-sigma
-  pattern: do not persist `/etc/ssh` as a directory, because that hides the
-  generated `/etc/ssh/sshd_config` on tmpfs root. Persist only OpenSSH host key
-  files through `services.openssh.hostKeys` pointing at `/persist/etc/ssh`.
-  Focused checks passed:
-  `tests/test-s-router-hetzner-ssh-impermanence.sh` and
-  `tests/test-s-router-hetzner-impermanence-contract.sh`.
-- Focused cleanup logic checks passed:
-  `tests/test-s-router-test-hetzner-cleanup-watchdog-pkill-sleep.sh`. It runs
-  the watchdog against a fake Hetzner API with `sleep` forced to fail and the
-  first floating-IP delete forced to fail, then asserts that server and
-  floating IP deletes still happen.
+- `network-codex-agent` now runs future Hetzner deploy commands in an
+  interactive tmux bash shell instead of hiding them behind a non-interactive
+  child script.
+- `network-codex-agent` dry-run verified the dedicated tmux-session behavior:
+  `hetzner-deploy-DRYRUN` accepted Ctrl-C, returned to an interactive shell,
+  and wrote `/tmp/hetzner-deploy-dryrun-after-ctrl-c.txt` afterward.
+- `network-codex-agent` now builds the expected reused-validator toplevel
+  through the correct flake attr
+  `#nixosConfigurations.s-router-hetzner-anywhere.config.system.build.toplevel`
+  and provisions temporary build swap before the remote build/rebuild path.
+  Focused guard passed:
+  `bash tests/test-s-router-test-hetzner-deploy-guards.sh`.
 
 ## Implemented but Not Yet Live-Validated
 
-- The Hetzner NixOS config is in impermanence mode: root is tmpfs, `/nix` and
-  `/persist` are btrfs subvolumes, and only SSH identity, root SSH state,
-  `/etc/machine-id`, and minimal NixOS/systemd state are persisted.
-- The generated root console password path is implemented for the next fresh
-  install, but the currently running failed install does not have that password.
+- Local NixOS runtime files contain generated Hetzner facts from the aborted
+  run; they are runtime state, not production evidence.
 
 ## Still Broken
 
-- Fresh `nixos-anywhere` install completed bootloader installation and rebooted,
-  but SSH did not return because the bad `/etc/ssh` persistence hid
-  `sshd_config`. The config fix is local/focused-tested but not live-validated
-  yet.
+- External prod-like validation is red. Full-loop run
+  `2026-05-12 00:55 UTC` reused Hetzner server `130500355` and started
+  dedicated tmux session `hetzner-deploy-130500355`, but remote
+  `nixos-rebuild boot --flake path:/root/s-router-test-nixos#s-router-hetzner-anywhere`
+  failed while building the toplevel:
+  `died with <Signals.SIGKILL: 9>`.
+- This SIGKILL path is patched but not live-validated yet.
+- Public-WAN reachability, host firewall behavior, Nebula handshake,
+  DNS-over-overlay, route selection, and leak-prevention checks are not
+  verified on that validator.
 
 ## Pending / Unknown
 
-- Whether the next fresh install returns on SSH after the `/etc/ssh`
-  persistence fix.
-- Whether the automatic Hetzner CA/profile issuance guard passes once the
-  validator returns over SSH.
-- Public-WAN reachability, Nebula handshakes, DNS-over-overlay, nftables
-  safety, and leak prevention after the next fresh install.
+- Whether the reused validator has enough memory/swap for the remote build, or
+  whether the deploy path must avoid remote build pressure for this workflow.
 
 ## Next Concrete Debugging Target
 
-- Clean up the current failed validator, start a fresh full-lab loop, and
-  verify SSH returns after NixOS install. If it still refuses, use `pw.txt` in
-  Hetzner console and capture the next exact systemd/network failure.
+- Inspect the preserved Hetzner deploy log for the SIGKILL root cause, then
+  rerun the full loop only after the deploy path cannot die silently during the
+  remote toplevel build.
 
-## Boundary Notes
+## Assumptions in the Wrong Layer
 
-- The Hetzner host is disposable validation state. Public addresses, delegated
-  prefixes, generated passwords, and provider facts belong in runtime/SOPS flow,
-  not committed model source.
-- Hetzner persistence should stay minimal. Persisting SSH identity and machine
-  identity is useful; broad logs, generated runtime outputs, and local
-  debugging residue should not become durable state by default.
+- Hetzner public addresses, delegated prefixes, generated passwords, and other
+  provider facts remain runtime/SOPS state. They must not be committed into
+  model source.

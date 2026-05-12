@@ -11,7 +11,7 @@ let
 
   identity = {
     enterpriseName = "esp0xdeadbeef";
-    siteName = "site-a";
+    siteName = "nixos";
     boxName = "s-router-test";
   };
 

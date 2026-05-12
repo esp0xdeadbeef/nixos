@@ -11,7 +11,7 @@ let
 
   identity = {
     enterpriseName = "esp0xdeadbeef";
-    siteName = "site-a";
+    siteName = "nixos";
     boxName = "s-router-test-clients";
   };
 
@@ -42,7 +42,7 @@ let
   builders = import ./client-builders.nix { inherit lib pkgs; };
 
   clientModules = [
-    (import ./site-a-clients.nix { inherit builders; })
+    (import ./nixos-clients.nix { inherit builders; })
     (import ./branch-hostile-clients.nix { inherit builders pkgs; })
     (import ./dmz-clients.nix { inherit builders pkgs; })
   ];

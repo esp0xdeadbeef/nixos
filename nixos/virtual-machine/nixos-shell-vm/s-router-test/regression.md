@@ -1,122 +1,133 @@
 # s-router-test Regression State
 
-Last updated: 2026-05-10 17:56 UTC.
+Last updated: 2026-05-12 03:32 UTC.
 
-Current state: not production-ready. Live online checks found a DNS policy
-materialization bug in `network-renderer-nixos`, and the concurrent CLAB
-validation is still red.
-The latest locked full-lab run also proved the Hetzner validator path is red:
-fresh `nixos-anywhere` install completed and rebooted, but SSH to the external
-validator returned `Connection refused`.
-Console evidence showed `sshd.service` failed because `/etc/ssh/sshd_config`
-did not exist.
+This file is current-state evidence only. Older entries are stale until
+reverified.
 
 ## Fixed and Live-Verified
 
-- No end-to-end production-ready state is verified. DNS, routes, nftables,
-  overlays, CLAB, Hetzner, lane preservation, and leak prevention have not all
-  passed in one locked full-lab loop.
-- Live selector nftables did not show the original upstream-selector core-core
-  crossconnect bug. The upstream selector still looked like a lane mover, not a
-  policy router.
-- Live downstream selector nftables did not show direct access-access
-  forwarding. Access-to-access traffic still requires policy in between.
+- Hetzner validator deploy path booted the expected system on server
+  `130500355`. The run verified SSH return, IPv4/IPv6 route probes, IPv4 ping,
+  and `/run/current-system` matching
+  `/nix/store/g7qaj9r2ir7wmd0dh3pa3i306fwkrhrk-nixos-system-hetzner-nebula-prodtest-01-25.11.20260501.26ef669`.
+- Local `s-router-test`, `s-router-test-clients`, and Hetzner toplevel builds
+  passed in the locked full-loop run that started at `2026-05-12 01:18 UTC`.
+- `s-router-clab` rebuild loop passed in that run.
 
 ## Fixed but Only Locally Tested
 
-- `network-codex-agent` now records observed runtime failures as hard-failing
-  tests before the theoretical sweeps. The 2026-05-10 online failure is
-  preserved under `tests/observed-runtime-failures/logs/` and fails first.
-- `network-codex-agent` locally updates the CLAB full-lab postcheck to validate
-  current bridge-kind host uplinks instead of stale macvlan markers. Focused
-  check passed: `bash tests/test-s-router-clab-current-example-postcheck.sh`.
-- `network-renderer-nixos` has a local fix for the access DNS helper that was
-  inserting `deny-direct-dns-egress` on `tenant-mgmt` before policy routing.
-  Focused renderer checks passed:
-  `bash tests/test-dns-service-access-policy-exceptions.sh`,
-  `bash tests/test-dual-wan-branch-overlay.sh`, and
-  `bash tests/test-dns-service-policy-routes.sh`.
-- `network-codex-agent` now raises Hetzner deploy failures before waiting on
-  slower CLAB VM finalization, and interrupt cleanup now terminates CLAB/QEMU
-  job trees. Focused guards passed:
-  `tests/test-s-router-test-cleanup-kills-job-trees.sh` and
-  `tests/test-s-router-test-hetzner-fails-before-clab-finalize.sh`.
-- `network-codex-agent` now tests the actual cleanup-watchdog `pkill sleep`
-  behavior with a fake Hetzner API. The observed bug was that `pkill sleep`
-  could interrupt the second `sleep 5` under `set -e`, leaving detached floating
-  IPs after server deletion. Focused guard passed:
-  `tests/test-s-router-test-hetzner-cleanup-watchdog-pkill-sleep.sh`.
-- Live cleanup verification passed after the retry/unassign patch: the
-  corrected watchdog removed leaked floating IPs `130193580` and `130193581`,
-  and Hetzner then showed no servers and no floating IPs.
-- Hetzner SSH impermanence now matches the working l-esp/l-werk/s-sigma
-  pattern: `/etc/ssh` is not persisted as a directory, and persistent host keys
-  are configured with `services.openssh.hostKeys`. This prevents the persistent
-  directory from hiding NixOS-generated `/etc/ssh/sshd_config`.
-- A generated UUIDv4 Hetzner root console password is now wired for the next
-  fresh install while SSH password login remains disabled. Focused guard passed:
-  `tests/test-s-router-test-hetzner-console-password.sh`.
+- `network-codex-agent` now starts Hetzner deploys in a named tmux window.
+- `network-codex-agent` now sources the Hetzner deploy command file from an
+  interactive `bash -li` tmux shell, so Ctrl-C returns to that shell instead of
+  hiding the deploy in an opaque child process.
+- `network-codex-agent` now fails the CLAB rebuild loop quickly after SSH
+  returns if `s-router-clab-render-live.service` is failed, if stale
+  `clab-fabric-*` containers exist without Docker network `clab`, or if any
+  router container has only `lo`.
+- Focused local guard passed:
+  `bash tests/test-s-router-test-containerlab-gate.sh`.
+- Focused Hetzner tmux/deploy guard passed:
+  `bash tests/test-s-router-test-hetzner-deploy-guards.sh`.
+- The CLAB deploy path now feeds resolved lab inventory to CPM instead of raw
+  `inventory-clab.nix`. Local CPM compile with the generated resolved wrapper
+  passed and produced literal DNS forwarders for the Hetzner DMZ resolver.
+- `network-control-plane-model` now fixes the previously red delegated IPv6
+  overlay public-egress handoff and unsafe core-nebula to WAN forwarding
+  contract. Verified locally with:
+  `bash tests/test-delegated-overlay-public-egress.sh`,
+  `bash tests/test-upstream-selector-nebula-underlay-core-transit.sh`,
+  `bash tests/test-policy-deny-precedence.sh`,
+  `bash tests/test-transit-default-routes-are-classified.sh`, and
+  `bash tests/test-network-labs-inventory-sweep.sh`.
+- `network-control-plane-model` now materializes service-target denies on
+  policy routers, including the minimal `priority-stability` fixture. The
+  locked `network-labs` inventory sweep passed across 44 outputs.
+- `network-forwarding-model` expected output counts are refreshed for the
+  current locked `s-router-overlay-dns-lane-policy` output. Verified locally
+  with `bash tests/test-network-labs-output.sh`.
+- `network-codex-agent` full-lab loop now waits for network repo tests before
+  reboot when `NETWORK_REPO_TEST_GATE=pre-reboot` (default), so model/render
+  contract failures hard-stop before the script restarts `s-router-test`.
+  Verified locally with `bash -n scripts/s-router-full-lab-rebuild-loop.sh`.
+
+## Fixed but Only Locally Tested
+
+- `network-renderer-containerlab-linux-backend` commit `98ef0b6` and the local
+  `network-codex-agent` orchestration patch make CLAB VM matrix worker failures
+  visible to the parent loop through worker status files and log scanning.
+- `network-renderer-containerlab-linux-backend` commit `648d523` fixes a
+  renderer materialization bug where single-endpoint overlay interfaces were
+  configured by runtime commands but dropped from the Containerlab link graph.
+  The focused `single-wan-with-nebula` renderer regression passes locally.
+- `network-codex-agent` now blocks the full loop before doing any restart work
+  while observed runtime failure tests exist.
+- `network-codex-agent` now patches the reused Hetzner validator deploy path to
+  use the correct expected-system flake attr and to add temporary build swap
+  before remote build/rebuild work.
+- `network-codex-agent` now clears the detached CLAB VM matrix worker root
+  before every matrix launch. The `2026-05-12 01:15 UTC` CLAB worker failure
+  was from a stale `clab-worker-0.K4jib8.log`, not current renderer output.
+- The NixOS tree is still dirty with unrelated runtime and client changes; this
+  file does not treat that dirty state as production evidence.
 
 ## Implemented but Not Yet Live-Validated
 
-- Hetzner validator reuse is implemented in `network-codex-agent` and pushed as
-  `08dbc07 reuse hetzner validators with switch`. Reused NixOS validators take
-  the `nixos-rebuild switch` path, and the cleanup watchdog is refreshed for
-  another 3600 seconds.
-- The current DNS renderer fix is not pushed or lock-propagated yet. The
-  locked `s-router-test` build has not consumed it.
+- `s-router-clab` has a local host-side render/deploy service patch. It renders
+  the locked model on the host and asks the nested container only to run
+  Docker/Containerlab against already-rendered YAML.
+- The host-side CLAB render service now uses an absolute store path and
+  explicit runtime inputs. Local `nix eval` of the service description passed.
 
 ## Still Broken
 
-- Live `s-router-access-mgmt` inserted direct DNS drops:
-  `iifname "tenant-mgmt" udp/tcp dport 53 drop comment "deny-direct-dns-egress"`.
-  This conflicts with intent, where `allow-mgmt-dns-to-uplinks` at priority 16
-  explicitly allows mgmt DNS to `isp-a` and `isp-b` before the priority 20
-  `deny-sitea-dns-to-uplinks`.
-- Latest CLAB loop failed before packet validation on the previous locked
-  chain:
-  `missing rendered physical VLAN 4` and
-  `FAILED: full tri-network CLAB host-uplink VLAN compile test failed`.
-- Live `s-router-clab` is not a trustworthy green runtime right now:
-  `clab`, `docker`, and `podman` were absent from `PATH`; `clab-trunk` and
-  `vlan2` were up, while `vlan4` and `vlan5` were down/no-carrier.
-- Live `s-router-core-nebula` still needs review. It had public routes but
-  public ping failed, and its ruleset contained broad overlay/core forwarding
-  accepts that need to be reconciled with intent before they are trusted.
-- `dmzweb01` resolved DNS through the modeled resolver but public IPv4/IPv6
-  ping failed. Verify the DMZ intent before deciding whether this is a renderer
-  bug or an expected deny.
-- Hetzner validator fresh install is red: the install completed, bootloader
-  installation succeeded, and the server stayed running in Hetzner, but SSH on
-  `204.168.245.145:22` refused connections after reboot. The identified cause
-  was missing `/etc/ssh/sshd_config`; the fix is not live-validated yet.
+- The latest full-loop run failed at `2026-05-12 01:35 UTC` while pushing the
+  transient Nebula CA passphrase to `s-router-test`:
+  `Failed to connect to system scope bus via machine transport: Host is down`.
+- `s-router-test` is not production-ready. DNS, route selection, nftables,
+  Nebula reachability, DNS-over-overlay, lane preservation, hostile GUA return,
+  and leak-prevention checks have not all passed on one locked returned
+  generation.
+- Current live router validation is red. Site A access containers can resolve
+  through the modeled resolver, but `b-router-access-branch` and
+  `b-router-access-hostile` get DNS timeouts through their rendered forwarders.
+  Direct branch queries to `10.20.10.1` and `fd42:dead:beef:10::1` time out,
+  while same-site queries from `s-router-access-mgmt` and
+  `s-router-access-client` succeed.
+- Live route evidence shows branch traffic to `10.20.10.1` is routed toward
+  the branch core Nebula path, and Nebula endpoint pings between
+  `s-router-core-nebula` and `b-router-core-nebula` work. The next target is
+  the cross-site DNS forward/return path through policy/upstream/core firewalls
+  and route tables.
+- The last verified CLAB live state was stale and invalid: `clab-fabric-*`
+  router containers had only `lo`, Docker network `clab` was missing, and the
+  old host render service failed with `exec: s-router-clab-render-live: not
+  found`.
 
 ## Pending / Unknown
 
-- Push and lock-propagate the `network-renderer-nixos` DNS fix, then rerun the
-  full-lab rebuild loop through the locked chain.
-- Fix the CLAB VLAN 4 rendered physical uplink failure in the owning renderer.
-- Recheck live client/admin/mgmt/dmz IPv4 and IPv6 egress, direct public DNS
-  leak prevention, DNS-over-overlay, and route selection after the locked loop.
-- Re-run the full network repo sweep; the latest captured sweep was not clean
-  enough to trust as a final result.
-- Hetzner console debugging is pending on the next fresh install with generated
-  `pw.txt`; the currently failed install did not have a configured root
-  password.
+- Whether the current CLAB VM matrix examples finish after the renderer
+  single-endpoint overlay fix. No fresh observed-runtime-failure file was
+  created before the full-loop run failed on the `s-router-test` host path.
+- Whether the Hetzner validator passes Nebula, DNS-over-overlay,
+  BGP/firewall assumptions, and leak-prevention checks after the local CPM/FWM
+  fixes are committed, pushed, locked downstream, and live-validated.
+- Whether the previously observed branch/core Nebula egress failures still
+  exist after the latest locked rebuild.
 
 ## Next Concrete Debugging Target
 
-- Stop the current failed Hetzner run through the cleanup watchdog, rerun
-  `~/github/network-codex-agent/scripts/s-router-full-lab-rebuild-loop.sh`,
-  and use the generated `pw.txt` root password in Hetzner console if SSH still
-  refuses. Capture the exact boot/systemd/network failure before changing model
-  or renderer code.
+- Commit and push the `network-forwarding-model`,
+  `network-control-plane-model`, and `network-codex-agent` fixes, propagate
+  locks through the downstream chain, then rerun
+  `scripts/s-router-full-lab-rebuild-loop.sh` through the locked chain.
 
 ## Assumptions in the Wrong Layer
 
-- An access DNS service must not infer that every tenant interface needs a local
-  direct-DNS drop. DNS allow/deny policy is CPM policy output, and the renderer
-  may only materialize explicit policy without overriding higher-priority
-  allows.
-- CLAB physical VLAN presence is renderer/containerlab materialization, not a
-  local `s-router-test` shell workaround.
+- Renderers and harness code must not infer routing, DNS, firewall, host
+  placement, or topology semantics from names.
+- Link deduplication and topology shape belong upstream in the model/control
+  plane layer, not in renderers or local scripts.
+- Runtime deployment realization is not proven by Docker container presence.
+  The CLAB host/container layer must prove the generated topology was deployed
+  and every router has non-loopback data-plane interfaces.

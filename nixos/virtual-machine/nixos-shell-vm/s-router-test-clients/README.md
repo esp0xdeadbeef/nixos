@@ -13,7 +13,7 @@ locked output.
 
 The box currently materializes:
 
-- site-a admin/client DHCP endpoints
+- nixos admin/client DHCP endpoints
 - branch and hostile DHCP endpoints
 - DMZ service fixtures for Nebula, WireGuard, and HTTP
 

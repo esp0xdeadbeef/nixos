@@ -12,13 +12,16 @@ let
         example_dir="$labs_repo/labs/lab-s-sigma/s-router-test-three-site"
 
         mkdir -p "$work_dir"
+        cat > "$work_dir/resolved-inventory-clab.nix" <<EOF
+        import "$example_dir/getResolvedInventory.nix" { renderer = "clab"; }
+        EOF
 
         nix run --show-trace "path:$cpm_repo#compile-and-build-control-plane-model" -- \
           "$example_dir/intent.nix" \
-          "$example_dir/inventory-clab.nix" \
+          "$work_dir/resolved-inventory-clab.nix" \
           "$work_dir/cpm.json"
 
-        nix eval --impure --json --expr "import $example_dir/inventory-clab.nix" \
+        nix eval --impure --json --expr "import $work_dir/resolved-inventory-clab.nix" \
           > "$work_dir/renderer-inventory.json"
 
         CLABGEN_RENDERER_INVENTORY_JSON="$work_dir/renderer-inventory.json" \

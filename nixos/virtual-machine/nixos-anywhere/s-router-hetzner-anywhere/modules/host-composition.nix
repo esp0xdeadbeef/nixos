@@ -173,7 +173,7 @@ let
       hostName = "s-router-hetzner-anywhere";
       runtimeFacts.publicIngress = {
         snatSourceCidr4 = "${internalWanPrefix}.0/24";
-        services.esp0xdeadbeef.site-c.dmz-nebula = {
+        services.esp0xdeadbeef.hetz.dmz-nebula = {
           publicIPv4SecretPath = "/run/secrets/hetzner-lighthouse-public-ipv4";
           gateway4 = "${internalWanPrefix}.3";
         };
