@@ -56,6 +56,10 @@
       url = "github:esp0xdeadbeef/network-renderer-containerlab-linux-backend";
     };
 
+    llm-agents = { 
+      url = "github:numtide/llm-agents.nix";
+    };
+
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
     };
@@ -150,10 +154,11 @@
   };
 
   outputs =
-    { self
-    , nixpkgs
-    , home-manager
-    , ...
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      ...
     }@inputs:
     let
       lib = nixpkgs.lib;
@@ -204,12 +209,9 @@
           { };
 
       # Discover all hosts automatically
-      hosts = lib.foldl'
-        (
-          acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
-        )
-        { }
-        hostRoots;
+      hosts = lib.foldl' (
+        acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
+      ) { } hostRoots;
 
       allHostAbs = lib.mapAttrsToList (_: v: "${root}/${v}") hosts;
 
@@ -232,7 +234,7 @@
               inGit = lib.hasPrefix "${root}/.git" p;
             in
             # include everything EXCEPT other hosts and .git
-              !(inOther || inGit);
+            !(inOther || inGit);
         };
     in
     {
@@ -258,27 +260,25 @@
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------
-      nixosConfigurations = lib.mapAttrs
-        (
-          name: path:
-            nixpkgs.lib.nixosSystem {
-              system = hostSystemFor name;
+      nixosConfigurations = lib.mapAttrs (
+        name: path:
+        nixpkgs.lib.nixosSystem {
+          system = hostSystemFor name;
 
-              specialArgs = {
-                inherit
-                  inputs
-                  outputs
-                  self
-                  name
-                  ;
-                outPath = self.outPath;
-              };
+          specialArgs = {
+            inherit
+              inputs
+              outputs
+              self
+              name
+              ;
+            outPath = self.outPath;
+          };
 
-              modules = [
-                (./. + "/${path}")
-              ];
-            }
-        )
-        hosts;
+          modules = [
+            (./. + "/${path}")
+          ];
+        }
+      ) hosts;
     };
 }

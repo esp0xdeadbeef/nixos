@@ -4,6 +4,7 @@
   config,
   inputs,
   modulesPath,
+  pkgs,
   ...
 }:
 let
@@ -17,7 +18,15 @@ in
     "${outPath}/library/10-vms/nixos-shell-vm/l-werk-host-config-nixos-shell-vm"
     inputs.nixos-shell.nixosModules.nixos-shell
     ./gnome.nix
+    
   ];
+  environment.systemPackages = with inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}; [
+    claude-code
+    opencode
+    qwen-code
+    codex
+  ];
+
 
   nixos-shell.mounts.mountHome = false;
   nixos-shell.mounts.mountNixProfile = false;

@@ -2,8 +2,10 @@
 {
   # Enable GNOME
   services.xserver.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
+  #services.xserver.displayManager.gdm.enable = true;
+  services.displayManager.gdm.enable = true;
+  #services.xserver.desktopManager.gnome.enable = true;
+  services.desktopManager.gnome.enable = true;
 
   # Bypass the login screen automatically for your user
   services.displayManager.autoLogin = {
@@ -12,6 +14,7 @@
   };
 
   # Workaround for GNOME autologin issue where the screen locks anyway
-  services.xserver.displayManager.gdm.autoLogin.delay = 0;
+  #services.xserver.displayManager.gdm.autoLogin.delay = 0;
+  #services.displayManager.gdm.autoLogin.delay = 0;
 }
 
