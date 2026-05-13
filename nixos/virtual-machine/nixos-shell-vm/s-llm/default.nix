@@ -16,6 +16,7 @@ in
 
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/l-werk-host-config-nixos-shell-vm"
+    "${outPath}/library/99-testing/autologin.nix"
     ./overwrites.nix
     ./container-settings.nix
   ];
