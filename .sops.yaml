@@ -25,6 +25,7 @@ keys:
   - &codex-jail age123fj9yey9cvkef5mn6cjqa2e4zrde9wa78ghlkp6vvag7qk65q3qcrat5w
   - &codex-jail-r age1zc8qevlgymsjweav076vk65ae6ef4n9x8fklv6ue45xl4czrqcpqdpepc3
   - &codex-jail-u age198xl6chpupaf6ecyqkcsg2j2mxf0s894csnxxdw6u0m4mjx7qgjqghg498
+  - &l-werk-llm-jail age1my0wzset83fpqn8aac7kd4zcdjjmeapxnqy6r9qg36jhe7t8x43qdf7frg
   - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
 
 creation_rules:
@@ -66,7 +67,7 @@ creation_rules:
           - *l-werk-root
           - *l-werk-deadbeef
 
-  - path_regex: '^(secrets/)*l-werk-.*\.(env|ya?ml)$'
+  - path_regex: '^(secrets/)*l-werk-default.*\.(env|ya?ml)$'
     input_type: env
     encrypted_regex: ".*"
     key_groups:
@@ -290,3 +291,19 @@ creation_rules:
           - *codex-jail
           - *codex-jail-u
           - *codex-jail-r
+  - path_regex: '^(secrets/)*l-werk-llm-jail.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-werk-llm-jail
+          - *l-werk-root
+          - *l-werk-deadbeef
+  - path_regex: '^(secrets/)*s-llm.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-werk-llm-jail
+          - *l-werk-root
+          - *l-werk-deadbeef
