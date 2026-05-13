@@ -25,7 +25,8 @@
   nixos-shell.mounts = {
     mountHome = false;
     extraMounts = {
-      "/current_pentest" = "/mnt/current_pentest/${config.networking.hostName}";
+      #"/mnt/current_pentest" = "/mnt/current_pentest/${config.networking.hostName}";
+      "/mnt/current_pentest" = "/mnt/current_pentest";
     };
   };
 }

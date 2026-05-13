@@ -2,22 +2,42 @@
   outPath,
   lib,
   config,
+  inputs,
+  modulesPath,
   ...
 }:
 let
-  vmRoot =
-    let
-      file = __curPos.file;
-    in
-    builtins.dirOf file;
+  vmRoot = builtins.dirOf __curPos.file;
 in
 {
   _module.args.vmRoot = vmRoot;
 
   imports = [
+    (modulesPath + "/profiles/qemu-guest.nix")
     "${outPath}/library/10-vms/nixos-shell-vm/l-werk-host-config-nixos-shell-vm"
-    "${outPath}/library/99-testing/autologin.nix"
-    ./overwrites.nix
-    ./container-settings.nix
+    inputs.nixos-shell.nixosModules.nixos-shell
+    ./gnome.nix
   ];
+
+  nixos-shell.mounts.mountHome = false;
+  nixos-shell.mounts.mountNixProfile = false;
+
+  nixos-shell.mounts.extraMounts = {
+    "/mnt/current_pentest" = {
+      target = "/mnt/current_pentest";
+      cache = "none";
+    };
+  };
+
+  virtualisation.memorySize = 4096;
+  virtualisation.cores = 4; 
+  virtualisation.graphics = true;
+  virtualisation.qemu.options = [
+    "-enable-kvm"
+    "-cpu host"
+    "-device virtio-vga-gl"
+    "-display sdl,gl=on"
+  ];
+
+  services.gnome.gnome-keyring.enable = lib.mkForce false;
 }

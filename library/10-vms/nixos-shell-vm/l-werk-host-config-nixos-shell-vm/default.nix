@@ -20,16 +20,16 @@
     inputs.sops-nix.nixosModules.sops
     # inputs.nvf.nixosModules.default
     # inputs.nixvim.nixosModules.nixvim
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
-    "${outPath}/library/01-general/desktop/shell-env.nix"
-    ./vm-settings.nix
-    ./restart-container.nix
-    ./network.nix
-    ./ssh.nix
-    ./impermanence.nix
-    ./persist-state-disk.nix
+    #"${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
+    #"${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
+    #"${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
+    #"${outPath}/library/01-general/desktop/shell-env.nix"
+    #./vm-settings.nix
+    #./restart-container.nix
+    #./network.nix
+    #./ssh.nix
+    #./impermanence.nix
+    #./persist-state-disk.nix
   ];
 
   networking.hostName = name;
@@ -98,16 +98,12 @@
   time.timeZone = "Europe/Amsterdam";
 
   #networking.networkmanager.enable = true;
-  # unlock gnome shit at unlock:
   security.pam.services.login.enableGnomeKeyring = true;
   environment.interactiveShellInit = ''
     ZSH_THEME=alanpeabody
 
   '';
 
-  sops.secrets."deadbeef-passwd" = {
-    neededForUsers = true; # make it available before the user is created
-  };
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {
     # FIXME: Replace with your username
@@ -116,8 +112,7 @@
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
 
-      # initialPassword = " ";
-      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+      initialPassword = " ";
 
       isNormalUser = true;
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
@@ -126,5 +121,5 @@
   };
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  system.stateVersion = "24.11";
+  system.stateVersion = "25.11";
 }
