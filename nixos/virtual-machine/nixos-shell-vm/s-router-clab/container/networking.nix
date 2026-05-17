@@ -44,23 +44,17 @@
     networks."09-mgmt0" = {
       matchConfig.Name = "mgmt0";
 
-      addresses = [
-        { Address = "10.233.222.2/24"; }
-      ];
-
       networkConfig = {
         ConfigureWithoutCarrier = true;
-        DHCP = "no";
+        DHCP = "ipv4";
         LinkLocalAddressing = "no";
         IPv6AcceptRA = false;
       };
 
-      routes = [
-        {
-          Destination = "0.0.0.0/0";
-          Gateway = "10.233.222.1";
-        }
-      ];
+      dhcpV4Config = {
+        UseDNS = false;
+        UseDomains = false;
+      };
     };
 
     networks."10-eth0" = {

@@ -1,7 +1,43 @@
-{ pkgs, config, lib, ... }:
+{
+  pkgs,
+  config,
+  lib,
+  inputs,
+  ...
+}:
 let
+  labInventory = import "${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/getResolvedInventory.nix" {
+    renderer = "nixos";
+  };
+
+  clabHostBridgeNetworks = labInventory.deployment.hosts.s-router-clab.bridgeNetworks or { };
+
+  clabTenantVlanIds = lib.unique (
+    lib.mapAttrsToList (_: bridge: toString bridge.vlan) (
+      lib.filterAttrs (
+        _: bridge:
+        (bridge.mode or null) == "vlan" && (bridge.parent or null) == "eth0" && bridge ? vlan
+      ) clabHostBridgeNetworks
+    )
+  );
+
+  clabExternalVlanIds = [
+    "2"
+    "4"
+    "5"
+  ];
+
+  clabContainerExternalVlanIds = [
+    "4"
+    "5"
+  ];
+
+  clabTrunkVlanIds = lib.unique (clabExternalVlanIds ++ clabTenantVlanIds);
+  clabContainerTrunkVlanIds = lib.unique (clabContainerExternalVlanIds ++ clabTenantVlanIds);
+
+  mkBridgeVlan = vlanId: { VLAN = vlanId; };
+
   disabledHostVlanIds = [
-    2
     3
     4
     5
@@ -36,15 +72,12 @@ in
           Name = "clab-trunk";
           Kind = "bridge";
         };
+        bridgeConfig = {
+          DefaultPVID = "none";
+          VLANFiltering = true;
+        };
       };
 
-      "10-clab-trunk.2" = {
-        netdevConfig = {
-          Name = "clab-trunk.2";
-          Kind = "vlan";
-        };
-        vlanConfig.Id = 2;
-      };
     };
 
     networks = disabledHostVlans.networks // {
@@ -56,6 +89,7 @@ in
           LinkLocalAddressing = "no";
           IPv6AcceptRA = false;
         };
+        bridgeVLANs = map mkBridgeVlan clabTrunkVlanIds;
       };
 
       "20-clab-eth0".enable = lib.mkForce false;
@@ -67,27 +101,24 @@ in
           DHCP = "no";
           LinkLocalAddressing = "no";
           IPv6AcceptRA = false;
-          VLAN = [ "clab-trunk.2" ];
         };
       };
 
-      "20-clab-trunk.2" = {
-        matchConfig.Name = "clab-trunk.2";
-        networkConfig = {
-          Bridge = "vlan2";
-          DHCP = "no";
-          LinkLocalAddressing = "no";
-          IPv6AcceptRA = false;
-        };
+      "30-vlan2" = {
+        matchConfig.Name = "vlan2";
+        networkConfig.DHCP = lib.mkForce "ipv4";
       };
+
+      "21-clab0" = {
+        matchConfig.Name = "clab0";
+        bridgeVLANs = map mkBridgeVlan clabContainerTrunkVlanIds;
+      };
+
     };
   };
 
   containers."${config.networking.hostName}-container".extraVeths = lib.mkForce {
-    mgmt0 = {
-      hostAddress = "10.233.222.1";
-      localAddress = "10.233.222.2";
-    };
+    mgmt0.hostBridge = "vlan2";
     clab0.hostBridge = "clab-trunk";
   };
 
@@ -107,5 +138,4 @@ in
     jq
     ripgrep
   ];
-
 }

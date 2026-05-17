@@ -19,7 +19,7 @@ let
     };
 in
 {
-  nebula01 = dmzClient "nebula01" {
+  nixos-nebula01 = dmzClient "nixos-nebula01" {
     v4 = "10.20.30.10";
     v6 = "fd42:dead:beef:30::10";
   } {
@@ -45,25 +45,7 @@ in
     ];
   };
 
-  wireguard01 = dmzClient "wireguard01" {
-    v4 = "10.20.30.11";
-    v6 = "fd42:dead:beef:30::11";
-  } {
-    extraModules = [
-      {
-        networking.firewall.allowedUDPPorts = [ 51820 ];
-        systemd.services.wireguard-fixture-udp = {
-          wantedBy = [ "multi-user.target" ];
-          serviceConfig = {
-            ExecStart = udpListener 51820;
-            Restart = "always";
-          };
-        };
-      }
-    ];
-  };
-
-  dmzweb01 = dmzClient "dmzweb01" {
+  nixos-dmzweb01 = dmzClient "nixos-dmzweb01" {
     v4 = "10.20.30.12";
     v6 = "fd42:dead:beef:30::12";
   } {

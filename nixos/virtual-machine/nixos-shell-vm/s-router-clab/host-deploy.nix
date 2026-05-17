@@ -11,9 +11,11 @@ let
       pkgs.coreutils
       pkgs.gnugrep
       pkgs.iproute2
+      pkgs.jq
       pkgs.nix
       pkgs.python3
       pkgs.systemd
+      pkgs.util-linux
     ];
     text = ''
     set -euo pipefail
@@ -22,33 +24,92 @@ let
 
     renderer_repo="${inputs.network-renderer-containerlab-linux-backend}"
     labs_repo="${inputs.network-labs}"
+    compiler_repo="${inputs.network-compiler}"
+    forwarding_repo="${inputs.network-forwarding-model}"
     cpm_repo="${inputs.network-control-plane-model}"
     work_dir="''${1:-/persist/s-router-clab/live-$(date +%s)}"
     example_dir="$labs_repo/labs/lab-s-sigma/s-router-test-three-site"
     container_name="s-router-clab-container"
     container_work_dir="''${work_dir#/persist}"
     container_work_dir="/persist''${container_work_dir}"
+    artifact_dir="$work_dir/network-artifacts"
+    container_artifact_dir="$container_work_dir/network-artifacts"
 
-    mkdir -p "$work_dir"
+    mkdir -p "$work_dir" "$artifact_dir"
     cat > "$work_dir/resolved-inventory-clab.nix" <<EOF
     import "$example_dir/getResolvedInventory.nix" { renderer = "clab"; }
     EOF
 
+    nix eval --impure --json --expr "import $example_dir/intent.nix" \
+      | jq -S . > "$artifact_dir/intent.json"
+
+    nix eval --impure --json --expr "import $work_dir/resolved-inventory-clab.nix" \
+      | jq -S . > "$artifact_dir/inventory.json"
+
+    OUTPUT_COMPILER_SIGNED_JSON="$artifact_dir/compiler.json" \
+      nix run --show-trace "path:$compiler_repo#compile" -- \
+        "$example_dir/intent.nix" >/dev/null
+
+    nix run --show-trace "path:$forwarding_repo#compile-and-build-forwarding-model" -- \
+      "$example_dir/intent.nix" \
+      | jq -S . > "$artifact_dir/forwarding.json"
+
     nix run --show-trace "path:$cpm_repo#compile-and-build-control-plane-model" -- \
       "$example_dir/intent.nix" \
       "$work_dir/resolved-inventory-clab.nix" \
-      "$work_dir/cpm.json"
+      "$work_dir/cpm.json" >/dev/null
+    jq -S . "$work_dir/cpm.json" > "$artifact_dir/control-plane.json"
 
-    nix eval --impure --json --expr "import $work_dir/resolved-inventory-clab.nix" \
-      > "$work_dir/renderer-inventory.json"
+    cp "$artifact_dir/inventory.json" "$work_dir/renderer-inventory.json"
 
     CLABGEN_RENDERER_INVENTORY_JSON="$work_dir/renderer-inventory.json" \
+      CLABGEN_DEPLOYMENT_HOST="s-router-clab" \
       nix run --show-trace "path:$renderer_repo#generate-clab-config" -- \
         "$work_dir/cpm.json" \
         "$work_dir/fabric.clab.yml" \
-        "$work_dir/vm-bridges-generated.nix"
+        "$work_dir/vm-bridges-generated.nix" >/dev/null
 
-    python3 - "$work_dir/vm-bridges-generated.nix" "$work_dir/setup-vlan-links.sh" <<'PY'
+    python3 - "$work_dir" "$artifact_dir/rendered-host.json" <<'PY'
+    import json
+    import sys
+    from pathlib import Path
+
+    work_dir = Path(sys.argv[1])
+    target = Path(sys.argv[2])
+    payload = {
+        "renderer": "network-renderer-containerlab-linux-backend",
+        "artifactKind": "containerlab-rendered-host",
+        "topology": str(work_dir / "fabric.clab.yml"),
+        "localTopology": str(work_dir / "fabric.no-overlay.clab.yml"),
+        "bridgeModule": str(work_dir / "vm-bridges-generated.nix"),
+        "networkArtifacts": str(work_dir / "network-artifacts"),
+    }
+    target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    PY
+
+    jq -S -n \
+      --slurpfile intent "$artifact_dir/intent.json" \
+      --slurpfile inventory "$artifact_dir/inventory.json" \
+      --slurpfile compiler "$artifact_dir/compiler.json" \
+      --slurpfile forwarding "$artifact_dir/forwarding.json" \
+      --slurpfile controlPlane "$artifact_dir/control-plane.json" \
+      --slurpfile renderedHost "$artifact_dir/rendered-host.json" \
+      '{
+        intent: $intent[0],
+        globalInventory: $inventory[0],
+        compilerOut: $compiler[0],
+        forwardingOut: $forwarding[0],
+        controlPlaneOut: $controlPlane[0],
+        renderedHost: $renderedHost[0],
+        hostName: "s-router-clab",
+        system: "containerlab-linux",
+        artifactContract: {
+          sharedPath: "/persist/s-router-clab/live-validation/network-artifacts",
+          containerPath: "/etc/network-artifacts"
+        }
+      }' > "$artifact_dir/debug-bundle.json"
+
+    python3 - "$work_dir/vm-bridges-generated.nix" "$work_dir/setup-bridge-links.sh" <<'PY'
     import json
     import re
     import sys
@@ -63,23 +124,64 @@ let
         raise SystemExit("missing bridgeNetworks JSON")
 
     bridge_networks = json.loads(match.group(1))
+    bridges_match = re.search(r"bridges = \[\n(.*?)\n  \];", bridges, re.S)
     commands = ["set -euo pipefail"]
+    bridge_names = set()
+    if bridges_match:
+        for bridge in re.findall(r'"([^"]+)"', bridges_match.group(1)):
+            bridge_names.add(bridge)
+    for bridge_name, bridge_data in sorted(bridge_networks.items()):
+        if not isinstance(bridge_data, dict):
+            continue
+        bridge = bridge_data.get("bridge") or bridge_name
+        if not isinstance(bridge, str) or not bridge:
+            continue
+        bridge_names.add(bridge)
+
+    for bridge in sorted(bridge_names):
+        commands.append(f"ip link show dev {bridge} >/dev/null 2>&1 || ip link add name {bridge} type bridge")
+        commands.append(f"ip link set dev {bridge} up")
+
     for bridge_name, bridge_data in sorted(bridge_networks.items()):
         if not isinstance(bridge_data, dict):
             continue
         if bridge_data.get("mode") != "vlan":
             continue
+        bridge = bridge_data.get("bridge") or bridge_name
         parent = bridge_data.get("parent")
         vlan = bridge_data.get("vlan")
-        if not isinstance(parent, str) or not isinstance(vlan, int):
+        if not isinstance(bridge, str) or not isinstance(parent, str) or not isinstance(vlan, int):
             continue
         interface = f"{parent}.{vlan}"
         commands.append(f"ip link show dev {interface} >/dev/null 2>&1 || ip link add link {parent} name {interface} type vlan id {vlan}")
+        commands.append(f"ip link set dev {interface} master {bridge}")
         commands.append(f"ip link set dev {interface} up")
 
     script_path.write_text("\n".join(commands) + "\n")
     PY
-    bash "$work_dir/setup-vlan-links.sh"
+    cat > "$work_dir/verify-containerlab-deploy.sh" <<'VERIFY_CLAB'
+    set -euo pipefail
+
+    containers="$(docker ps --format '{{.Names}}' | grep '^clab-fabric-' || true)"
+    test -n "$containers" || {
+      echo "no clab-fabric containers are running after deploy" >&2
+      exit 1
+    }
+
+    while IFS= read -r container; do
+      count="$(
+        docker exec "$container" sh -c \
+          'find /sys/class/net -mindepth 1 -maxdepth 1 ! -name lo | wc -l'
+      )"
+      if [ "$count" -lt 1 ]; then
+        docker exec "$container" ip -br link || true
+        echo "container $container has no non-loopback interfaces after deploy" >&2
+        exit 1
+      fi
+    done <<EOF
+    $containers
+    EOF
+    VERIFY_CLAB
 
     python3 - "$work_dir/fabric.clab.yml" "$work_dir/fabric.no-overlay.clab.yml" <<'PY'
     import sys
@@ -114,12 +216,17 @@ let
     target.write_text("\n".join(output) + "\n")
     PY
 
-    machinectl shell -q "$container_name" /run/current-system/sw/bin/bash -lc "
+    flock /run/s-router-clab-render-live.lock machinectl shell -q "$container_name" /run/current-system/sw/bin/bash -lc "
       set -euo pipefail
       mkdir -p /run/s-router-clab
       ln -sfn '$container_work_dir' /run/s-router-clab/live-current
-      containerlab destroy --name fabric -c || true
+      rm -rf /etc/network-artifacts
+      ln -s '$container_artifact_dir' /etc/network-artifacts
+      containerlab destroy --all --cleanup --yes || true
+      docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f
+      bash '$container_work_dir/setup-bridge-links.sh'
       containerlab deploy -t '$container_work_dir/fabric.no-overlay.clab.yml' -d --reconfigure
+      bash '$container_work_dir/verify-containerlab-deploy.sh'
     "
     '';
   };

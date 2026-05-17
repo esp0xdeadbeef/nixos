@@ -1,6 +1,22 @@
-{ builders }:
+{
+  builders,
+  lib,
+  siteName ? "nixos",
+  clientTenant ? "client",
+  clientCount ? 2,
+}:
 
 let
+  rangeFromOne = count: map (index: index + 1) (lib.range 0 (count - 1));
+
+  twoDigit = index:
+    if index < 10 then
+      "0${toString index}"
+    else
+      toString index;
+
+  clientName = index: "${siteName}-${clientTenant}${twoDigit index}";
+
   mkDynamicClient =
     name: bridge:
     {
@@ -12,10 +28,20 @@ let
         dnsServers = [ ];
       };
     };
+
+  mkNumberedClients =
+    bridge:
+    builtins.listToAttrs (
+      map
+        (index: {
+          name = clientName index;
+          value = mkDynamicClient (clientName index) bridge;
+        })
+        (rangeFromOne clientCount)
+    );
 in
 {
-  admin-test = mkDynamicClient "admin-test" "admin";
-  client-test = mkDynamicClient "client-test" "client";
-  client2-test = mkDynamicClient "client2-test" "client2";
-  mgmt-test = mkDynamicClient "mgmt-test" "mgmt";
-}
+  nixos-admin-test = mkDynamicClient "nixos-admin-test" "admin";
+  nixos-mgmt-test = mkDynamicClient "nixos-mgmt-test" "mgmt";
+  nixos-streaming-test = mkDynamicClient "nixos-streaming-test" "streaming";
+} // mkNumberedClients "client"

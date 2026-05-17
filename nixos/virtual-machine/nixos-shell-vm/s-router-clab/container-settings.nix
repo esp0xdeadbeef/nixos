@@ -12,10 +12,7 @@
     privateNetwork = true;
 
     extraVeths = {
-      mgmt0 = {
-        hostAddress = "10.233.222.1";
-        localAddress = "10.233.222.2";
-      };
+      mgmt0.hostBridge = "vlan2";
     };
 
     bindMounts."/persist" = {

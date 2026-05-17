@@ -24,6 +24,8 @@ let
     intentPath = "${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/intent.nix";
     inventoryPath = labResolvedInventoryPath;
   };
+  labIntent = import fabric.intentPath;
+  labInventory = import fabric.inventoryPath;
 
   sliceArgs = {
     inherit (identity) boxName;
@@ -41,8 +43,21 @@ let
 
   builders = import ./client-builders.nix { inherit lib pkgs; };
 
+  clientAccessCount = 2;
+
   clientModules = [
-    (import ./nixos-clients.nix { inherit builders; })
+    (import ./nixos-clients.nix {
+      inherit builders lib;
+      siteName = identity.siteName;
+      clientTenant = "client";
+      clientCount = clientAccessCount;
+    })
+    (import ./model-site-clients.nix {
+      inherit builders lib pkgs;
+      intent = labIntent;
+      inventory = labInventory;
+      siteName = "clab";
+    })
     (import ./branch-hostile-clients.nix { inherit builders pkgs; })
     (import ./dmz-clients.nix { inherit builders pkgs; })
   ];
@@ -56,6 +71,7 @@ let
     netdevs = (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
     networks = (renderedHost.networks or { }) // (renderedBridges.networks or { });
     containers = clientContainers;
+    clientAccessCount = clientAccessCount;
     hostValidation = {
       requireDefaultRoutes = true;
       requireHostResolver = true;
@@ -113,7 +129,7 @@ in
   systemd.network.wait-online.enable = false;
   networking.useDHCP = false;
   networking.useHostResolvConf = lib.mkForce false;
-  services.resolved.enable = lib.mkForce false;
+  services.resolved.enable = lib.mkForce true;
 
   systemd.network.netdevs =
     (renderedHost.netdevs or { })

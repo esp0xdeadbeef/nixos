@@ -1,5 +1,6 @@
 { inputs
 , lib
+, outPath
 , ...
 }:
 let
@@ -75,19 +76,7 @@ let
         (_overlayId: overlay: builtins.elem "${overlay.enterpriseName or ""}::${overlay.siteName or ""}" selectedSiteKeys)
         (nebulaRuntimePlan.overlays or { });
   };
-  siteCDmzLighthouseEndpoint4 = "10.90.10.100";
-  applyHetznerLighthouseEndpoint = value:
-    if builtins.isAttrs value && builtins.hasAttr "lighthouse" value && builtins.isAttrs value.lighthouse then
-      lib.recursiveUpdate value {
-        lighthouse.endpoint = siteCDmzLighthouseEndpoint4;
-        lighthouse.endpoint6 = "";
-      }
-    else
-      value;
-  selectedNebulaRuntimePlanForHetzner = selectedNebulaRuntimePlan // {
-    nodes = lib.mapAttrs (_: applyHetznerLighthouseEndpoint) (selectedNebulaRuntimePlan.nodes or { });
-    overlays = lib.mapAttrs (_: applyHetznerLighthouseEndpoint) (selectedNebulaRuntimePlan.overlays or { });
-  };
+  selectedNebulaRuntimePlanForHetzner = selectedNebulaRuntimePlan;
   builders = import ../../../nixos-shell-vm/s-router-test/modules/container-builders.nix {
     inherit lib;
     pkgs = pkgsForRenderer;
@@ -95,6 +84,7 @@ let
       nebulaRenderer.buildNebulaRuntimeNixosModule {
         pkgs = pkgsForRenderer;
         inherit nodeName;
+        runtimeNode = selectedNebulaRuntimePlanForHetzner.nodes.${nodeName};
       };
   };
   overlayContainers = import ../../../nixos-shell-vm/s-router-test/modules/overlay-containers.nix {
@@ -102,6 +92,29 @@ let
     nebulaRuntimePlan = selectedNebulaRuntimePlanForHetzner;
     inherit (builders) mkNebulaNode mkNebulaProfileMount mkNebulaRuntimeAddon;
   };
+  realizationNodes = (((builtHost.globalInventory or { }).realization or { }).nodes or { });
+  hetznerRealizationNodeFor = logicalName:
+    let
+      matches =
+        lib.filterAttrs
+          (
+            _nodeName: node:
+            (node.host or null) == "s-router-hetzner-anywhere"
+            && ((node.logicalNode or { }).name or null) == logicalName
+          )
+          realizationNodes;
+    in
+      if matches == { } then
+        throw "missing ${logicalName} realization node on s-router-hetzner-anywhere"
+      else
+        builtins.head (builtins.attrValues matches);
+  runtimeContainerNameFor = logicalName:
+    let
+      node = hetznerRealizationNodeFor logicalName;
+    in
+      node.targetContainer or (node.runtimeName or logicalName);
+  hetzCoreContainerName = runtimeContainerNameFor "hetz-router-core";
+  hetzNebulaCoreContainerName = runtimeContainerNameFor "hetz-router-nebula-core";
   nebulaBootstrapModule = nebulaRenderer.buildNebulaBootstrapNixosModule {
     pkgs = pkgsForRenderer;
     nebulaRuntimePlan = selectedNebulaRuntimePlanForHetzner;
@@ -109,11 +122,12 @@ let
     externalLighthousePublicIpv6SecretPath = "/run/secrets/hetzner-public-ipv6";
     externalPortForwardPublicIpv4SecretPath = "/run/secrets/hetzner-public-ipv4";
     externalPortForwardPublicIpv6SecretPath = "/run/secrets/hetzner-public-ipv6";
-    externalPortForwardNodeNames = [ "c-router-nebula-core" ];
-    externalRuntimeNodeNames = [ "c-router-nebula-core" ];
-    runtimeListenHosts = {
-      c-router-nebula-core = internalWanForwardTarget;
-    };
+    externalPortForwardNodeNames = [ ];
+    externalRuntimeNodeNames = [ hetzNebulaCoreContainerName ];
+    externalRemoteLighthouseEndpoint4SecretPath = "/run/secrets/hetzner-lighthouse-public-ipv4";
+    externalRemoteLighthouseEndpoint6SecretPath = "/run/secrets/hetzner-public-ipv6";
+    externalSuppressPublicLighthouseStaticMap = true;
+    sopsProfileSecretPrefix = "nebula-profile";
   };
   externalLighthouseModule = nebulaRenderer.buildExternalLighthouseNixosModule {
     pkgs = pkgsForRenderer;
@@ -128,7 +142,9 @@ let
   runtimeSecretsDir = "/persist/s-router-test-runtime";
   operatorAuthorizedKeys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA1Rmk/3OrwWB5qvWrltIDGgK2vxQIXfRtPkAg56gHB1 deadbeef@l-x13s"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJwxQYzAV73hk/YIet+5EfgS6RdbkA0wyL5J8G8SjAY0 root@s-router-test"
   ];
   publicIPv4SecretPath = "${runtimeSecretsDir}/hetzner-public-ipv4";
   lighthousePublicIPv4SecretPath = "${runtimeSecretsDir}/hetzner-lighthouse-public-ipv4";
@@ -152,9 +168,47 @@ let
     inherit lib;
     inventory = builtHost.globalInventory or { };
     hostName = "s-router-hetzner-anywhere";
+    coreNodeName = "hetz-router-core";
   };
-  internalWanPrefix = "172.31.254";
-  internalWanForwardTarget = "${internalWanPrefix}.4";
+  hetzForwardingSite =
+    (((builtHost.forwardingOut or { }).enterprise or { }).esp or { }).site.hetz or { };
+  hostNatIngress =
+    if builtins.isAttrs (hetzForwardingSite.hostNatIngress or null) && hetzForwardingSite.hostNatIngress != { } then
+      hetzForwardingSite.hostNatIngress
+    else
+      throw "s-router-hetzner-anywhere: forwarding output must provide esp.hetz.hostNatIngress";
+  hostNatIngressEnabled = hostNatIngress.enabled or false;
+  hostNatIngressTargetNode =
+    if hostNatIngressEnabled then
+      hostNatIngress.targetNode or (throw "s-router-hetzner-anywhere: hostNatIngress.targetNode is required")
+    else
+      "hetz-router-core";
+  hostNatIngressUplink =
+    if hostNatIngressEnabled then
+      hostNatIngress.uplink or (throw "s-router-hetzner-anywhere: hostNatIngress.uplink is required")
+    else
+      "wan";
+  hostNatIngressTargetWan = import ./hetzner-internal-wan.nix {
+    inherit lib;
+    inventory = builtHost.globalInventory or { };
+    hostName = "s-router-hetzner-anywhere";
+    coreNodeName = hostNatIngressTargetNode;
+    uplinkName = hostNatIngressUplink;
+  };
+  hostNatIngressReservedTcpDports =
+    lib.sort (a: b: a < b) (
+      lib.unique (
+        lib.concatMap
+          (port:
+            if (port.proto or null) == "tcp" then
+              port.dports or [ ]
+            else
+              [ ])
+          (hostNatIngress.hostReservedPorts or [ ])
+      )
+    );
+  internalWanCidr4 = hostNatIngressTargetWan.hostAddress4;
+  internalWanForwardTarget = hostNatIngressTargetWan.coreAddress4Bare;
   renderedAndOverlayContainers = lib.recursiveUpdate renderedContainers overlayContainers;
   accessPrefixRuntimeSecrets = import ./access-prefix-runtime-secrets.nix {
     inherit lib runtimeSecretsDir;
@@ -172,10 +226,10 @@ let
       inventory = builtHost.globalInventory or { };
       hostName = "s-router-hetzner-anywhere";
       runtimeFacts.publicIngress = {
-        snatSourceCidr4 = "${internalWanPrefix}.0/24";
+        snatSourceCidr4 = internalWanCidr4;
         services.esp0xdeadbeef.hetz.dmz-nebula = {
           publicIPv4SecretPath = "/run/secrets/hetzner-lighthouse-public-ipv4";
-          gateway4 = "${internalWanPrefix}.3";
+          gateway4 = internalWanForwardTarget;
         };
         runtimeForwards = [
           {
@@ -186,23 +240,14 @@ let
               "udp"
             ];
             protectServiceDports = false;
-            exceptTcpDports = [ 22 ];
-            inputDports = [ 4242 ];
-            containerInterface = {
-              container = "c-router-nebula-core";
-              name = "portforward";
-              hostBridge = "br-wan";
-              localAddress = "${internalWanForwardTarget}/24";
-              gateway4 = "${internalWanPrefix}.1";
-              routeMetric = 5000;
-            };
+            exceptTcpDports = hostNatIngressReservedTcpDports;
           }
         ];
       };
     };
   hetznerContainerOverrides = {
-    c-router-core = let
-      baseContainer = renderedAndOverlayContainers.c-router-core or { };
+    ${hetzCoreContainerName} = let
+      baseContainer = renderedAndOverlayContainers.${hetzCoreContainerName} or { };
       baseConfig = baseContainer.config or { };
     in {
       config = { pkgs, ... }: {
@@ -230,6 +275,7 @@ in
   imports = [
     inputs.disko.nixosModules.disko
     inputs.impermanence.nixosModules.impermanence
+    inputs.sops-nix.nixosModules.sops
     (builtHost.artifactModule or { })
     ../disko.nix
     ../hardware.nix
@@ -249,6 +295,9 @@ in
       ];
 
       networking.hostName = "hetzner-nebula-prodtest-01";
+      sops.defaultSopsFile = "${outPath}/secrets/s-router-test.yaml";
+      sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
+      sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
       fileSystems."/boot".neededForBoot = true;
       fileSystems."/nix".neededForBoot = true;
       fileSystems."/persist".neededForBoot = true;
@@ -266,10 +315,15 @@ in
       system.activationScripts.prepareHetznerImpermanenceMachineId = {
         deps = [ "createPersistentStorageDirs" ];
         text = ''
-          if [ -e /etc/machine-id ] && [ ! -e /persist/etc/machine-id ]; then
+          install -d -m 0755 /persist/etc
+          if [ -e /etc/machine-id ] && [ ! -s /persist/etc/machine-id ]; then
             install -D -m 0444 /etc/machine-id /persist/etc/machine-id
-            rm -f /etc/machine-id
           fi
+          if [ ! -s /persist/etc/machine-id ]; then
+            ${pkgsForRenderer.systemd}/bin/systemd-id128 new > /persist/etc/machine-id
+            chmod 0444 /persist/etc/machine-id
+          fi
+          rm -f /etc/machine-id
         '';
       };
       system.activationScripts.persist-files.deps = [
@@ -369,6 +423,8 @@ in
             echo "could not find Hetzner primary interface with MAC ${primaryInterfaceMac}" >&2
             exit 1
           fi
+          ip link set dev "$primary_if" up
+          ip link set dev br-wan up
 
           public4="$(tr -d '\n' < ${publicIPv4SecretPath})"
           public6_prefix="$(tr -d '\n' < ${publicIPv6SecretPath})"
@@ -446,6 +502,7 @@ in
         bind
         conntrack-tools
         curl
+        dig
         ethtool
         gron
         iproute2

@@ -4,6 +4,7 @@ let
   basePackages = with pkgs; [
     bind
     curl
+    dig
     ethtool
     iproute2
     iputils

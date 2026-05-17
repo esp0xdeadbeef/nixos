@@ -54,6 +54,8 @@ in
       settings = {
         experimental-features = "nix-command flakes";
         flake-registry = "";
+        max-jobs = "auto";
+        cores = 0;
         nix-path = config.nix.nixPath;
       };
 
@@ -133,7 +135,7 @@ in
       extraGroups = [ "wheel" ];
 
       openssh.authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBKIjWf+YcfijNBH+ilujFPNpgVZH9jD1PA1GiIzIWxO deadbeef@l-x13s"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA1Rmk/3OrwWB5qvWrltIDGgK2vxQIXfRtPkAg56gHB1 deadbeef@l-x13s"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID3aMs0pSWWYY3Sah8zYP0cJKW7SO/5F8Z7QjM359C+i root@nixos"
       ];
@@ -190,15 +192,43 @@ in
     curl
     wget
     jq
+    gron
     ripgrep
     fd
     htop
+    btop
     pciutils
     usbutils
+    iproute2
+    iputils
+    bind
+    nmap
+    tcpdump
+    traceroute
+    mtr
+    netcat-openbsd
+    socat
+    nftables
+    conntrack-tools
+    ethtool
+    iptables
+    procps
     lsof
     file
+    tree
+    unzip
+    zip
+    rsync
+    moreutils
+    nixpkgs-fmt
+    nil
+    statix
+    deadnix
+    shellcheck
     gcc
     gdb
+    gnumake
+    pkg-config
     python3
     ruff
     nodejs

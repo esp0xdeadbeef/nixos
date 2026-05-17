@@ -4,6 +4,7 @@ let
   common = with pkgs; [
     bind
     curl
+    dig
     ethtool
     iproute2
     iputils

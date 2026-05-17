@@ -24,15 +24,7 @@ let
     renderer = "nixos";
   };
   hetznerRuntime = import ../../../nixos-anywhere/s-router-hetzner-anywhere/runtime.nix;
-  runtimeUnderlayEndpoints = lib.unique (
-    lib.filter
-      (value: builtins.isString value && value != "")
-      [
-        (hetznerRuntime.publicIPv4 or "")
-        (hetznerRuntime.publicIPv6 or "")
-        (hetznerRuntime.lighthousePublicIPv4 or "")
-      ]
-  );
+  runtimeUnderlayEndpoints = [ ];
   addRuntimeUnderlayEndpoints =
     enterpriseSites:
     lib.mapAttrs
@@ -138,10 +130,59 @@ let
     inventory = builtHost.globalInventory or { };
   };
 
-  siteCDmzLighthouseEndpoint4 = "10.90.10.100";
+  nebulaNodeBelongsToHost =
+    _nodeName: node:
+    let
+      deploymentHost = (node.materialization or { }).deploymentHost or null;
+    in
+    !(builtins.isString deploymentHost) || deploymentHost == "" || deploymentHost == deploymentHostName;
+
+  routerNebulaNodes =
+    lib.filterAttrs
+      nebulaNodeBelongsToHost
+      (builtins.removeAttrs (nebulaRuntimePlan.nodes or { }) clientRuntimeNodeNames);
+
+  realizationNodes = (((builtHost.globalInventory or { }).realization or { }).nodes or { });
+  hetznerRealizationNodeFor = logicalName:
+    let
+      matches =
+        lib.filterAttrs
+          (
+            _nodeName: node:
+            (node.host or null) == "s-router-hetzner-anywhere"
+            && ((node.logicalNode or { }).name or null) == logicalName
+          )
+          realizationNodes;
+    in
+      if matches == { } then
+        throw "missing ${logicalName} realization node on s-router-hetzner-anywhere"
+      else
+        builtins.head (builtins.attrValues matches);
+  runtimeContainerNameFor = logicalName:
+    let
+      node = hetznerRealizationNodeFor logicalName;
+    in
+      node.targetContainer or (node.runtimeName or logicalName);
+  requireNebulaPlanNode = nodeName:
+    if builtins.hasAttr nodeName (nebulaRuntimePlan.nodes or { }) then
+      nodeName
+    else
+      throw "missing ${nodeName} in Nebula runtime plan";
+  externalHetznerLighthouseName = requireNebulaPlanNode "hetz-router-lighthouse";
+  externalHetznerNebulaCoreName = runtimeContainerNameFor "hetz-router-nebula-core";
+
+  externalHetznerRuntimeNodeNames = [
+    externalHetznerLighthouseName
+    externalHetznerNebulaCoreName
+  ];
+
+  externalHetznerNebulaNodes =
+    lib.filterAttrs
+      (nodeName: _: builtins.elem nodeName externalHetznerRuntimeNodeNames)
+      (nebulaRuntimePlan.nodes or { });
 
   routerNebulaRuntimePlan = nebulaRuntimePlan // {
-    nodes = builtins.removeAttrs (nebulaRuntimePlan.nodes or { }) clientRuntimeNodeNames;
+    nodes = routerNebulaNodes;
     overlays = lib.mapAttrs
       (
         _overlayId: overlay:
@@ -149,7 +190,28 @@ let
             // {
             runtimeNodes =
               if builtins.isAttrs (overlay.runtimeNodes or null) then
-                builtins.removeAttrs overlay.runtimeNodes clientRuntimeNodeNames
+                lib.filterAttrs
+                  (nodeName: _: builtins.hasAttr nodeName routerNebulaNodes)
+                  (builtins.removeAttrs overlay.runtimeNodes clientRuntimeNodeNames)
+              else
+                overlay.runtimeNodes or { };
+          }
+      )
+      (nebulaRuntimePlan.overlays or { });
+  };
+
+  bootstrapNebulaRuntimePlan = routerNebulaRuntimePlan // {
+    nodes = routerNebulaNodes // externalHetznerNebulaNodes;
+    overlays = lib.mapAttrs
+      (
+        _overlayId: overlay:
+          overlay
+          // {
+            runtimeNodes =
+              if builtins.isAttrs (overlay.runtimeNodes or null) then
+                lib.filterAttrs
+                  (nodeName: _: builtins.hasAttr nodeName (routerNebulaNodes // externalHetznerNebulaNodes))
+                  (builtins.removeAttrs overlay.runtimeNodes clientRuntimeNodeNames)
               else
                 overlay.runtimeNodes or { };
           }
@@ -228,7 +290,10 @@ let
   builders = import ./container-builders.nix {
     inherit lib pkgs;
     mkNebulaRuntimeService = nodeName:
-      nebulaApi.renderer.buildNebulaRuntimeNixosModule { inherit pkgs nodeName; };
+      nebulaApi.renderer.buildNebulaRuntimeNixosModule {
+        inherit pkgs nodeName;
+        runtimeNode = routerNebulaRuntimePlan.nodes.${nodeName};
+      };
   };
 
   overlayContainers = import ./overlay-containers.nix {
@@ -247,19 +312,20 @@ in
     (builtHost.artifactModule or { })
     (nebulaApi.renderer.buildNebulaBootstrapNixosModule {
       inherit pkgs;
-      nebulaRuntimePlan = routerNebulaRuntimePlan;
+      nebulaRuntimePlan = bootstrapNebulaRuntimePlan;
       externalLighthousePublicIpv4SecretPath = "/run/secrets/hetzner-lighthouse-public-ipv4";
       externalLighthousePublicIpv6SecretPath = "/run/secrets/hetzner-public-ipv6";
       externalPortForwardPublicIpv4SecretPath = "/run/secrets/hetzner-public-ipv4";
       externalPortForwardPublicIpv6SecretPath = "/run/secrets/hetzner-public-ipv6";
-      externalPortForwardNodeNames = [ "c-router-nebula-core" ];
-      externalRuntimeNodeNames = [ "c-router-nebula-core" ];
+      externalPortForwardNodeNames = [ ];
+      externalRuntimeNodeNames = [ externalHetznerNebulaCoreName ];
       runtimeListenHosts = {
-        c-router-nebula-core = "172.31.254.4";
+        ${externalHetznerNebulaCoreName} = "172.31.254.4";
       };
-      externalRemoteLighthouseEndpoint4 = siteCDmzLighthouseEndpoint4;
+      externalRemoteLighthouseEndpoint4SecretPath = "/run/secrets/hetzner-lighthouse-public-ipv4";
       externalRemoteLighthouseEndpoint6 = "";
-      externalSuppressPublicLighthouseStaticMap = false;
+      externalSuppressPublicLighthouseStaticMap = true;
+      sopsProfileSecretPrefix = "nebula-profile";
     })
   ];
 
