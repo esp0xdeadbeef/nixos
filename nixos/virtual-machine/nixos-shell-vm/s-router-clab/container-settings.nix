@@ -1,19 +1,16 @@
-{
-  config,
-  pkgs,
-  lib,
-  inputs,
-  vmRoot,
-  ...
+{ config
+, pkgs
+, lib
+, inputs
+, vmRoot
+, ...
 }:
 {
   containers."${config.networking.hostName}-container" = {
     autoStart = true;
     privateNetwork = true;
 
-    extraVeths = {
-      mgmt0.hostBridge = "vlan2";
-    };
+    extraVeths = { };
 
     bindMounts."/persist" = {
       hostPath = "/persist";

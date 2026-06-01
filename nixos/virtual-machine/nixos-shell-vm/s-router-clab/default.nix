@@ -1,8 +1,7 @@
-{
-  outPath,
-  lib,
-  config,
-  ...
+{ outPath
+, lib
+, config
+, ...
 }:
 let
   vmRoot =
@@ -17,6 +16,7 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config"
     ./overwrites.nix
+    ./host-adapter-guard.nix
     ./container-settings.nix
     ./host-deploy.nix
   ];

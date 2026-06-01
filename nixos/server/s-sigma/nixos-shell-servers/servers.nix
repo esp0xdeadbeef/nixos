@@ -52,9 +52,9 @@ in
       description = "s-router-clab VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
     })
-    (mkVM "s-router-test" {
-      description = "s-router-test VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-test"}";
+    (mkVM "s-router-nixos" {
+      description = "s-router-nixos VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-router-nixos"}";
     })
     (mkVM "s-router-test-clients" {
       description = "s-router-test-clients VM (nixos-shell)";

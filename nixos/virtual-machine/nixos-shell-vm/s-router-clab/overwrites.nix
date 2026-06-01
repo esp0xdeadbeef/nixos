@@ -1,11 +1,15 @@
-{
-  pkgs,
-  config,
-  lib,
-  inputs,
-  ...
+{ pkgs
+, config
+, lib
+, inputs
+, outPath
+, ...
 }:
 let
+  mkMgmt = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-management-networkd.nix" {
+    inherit lib pkgs;
+  };
+
   labInventory = import "${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/getResolvedInventory.nix" {
     renderer = "nixos";
   };
@@ -14,10 +18,12 @@ let
 
   clabTenantVlanIds = lib.unique (
     lib.mapAttrsToList (_: bridge: toString bridge.vlan) (
-      lib.filterAttrs (
-        _: bridge:
-        (bridge.mode or null) == "vlan" && (bridge.parent or null) == "eth0" && bridge ? vlan
-      ) clabHostBridgeNetworks
+      lib.filterAttrs
+        (
+          _: bridge:
+            (bridge.mode or null) == "vlan" && (bridge.parent or null) == "eth0" && bridge ? vlan
+        )
+        clabHostBridgeNetworks
     )
   );
 
@@ -63,6 +69,10 @@ let
   disabledHostVlans = lib.foldl' lib.recursiveUpdate { } (map disableHostVlan disabledHostVlanIds);
 in
 {
+  imports = [
+    (mkMgmt "eth0" 2 { bridge = "vlan2"; })
+  ];
+
   systemd.network = {
     netdevs = disabledHostVlans.netdevs // {
       "10-clab-eth0".enable = lib.mkForce false;
@@ -111,6 +121,12 @@ in
 
       "21-clab0" = {
         matchConfig.Name = "clab0";
+        networkConfig = {
+          Bridge = "clab-trunk";
+          DHCP = "no";
+          LinkLocalAddressing = "no";
+          IPv6AcceptRA = false;
+        };
         bridgeVLANs = map mkBridgeVlan clabContainerTrunkVlanIds;
       };
 
@@ -122,12 +138,6 @@ in
     clab0.hostBridge = "clab-trunk";
   };
 
-  networking.nat = {
-    enable = true;
-    externalInterface = "vlan2";
-    internalInterfaces = [ "mgmt0" ];
-  };
-
   environment.systemPackages = with pkgs; [
     vim
     git
@@ -136,6 +146,7 @@ in
     htop
     gron
     jq
+    python3
     ripgrep
   ];
 }

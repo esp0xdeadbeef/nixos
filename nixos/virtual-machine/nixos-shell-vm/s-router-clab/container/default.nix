@@ -1,7 +1,6 @@
-{
-  lib,
-  pkgs,
-  ...
+{ lib
+, pkgs
+, ...
 }:
 {
   imports = [
@@ -42,7 +41,9 @@
     python3
     ripgrep
     tcpdump
+    tmux
     traceroute
+    tshark
     vim
   ];
 

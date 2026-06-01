@@ -1,6 +1,6 @@
-{
-  lib,
-  debugPackages,
+{ lib
+, debugPackages
+,
 }:
 
 let
@@ -31,18 +31,18 @@ let
     };
 
   mkStaticTenantEndpoint =
-    {
-      addr4,
-      gw4,
-      addr6,
-      gw6,
-      mdnsClient ? false,
-      dnsServers ? [
+    { addr4
+    , gw4
+    , addr6
+    , gw6
+    , mdnsClient ? false
+    , dnsServers ? [
         gw4
         gw6
-      ],
-      hostname ? null,
-      extraModules ? [ ],
+      ]
+    , hostname ? null
+    , extraModules ? [ ]
+    ,
     }:
     { lib, ... }@moduleArgs:
     lib.mkMerge (

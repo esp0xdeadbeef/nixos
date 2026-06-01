@@ -1,9 +1,9 @@
-{
-  builders,
-  lib,
-  siteName ? "nixos",
-  clientTenant ? "client",
-  clientCount ? 2,
+{ builders
+, lib
+, siteName ? "nixos"
+, clientTenant ? "client"
+, clientCount ? 2
+,
 }:
 
 let
@@ -43,5 +43,6 @@ in
 {
   nixos-admin-test = mkDynamicClient "nixos-admin-test" "admin";
   nixos-mgmt-test = mkDynamicClient "nixos-mgmt-test" "mgmt";
+  s-sigma = mkDynamicClient "s-sigma" "mgmt";
   nixos-streaming-test = mkDynamicClient "nixos-streaming-test" "streaming";
 } // mkNumberedClients "client"

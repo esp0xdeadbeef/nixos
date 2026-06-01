@@ -1,9 +1,8 @@
-{
-  config,
-  pkgs,
-  lib,
-  vmRoot,
-  ...
+{ config
+, pkgs
+, lib
+, vmRoot
+, ...
 }:
 {
   containers."${config.networking.hostName}-container" = {

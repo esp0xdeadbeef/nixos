@@ -1,14 +1,14 @@
-{
-  debugPackages,
-  mkNebulaRuntimeService,
+{ debugPackages
+, mkNebulaRuntimeService
+,
 }:
 
 let
   mkNebulaRuntimeAddon =
-    {
-      nodeName,
-      firewallModule ? { },
-      extraModules ? [ ],
+    { nodeName
+    , firewallModule ? { }
+    , extraModules ? [ ]
+    ,
     }:
     { ... }:
     {
@@ -24,11 +24,11 @@ let
     };
 
   mkNebulaNode =
-    {
-      nodeName ? "overlay-node",
-      networkModule,
-      firewallModule ? { },
-      extraModules ? [ ],
+    { nodeName ? "overlay-node"
+    , networkModule
+    , firewallModule ? { }
+    , extraModules ? [ ]
+    ,
     }:
     { ... }:
     {
@@ -51,9 +51,21 @@ let
     };
 
   mkNebulaProfileMount = profileName: {
+    "/persist/nebula-runtime/profiles/${profileName}" = {
+      hostPath = "/persist/nebula-runtime/profiles/${profileName}";
+      isReadOnly = false;
+    };
     "/persist/etc/nebula" = {
       hostPath = "/persist/nebula-runtime/profiles/${profileName}";
       isReadOnly = false;
+    };
+    "/run/secrets/hetzner-lighthouse-public-ipv4" = {
+      hostPath = "/run/secrets/hetzner-lighthouse-public-ipv4";
+      isReadOnly = true;
+    };
+    "/run/secrets/hetzner-public-ipv6" = {
+      hostPath = "/run/secrets/hetzner-public-ipv6";
+      isReadOnly = true;
     };
   };
 in

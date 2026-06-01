@@ -1,10 +1,10 @@
-{
-  lib,
-  renderedContainers,
-  mkNebulaRuntimeAddon,
-  mkNebulaNode,
-  mkNebulaProfileMount,
-  profileForName,
+{ lib
+, renderedContainers
+, mkNebulaRuntimeAddon
+, mkNebulaNode
+, mkNebulaProfileMount
+, profileForName
+,
 }:
 
 let

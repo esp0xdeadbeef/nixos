@@ -1,6 +1,6 @@
-{
-  lib,
-  debugPackages,
+{ lib
+, debugPackages
+,
 }:
 
 let
@@ -10,18 +10,18 @@ let
 in
 {
   mkDmzEndpoint =
-    {
-      addr4,
-      gw4,
-      addr6,
-      gw6,
-      dnsServers ? [
+    { addr4
+    , gw4
+    , addr6
+    , gw6
+    , dnsServers ? [
         gw4
         gw6
-      ],
-      allowedTcpPorts ? [ ],
-      allowedUdpPorts ? [ ],
-      extraModules ? [ ],
+      ]
+    , allowedTcpPorts ? [ ]
+    , allowedUdpPorts ? [ ]
+    , extraModules ? [ ]
+    ,
     }:
     { lib, ... }@moduleArgs:
     lib.mkMerge (

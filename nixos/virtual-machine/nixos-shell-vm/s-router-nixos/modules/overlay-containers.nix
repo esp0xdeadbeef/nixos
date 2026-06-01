@@ -1,11 +1,11 @@
-{
-  lib,
-  nebulaRuntimePlan,
-  renderedContainers,
-  mkNebulaRuntimeAddon,
-  mkNebulaNode,
-  mkNebulaProfileMount,
-  excludedNodeNames ? [ ],
+{ lib
+, nebulaRuntimePlan
+, renderedContainers
+, mkNebulaRuntimeAddon
+, mkNebulaNode
+, mkNebulaProfileMount
+, excludedNodeNames ? [ ]
+,
 }:
 
 let
@@ -28,7 +28,7 @@ let
 in
 lib.foldl'
   lib.recursiveUpdate
-  { }
+{ }
   (map
     (nodeName: augment.mkOverlayAugment nodeName (nebulaRuntimePlan.nodes.${nodeName}))
     overlayNodeNames)

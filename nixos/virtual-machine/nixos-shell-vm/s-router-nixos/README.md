@@ -12,7 +12,6 @@ network-labs examples
   -> network-forwarding-model
   -> network-control-plane-model
   -> network-renderer-nixos
-  -> network-renderer-nebula
   -> s-router-test live validation
 ```
 
@@ -20,6 +19,9 @@ network-labs examples
 
 - `network-*` repositories own schema, compiler behavior, forwarding/control-plane
   data, and renderer output.
+- Nebula member materialization is tested as a standalone
+  `network-renderer-nebula` CLI/service contract; this VM should not import that
+  renderer directly while proving the base NixOS topology.
 - `network-labs` owns reusable examples.
 - `s-router-test` owns router VM/container materialization and live probes.
 - `s-router-test-clients` owns client endpoint and DMZ service fixtures.
@@ -50,6 +52,44 @@ The rebuild loop syncs the NixOS tree to the launcher workspace, builds through
 the locked flake chain, reboots `s-router-test`, unlocks the transient Nebula CA,
 and runs live probes. Treat helper summaries critically; direct container checks
 are still required before claiming production readiness.
+
+## Review/Test Module Execution
+
+Runtime-bound SMT and RaTM modules that depend on live NixOS substrate execute
+here, not in `network-codex-agent`.
+
+`network-codex-agent` may register the module, parse-check a reference fixture,
+start the loop, and collect evidence. It does not own VLAN `4`, runtime bridges,
+containers, nftables, DNS, or route behavior.
+
+Required behavior for a harness-owned test runner:
+
+- run the selected SMT/RaTM module inside the rebuilt `s-router-test` runtime;
+- record exact command, container/node, source address, expected route/firewall
+  behavior, and evidence artifact;
+- fail if required VLANs, bridges, generated renderer artifacts, or runtime
+  expectation files are missing;
+- refuse to mark a row `OK` from a repo-local parse/build outside this runtime.
+- delegate Nebula public endpoint, public IP, public ingress, and remote overlay
+  return-route acceptance to the Hetzner harness, because this VM does not own
+  the live public provider addresses.
+
+For the fake PPPoE upstream module:
+
+- VLAN `11` is the fake PPPoE provider-to-core handoff;
+- VLAN `4` is the fake provider upstream/WAN side;
+- fake downstream/client-side fixture segments must not use VLAN IDs `2`
+  through `10`;
+- packet behavior, nft counters, route selection, DNS behavior, and no-router-GUA
+  checks are acceptance evidence only when collected from this runtime or a
+  matching CLAB/Hetzner harness.
+
+Nebula overlay/public-IP context:
+
+- local `s-router-test` checks may prove rendered/provider material, service
+  startup, local overlay interface state, and local route/firewall preflight;
+- public endpoint reachability, public ingress, remote overlay return routes,
+  and live public IP behavior must be proven by the Hetzner harness.
 
 ## Hostile IPv6 Target
 

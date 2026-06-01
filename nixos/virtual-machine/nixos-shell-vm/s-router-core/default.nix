@@ -1,8 +1,7 @@
-{
-  inputs,
-  outPath,
-  lib,
-  ...
+{ inputs
+, outPath
+, lib
+, ...
 }:
 
 let
@@ -37,6 +36,8 @@ let
   builtHost = api.renderer.buildHostFromPaths {
     inherit (fabric) intentPath inventoryPath;
     selector = identity.boxName;
+    containerDefaults = commonContainerOptions;
+    disabled = disabledContainers;
     file = "nixos/virtual-machine/nixos-shell-vm/s-router-core/default.nix";
   };
 
@@ -50,17 +51,9 @@ let
       matchedSites = [ identity.siteName ];
     };
 
-  renderedHost = api.host.build sliceArgs;
+  renderedHost = builtHost.renderedHost or { };
 
-  renderedBridges = api.bridges.build sliceArgs;
-
-  renderedContainers = api.containers.buildForBox (
-    sliceArgs
-    // {
-      disabled = disabledContainers;
-      defaults = commonContainerOptions;
-    }
-  );
+  renderedContainers = renderedHost.containers or { };
 
   deploymentHostName =
     let
@@ -80,18 +73,14 @@ let
   renderedHostNetwork = {
     hostName = renderedHost.hostName or identity.boxName;
     inherit deploymentHostName;
-    bridgeNameMap = renderedBridges.bridgeNameMap or { };
-    bridges = renderedBridges.bridges or { };
-    netdevs =
-      (renderedHost.netdevs or { })
-      // (renderedBridges.netdevs or { });
-    networks =
-      (renderedHost.networks or { })
-      // (renderedBridges.networks or { });
+    bridgeNameMap = renderedHost.bridgeNameMap or { };
+    bridges = renderedHost.bridges or { };
+    netdevs = renderedHost.netdevs or { };
+    networks = renderedHost.networks or { };
     containers = renderedContainers;
     debug = {
       host = renderedHost.debug or { };
-      bridges = renderedBridges.debug or { };
+      bridges = renderedHost.debug or { };
       containers = builtins.attrNames renderedContainers;
     };
   };
@@ -121,7 +110,7 @@ in
     builtins.toJSON {
       inherit identity fabric disabledContainers;
       host = renderedHost.debug or { };
-      bridges = renderedBridges.debug or { };
+      bridges = renderedHost.debug or { };
       containers = builtins.attrNames renderedContainers;
     };
 
@@ -131,13 +120,9 @@ in
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce false;
 
-  systemd.network.netdevs =
-    (renderedHost.netdevs or { })
-    // (renderedBridges.netdevs or { });
+  systemd.network.netdevs = renderedHost.netdevs or { };
 
-  systemd.network.networks =
-    (renderedHost.networks or { })
-    // (renderedBridges.networks or { });
+  systemd.network.networks = renderedHost.networks or { };
 
   containers = renderedContainers;
 }

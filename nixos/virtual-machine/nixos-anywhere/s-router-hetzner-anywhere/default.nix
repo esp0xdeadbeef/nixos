@@ -13,6 +13,10 @@ in
     }
   ];
 
+  environment.systemPackages = with pkgs; [
+    python3
+  ];
+
   systemd.services.s-router-hetzner-persist-swapfile = {
     description = "Prepare persistent btrfs swapfile for Hetzner validation builds";
     before = [ "persist-swap-swapfile.swap" ];

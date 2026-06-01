@@ -15,10 +15,9 @@ let
     boxName = "s-router-test-clients";
   };
 
-  labResolvedInventoryPath =
-    builtins.toFile "lab-sigma-resolved-inventory-nixos.nix" ''
-      import ${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/getResolvedInventory.nix { renderer = "nixos"; }
-    '';
+  labResolvedInventoryPath = builtins.toFile "lab-sigma-resolved-inventory-nixos.nix" ''
+    import ${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/getResolvedInventory.nix { renderer = "nixos"; }
+  '';
 
   fabric = {
     intentPath = "${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/intent.nix";
@@ -38,8 +37,10 @@ let
     file = "nixos/virtual-machine/nixos-shell-vm/s-router-test-clients/default.nix";
   };
 
-  renderedHost = api.host.build sliceArgs;
-  renderedBridges = api.bridges.build sliceArgs;
+  renderedHost = builtHost.renderedHost or { };
+  renderedHostNetworks = builtins.mapAttrs (
+    _: network: builtins.removeAttrs network [ "dhcpConfig" ]
+  ) (renderedHost.networks or { });
 
   builders = import ./client-builders.nix { inherit lib pkgs; };
 
@@ -56,7 +57,16 @@ let
       inherit builders lib pkgs;
       intent = labIntent;
       inventory = labInventory;
+      runtimeTargets = builtHost.runtimeTargets or { };
+      siteName = identity.siteName;
+    })
+    (import ./model-site-clients.nix {
+      inherit builders lib pkgs;
+      intent = labIntent;
+      inventory = labInventory;
+      runtimeTargets = builtHost.runtimeTargets or { };
       siteName = "clab";
+      endpointAddressing = "dhcp";
     })
     (import ./branch-hostile-clients.nix { inherit builders pkgs; })
     (import ./dmz-clients.nix { inherit builders pkgs; })
@@ -66,10 +76,10 @@ let
 
   renderedHostNetwork = {
     hostName = renderedHost.hostName or identity.boxName;
-    bridgeNameMap = renderedBridges.bridgeNameMap or { };
-    bridges = renderedBridges.bridges or { };
-    netdevs = (renderedHost.netdevs or { }) // (renderedBridges.netdevs or { });
-    networks = (renderedHost.networks or { }) // (renderedBridges.networks or { });
+    bridgeNameMap = renderedHost.bridgeNameMap or { };
+    bridges = renderedHost.bridges or { };
+    netdevs = renderedHost.netdevs or { };
+    networks = renderedHostNetworks;
     containers = clientContainers;
     clientAccessCount = clientAccessCount;
     hostValidation = {
@@ -80,29 +90,25 @@ let
     };
   };
 
-  mkClientBridge =
-    name:
-    {
-      netdevConfig = {
-        Kind = "bridge";
-        Name = name;
-      };
+  mkClientBridge = name: {
+    netdevConfig = {
+      Kind = "bridge";
+      Name = name;
     };
+  };
 
-  mkClientBridgeNetwork =
-    name:
-    {
-      matchConfig.Name = name;
-      linkConfig = {
-        ActivationPolicy = "always-up";
-        RequiredForOnline = "no";
-      };
-      networkConfig = {
-        ConfigureWithoutCarrier = true;
-        DHCP = "no";
-        IPv6AcceptRA = false;
-      };
+  mkClientBridgeNetwork = name: {
+    matchConfig.Name = name;
+    linkConfig = {
+      ActivationPolicy = "always-up";
+      RequiredForOnline = "no";
     };
+    networkConfig = {
+      ConfigureWithoutCarrier = true;
+      DHCP = "no";
+      IPv6AcceptRA = false;
+    };
+  };
 
   localOnlyClientBridges = [ ];
 in
@@ -121,7 +127,9 @@ in
     jq
     ripgrep
     tcpdump
+    tmux
     traceroute
+    tshark
   ];
 
   networking.useNetworkd = true;
@@ -132,16 +140,10 @@ in
   services.resolved.enable = lib.mkForce true;
 
   systemd.network.netdevs =
-    (renderedHost.netdevs or { })
-    // (renderedBridges.netdevs or { })
-    // lib.genAttrs localOnlyClientBridges mkClientBridge;
+    (renderedHost.netdevs or { }) // lib.genAttrs localOnlyClientBridges mkClientBridge;
   systemd.network.networks =
     lib.recursiveUpdate
-      (
-        (renderedHost.networks or { })
-        // (renderedBridges.networks or { })
-        // lib.genAttrs localOnlyClientBridges mkClientBridgeNetwork
-      )
+      (renderedHostNetworks // lib.genAttrs localOnlyClientBridges mkClientBridgeNetwork)
       {
         "30-vlan2".networkConfig.DHCP = "ipv4";
       };

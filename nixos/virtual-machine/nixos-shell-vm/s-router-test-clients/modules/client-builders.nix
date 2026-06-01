@@ -12,13 +12,16 @@ let
     lsof
     mtr
     netcat-openbsd
+    nmap
     nftables
     procps
     ripgrep
     socat
     strace
     tcpdump
+    tmux
     traceroute
+    tshark
   ];
 
   evalModules =
@@ -40,9 +43,9 @@ let
     };
 
   mkDhcpEndpoint =
-    {
-      hostname,
-      dnsServers,
+    { hostname
+    , dnsServers
+    ,
     }:
     moduleArgs:
     lib.mkMerge [
@@ -61,18 +64,19 @@ let
     ];
 
   mkStaticEndpoint =
-    {
-      hostname,
-      addr4,
-      gw4,
-      addr6,
-      gw6,
-      dnsServers ? [
+    { hostname
+    , addr4
+    , gw4
+    , addr6
+    , gw6
+    , dnsServers ? [
         gw4
         gw6
-      ],
-      mdnsClient ? false,
-      extraModules ? [ ],
+      ]
+    , ipv6AcceptRA ? false
+    , mdnsClient ? false
+    , extraModules ? [ ]
+    ,
     }:
     { lib, ... }@moduleArgs:
     lib.mkMerge (
@@ -88,7 +92,7 @@ let
               ];
               DNS = dnsServers;
               Domains = [ "lan." ];
-              IPv6AcceptRA = false;
+              IPv6AcceptRA = ipv6AcceptRA;
               MulticastDNS = "yes";
             };
             routes = [

@@ -14,13 +14,19 @@ locked output.
 The box currently materializes:
 
 - nixos admin/client DHCP endpoints
+- `s-sigma` as a DHCP-only mgmt-side hypervisor fixture
+- CLAB endpoint fixtures for the modeled tenant clients on the shared lab VLANs
 - branch and hostile DHCP endpoints
 - DMZ service fixtures for Nebula, WireGuard, and HTTP
 
-Site-C access routers are realized on the Hetzner validation host in the current
-lab inventory. Site-C endpoint fixtures must live with that modeled access
-fabric, or be introduced through explicit inventory/model placement, before
-this client box materializes them.
+Endpoint fixtures must be derived from `intent.nix`, resolved inventory, and
+renderer runtime targets. Adding a site endpoint here must not copy router
+behavior or infer topology from names.
+
+`s-sigma` is a hypervisor/build host fixture, not an access-node service. It is
+attached to the mgmt bridge and receives its address from DHCP like the real
+network. Admin reachability must come from the modeled admin-to-mgmt policy, not
+from local route or firewall shortcuts in this box.
 
 ## Boundary
 

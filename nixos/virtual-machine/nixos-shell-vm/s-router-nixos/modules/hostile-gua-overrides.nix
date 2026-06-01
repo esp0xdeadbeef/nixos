@@ -1,7 +1,7 @@
-{
-  lib,
-  renderedContainers ? { },
-  hetznerAccessPrefixSecretNames ? [ ],
+{ lib
+, renderedContainers ? { }
+, hetznerAccessPrefixSecretNames ? [ ]
+,
 }:
 let
   secretMounts =
@@ -14,13 +14,13 @@ let
 in
 lib.mapAttrs
   (_containerName: container:
-    container
+  container
     // {
-      bindMounts =
-        (if builtins.isAttrs (container.bindMounts or null) then
-          container.bindMounts
-        else
-          { })
-        // secretMounts;
-    })
+    bindMounts =
+      (if builtins.isAttrs (container.bindMounts or null) then
+        container.bindMounts
+      else
+        { })
+      // secretMounts;
+  })
   renderedContainers

@@ -43,28 +43,53 @@
 
     networks."09-mgmt0" = {
       matchConfig.Name = "mgmt0";
-
       networkConfig = {
-        ConfigureWithoutCarrier = true;
         DHCP = "ipv4";
         LinkLocalAddressing = "no";
         IPv6AcceptRA = false;
       };
-
       dhcpV4Config = {
-        UseDNS = false;
-        UseDomains = false;
+        RouteMetric = 1024;
       };
+    };
+
+    netdevs."10-eth0.4" = {
+      netdevConfig = {
+        Name = "eth0.4";
+        Kind = "vlan";
+      };
+      vlanConfig.Id = 4;
     };
 
     networks."10-eth0" = {
       matchConfig.Name = "eth0";
-
       networkConfig = {
         ConfigureWithoutCarrier = true;
         DHCP = "no";
         LinkLocalAddressing = "no";
+        VLAN = [ "eth0.4" ];
         IPv6AcceptRA = false;
+      };
+    };
+
+    networks."20-eth0.4" = {
+      matchConfig.Name = "eth0.4";
+      networkConfig = {
+        DHCP = "no";
+        LinkLocalAddressing = "no";
+        IPv6AcceptRA = false;
+      };
+    };
+
+    networks."30-br-uplink0" = {
+      matchConfig.Name = "br-uplink0";
+      networkConfig = {
+        DHCP = "ipv4";
+        LinkLocalAddressing = "no";
+        IPv6AcceptRA = false;
+      };
+      dhcpV4Config = {
+        RouteMetric = 2048;
       };
     };
   };

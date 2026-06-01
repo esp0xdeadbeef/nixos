@@ -14,11 +14,14 @@ let
     netcat-openbsd
     nftables
     procps
+    python3
     ripgrep
     socat
     strace
     tcpdump
+    tmux
     traceroute
+    tshark
   ];
 in
 {
