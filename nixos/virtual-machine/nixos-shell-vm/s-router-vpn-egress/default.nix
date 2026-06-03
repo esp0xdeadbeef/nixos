@@ -16,6 +16,7 @@ in
 
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config"
+    ./host-network.nix
     ./overwrites.nix
     #./host
     ./start-vpn-egress-containers.nix
