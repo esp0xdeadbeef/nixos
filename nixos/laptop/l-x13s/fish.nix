@@ -40,7 +40,11 @@
       # General.
       c = "clear";
       q = "exit";
-      #cat = "bat";
+      ll = "eza -lah --group-directories-first --icons=auto";
+      la = "eza -la --group-directories-first --icons=auto";
+      l = "eza -lah --group-directories-first --icons=auto";
+      tree = "eza --tree --icons=auto";
+      cat = "bat";
       grep = "rg";
 
       # Navigation.
