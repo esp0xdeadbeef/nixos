@@ -17,9 +17,7 @@
     ./packages/packages.nix
     ./packages/widevine.nix
 
-    # X13s-only nixos-hardware branch:
-    # https://github.com/NixOS/nixos-hardware/pull/1751
-    inputs.nixos-hardware-x13s.nixosModules.lenovo-thinkpad-x13s
+    inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x13s
 
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager

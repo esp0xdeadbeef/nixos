@@ -4,29 +4,10 @@ The ThinkPad X13s is `aarch64-linux`. Build and install this host on the X13s
 itself, or configure a native ARM builder. Building it on plain `x86_64-linux`
 fails while evaluating/building X13s DTBs.
 
-## Known Bootloader Issue
+## Bootloader
 
-The X13s nixos-hardware PR currently injects this GRUB line:
-
-```grub
-devicetree dtbs/<kernel-version>/qcom/sc8280xp-lenovo-thinkpad-x13s.dtb
-```
-
-On this machine GRUB failed with:
-
-```text
-error: invalid file name `dtbs/6.12.84/qcom/sc8280xp-lenovo-thinkpad-x13s.dtb`
-```
-
-This host overrides `boot.loader.grub.extraPerEntryConfig` so the DTB path is
-addressed through the same GRUB drive variable used by the kernel and initrd:
-
-```grub
-devicetree ($drive1)//dtbs/<kernel-version>/qcom/sc8280xp-lenovo-thinkpad-x13s.dtb
-```
-
-Keep that override in `hardware/bootloader.nix` until the upstream X13s module
-or NixOS GRUB generation handles this correctly.
+This host uses systemd-boot on the ESP. The generated loader entry includes the
+X13s DTB through a systemd-boot `devicetree` line.
 
 ## Disk Layout
 
@@ -50,37 +31,23 @@ sudo apt-get update
 sudo apt-get install -y btrfs-progs cryptsetup dosfstools efibootmgr gdisk git jq nix-bin rsync
 ```
 
-Prepare the disk:
+Prepare the disk with disko. This wipes `/dev/nvme0n1`.
 
 ```bash
 sudo swapoff -a || true
 sudo umount -R /mnt 2>/dev/null || true
 sudo cryptsetup close root 2>/dev/null || true
 
-sudo wipefs -af /dev/nvme0n1
-sudo sgdisk --zap-all /dev/nvme0n1
-sudo sgdisk -n 1:1MiB:+1075MiB -t 1:EF00 -c 1:ESP /dev/nvme0n1
-sudo sgdisk -n 2:0:0 -t 2:8309 -c 2:root-luks /dev/nvme0n1
-sudo partprobe /dev/nvme0n1
+printf '<luks-password>' | sudo tee /tmp/disk.key >/dev/null
+sudo chmod 600 /tmp/disk.key
 
-sudo cryptsetup luksFormat --type luks2 /dev/nvme0n1p2
-sudo cryptsetup open /dev/nvme0n1p2 root
-sudo mkfs.vfat -F 32 -n NIXBOOT /dev/nvme0n1p1
-sudo mkfs.btrfs -f -L nixos-root /dev/mapper/root
+sudo nix --extra-experimental-features 'nix-command flakes' \
+  run github:nix-community/disko/latest -- \
+  --mode destroy,format,mount --yes-wipe-all-disks \
+  /path/to/this/repo/nixos/laptop/l-x13s/disko.nix
 
-sudo mount /dev/mapper/root /mnt
-sudo btrfs subvolume create /mnt/root
-sudo btrfs subvolume create /mnt/nix
-sudo btrfs subvolume create /mnt/persist
-sudo umount /mnt
-
-sudo mount -o subvol=root /dev/mapper/root /mnt
-sudo mkdir -p /mnt/boot /mnt/nix /mnt/persist /mnt/partition-root
-sudo mount -o subvol=nix,compress=zstd,noatime /dev/mapper/root /mnt/nix
-sudo mount -o subvol=persist,compress=zstd,noatime /dev/mapper/root /mnt/persist
-sudo mount /dev/mapper/root /mnt/partition-root
-sudo mount /dev/nvme0n1p1 /mnt/boot
-sudo mkdir -p /mnt/persist/etc/ssh /mnt/persist/var/lib
+sudo mkdir -p /mnt/src/nixos /mnt/root-cache /mnt/tmp /mnt/persist/etc/ssh /mnt/persist/var/lib
+sudo chown -R ubuntu:ubuntu /mnt/src
 ```
 
 The Ubuntu live overlay is too small for the full desktop closure. Put the repo,
@@ -112,10 +79,14 @@ sudo env XDG_CACHE_HOME=/mnt/root-cache TMPDIR=/mnt/tmp \
   --impure --no-root-passwd --flake path:/mnt/src/nixos#l-x13s
 ```
 
-Create or refresh the NVRAM boot entry if needed:
+The installer creates or refreshes a `Linux Boot Manager` NVRAM entry for
+systemd-boot. A fallback removable path is also installed at
+`\EFI\BOOT\BOOTAA64.EFI`.
+
+Remove the temporary live-system key file after installation:
 
 ```bash
-sudo efibootmgr -c -d /dev/nvme0n1 -p 1 -L NixOS -l '\EFI\BOOT\BOOTAA64.EFI'
+sudo rm -f /tmp/disk.key
 ```
 
 ## Pre-Reboot Checks
@@ -124,15 +95,17 @@ Before rebooting, confirm:
 
 ```bash
 test -e /mnt/boot/EFI/BOOT/BOOTAA64.EFI
-test -e /mnt/boot/dtbs/*/qcom/sc8280xp-lenovo-thinkpad-x13s.dtb
+test -e /mnt/boot/EFI/systemd/systemd-bootaa64.efi
+test -e /mnt/boot/EFI/nixos/*sc8280xp-lenovo-thinkpad-x13s.dtb.efi
 test -e /mnt/nix/var/nix/profiles/system/kernel
 test -e /mnt/nix/var/nix/profiles/system/initrd
-grep -F 'devicetree ($drive1)//dtbs/' /mnt/boot/grub/grub.cfg
+grep -F 'devicetree /EFI/nixos/' /mnt/boot/loader/entries/nixos-generation-1.conf
 btrfs subvolume list /mnt/partition-root
 findmnt /mnt /mnt/nix /mnt/persist /mnt/partition-root /mnt/boot
 sudo efibootmgr -v
 ```
 
-The `NixOS` EFI entry should point at `\EFI\BOOT\BOOTAA64.EFI` on the new ESP.
+The `Linux Boot Manager` EFI entry should point at
+`\EFI\systemd\systemd-bootaa64.efi` on the new ESP.
 `/mnt/partition-root` should show `root`, `nix`, and `persist` btrfs
 subvolumes before rebooting.

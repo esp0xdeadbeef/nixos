@@ -8,7 +8,10 @@
 
 {
   boot.initrd.systemd.enable = true;
-  boot.initrd.systemd.tpm2.enable = true; # keep your TPM2 settings
+  boot.initrd.systemd.tpm2.enable = false;
+  boot.kernelParams = lib.mkAfter [ "systemd.tpm2_wait=0" ];
+
+  systemd.tpm2.enable = false;
 
   fileSystems."/persist".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
