@@ -39,6 +39,10 @@
       url = "github:esp0xdeadbeef/network-renderer-wireguard";
     };
 
+    network-renderer-access-endpoint-nixos = {
+      url = "github:esp0xdeadbeef/network-renderer-access-endpoint-nixos";
+    };
+
     network-compiler = {
       url = "github:esp0xdeadbeef/network-compiler";
     };
