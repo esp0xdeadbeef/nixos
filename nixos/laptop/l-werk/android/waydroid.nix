@@ -167,7 +167,7 @@ in
     };
   };
 
-  programs.adb.enable = true;
+  #programs.adb.enable = true;
 
   systemd.services."waydroid-mitm-root" = {
     description = "Inject MITM cert into Waydroid USER store + set proxy (root)";

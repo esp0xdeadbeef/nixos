@@ -119,7 +119,7 @@ in
         #certipy
         teams-for-linux
         slack
-        (burpsuite.override { proEdition = true; })
+        (burpsuite.override { iconName = "pro"; })
         gh
       ];
     in

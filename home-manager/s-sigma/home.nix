@@ -71,7 +71,7 @@
     ffuf
     #exploitdb
     inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
-    # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+    # (inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { iconName = "pro"; })
   ];
   # Enable home-manager and git
   programs.home-manager.enable = true;

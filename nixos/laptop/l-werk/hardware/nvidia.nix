@@ -46,11 +46,11 @@
   virtualisation.docker.rootless.daemon.settings.features.cdi = true;
 
   # cuda runtime
-  environment.systemPackages = [
-    (pkgs.ollama.override {
-      acceleration = "cuda";
-    })
-  ];
-  services.ollama.acceleration = "cuda";
+  #environment.systemPackages = [
+  #  (pkgs.ollama.override {
+  #    acceleration = "cuda";
+  #  })
+  #];
+  #services.ollama.acceleration = "cuda";
 
 }

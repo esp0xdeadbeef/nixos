@@ -487,7 +487,7 @@
               bridge = "tr103";
             };
             interface = {
-              name = "downstream-admin";
+              name = "downstr-admin";
             };
           };
 
@@ -499,7 +499,7 @@
               bridge = "tr104";
             };
             interface = {
-              name = "downstream-client";
+              name = "downstr-client";
             };
           };
 

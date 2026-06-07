@@ -23,7 +23,7 @@
     #exploitdb
     nixpkgs-unstable.legacyPackages.x86_64-linux.exploitdb
     nixpkgs-unstable.legacyPackages.x86_64-linux.i3lock
-    (nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { proEdition = true; })
+    (nixpkgs-unstable.legacyPackages.x86_64-linux.burpsuite.override { iconName = "pro"; })
   ];
 }
 

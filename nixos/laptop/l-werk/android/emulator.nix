@@ -20,11 +20,13 @@ in
 {
   nixpkgs.config.android_sdk.accept_license = true;
 
-  programs.adb.enable = true;
+  #programs.adb.enable = true;
+  
   environment.systemPackages = [
     androidPkgs.androidsdk
     pkgs.qemu
     pkgs.androidsdk
+    pkgs.android-tools
 
     # Force wrapper to override real emulator
     (lib.hiPrio (

@@ -106,7 +106,7 @@ in
       traceroute
       tmux
       dig
-      #(burpsuite.override { proEdition = true; })
+      #(burpsuite.override { iconName = "pro"; })
       bindfs
       xclip
       wget

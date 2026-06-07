@@ -1,36 +1,19 @@
 # `s-router-clab`
 
-`s-router-clab` is the CLAB runtime harness for model/render validation. It
-owns CLAB container materialization, CLAB bridges, CLAB route/firewall/DNS
-probes, and CLAB-specific CMC/RaTM module tests before FAT evidence is accepted.
+`s-router-clab` is a thin host profile for the Containerlab target. It must not
+implement Containerlab topology, deploy logic, route/firewall/DNS rules,
+overlays, PPP/PPPoE, endpoint behavior, generated artifacts, probes, or
+validation hooks locally.
 
-## Review/Test Module Execution
+The host profile may only:
 
-Runtime-bound CMC/RaTM tests that target CLAB execute here, not as repo-local
-parse/build checks in `network-codex-agent`.
+- select the HAT or SAT lab source;
+- identify `deploymentHost = "s-router-clab"`;
+- import renderer-produced host/runtime configuration;
+- bind host secrets or runtime inputs required by renderer output;
+- preserve explicitly approved VLAN 2 management reachability.
 
-Required behavior for CLAB-scoped module tests:
-
-- run the selected CMC/RaTM module test inside the rebuilt `s-router-clab`
-  runtime;
-- record exact command, container/node, source address, expected route/firewall
-  behavior, and evidence artifact;
-- fail if required CLAB bridges, VLANs, generated renderer artifacts, or runtime
-  expectation files are missing;
-- refuse to mark a row `OK` from a repo-local parse/build outside this runtime.
-
-For the fake PPPoE upstream module:
-
-- VLAN `11` is the fake PPPoE provider-to-core handoff;
-- VLAN `4` is the fake provider upstream/WAN side;
-- fake downstream/client-side fixture segments must not use VLAN IDs `2`
-  through `10`;
-- CLAB route/firewall/DNS and no-router-GUA behavior are acceptance evidence
-  only when collected from this runtime or an equivalent owning harness.
-
-Nebula overlay/public-IP context:
-
-- local CLAB checks may prove renderer output, local service wiring, local
-  routes, local firewall rules, and local leak-prevention preflight;
-- public endpoint reachability, public ingress, remote overlay return routes,
-  and live public IP behavior must be proven by the Hetzner harness.
+Containerlab topology, runtime/deploy behavior, generated artifacts, and CLAB
+validation hooks belong in `network-renderer-containerlab-linux-backend` or an
+upstream model contract. Missing behavior is a renderer/model gap, not a reason
+to add local Nix modules or scripts here.

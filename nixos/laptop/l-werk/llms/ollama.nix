@@ -10,7 +10,7 @@ in
   services.ollama = {
     enable = true;
     package = pkgs-unstable.ollama-cuda;
-    acceleration = "cuda";
+    #acceleration = "cuda";
 
     loadModels = [
       "llama3.1:8b"

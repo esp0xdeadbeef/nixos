@@ -1,18 +1,18 @@
-# `s-router-test`
+# `s-router-nixos`
 
-`s-router-test` is a single-VM integration harness for the locked `network-*`
+`s-router-nixos` is a single-VM integration harness for the locked `network-*`
 pipeline. It should consume model and renderer output; it should not become the
 place where topology, route policy, or overlay semantics are invented.
 
 The chain under test is:
 
 ```text
-network-labs examples
+network-labs controlled SAT source
   -> network-compiler
   -> network-forwarding-model
   -> network-control-plane-model
   -> network-renderer-nixos
-  -> s-router-test live validation
+  -> s-router-nixos live validation
 ```
 
 ## Ownership
@@ -22,18 +22,18 @@ network-labs examples
 - Nebula member materialization is tested as a standalone
   `network-renderer-nebula` CLI/service contract; this VM should not import that
   renderer directly while proving the base NixOS topology.
-- `network-labs` owns reusable examples.
-- `s-router-test` owns router VM/container materialization and live probes.
+- `network-labs` owns the controlled SAT source and reusable examples.
+- `s-router-nixos` owns router VM/container materialization and live probes.
 - `s-router-test-clients` owns client endpoint and DMZ service fixtures.
-- Any local `s-router-test` helper that injects routes, firewall, delegated-prefix
+- Any local `s-router-nixos` helper that injects routes, firewall, delegated-prefix
   behavior, or overlay runtime policy is transitional glue and must be recorded in
   `regression.md` as wrong-layer work.
 
-## Current Examples
+## Current Source
 
-The active tri-site examples are in the locked `network-labs` input:
+The active controlled SAT source is in the locked `network-labs` input:
 
-- `examples/s-router-test-three-site`
+- `sat`
 
 Do not use `../../` or `file:` path inputs for the remote rebuild path. `s-sigma`
 only sees the NixOS checkout and locked flake inputs.
@@ -44,12 +44,12 @@ Use the script wrappers instead of hand-rolled SSH quoting:
 
 ```bash
 ~/github/network-codex-agent/scripts/s-router-full-lab-rebuild-loop.sh
-~/github/network-codex-agent/scripts/exec-on-remote.sh s-router-test <cmd> [args...]
+~/github/network-codex-agent/scripts/exec-on-remote.sh s-router-nixos <cmd> [args...]
 ~/github/network-codex-agent/scripts/exec-in-s-router-test-machine.sh <container> <cmd> [args...]
 ```
 
 The rebuild loop syncs the NixOS tree to the launcher workspace, builds through
-the locked flake chain, reboots `s-router-test`, unlocks the transient Nebula CA,
+the locked flake chain, reboots `s-router-nixos`, unlocks the transient Nebula CA,
 and runs live probes. Treat helper summaries critically; direct container checks
 are still required before claiming production readiness.
 
@@ -64,7 +64,7 @@ containers, nftables, DNS, or route behavior.
 
 Required behavior for a harness-owned test runner:
 
-- run the selected SMT/RaTM module inside the rebuilt `s-router-test` runtime;
+- run the selected SMT/RaTM module inside the rebuilt `s-router-nixos` runtime;
 - record exact command, container/node, source address, expected route/firewall
   behavior, and evidence artifact;
 - fail if required VLANs, bridges, generated renderer artifacts, or runtime
@@ -86,7 +86,7 @@ For the fake PPPoE upstream module:
 
 Nebula overlay/public-IP context:
 
-- local `s-router-test` checks may prove rendered/provider material, service
+- local `s-router-nixos` checks may prove rendered/provider material, service
   startup, local overlay interface state, and local route/firewall preflight;
 - public endpoint reachability, public ingress, remote overlay return routes,
   and live public IP behavior must be proven by the Hetzner harness.
