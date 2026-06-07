@@ -15,7 +15,7 @@ in
   networking.hostName = lib.mkForce "s-router-nixos";
 
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config"
+    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./management-vlan2.nix
 
     (import ./renderers.nix {
