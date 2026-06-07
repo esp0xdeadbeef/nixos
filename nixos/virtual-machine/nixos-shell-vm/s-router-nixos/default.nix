@@ -16,6 +16,7 @@ in
 
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config"
+    ./management-vlan2.nix
 
     (import ./renderers.nix {
       inherit inputs lib;
