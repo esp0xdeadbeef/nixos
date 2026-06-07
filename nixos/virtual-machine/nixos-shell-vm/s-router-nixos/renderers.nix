@@ -6,23 +6,12 @@
 ,
 }:
 
-{ pkgs
-, ...
-}:
+{ ... }:
 
 let
-  system = pkgs.stdenv.hostPlatform.system or "x86_64-linux";
   labPath = "${inputs.network-labs}/${labSource}";
   intent = "${labPath}/intent.nix";
-  inventory =
-    if builtins.pathExists "${labPath}/inventory-nixos.nix" then
-      "${labPath}/inventory-nixos.nix"
-    else if builtins.pathExists "${labPath}/getResolvedInventory.nix" then
-      builtins.toFile "s-router-nixos-inventory.nix" ''
-        import ${labPath}/getResolvedInventory.nix { renderer = "nixos"; }
-      ''
-    else
-      "${labPath}/inventory.nix";
+  inventory = "${labPath}/inventory.nix";
 
   rendererInput = {
     inherit
@@ -51,7 +40,7 @@ let
       render-nebula
       render-wireguard
       ;
-    sops-for-renderers = ./sops.nix;
+    sops-for-renderers = "${labPath}/sops.nix";
   };
 in
 {

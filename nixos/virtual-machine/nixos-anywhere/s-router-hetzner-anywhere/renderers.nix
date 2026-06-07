@@ -51,7 +51,7 @@ let
       render-nebula
       render-wireguard
       ;
-    sops-for-renderers = ./sops.nix;
+    sops-for-renderers = "${inputs.network-labs}/${labSource}/sops.nix";
   };
 in
 {
