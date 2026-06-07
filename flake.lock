@@ -1498,11 +1498,11 @@
         "nixpkgs": "nixpkgs_9"
       },
       "locked": {
-        "lastModified": 1780835241,
-        "narHash": "sha256-JbF18NSlFUS/gg6wex06hlxeKyABj4pcLkeLaC8HbwA=",
+        "lastModified": 1780847797,
+        "narHash": "sha256-CKuiNnu2rkzefzC/pp18Rf7uzm7Nh0Jxzu86qSoH6tg=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-containerlab-linux-backend",
-        "rev": "caadb94870de3fad9178eaedcd155b3ada6519a8",
+        "rev": "d9e60bfd2f0e24bd6e2c2c98bcdc80a499b0bcda",
         "type": "github"
       },
       "original": {
