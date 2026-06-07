@@ -921,11 +921,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1780846516,
-        "narHash": "sha256-QkUivcLqB8seRdcYT9YR3gzJqvT9t+fqLCmcl35lH80=",
+        "lastModified": 1780846609,
+        "narHash": "sha256-M27efXktHAjGIfl2ODFKw6d/WvrCIUHxo7b5HsCKt/s=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "e12028d5bdff0d36d4d8e37b7bf875c7bfb5e4a7",
+        "rev": "7fff8eaa6ad14be6019582d9817eeeed7e37ff40",
         "type": "github"
       },
       "original": {
