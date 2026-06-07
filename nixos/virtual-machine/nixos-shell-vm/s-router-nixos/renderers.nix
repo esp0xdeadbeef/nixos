@@ -12,6 +12,7 @@ let
   labPath = "${inputs.network-labs}/${labSource}";
   intent = "${labPath}/intent.nix";
   inventory = "${labPath}/inventory.nix";
+  sops = "${labPath}/sops.nix";
 
   rendererInput = {
     inherit
@@ -40,7 +41,7 @@ let
       render-nebula
       render-wireguard
       ;
-    sops-for-renderers = "${labPath}/sops.nix";
+    sops-for-renderers = sops; 
   };
 in
 {
