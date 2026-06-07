@@ -1,1 +1,0 @@
-import ./default-sat.nix
