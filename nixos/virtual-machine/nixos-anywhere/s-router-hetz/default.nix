@@ -15,8 +15,7 @@ in
   networking.hostName = lib.mkForce "s-router-hetz";
 
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
-    ./management-vlan2.nix
+    ./disko.nix
 
     (import ./renderers.nix {
       inherit inputs lib;
