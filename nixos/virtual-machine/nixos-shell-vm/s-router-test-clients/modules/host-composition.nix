@@ -3,7 +3,6 @@
 , pkgs
 , sRouterTestClientsLabProfile ? {
     labSource = "active-lab";
-    labSelector = "s-router-test-clients";
   }
 , ...
 }:
@@ -14,55 +13,47 @@ let
   cpm =
     inputs.network-cpm.libBySystem.${system}
       or inputs.network-cpm.lib
-      or inputs.network-renderer-nixos.lib;
+      or (throw "s-router-test-clients: missing network-cpm API");
 
   labPath = "${inputs.network-labs}/${sRouterTestClientsLabProfile.labSource}";
 
-  cpmInput = {
+  labInputs = {
     intentPath = "${labPath}/intent.nix";
     inventoryPath = "${labPath}/inventory.nix";
     sopsPath = "${labPath}/sops.nix";
-    selector = sRouterTestClientsLabProfile.labSelector;
-    file = "nixos/virtual-machine/nixos-shell-vm/s-router-test-clients/default.nix";
   };
 
   cpmOutput =
     if cpm ? emulatedClients && cpm.emulatedClients ? buildFromPaths then
-      cpm.emulatedClients.buildFromPaths cpmInput
-    else if cpm ? renderer && cpm.renderer ? buildHostFromPaths then
-      cpm.renderer.buildHostFromPaths cpmInput
+      cpm.emulatedClients.buildFromPaths labInputs
+    else if cpm ? clients && cpm.clients ? emulateFromPaths then
+      cpm.clients.emulateFromPaths labInputs
+    else if cpm ? clientFixtures && cpm.clientFixtures ? buildFromPaths then
+      cpm.clientFixtures.buildFromPaths labInputs
     else
-      throw "s-router-test-clients: CPM API must expose emulatedClients.buildFromPaths or renderer.buildHostFromPaths";
+      throw "s-router-test-clients: CPM API must expose emulatedClients.buildFromPaths, clients.emulateFromPaths, or clientFixtures.buildFromPaths";
 
-  renderedHost = cpmOutput.renderedHost or { };
-
-  renderedHostNetworks = builtins.mapAttrs
-    (_: network: builtins.removeAttrs network [ "dhcpConfig" ])
-    (renderedHost.networks or { });
-
-  labIntent = cpmOutput.intent or import cpmInput.intentPath;
-  labInventory = cpmOutput.inventory or import cpmInput.inventoryPath;
+  labIntent = cpmOutput.intent or import labInputs.intentPath;
+  labInventory = cpmOutput.inventory or import labInputs.inventoryPath;
   runtimeTargets = cpmOutput.runtimeTargets or { };
+  hostNetwork = cpmOutput.hostNetwork or cpmOutput.renderedHost or { };
 
-  siteName = cpmOutput.siteName or "nixos";
+  hostNetworks = builtins.mapAttrs
+    (_: network: builtins.removeAttrs network [ "dhcpConfig" ])
+    (hostNetwork.networks or { });
 
   builders = import ./client-builders.nix { inherit lib pkgs; };
 
+  siteName = cpmOutput.siteName or "nixos";
   clientAccessCount = cpmOutput.clientAccessCount or 2;
 
-  modelClients =
-    cpmOutput.emulatedClients
-      or cpmOutput.clients
-      or null;
-
   clientContainers =
-    if modelClients != null then
-      modelClients
-    else
-      lib.foldl' lib.recursiveUpdate { } [
+    cpmOutput.containers
+      or cpmOutput.emulatedClients
+      or cpmOutput.clientFixtures
+      or lib.foldl' lib.recursiveUpdate { } [
         (import ./nixos-clients.nix {
-          inherit builders lib;
-          inherit siteName clientAccessCount;
+          inherit builders lib siteName;
           clientTenant = "client";
           clientCount = clientAccessCount;
         })
@@ -85,8 +76,7 @@ let
 in
 {
   imports = [
-    (cpmOutput.artifactModule or { })
-    cpmInput.sopsPath
+    labInputs.sopsPath
   ];
 
   system.stateVersion = lib.mkForce "25.11";
@@ -111,18 +101,18 @@ in
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce true;
 
-  systemd.network.netdevs = renderedHost.netdevs or { };
+  systemd.network.netdevs = hostNetwork.netdevs or { };
 
-  systemd.network.networks = lib.recursiveUpdate renderedHostNetworks {
+  systemd.network.networks = lib.recursiveUpdate hostNetworks {
     "30-vlan2".networkConfig.DHCP = "ipv4";
   };
 
   _module.args.renderedHostNetwork = {
-    hostName = renderedHost.hostName or sRouterTestClientsLabProfile.labSelector;
-    bridgeNameMap = renderedHost.bridgeNameMap or { };
-    bridges = renderedHost.bridges or { };
-    netdevs = renderedHost.netdevs or { };
-    networks = renderedHostNetworks;
+    hostName = hostNetwork.hostName or "s-router-test-clients";
+    bridgeNameMap = hostNetwork.bridgeNameMap or { };
+    bridges = hostNetwork.bridges or { };
+    netdevs = hostNetwork.netdevs or { };
+    networks = hostNetworks;
     containers = clientContainers;
     clientAccessCount = clientAccessCount;
     hostValidation = {
