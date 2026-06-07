@@ -88,6 +88,7 @@ in
     "sd_mod"
     "sr_mod"
   ];
+  time.timeZone = "Europe/Amsterdam";
 
   fileSystems."/boot".neededForBoot = true;
   fileSystems."/persist".neededForBoot = true;
