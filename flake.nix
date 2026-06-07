@@ -35,6 +35,10 @@
       url = "github:esp0xdeadbeef/network-renderer-nebula";
     };
 
+    network-renderer-wireguard = {
+      url = "github:esp0xdeadbeef/network-renderer-wireguard";
+    };
+
     network-compiler = {
       url = "github:esp0xdeadbeef/network-compiler";
     };
