@@ -1,3 +1,7 @@
+{ inputs
+, outPath
+, ...
+}:
 let
   system = "x86_64-linux";
   labSource = "active-lab";
