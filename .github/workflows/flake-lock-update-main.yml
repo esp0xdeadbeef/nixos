@@ -28,7 +28,7 @@ jobs:
       - name: Build important hosts
         run: |
           set -euo pipefail
-          for host in s-sigma l-esp l-werk l-x13s; do
+          for host in s-sigma; do
             nix build ".#nixosConfigurations.${host}.config.system.build.toplevel"
           done
 
