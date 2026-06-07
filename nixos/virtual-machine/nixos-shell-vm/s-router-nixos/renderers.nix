@@ -2,6 +2,7 @@
 , lib
 , labSource
 , selectorFile
+, system
 , hostName ? "s-router-nixos"
 ,
 }:
@@ -15,33 +16,28 @@ let
   sops = "${labPath}/sops.nix";
 
   rendererInput = {
-    inherit
-      hostName
-      intent
-      inventory
-      system
-      ;
+    inherit hostName intent inventory;
   };
 
-  render-nixos = inputs.network-renderer-nixos.lib.renderer.hostModule (
-    rendererInput
-    // {
-      inherit lib;
-      selectorFile = selectorFile;
-    }
-  );
+  render-nixos =
+    inputs.network-renderer-nixos.libBySystem.${system}.renderer.hostModule (
+      rendererInput
+      // {
+        inherit lib selectorFile;
+      }
+    );
 
-  render-nebula = inputs.network-renderer-nebula.libBySystem.${system}.renderer.hostModule rendererInput;
+  render-nebula =
+    inputs.network-renderer-nebula.libBySystem.${system}.renderer.hostModule
+      rendererInput;
 
-  render-wireguard = inputs.network-renderer-wireguard.libBySystem.${system}.renderer.hostModule rendererInput;
+  render-wireguard =
+    inputs.network-renderer-wireguard.libBySystem.${system}.renderer.hostModule
+      rendererInput;
 
   renderer-contract = {
-    inherit
-      render-nixos
-      render-nebula
-      render-wireguard
-      ;
-    sops-for-renderers = sops; 
+    inherit render-nixos render-nebula render-wireguard;
+    sops-for-renderers = sops;
   };
 in
 {

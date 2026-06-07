@@ -3,15 +3,15 @@
 , outPath
 , ...
 }:
-let 
-labSource = "active-lab";
+let
+  labSource = "active-lab";
 in
 {
   _module.args.sRouterNixosLabProfile = {
-    labSource = labSource;
+    inherit labSource;
     labSelector = "s-router-nixos";
   };
-  # single import to use the renderer expected here.
+
   networking.hostName = lib.mkForce "s-router-nixos";
 
   imports = [
@@ -19,7 +19,10 @@ in
 
     (import ./renderers.nix {
       inherit inputs lib;
-      labSource = labSource; 
+      inherit labSource;
+
+      system = "x86_64-linux";
+
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-nixos/default.nix";
     })
   ];
