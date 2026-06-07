@@ -1,120 +1,92 @@
-{
-  inputs,
-  lib,
-  outPath,
-  pkgs,
-  ...
+{ inputs
+, lib
+, pkgs
+, sRouterTestClientsLabProfile ? {
+    labSource = "active-lab";
+    labSelector = "s-router-test-clients";
+  }
+, ...
 }:
 
 let
-  api = inputs.network-renderer-nixos.lib;
+  system = pkgs.stdenv.hostPlatform.system;
 
-  identity = {
-    enterpriseName = "esp0xdeadbeef";
-    siteName = "nixos";
-    boxName = "s-router-test-clients";
-  };
+  cpm =
+    inputs.network-cpm.libBySystem.${system}
+      or inputs.network-cpm.lib
+      or inputs.network-renderer-nixos.lib;
 
-  labResolvedInventoryPath = builtins.toFile "lab-sigma-resolved-inventory-nixos.nix" ''
-    import ${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/getResolvedInventory.nix { renderer = "nixos"; }
-  '';
+  labPath = "${inputs.network-labs}/${sRouterTestClientsLabProfile.labSource}";
 
-  fabric = {
-    intentPath = "${inputs.network-labs}/labs/lab-s-sigma/s-router-test-three-site/intent.nix";
-    inventoryPath = labResolvedInventoryPath;
-  };
-  labIntent = import fabric.intentPath;
-  labInventory = import fabric.inventoryPath;
-
-  sliceArgs = {
-    inherit (identity) boxName;
-    inherit (fabric) intentPath inventoryPath;
-  };
-
-  builtHost = api.renderer.buildHostFromPaths {
-    inherit (fabric) intentPath inventoryPath;
-    selector = identity.boxName;
+  cpmInput = {
+    intentPath = "${labPath}/intent.nix";
+    inventoryPath = "${labPath}/inventory.nix";
+    sopsPath = "${labPath}/sops.nix";
+    selector = sRouterTestClientsLabProfile.labSelector;
     file = "nixos/virtual-machine/nixos-shell-vm/s-router-test-clients/default.nix";
   };
 
-  renderedHost = builtHost.renderedHost or { };
-  renderedHostNetworks = builtins.mapAttrs (
-    _: network: builtins.removeAttrs network [ "dhcpConfig" ]
-  ) (renderedHost.networks or { });
+  cpmOutput =
+    if cpm ? emulatedClients && cpm.emulatedClients ? buildFromPaths then
+      cpm.emulatedClients.buildFromPaths cpmInput
+    else if cpm ? renderer && cpm.renderer ? buildHostFromPaths then
+      cpm.renderer.buildHostFromPaths cpmInput
+    else
+      throw "s-router-test-clients: CPM API must expose emulatedClients.buildFromPaths or renderer.buildHostFromPaths";
+
+  renderedHost = cpmOutput.renderedHost or { };
+
+  renderedHostNetworks = builtins.mapAttrs
+    (_: network: builtins.removeAttrs network [ "dhcpConfig" ])
+    (renderedHost.networks or { });
+
+  labIntent = cpmOutput.intent or import cpmInput.intentPath;
+  labInventory = cpmOutput.inventory or import cpmInput.inventoryPath;
+  runtimeTargets = cpmOutput.runtimeTargets or { };
+
+  siteName = cpmOutput.siteName or "nixos";
 
   builders = import ./client-builders.nix { inherit lib pkgs; };
 
-  clientAccessCount = 2;
+  clientAccessCount = cpmOutput.clientAccessCount or 2;
 
-  clientModules = [
-    (import ./nixos-clients.nix {
-      inherit builders lib;
-      siteName = identity.siteName;
-      clientTenant = "client";
-      clientCount = clientAccessCount;
-    })
-    (import ./model-site-clients.nix {
-      inherit builders lib pkgs;
-      intent = labIntent;
-      inventory = labInventory;
-      runtimeTargets = builtHost.runtimeTargets or { };
-      siteName = identity.siteName;
-    })
-    (import ./model-site-clients.nix {
-      inherit builders lib pkgs;
-      intent = labIntent;
-      inventory = labInventory;
-      runtimeTargets = builtHost.runtimeTargets or { };
-      siteName = "clab";
-      endpointAddressing = "dhcp";
-    })
-    (import ./branch-hostile-clients.nix { inherit builders pkgs; })
-    (import ./dmz-clients.nix { inherit builders pkgs; })
-  ];
+  modelClients =
+    cpmOutput.emulatedClients
+      or cpmOutput.clients
+      or null;
 
-  clientContainers = lib.foldl' lib.recursiveUpdate { } clientModules;
-
-  renderedHostNetwork = {
-    hostName = renderedHost.hostName or identity.boxName;
-    bridgeNameMap = renderedHost.bridgeNameMap or { };
-    bridges = renderedHost.bridges or { };
-    netdevs = renderedHost.netdevs or { };
-    networks = renderedHostNetworks;
-    containers = clientContainers;
-    clientAccessCount = clientAccessCount;
-    hostValidation = {
-      requireDefaultRoutes = true;
-      requireHostResolver = true;
-      requirePublicIpv4Ping = true;
-      requirePublicIpv6Ping = true;
-    };
-  };
-
-  mkClientBridge = name: {
-    netdevConfig = {
-      Kind = "bridge";
-      Name = name;
-    };
-  };
-
-  mkClientBridgeNetwork = name: {
-    matchConfig.Name = name;
-    linkConfig = {
-      ActivationPolicy = "always-up";
-      RequiredForOnline = "no";
-    };
-    networkConfig = {
-      ConfigureWithoutCarrier = true;
-      DHCP = "no";
-      IPv6AcceptRA = false;
-    };
-  };
-
-  localOnlyClientBridges = [ ];
+  clientContainers =
+    if modelClients != null then
+      modelClients
+    else
+      lib.foldl' lib.recursiveUpdate { } [
+        (import ./nixos-clients.nix {
+          inherit builders lib;
+          inherit siteName clientAccessCount;
+          clientTenant = "client";
+          clientCount = clientAccessCount;
+        })
+        (import ./model-site-clients.nix {
+          inherit builders lib pkgs runtimeTargets;
+          intent = labIntent;
+          inventory = labInventory;
+          inherit siteName;
+        })
+        (import ./model-site-clients.nix {
+          inherit builders lib pkgs runtimeTargets;
+          intent = labIntent;
+          inventory = labInventory;
+          siteName = "clab";
+          endpointAddressing = "dhcp";
+        })
+        (import ./branch-hostile-clients.nix { inherit builders pkgs; })
+        (import ./dmz-clients.nix { inherit builders pkgs; })
+      ];
 in
 {
   imports = [
-    (builtHost.artifactModule or { })
+    (cpmOutput.artifactModule or { })
+    cpmInput.sopsPath
   ];
 
   system.stateVersion = lib.mkForce "25.11";
@@ -139,25 +111,27 @@ in
   networking.useHostResolvConf = lib.mkForce false;
   services.resolved.enable = lib.mkForce true;
 
-  systemd.network.netdevs =
-    (renderedHost.netdevs or { }) // lib.genAttrs localOnlyClientBridges mkClientBridge;
-  systemd.network.networks =
-    lib.recursiveUpdate
-      (renderedHostNetworks // lib.genAttrs localOnlyClientBridges mkClientBridgeNetwork)
-      {
-        "30-vlan2".networkConfig.DHCP = "ipv4";
-      };
+  systemd.network.netdevs = renderedHost.netdevs or { };
 
-  _module.args = {
-    inherit renderedHostNetwork;
+  systemd.network.networks = lib.recursiveUpdate renderedHostNetworks {
+    "30-vlan2".networkConfig.DHCP = "ipv4";
+  };
+
+  _module.args.renderedHostNetwork = {
+    hostName = renderedHost.hostName or sRouterTestClientsLabProfile.labSelector;
+    bridgeNameMap = renderedHost.bridgeNameMap or { };
+    bridges = renderedHost.bridges or { };
+    netdevs = renderedHost.netdevs or { };
+    networks = renderedHostNetworks;
+    containers = clientContainers;
+    clientAccessCount = clientAccessCount;
+    hostValidation = {
+      requireDefaultRoutes = true;
+      requireHostResolver = true;
+      requirePublicIpv4Ping = true;
+      requirePublicIpv6Ping = true;
+    };
   };
 
   containers = clientContainers;
-
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
-  ];
-  users.users.deadbeef.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
-  ];
 }
