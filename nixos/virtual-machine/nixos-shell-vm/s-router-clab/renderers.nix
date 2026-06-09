@@ -12,7 +12,7 @@
 let
   labPath = "${inputs.network-labs}/${labSource}";
   intent = "${labPath}/intent.nix";
-  inventory = "${labPath}/inventory.nix";
+  inventory = "${labPath}/inventory-clab.nix";
   sops = "${labPath}/sops-routing-${hostName}.nix";
 
   rendererInput = {
