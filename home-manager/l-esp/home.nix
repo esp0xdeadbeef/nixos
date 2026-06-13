@@ -41,6 +41,7 @@ in
     #./projects/osee/start-lxc.nix
     #./projects/osee/vm-settings-resize-guest.nix
     ../01-general/darkmode/config.nix
+    ../01-general/editors/vscode.nix
     ../01-general/pdf-reader/packages.nix
     ../01-general/pentesting/packages.nix
     ../01-general/virt-manager-config/default.nix
@@ -117,7 +118,6 @@ in
       ];
 
       unstable = with unstablePkgs; [
-        vscode
         # firefox
         exploitdb
         netexec
@@ -125,13 +125,6 @@ in
       ];
     in
     stable ++ unstable;
-
-  # home-manager
-  programs.vscode = {
-    enable = true;
-    package = unstablePkgs.vscodium.fhs;
-    mutableExtensionsDir = true;
-  };
 
   # Enable home-manager
   programs.home-manager.enable = true;

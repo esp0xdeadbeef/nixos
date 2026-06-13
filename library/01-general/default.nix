@@ -1,6 +1,8 @@
 { pkgs, ... }:
 {
   imports = [
+    ../../modules/nixos/cuda-cache.nix
+
     ./desktop/applet-nm.nix
     ./desktop/fonts.nix
     ./desktop/packages.nix

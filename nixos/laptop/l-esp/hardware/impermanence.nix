@@ -121,6 +121,9 @@
     ];
     files = [
       "/etc/machine-id"
+      # Do not persist /var/lib/systemd/credential.secret as a file.
+      # systemd-creds treats the impermanence bind mount as busy; libvirt uses
+      # its own raw key under the already-persisted /var/lib/libvirt instead.
       # "/var/cache/locatedb" # added it to persistent output in updatedb.nix (/persist/var/cache/locatedb); updatedb (locate <something>) history
       # {
       #   file = "/var/keys/secret_file";

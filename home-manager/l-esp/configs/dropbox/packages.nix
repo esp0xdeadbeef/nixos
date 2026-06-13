@@ -1,9 +1,8 @@
-{
-  config,
-  pkgs,
-  lib,
-  inputs,
-  ...
+{ config
+, pkgs
+, lib
+, inputs
+, ...
 }:
 
 let
@@ -11,6 +10,21 @@ let
     inherit (pkgs.stdenv.hostPlatform) system;
     config.allowUnfree = true;
   };
+
+  gsettingsDataDirs = map (pkg: lib.removeSuffix "/glib-2.0/schemas" (pkgs.glib.getSchemaPath pkg)) [
+    pkgs.gsettings-desktop-schemas
+    pkgs.gtk3
+    pkgs.maestral-gui
+  ];
+
+  maestralXdgDataDirs = lib.concatStringsSep ":" (
+    gsettingsDataDirs
+    ++ [
+      "${pkgs.maestral-gui}/share"
+      "${config.home.profileDirectory}/share"
+      "/run/current-system/sw/share"
+    ]
+  );
 in
 {
   home.packages = with pkgs; [
@@ -30,7 +44,11 @@ in
     };
     Service = {
       ExecStart = "${pkgs.maestral-gui}/bin/maestral_qt";
+      Environment = [
+        "XDG_DATA_DIRS=${maestralXdgDataDirs}"
+      ];
       Restart = "on-failure";
+      RestartSec = "5s";
     };
   };
 }
