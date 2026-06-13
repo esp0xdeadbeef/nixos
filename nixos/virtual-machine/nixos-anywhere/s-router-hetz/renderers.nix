@@ -11,12 +11,19 @@
 
 let
   labPath = "${inputs.network-labs}/${labSource}";
-  intent = "${labPath}/intent.nix";
-  inventory = "${labPath}/inventory-nixos.nix";
   sops = "${labPath}/sops-routing-${hostName}.nix";
 
+  cpmLib = inputs.network-control-plane-model.libBySystem.${system};
+
+  cpmBuilt = cpmLib.compileAndBuildFromPaths {
+    inputPath = "${labPath}/intent.nix";
+    inventoryPath = "${labPath}/inventory-nixos.nix";
+  };
+
   rendererInput = {
-    inherit hostName intent inventory;
+    inherit hostName;
+    cpm = cpmBuilt;
+    controlPlane = cpmBuilt;
   };
 
   render-nixos =
