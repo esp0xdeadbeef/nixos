@@ -1,52 +1,36 @@
 { inputs
 , lib
-, labSource
-, selectorFile
 , system
-, hostName ? "s-router-nixos"
+, hostName
+, cpm
 ,
 }:
 
 { ... }:
 
-let
-  labPath = "${inputs.network-labs}/${labSource}";
-  intent = "${labPath}/intent.nix";
-  inventory = "${labPath}/inventory-nixos.nix";
-  sops = "${labPath}/sops-routing-${hostName}.nix";
-
-  rendererInput = {
-    inherit hostName intent inventory;
-  };
-
-  render-nixos =
-    inputs.network-renderer-nixos.libBySystem.${system}.renderer.hostModule (
-      rendererInput
-      // {
-        inherit lib selectorFile;
-      }
-    );
-
-  render-nebula =
-    inputs.network-renderer-nebula.libBySystem.${system}.renderer.hostModule
-      rendererInput;
-
-  render-wireguard =
-    inputs.network-renderer-wireguard.libBySystem.${system}.renderer.hostModule
-      rendererInput;
-
-  renderer-contract = {
-    inherit render-nixos render-nebula render-wireguard;
-    sops-for-renderers = sops;
-  };
-in
 {
   imports = [
-    render-nixos
-    render-nebula
-    render-wireguard
-    renderer-contract.sops-for-renderers
-  ];
+    # Nixos renderer: REQUIRES pre-compiled CPM (throws if cpm is null).
+    (inputs.network-renderer-nixos.libBySystem.${system}.renderer.hostModule {
+      inherit hostName;
+      inherit cpm;
+    })
 
-  _module.args.sRouterNixosRenderers = renderer-contract;
+    # Nebula: RENDERER_GAP — hostModule requires intent/inventory paths and
+    # compiles CPM internally. Passing cpm here; the renderer does not yet
+    # consume it. See nebula flake.nix line 54.
+    (inputs.network-renderer-nebula.libBySystem.${system}.renderer.hostModule {
+      inherit hostName;
+      inherit cpm;
+    })
+
+    # Wireguard: accepts pre-compiled CPM output.
+    # CPM_GAP: wgInventory not passed — the renderer's buildWireGuardNodeConfigs
+    # requires wgInventory keyed by overlay name. This data should be emitted by
+    # CPM so the host does not need to walk inventory to extract it.
+    (inputs.network-renderer-wireguard.libBySystem.${system}.renderer.hostModule {
+      inherit hostName;
+      controlPlaneModel = cpm;
+    })
+  ];
 }

@@ -4,7 +4,14 @@
 , ...
 }:
 let
+  system = "x86_64-linux";
   labSource = "active-lab";
+  hostName = "s-router-clab";
+
+  cpmResult = inputs.network-control-plane-model.libBySystem.${system}.compileAndBuildFromPaths {
+    inputPath = "${inputs.network-labs}/${labSource}/intent.nix";
+    inventoryPath = "${inputs.network-labs}/${labSource}/inventory-clab.nix";
+  };
 in
 {
   _module.args.sRouterClabLabProfile = {
@@ -19,12 +26,9 @@ in
     ./management-vlan2.nix
 
     (import ./renderers.nix {
-      inherit inputs lib;
-      inherit labSource;
-
-      system = "x86_64-linux";
-
-      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-clab/default.nix";
+      inherit inputs lib system hostName;
+      cpm = cpmResult.control_plane_model;
+      cpmResult = cpmResult;
     })
   ];
 }
