@@ -16,11 +16,6 @@ let
   #   /dev/disk/by-id/ata-SAMSUNG_...
   #   /dev/disk/by-id/nvme-SAMSUNG_...
   installDisk = "/dev/sda";
-
-  cpmResult = inputs.network-control-plane-model.libBySystem.${system}.compileAndBuildFromPaths {
-    inputPath = "${inputs.network-labs}/${labSource}/intent.nix";
-    inventoryPath = "${inputs.network-labs}/${labSource}/inventory-nixos.nix";
-  };
 in
 {
   _module.args.sRouterNixosLabProfile = {
@@ -54,8 +49,10 @@ in
     })
 
     (import ./renderers.nix {
-      inherit inputs lib system hostName;
-      cpm = cpmResult.control_plane_model;
+      inherit inputs lib labSource system;
+      inherit hostName;
+
+      selectorFile = "nixos/virtual-machine/nixos-anywhere/s-router-hetz/default.nix";
     })
   ];
 }
