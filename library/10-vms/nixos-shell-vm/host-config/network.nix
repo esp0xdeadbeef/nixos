@@ -1,8 +1,7 @@
-{
-  outPath,
-  lib,
-  pkgs,
-  ...
+{ outPath
+, lib
+, pkgs
+, ...
 }:
 
 let
@@ -14,5 +13,16 @@ let
   };
 in
 {
+  imports = [
+    (mkMgmt "eth0" 2 { bridge = "vlan2"; })
+    (mkBridge "eth0" 3 { bridge = "vlan3"; })
+    (mkBridge "eth0" 4 { bridge = "vlan4"; })
+    (mkBridge "eth0" 5 { bridge = "vlan5"; })
+    (mkBridge "eth0" 6 { bridge = "vlan6"; })
+    (mkBridge "eth0" 7 { bridge = "vlan7"; })
+    (mkBridge "eth0" 8 { bridge = "vlan8"; })
+    (mkBridge "eth0" 9 { bridge = "vlan9"; })
+    (mkBridge "eth0" 1010 { bridge = "vlan1010"; })
+  ];
 
 }

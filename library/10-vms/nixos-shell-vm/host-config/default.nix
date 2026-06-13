@@ -1,14 +1,13 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  name,
-  outPath,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, name
+, outPath
+, ...
 }:
 {
   # You can import other NixOS modules here
@@ -26,6 +25,7 @@
     "${outPath}/library/01-general/desktop/shell-env.nix"
     ./vm-settings.nix
     ./restart-container.nix
+    ./network.nix
     ./ssh.nix
     ./impermanence.nix
     ./persist-state-disk.nix
