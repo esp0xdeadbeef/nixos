@@ -28,6 +28,7 @@ keys:
   - &codex-jail-u age198xl6chpupaf6ecyqkcsg2j2mxf0s894csnxxdw6u0m4mjx7qgjqghg498
   - &l-werk-llm-jail age1my0wzset83fpqn8aac7kd4zcdjjmeapxnqy6r9qg36jhe7t8x43qdf7frg
   - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
+  - &hetz-test age1757z4z4t392kxuzfeajuaukh93na90e2p08t06k9ggpw6wa75dsshhqpzw
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -310,3 +311,17 @@ creation_rules:
           - *l-werk-llm-jail
           - *l-werk-root
           - *l-werk-deadbeef
+
+  - path_regex: '^(secrets/)*hetz-test.*\.(env|ya?ml)$'
+    input_type: env
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *l-x13s-deadbeef
+          - *l-x13s-root
+          - *codex-jail
+          - *codex-jail-u
+          - *codex-jail-r
+          - *hetz-test
