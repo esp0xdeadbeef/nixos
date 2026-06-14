@@ -17,7 +17,7 @@ let
 
   cpmBuilt = cpmLib.compileAndBuildFromPaths {
     inputPath = "${labPath}/intent.nix";
-    inventoryPath = "${labPath}/inventory-nixos.nix";
+    inventoryPath = "${labPath}/inventory-hetz.nix";
   };
 
   rendererInput = {
