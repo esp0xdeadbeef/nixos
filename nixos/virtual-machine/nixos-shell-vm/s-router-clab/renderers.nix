@@ -30,6 +30,8 @@ let
         hostDeploy = if cpmBuilt ? deploymentHosts then cpmBuilt.deploymentHosts.${hostName} or null else null;
       in
         if hostDeploy != null && hostDeploy ? uplinks then hostDeploy.uplinks.management or null else null;
+    rendererInventoryJsonPath = builtins.toFile "renderer-inventory-${hostName}.json"
+      (builtins.toJSON (import "${labPath}/inventory-clab.nix"));
     # CPM_GAP: CPM does not yet emit bridgeControl for host-level bridges.
     bridgeControl = {
       dhcpServer = false;
