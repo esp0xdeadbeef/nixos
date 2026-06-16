@@ -85,6 +85,12 @@
 
   systemd.tmpfiles.rules = [
     "d /mnt/current_pentest 0755 root root -"
+    "d /persist/var/lib/libvirt/images 0711 root root -"
+    "h /persist/var/lib/libvirt/images - - - - +C"
+    "d /persist/home/deadbeef/vms/disks 0755 deadbeef users -"
+    "h /persist/home/deadbeef/vms/disks - - - - +C"
+    "d /persist/home/deadbeef/.local/share/lxc 0755 deadbeef users -"
+    "h /persist/home/deadbeef/.local/share/lxc - - - - +C"
     "d /persist/home/deadbeef/.local/share/containers 0700 deadbeef users -"
     "h /persist/home/deadbeef/.local/share/containers - - - - +C"
   ];
