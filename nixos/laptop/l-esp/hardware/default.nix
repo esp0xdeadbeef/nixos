@@ -13,4 +13,6 @@
     ./suspend-to-disk.nix
     ./tmpfs.nix
   ];
+
+  boot.kernelModules = [ "iwlwifi" ];
 }
