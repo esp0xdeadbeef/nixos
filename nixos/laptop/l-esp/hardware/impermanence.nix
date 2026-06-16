@@ -85,6 +85,8 @@
 
   systemd.tmpfiles.rules = [
     "d /mnt/current_pentest 0755 root root -"
+    "d /persist/home/deadbeef/.local/share/containers 0700 deadbeef users -"
+    "h /persist/home/deadbeef/.local/share/containers - - - - +C"
   ];
   environment.persistence."/persist" = {
     enable = true; # NB: Defaults to true, not needed
