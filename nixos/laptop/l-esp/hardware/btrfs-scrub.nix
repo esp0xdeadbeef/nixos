@@ -22,6 +22,7 @@ in
       Type = "oneshot";
       Nice = 10;
       IOSchedulingClass = "idle";
+      TimeoutStopSec = "5min";
     };
     path = [
       pkgs.btrfs-progs
@@ -32,14 +33,14 @@ in
       set -euo pipefail
 
       swap_was_active=0
-      if swapon --show=NAME --noheadings | grep -Fxq ${swapfile}; then
+      if swapon --show=NAME --noheadings | grep -Fxq '${swapfile}'; then
         swap_was_active=1
-        swapoff ${swapfile}
+        swapoff '${swapfile}'
       fi
 
       restore_swap() {
         if [ "$swap_was_active" = 1 ]; then
-          swapon ${swapfile}
+          swapon '${swapfile}'
         fi
       }
       trap restore_swap EXIT
