@@ -23,7 +23,6 @@
     # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
 
     ./connect-nas
-    ./build_disable-sleep-suspend-hibernate
     ./hardware
     ./llms
     ./neovim-configuration

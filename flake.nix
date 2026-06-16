@@ -34,6 +34,7 @@
 
     network-control-plane-model = {
       url = "github:esp0xdeadbeef/network-control-plane-model";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-renderer-nixos = {
