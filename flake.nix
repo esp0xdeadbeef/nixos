@@ -262,9 +262,6 @@
 
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
 
-      homeManagerModules =
-        if builtins.pathExists ./modules/home-manager then import ./modules/home-manager else { };
-
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------

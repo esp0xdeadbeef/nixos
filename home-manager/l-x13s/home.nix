@@ -71,5 +71,5 @@
     home-manager
   ];
 
-  home.stateVersion = "24.11"; # Match your system state version
+  home.stateVersion = "26.05"; # Match your system state version
 }
