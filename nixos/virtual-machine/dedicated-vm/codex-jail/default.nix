@@ -1,13 +1,12 @@
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  name,
-  outPath,
-  modulesPath,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, name
+, outPath
+, modulesPath
+, ...
 }:
 
 let
@@ -32,6 +31,13 @@ in
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
+
+  swapDevices = [
+    {
+      device = "/persist/var/lib/swapfile";
+      size = 45 * 1024;
+    }
+  ];
 
   networking.hostName = "codex-jail";
 

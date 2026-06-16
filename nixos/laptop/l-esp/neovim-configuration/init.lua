@@ -1,264 +1,188 @@
--- Bootstrap lazy.nvim
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
-	vim.fn.system({ "git", "clone", "--filter=blob:none", "https://github.com/folke/lazy.nvim.git", lazypath })
-end
-vim.opt.rtp:prepend(lazypath)
-
-require("lazy").setup({
-	{
-		"nmac427/guess-indent.nvim",
-		config = function()
-			require("guess-indent").setup({})
-		end,
-	},
-	{
-		"stevearc/conform.nvim",
-		event = { "BufWritePre" }, -- lazy-loads before save
-		config = function()
-			require("conform").setup({
-				formatters_by_ft = {
-					lua = { "stylua" },
-					nix = { "nixfmt" },
-					python = { "black" },
-					javascript = { "prettier" },
-					typescript = { "prettier" },
-					json = { "prettier" },
-					sh = { "shfmt" },
-					asm = { "nasmfmt" },
-				},
-				formatters = {
-					nasmfmt = {
-						command = "nasmfmt",
-						args = { "-ii", "8", "-ci", "40", "$FILENAME" },
-						stdin = false, -- important: nasmfmt edits the file directly
-						inherit = false, -- don’t send buffer via stdin
-					},
-				},
-
-				format_on_save = {
-					timeout_ms = 1500,
-					lsp_fallback = true,
-				},
-			})
-		end,
-	},
-	{
-		"nvim-telescope/telescope.nvim",
-		-- tag = "0.1.5",
-		dependencies = { "nvim-lua/plenary.nvim" },
-		config = function()
-			local telescope = require("telescope")
-			local builtin = require("telescope.builtin")
-
-			telescope.setup({
-				defaults = {
-					layout_strategy = "horizontal",
-					layout_config = { width = 0.9, preview_cutoff = 120 },
-					sorting_strategy = "ascending",
-					prompt_prefix = " ",
-					selection_caret = " ",
-				},
-			})
-
-			-- keymaps
-			vim.keymap.set("n", "<leader>f", builtin.find_files, { desc = "Fuzzy find files" })
-			vim.keymap.set("n", "<leader>g", builtin.live_grep, { desc = "Live grep" })
-			vim.keymap.set("n", "<leader>b", builtin.buffers, { desc = "Fuzzy find buffers" })
-			vim.keymap.set("n", "<leader>h", builtin.help_tags, { desc = "Help tags" })
-		end,
-	},
-
-	{
-		"trixnz/sops.nvim",
-		lazy = false, -- or `true` and specify filetypes/patterns
-		config = function()
-			require("sops").setup({
-				-- optional config overrides
-				-- e.g. enable only for *.sops.yaml, etc.
-			})
-		end,
-	},
-	-- Markdown preview in browser
-	{
-		"toppair/peek.nvim",
-		build = "deno task --quiet build:fast",
-		ft = { "markdown" },
-		config = function()
-			require("peek").setup({ theme = "dark", app = "browser" })
-			vim.keymap.set("n", "<leader>M", function()
-				require("peek").open()
-			end, { desc = "Markdown preview open" })
-			vim.keymap.set("n", "<leader>m", function()
-				require("peek").close()
-			end, { desc = "Markdown preview close" })
-		end,
-	},
-
-	-- Inline image rendering (Neovide only)
-	{
-		"3rd/image.nvim",
-		dependencies = { "nvim-lua/plenary.nvim" },
-		config = function()
-			if not vim.g.neovide then
-				return
-			end
-			vim.env.TERM = "xterm-256color"
-			local ok, image = pcall(require, "image")
-			if not ok then
-				return
-			end
-			image.setup({
-				backend = "magick_cli",
-				integrations = {
-					markdown = {
-						enabled = true,
-						download_remote_images = true,
-						clear_in_insert_mode = false,
-					},
-				},
-			})
-		end,
-	}, -- File explorer
-	{
-		"nvim-tree/nvim-tree.lua",
-		dependencies = { "nvim-tree/nvim-web-devicons" },
-		config = function()
-			require("nvim-tree").setup({
-				view = {
-					width = 35,
-					side = "left",
-				},
-				filters = {
-					dotfiles = false,
-				},
-				git = {
-					enable = true,
-				},
-				update_focused_file = {
-					enable = true, -- follow the current file
-					update_root = true, -- optionally change the root when the file moves
-					ignore_list = {}, -- add patterns here if you want to skip certain dirs
-				},
-				sync_root_with_cwd = true, -- keep tree root synced with Neovim cwd
-				respect_buf_cwd = false, -- don’t auto-change cwd when switching buffers
-			})
-
-			vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { desc = "Toggle file explorer" })
-		end,
-	},
-	-- Paste clipboard images as files
-	{
-		"HakonHarnes/img-clip.nvim",
-		config = function()
-			require("img-clip").setup({
-				default = {
-					dir_path = "images",
-					confirm_name = false,
-					file_name = "%Y-%m-%d-%H%M%S",
-					use_absolute_path = false,
-					drag_and_drop = { insert_mode = true },
-				},
-			})
-			vim.keymap.set("n", "<leader>p", function()
-				local buf_dir = vim.fn.expand("%:p:h")
-				if buf_dir == "" then
-					buf_dir = vim.fn.getcwd()
-				end
-				require("img-clip").paste_image({
-					dir_path = buf_dir .. "/images",
-					confirm_name = false,
-				})
-			end, { desc = "Paste image to ./images" })
-		end,
-	},
-	{
-		"moll/vim-bbye",
-		config = function()
-			vim.keymap.set("n", "<leader>q", ":Bdelete<CR>", { desc = "Close buffer like VSCode tab" })
-		end,
-	},
-	{
-		"akinsho/bufferline.nvim",
-		dependencies = "nvim-tree/nvim-web-devicons",
-		config = function()
-			require("bufferline").setup({})
-			vim.opt.termguicolors = true
-			vim.opt.showtabline = 2
-		end,
-	},
-{ "nfnty/vim-nftables", ft = "nftables" },
-	{ "neovim/nvim-lspconfig" },
-	{ "hrsh7th/nvim-cmp" },
-	{ "hrsh7th/cmp-nvim-lsp" },
-	{ "L3MON4D3/LuaSnip" },
-	{ "saadparwaiz1/cmp_luasnip" },
-	{
-		"folke/snacks.nvim",
-		lazy = false,
-		priority = 1000,
-		config = function()
-			require("snacks").setup({
-				-- Optional: you can configure things like this
-				-- notifications = { enabled = true },
-				-- keymaps = true,
-				-- icons = true,
-			})
-		end,
-	},
-
-	-- Optional: PDF reader, Avante AI assistant
-	{ "r-pletnev/pdfreader.nvim", dependencies = { "folke/snacks.nvim" } },
-	{ "yetone/avante.nvim", dependencies = { "MunifTanjim/nui.nvim", "nvim-lua/plenary.nvim" } },
-})
-
--- Project-local session management (autosaves even if pkilled)
-vim.opt.sessionoptions = { "buffers", "curdir", "tabpages", "winsize", "help", "globals" }
-
--- Local state
-local function get_session_file()
-	local cwd = vim.fn.getcwd()
-	local hash = vim.fn.sha256(cwd):sub(1, 32)
-	local sessions_dir = vim.fn.stdpath("data") .. "/sessions"
-	vim.fn.mkdir(sessions_dir, "p")
-	return sessions_dir .. "/" .. hash .. ".vim"
-end
-
-local function save_session()
-	local ok, err = pcall(function()
-		vim.cmd("silent! mksession! " .. vim.fn.fnameescape(get_session_file()))
-	end)
-	if not ok then
-		vim.notify("Failed to save session: " .. err, vim.log.levels.WARN)
-	end
-end
-
-local function load_session()
-	local sessionfile = get_session_file()
-	if vim.fn.filereadable(sessionfile) == 1 then
-		vim.cmd("silent! source " .. vim.fn.fnameescape(sessionfile))
-	end
-	-- vim.schedule(function()
-	--	require("nvim-tree.api").tree.open()
-	--end)
-end
-
-vim.api.nvim_create_autocmd("VimEnter", {
-	once = true,
-	callback = load_session,
-})
-
-vim.api.nvim_create_autocmd({ "BufLeave", "FocusLost", "BufWritePost", "VimLeavePre" }, {
-	callback = save_session,
-})
-
--- Periodic autosave (every 1 minute)
-vim.fn.timer_start(1 * 60 * 1000, function()
-	if vim.fn.bufnr("%") ~= -1 then
-		save_session()
-	end
-end, { ["repeat"] = -1 })
+vim.g.mapleader = " "
+vim.g.maplocalleader = " "
 
 vim.opt.number = true
 vim.opt.relativenumber = true
+vim.opt.signcolumn = "yes"
+vim.opt.termguicolors = true
+vim.opt.mouse = "a"
 vim.opt.clipboard = "unnamedplus"
+vim.opt.expandtab = true
+vim.opt.shiftwidth = 2
+vim.opt.tabstop = 2
+vim.opt.smartindent = true
+vim.opt.ignorecase = true
+vim.opt.smartcase = true
+vim.opt.undofile = true
+vim.opt.updatetime = 250
+vim.opt.timeoutlen = 300
+vim.opt.splitright = true
+vim.opt.splitbelow = true
+vim.opt.completeopt = { "menu", "menuone", "noselect" }
+
+local function setup(name, configure)
+local ok, plugin = pcall(require, name)
+if not ok then
+vim.notify("Plugin not available: " .. name, vim.log.levels.WARN)
+return nil
+end
+
+if configure then
+configure(plugin)
+elseif type(plugin.setup) == "function" then
+plugin.setup({})
+end
+
+return plugin
+end
+
+local function force_black_background()
+local groups = {
+"Normal",
+"NormalNC",
+"NormalFloat",
+"FloatBorder",
+"SignColumn",
+"EndOfBuffer",
+"LineNr",
+"CursorLineNr",
+"FoldColumn",
+"StatusLine",
+"StatusLineNC",
+"VertSplit",
+"WinSeparator",
+"TabLine",
+"TabLineFill",
+"Pmenu",
+"PmenuSel",
+}
+
+for _, group in ipairs(groups) do
+vim.api.nvim_set_hl(0, group, { bg = "#000000" })
+end
+end
+
+local function map_if_free(mode, lhs, rhs, opts)
+local existing = vim.fn.maparg(lhs, mode)
+if existing ~= nil and existing ~= "" then
+return
+end
+
+vim.keymap.set(mode, lhs, rhs, opts)
+end
+
+vim.keymap.set("n", "<leader>w", "<cmd>write<cr>", { desc = "Write file" })
+vim.keymap.set("n", "<leader>q", "<cmd>quit<cr>", { desc = "Quit" })
+vim.keymap.set("n", "<leader>e", "<cmd>Neotree toggle<cr>", { desc = "Toggle file explorer" })
+vim.keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<cr>", { desc = "Find files" })
+vim.keymap.set("n", "<leader>fg", "<cmd>Telescope live_grep<cr>", { desc = "Live grep" })
+vim.keymap.set("n", "<leader>fb", "<cmd>Telescope buffers<cr>", { desc = "Buffers" })
+vim.keymap.set("n", "<leader>fh", "<cmd>Telescope help_tags<cr>", { desc = "Help tags" })
+vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { desc = "Code action" })
+vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "Rename symbol" })
+vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "Go to definition" })
+vim.keymap.set("n", "gr", vim.lsp.buf.references, { desc = "Go to references" })
+vim.keymap.set("n", "K", vim.lsp.buf.hover, { desc = "Hover" })
+vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { desc = "Previous diagnostic" })
+vim.keymap.set("n", "]d", vim.diagnostic.goto_next, { desc = "Next diagnostic" })
+
+vim.cmd.colorscheme("gruvbox")
+force_black_background()
+vim.api.nvim_create_autocmd("ColorScheme", { callback = force_black_background })
+
+setup("which-key")
+setup("gitsigns")
+setup("ibl")
+setup("lualine", function(lualine)
+lualine.setup({
+options = {
+theme = "gruvbox",
+globalstatus = true,
+},
+})
+end)
+
+setup("neo-tree", function(neo_tree)
+neo_tree.setup({
+filesystem = {
+follow_current_file = {
+enabled = true,
+},
+},
+})
+end)
+
+setup("telescope")
+pcall(require("telescope").load_extension, "fzf")
+
+vim.g.mkdp_auto_start = 0
+vim.g.mkdp_auto_close = 1
+vim.g.mkdp_refresh_slow = 0
+vim.g.mkdp_command_for_global = 0
+vim.g.mkdp_open_to_the_world = 0
+vim.g.mkdp_open_ip = "127.0.0.1"
+vim.g.mkdp_browser = ""
+vim.g.mkdp_echo_preview_url = 1
+vim.g.mkdp_theme = "dark"
+
+map_if_free("n", "<leader>M", "<cmd>MarkdownPreview<cr>", { desc = "Markdown preview open" })
+map_if_free("n", "<leader>m", "<cmd>MarkdownPreviewStop<cr>", { desc = "Markdown preview close" })
+
+setup("nvim-treesitter")
+vim.api.nvim_create_autocmd("FileType", {
+callback = function(event)
+pcall(vim.treesitter.start, event.buf)
+
+if pcall(require, "nvim-treesitter") then
+vim.bo[event.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+end
+end,
+})
+
+local capabilities = vim.lsp.protocol.make_client_capabilities()
+local blink = setup("blink.cmp", function(cmp)
+cmp.setup({
+keymap = {
+preset = "default",
+},
+appearance = {
+nerd_font_variant = "mono",
+},
+sources = {
+default = { "lsp", "path", "snippets", "buffer" },
+},
+})
+end)
+
+if blink and type(blink.get_lsp_capabilities) == "function" then
+capabilities = blink.get_lsp_capabilities(capabilities)
+end
+
+local servers = {
+"bashls",
+"jsonls",
+"lua_ls",
+"nil_ls",
+"pyright",
+"ts_ls",
+"yamlls",
+}
+
+for _, server in ipairs(servers) do
+vim.lsp.config(server, {
+capabilities = capabilities,
+})
+end
+
+vim.lsp.enable(servers)
+
+vim.api.nvim_create_autocmd("BufWritePre", {
+callback = function()
+vim.lsp.buf.format({
+async = false,
+timeout_ms = 3000,
+})
+end,
+})
+
+force_black_background()

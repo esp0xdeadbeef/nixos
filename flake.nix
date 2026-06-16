@@ -16,17 +16,6 @@
       #url = "github:nixos/nixpkgs/nixos-unstable";
     };
 
-    systems = {
-      url = "github:nix-systems/default-linux";
-    };
-
-    kickstart-nix-nvim = {
-      url = "github:nix-community/kickstart-nix.nvim";
-      # do NOT make nixpkgs follow your main nixpkgs; it breaks wrapNeovimUnstable
-      # omit this line entirely:
-      # inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
@@ -41,14 +30,6 @@
 
     network-renderer-access-endpoint-nixos = {
       url = "github:esp0xdeadbeef/network-renderer-access-endpoint-nixos";
-    };
-
-    network-compiler = {
-      url = "github:esp0xdeadbeef/network-compiler";
-    };
-
-    network-forwarding-model = {
-      url = "github:esp0xdeadbeef/network-forwarding-model";
     };
 
     network-control-plane-model = {
@@ -70,19 +51,6 @@
 
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
-    };
-
-    nixvim = {
-      url = "github:nix-community/nixvim";
-    };
-
-    khanelivim = {
-      url = "github:khaneliman/khanelivim";
-    };
-
-    nvf = {
-      url = "github:NotAShelf/nvf";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     lanzaboote = {
@@ -148,12 +116,6 @@
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
 
-    # nixos-x13s branch to follow:
-    nixos-x13s = {
-      url = "github:BrainWart/x13s-nixos";
-      inputs.nixpkgs.follows = "nixpkgs-stable";
-    };
-
     # integrated:
     # nix run github:Mic92/nixos-shell -- --flake .#vm
     nixos-shell = {
@@ -162,11 +124,10 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      home-manager,
-      ...
+    { self
+    , nixpkgs
+    , home-manager
+    , ...
     }@inputs:
     let
       lib = nixpkgs.lib;
@@ -217,9 +178,12 @@
           { };
 
       # Discover all hosts automatically
-      hosts = lib.foldl' (
-        acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
-      ) { } hostRoots;
+      hosts = lib.foldl'
+        (
+          acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
+        )
+        { }
+        hostRoots;
 
       allHostAbs = lib.mapAttrsToList (_: v: "${root}/${v}") hosts;
 
@@ -242,7 +206,7 @@
               inGit = lib.hasPrefix "${root}/.git" p;
             in
             # include everything EXCEPT other hosts and .git
-            !(inOther || inGit);
+              !(inOther || inGit);
         };
     in
     {
@@ -265,25 +229,27 @@
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------
-      nixosConfigurations = lib.mapAttrs (
-        name: path:
-        nixpkgs.lib.nixosSystem {
-          system = hostSystemFor name;
+      nixosConfigurations = lib.mapAttrs
+        (
+          name: path:
+            nixpkgs.lib.nixosSystem {
+              system = hostSystemFor name;
 
-          specialArgs = {
-            inherit
-              inputs
-              outputs
-              self
-              name
-              ;
-            outPath = self.outPath;
-          };
+              specialArgs = {
+                inherit
+                  inputs
+                  outputs
+                  self
+                  name
+                  ;
+                outPath = self.outPath;
+              };
 
-          modules = [
-            (./. + "/${path}")
-          ];
-        }
-      ) hosts;
+              modules = [
+                (./. + "/${path}")
+              ];
+            }
+        )
+        hosts;
     };
 }
