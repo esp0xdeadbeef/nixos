@@ -5,6 +5,7 @@
     ./audio.nix
     ./bluetooth.nix
     ./bootloader.nix
+    ./btrfs-scrub.nix
     ./hardware-configuration.nix
     ./impermanence.nix
     ./lanzaboote.nix
