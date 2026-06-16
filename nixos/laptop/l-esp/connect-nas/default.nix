@@ -60,6 +60,7 @@
           cat > /run/systemd/system/mnt-nas-$name.mount <<EOF
         [Unit]
         Description=SMB mount ($name)
+        Wants=network-online.target
         After=network-online.target
         ConditionPathExists=$credfile
 
@@ -67,13 +68,13 @@
         What=//$host/$share
         Where=/mnt/nas/$name
         Type=cifs
-        Options=credentials=$credfile,vers=3.0,sec=ntlmssp,noserverino,iocharset=utf8,uid=1000,gid=100,file_mode=0755,dir_mode=0755
+        Options=credentials=$credfile,vers=3.0,sec=ntlmssp,noserverino,iocharset=utf8,uid=1000,gid=100,file_mode=0755,dir_mode=0755,_netdev,x-systemd.mount-timeout=10s
+        TimeoutSec=10s
         EOF
 
                   cat > /run/systemd/system/mnt-nas-$name.automount <<EOF
         [Unit]
         Description=Automount SMB ($name)
-        After=network-online.target
 
         [Automount]
         Where=/mnt/nas/$name
