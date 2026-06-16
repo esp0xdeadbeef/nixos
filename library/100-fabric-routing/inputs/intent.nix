@@ -170,6 +170,25 @@
         }
 
         {
+          id = "allow-tenants-to-site-dns";
+          priority = 30;
+          from = {
+            kind = "tenant-set";
+            members = [
+              "mgmt"
+              "admin"
+              "client"
+            ];
+          };
+          to = {
+            kind = "service";
+            name = "site-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
+
+        {
           id = "allow-tenants-to-wan";
           priority = 100;
           from = {
