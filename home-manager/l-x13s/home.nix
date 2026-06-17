@@ -17,6 +17,7 @@
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
     # ./steam/packages.nix
+    ../01-general/darkmode/config.nix
     ./configs/i3/packages.nix
     ./configs/i3status-rust/packages.nix
   ];
@@ -48,11 +49,6 @@
   home.username = "deadbeef";
   home.homeDirectory = "/home/deadbeef";
   home.enableNixpkgsReleaseCheck = false;
-  gtk.enable = true;
-  gtk.theme = {
-    name = "Adwaita-dark";
-    package = pkgs.gnome-themes-extra;
-  };
 
   home.packages = with pkgs; [
     htop
