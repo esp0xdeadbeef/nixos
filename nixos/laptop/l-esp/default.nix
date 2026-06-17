@@ -4,23 +4,23 @@
   lib,
   config,
   pkgs,
+  profiles,
   outPath,
   ...
 }:
 {
-  # You can import other NixOS modules here
   imports = [
-    # If you want to use modules your own flake exports (from modules/nixos):
-    # outputs.nixosModules.example
-
-    # Or modules from other flakes (such as nixos-hardware):
-    ## Using the specific lenovo-thinkpad-p16s-intel-gen2 model with nvidia overwrite
-    # inputs.hardware.nixosModules.common-cpu-intel
-    # inputs.hardware.nixosModules.common-gpu-nvidia
     inputs.lanzaboote.nixosModules.lanzaboote
+    inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
+    inputs.impermanence.nixosModules.impermanence
+    inputs.home-manager.nixosModules.home-manager
+    inputs.sops-nix.nixosModules.sops
 
-    # You can also split up your configuration and import pieces of it here:
-    # cd /home/deadbeef/github/nixos/nixos/l-esp ; ./generate-imports.sh
+    profiles.nixos.workstation.full
+    profiles.nixos.desktop.i3
+    profiles.nixos.boot.usb-removable
+    profiles.nixos.workstation.pentest-cleanup
+    profiles.nixos.vm-host.nixos-shell
 
     ./connect-nas
     ./hardware
@@ -29,20 +29,9 @@
     #./osee
     ./signal
     ./torrents
-    ./unmount-pentest-directory
     ./nebula-node
-
-    "${outPath}/library/01-general"
-    "${outPath}/library/02-window-manager-i3"
-    # ../30-physical-hardware-connections/why2025-badge/default.nix
-    # ../99-testing/autologin-ssh-and-tty.nix
-
-    inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
-    inputs.impermanence.nixosModules.impermanence
-    inputs.home-manager.nixosModules.home-manager
-    inputs.sops-nix.nixosModules.sops
-    # inputs.nvf.nixosModules.default
-    # inputs.nixvim.nixosModules.nixvim
+    ./optional
+    ./nixos-shell-servers
   ];
 
   hardware.nvidia.prime = {
@@ -73,52 +62,36 @@
   #   extraPackages = with pkgs; [ git curl ];
   # };
 
-  sops.defaultSopsFile = ../../../secrets/l-esp-default.yaml;
-  # This will automatically import SSH keys as age keys
+  sops.defaultSopsFile = "${outPath}/secrets/l-esp-default.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
-  # This is using an age key that is expected to already be in the filesystem
-  # sops.age.keyFile = "/var/lib/sops-nix/key.txt";
-  # This will generate a new key if the key specified above does not exist
-  # sops.age.generateKey = true;
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
-  # This is the actual specification of the secrets.
-  # sops.secrets.example-key = { };
-  # sops.secrets."myservice/my_subdir/my_secret" = { };
 
   home-manager = {
     sharedModules = [
       inputs.sops-nix.homeManagerModules.sops
     ];
     extraSpecialArgs = {
-      inherit inputs outputs;
+      inherit
+        inputs
+        outPath
+        outputs
+        profiles
+        ;
+      primaryUserHome = config.local.users.primary.homeDirectory;
+      primaryUser = config.local.users.primary.resolvedName;
     };
     users = {
-      # Import your home-manager configuration
-      deadbeef = import ../../../home-manager/l-esp/home.nix;
+      ${config.local.users.primary.resolvedName} = import "${outPath}/home-manager/l-esp/home.nix";
     };
   };
 
   nixpkgs = {
-    # You can add overlays here
     overlays = [
-      # Add overlays your own flake exports (from overlays and pkgs dir):
       outputs.overlays.additions
       outputs.overlays.modifications
       outputs.overlays.unstable-packages
-
-      # You can also add overlays exported from other flakes:
-      # neovim-nightly-overlay.overlays.default
-
-      # Or define it inline, for example:
-      # (final: prev: {
-      #   hi = final.hello.overrideAttrs (oldAttrs: {
-      #     patches = [ ./change-hello-to-hi.patch ];
-      #   });
-      # })
     ];
-    # Configure your nixpkgs instance
     config = {
-      # Disable if you don't want unfree packages
       allowUnfree = true;
     };
   };
@@ -144,42 +117,24 @@
       nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
     };
 
-  # FIXME: Add the rest of your current configuration
-
-  # networking.hostName = "l-werk";
-  # networking.networkmanager.enable = true;
-  # time.timeZone = "Europe/Amsterdam";
-
   networking.hostName = "l-esp";
   networking.networkmanager.enable = true;
-  # unlock gnome shit at unlock:
+  local.users.primary.name = "deadbeef";
   security.pam.services.login.enableGnomeKeyring = true;
   environment.interactiveShellInit = ''
     ZSH_THEME=robbyrussell
   '';
 
-  sops.secrets."deadbeef-passwd" = {
-    neededForUsers = true; # make it available before the user is created
+  sops.secrets."${config.local.users.primary.resolvedName}-passwd" = {
+    neededForUsers = true;
   };
-  # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
-  users.users = {
-    # FIXME: Replace with your username
-    deadbeef = {
-      # TODO: You can ss-test-vmet an initial password for your user.
-      # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
-      # Be sure to change it (using passwd) after rebooting!
 
-      # initialPassword = " ";
-      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
-
-      isNormalUser = true;
-      openssh.authorizedKeys.keys = [
-        # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
-        # "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILNntUmNyQ+OYSEGHlXSBOQSWsJkXnx8E+zhfhGFRDuy deadbeef@l-x13s"
-      ];
-      # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
-      extraGroups = [ "wheel" ];
-    };
+  users.users.deadbeef = {
+    hashedPasswordFile = config.sops.secrets."deadbeef-passwd".path;
+    isNormalUser = true;
+    openssh.authorizedKeys.keys = [
+      # "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILNntUmNyQ+OYSEGHlXSBOQSWsJkXnx8E+zhfhGFRDuy deadbeef@l-x13s"
+    ];
   };
 
   environment = {
@@ -191,20 +146,5 @@
       '')
     ];
   };
-
-  # This setups a SSH server. Very important if you're setting up a headless system.
-  # Feel free to remove if you don't need it.
-  # services.openssh = {
-  #   enable = false;
-  #   settings = {
-  #     # Opinionated: forbid root login through SSH.
-  #     PermitRootLogin = "no";
-  #     # Opinionated: use keys only.
-  #     # Remove if you want to SSH using passwords
-  #     PasswordAuthentication = true;
-  #   };
-  # };
-
-  # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   system.stateVersion = "24.11";
 }

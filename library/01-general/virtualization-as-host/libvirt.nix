@@ -1,6 +1,14 @@
-{ config, lib, pkgs, ... }:
 {
-  users.users.deadbeef = {
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  primaryUser = config.local.users.primary.resolvedName;
+in
+lib.mkIf (primaryUser != null) {
+  users.users.${primaryUser} = {
     extraGroups = [ "libvirtd" ];
   };
 

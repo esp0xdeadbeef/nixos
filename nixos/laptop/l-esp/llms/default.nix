@@ -1,7 +1,8 @@
-{ pkgs, ... }:
+{ profiles, ... }:
 {
   imports = [
-    ./lmstudio.nix
+    profiles.nixos.llm.lmstudio
+    profiles.nixos.llm.ollama-base
     ./ollama.nix
   ];
 }

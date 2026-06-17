@@ -5,13 +5,11 @@ TLDR this repo was never ment to be public, but someone wanted it so i published
 https://github.com/Misterio77/nix-starter-configs
 
 
-# Todo
+# Import convention
 
-- [ ] Revisit all hosts with the ugly importer, remove build_ files.
-```bash
-(echo '{ pkgs, ... }: { imports = ['; find . -name 'build_*' -prune -o -name '*.nix' ! -name 'default.nix' -print; echo ']; }') | nixfmt | tee ./default.nix
-```
+Hosts should import explicit profiles and host-local modules by intent. Avoid
+regenerating `imports` from every `.nix` file in a directory.
 
-- [ ] Make hosts usb bootable (check git history on this file)
-
-
+Temporary or experimental modules can stay in scoped optional directories. Prefix
+their file or directory name with `build_` or `disabled_` to keep them present in
+the tree but excluded from dynamic optional imports.

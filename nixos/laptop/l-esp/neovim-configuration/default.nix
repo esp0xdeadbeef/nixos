@@ -1,11 +1,7 @@
-{ config, inputs, pkgs, ... }:
+{ pkgs, ... }:
 
 let
-  system = pkgs.stdenv.hostPlatform.system;
-  unstablePkgs = import inputs.nixpkgs-unstable {
-    inherit system;
-    config = config.nixpkgs.config;
-  };
+  unstablePkgs = pkgs.unstable;
 in
 
 {

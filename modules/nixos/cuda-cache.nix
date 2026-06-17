@@ -63,10 +63,16 @@ in
     };
   };
 
-  config = lib.mkIf enablePublicCudaCache {
-    nix.settings = {
-      extra-substituters = lib.mkAfter [ cfg.publicCudaCache.url ];
-      extra-trusted-public-keys = lib.mkAfter [ cfg.publicCudaCache.publicKey ];
-    };
-  };
+  config = lib.mkMerge [
+    {
+      local.nix.cudaCache.enable = lib.mkDefault (cfg.autoEnable && nvidiaDriverConfigured);
+    }
+
+    (lib.mkIf enablePublicCudaCache {
+      nix.settings = {
+        extra-substituters = lib.mkAfter [ cfg.publicCudaCache.url ];
+        extra-trusted-public-keys = lib.mkAfter [ cfg.publicCudaCache.publicKey ];
+      };
+    })
+  ];
 }

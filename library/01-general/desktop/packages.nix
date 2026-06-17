@@ -2,13 +2,10 @@
   config,
   pkgs,
   lib,
-  inputs,
   ...
 }:
 let
-  unstablePkgs = import inputs.nixpkgs-unstable {
-    system = pkgs.stdenv.hostPlatform.system;
-  };
+  unstablePkgs = pkgs.unstable;
 in
 {
   environment.etc.hosts.enable = false;

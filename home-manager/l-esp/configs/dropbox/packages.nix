@@ -1,16 +1,11 @@
-{ config
-, pkgs
-, lib
-, inputs
-, ...
+{
+  config,
+  pkgs,
+  lib,
+  ...
 }:
 
 let
-  unstablePkgs = import inputs.nixpkgs-unstable {
-    inherit (pkgs.stdenv.hostPlatform) system;
-    config.allowUnfree = true;
-  };
-
   gsettingsDataDirs = map (pkg: lib.removeSuffix "/glib-2.0/schemas" (pkgs.glib.getSchemaPath pkg)) [
     pkgs.gsettings-desktop-schemas
     pkgs.gtk3

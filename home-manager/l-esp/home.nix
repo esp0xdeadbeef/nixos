@@ -1,52 +1,28 @@
-args@{
+{
   inputs,
   outputs,
-  lib,
   config,
   pkgs,
-  sopsSecrets,
+  outPath,
+  profiles,
+  primaryUser,
+  primaryUserHome,
   ...
 }:
 let
-  _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
   unstablePkgs = pkgs.unstable;
-  stablePkgs = import inputs.nixpkgs-stable {
-    system = pkgs.stdenv.hostPlatform.system;
-    config.allowUnfree = true;
-  };
 in
 {
-  home.activation.debugArgs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    # this will log in journalctl -u home-manager-deadbeef.service -e
-    echo "[+] Home Manager activation: showing specialArgs"
-    echo " -> ${lib.concatStringsSep " " (builtins.attrNames args)}"
-  '';
-
-  # You can import other home-manager modules here
   imports = [
-    # If you want to use modules your own flake exports (from modules/home-manager):
-    # outputs.homeManagerModules.example
-
-    # Or modules exported from other flakes (such as nix-colors):
-    # inputs.nix-colors.homeManagerModules.default
-
-    # You can also split up your configuration and import pieces of it here:
     ./configs/dropbox/packages.nix
     ./configs/flameshot/packages.nix
     ./configs/git/config.nix
     ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/sway/packages.nix
     ./configs/tmuxp/packages.nix
-    #./projects/osee/create-x2go-profile.nix
-    #./projects/osee/start-lxc.nix
-    #./projects/osee/vm-settings-resize-guest.nix
-    ../01-general/darkmode/config.nix
-    ../01-general/editors/vscode.nix
-    ../01-general/pdf-reader/packages.nix
-    ../01-general/pentesting/packages.nix
-    ../01-general/virt-manager-config/default.nix
-    ../02-window-manager-i3/i3/packages.nix
-    ../02-window-manager-i3/i3status-rust/packages.nix
+    ./projects
+    "${outPath}/home-manager/01-general/pentesting/packages.nix"
+    profiles.home-manager.desktop-i3
 
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
@@ -62,7 +38,7 @@ in
   # programs.zen-browser.enable = true;
 
   sops = {
-    defaultSopsFile = ../../secrets/l-esp-default-deadbeef.yaml;
+    defaultSopsFile = "${outPath}/secrets/l-esp-default-${primaryUser}.yaml";
     age = {
       sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
       generateKey = true;
@@ -98,8 +74,8 @@ in
   home.enableNixpkgsReleaseCheck = false;
 
   home = {
-    username = "deadbeef";
-    homeDirectory = "/home/deadbeef";
+    username = primaryUser;
+    homeDirectory = primaryUserHome;
   };
 
   home.packages =

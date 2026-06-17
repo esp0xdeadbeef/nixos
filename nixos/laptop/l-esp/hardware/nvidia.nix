@@ -37,6 +37,6 @@
     };
   };
 
-  services.ollama.package = pkgs.ollama-cuda;
+  services.ollama.package = pkgs.unstable.ollama-cuda;
 
 }

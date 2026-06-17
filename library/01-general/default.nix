@@ -2,6 +2,7 @@
 {
   imports = [
     ../../modules/nixos/cuda-cache.nix
+    ../../modules/nixos/local-users.nix
 
     ./desktop/applet-nm.nix
     ./desktop/fonts.nix

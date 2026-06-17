@@ -4,6 +4,9 @@
   pkgs,
   ...
 }:
+let
+  primaryUser = config.local.users.primary.resolvedName;
+in
 {
   # Enable the unfree 1Password packages
   nixpkgs.config.allowUnfreePredicate =
@@ -20,6 +23,6 @@
     enable = true;
     # Certain features, including CLI integration and system authentication support,
     # require enabling PolKit integration on some desktop environments (e.g. Plasma).
-    polkitPolicyOwners = [ "deadbeef" ];
+    polkitPolicyOwners = lib.mkIf (primaryUser != null) [ primaryUser ];
   };
 }
