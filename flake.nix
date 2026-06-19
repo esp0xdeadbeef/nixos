@@ -251,6 +251,7 @@
           };
 
           modules = [
+            outputs.nixosModules.pythonPycachePrefix
             (./. + "/${path}")
           ];
         }

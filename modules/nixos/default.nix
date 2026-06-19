@@ -3,4 +3,10 @@
 {
   cudaCache = import ./cuda-cache.nix;
   localUsers = import ./local-users.nix;
+  pythonPycachePrefix = {
+    environment.variables.PYTHONPYCACHEPREFIX = "/dev/shm";
+    environment.shellInit = ''
+      export PYTHONPYCACHEPREFIX="/dev/shm"
+    '';
+  };
 }
