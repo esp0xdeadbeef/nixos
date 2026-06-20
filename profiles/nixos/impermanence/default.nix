@@ -475,7 +475,6 @@ in
           ".local/state/wireplumber/default-nodes"
           ".screenrc"
           ".ZAP/config.xml"
-          ".config/nix/nix.conf"
           ".zsh_history"
           ".zshrc"
           ".aliases"
