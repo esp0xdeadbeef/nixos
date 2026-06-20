@@ -49,6 +49,8 @@ in
       variables.HISTSIZE = "100000000";
     };
 
+    users.defaultUserShell = lib.mkOverride 900 pkgs.zsh;
+
     programs.zsh = {
       enable = true;
 
