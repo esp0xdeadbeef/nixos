@@ -1,9 +1,8 @@
-{
-  inputs,
-  config,
-  pkgs,
-  lib,
-  ...
+{ inputs
+, config
+, pkgs
+, lib
+, ...
 }:
 
 {
@@ -157,7 +156,7 @@
         ".config/freerdp/server" # remmina ssl certs
 
         ".cache/remmina" # ffs, just remember shit remmina!
-        # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-werk/remmina/config.nix)
+        # ".local/share/remmina" # remmina remote desktop connections (not needed anymore, check /home/deadbeef/github/nixos/home-manager/l-envil/remmina/config.nix)
 
         ".config/Code" # vscode settings and data
         ".vscode" # workspace-specific settings and plugins

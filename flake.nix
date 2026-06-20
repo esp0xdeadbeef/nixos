@@ -129,11 +129,10 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      home-manager,
-      ...
+    { self
+    , nixpkgs
+    , home-manager
+    , ...
     }@inputs:
     let
       lib = nixpkgs.lib;
@@ -159,7 +158,7 @@
       # Most hosts are x86_64. The ThinkPad X13s is Qualcomm ARM64, so evaluating
       # it as x86_64-linux is wrong.
       hostSystems = {
-        l-x13s = "aarch64-linux";
+        l-portal = "aarch64-linux";
       };
 
       hostSystemFor = name: hostSystems.${name} or "x86_64-linux";
@@ -187,9 +186,12 @@
           { };
 
       # Discover all hosts automatically
-      hosts = lib.foldl' (
-        acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
-      ) { } hostRoots;
+      hosts = lib.foldl'
+        (
+          acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
+        )
+        { }
+        hostRoots;
 
       allHostAbs = lib.mapAttrsToList (_: v: "${root}/${v}") hosts;
 
@@ -212,7 +214,7 @@
               inGit = lib.hasPrefix "${root}/.git" p;
             in
             # include everything EXCEPT other hosts and .git
-            !(inOther || inGit);
+              !(inOther || inGit);
         };
     in
     {
@@ -230,10 +232,11 @@
 
       overlays =
         if builtins.pathExists ./overlays then
-          import ./overlays {
-            inherit inputs;
-            outPath = root;
-          }
+          import ./overlays
+            {
+              inherit inputs;
+              outPath = root;
+            }
         else
           { };
 
@@ -249,27 +252,29 @@
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------
-      nixosConfigurations = lib.mapAttrs (
-        name: path:
-        nixpkgs.lib.nixosSystem {
-          system = hostSystemFor name;
+      nixosConfigurations = lib.mapAttrs
+        (
+          name: path:
+            nixpkgs.lib.nixosSystem {
+              system = hostSystemFor name;
 
-          specialArgs = {
-            inherit
-              inputs
-              outputs
-              profiles
-              self
-              name
-              ;
-            outPath = self.outPath;
-          };
+              specialArgs = {
+                inherit
+                  inputs
+                  outputs
+                  profiles
+                  self
+                  name
+                  ;
+                outPath = self.outPath;
+              };
 
-          modules = [
-            outputs.nixosModules.pythonPycachePrefix
-            (./. + "/${path}")
-          ];
-        }
-      ) hosts;
+              modules = [
+                outputs.nixosModules.pythonPycachePrefix
+                (./. + "/${path}")
+              ];
+            }
+        )
+        hosts;
     };
 }

@@ -1,11 +1,10 @@
-{
-  outPath,
-  lib,
-  config,
-  inputs,
-  modulesPath,
-  pkgs,
-  ...
+{ outPath
+, lib
+, config
+, inputs
+, modulesPath
+, pkgs
+, ...
 }:
 let
   vmRoot = builtins.dirOf __curPos.file;
@@ -15,10 +14,10 @@ in
 
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
-    "${outPath}/library/10-vms/nixos-shell-vm/l-werk-host-config-nixos-shell-vm"
+    "${outPath}/library/10-vms/nixos-shell-vm/l-envil-host-config-nixos-shell-vm"
     inputs.nixos-shell.nixosModules.nixos-shell
     ./gnome.nix
-    
+
   ];
   environment.systemPackages = with inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}; [
     claude-code
@@ -39,7 +38,7 @@ in
   };
 
   virtualisation.memorySize = 4096;
-  virtualisation.cores = 4; 
+  virtualisation.cores = 4;
   virtualisation.graphics = true;
   virtualisation.qemu.options = [
     "-enable-kvm"

@@ -66,7 +66,7 @@ The repo works, but boundaries are blurry:
 - Some reusable modules live in `library/`, some in `home-manager/01-general`,
   while exported module directories under `modules/` are nearly empty.
 - Local packages such as `mxbuild`, `azurehound`, and pentest PowerShell tooling
-  live under `nixos/laptop/l-werk/1-custom-packages`, even though they are really
+  live under `nixos/laptop/l-envil/1-custom-packages`, even though they are really
   packages or package-backed modules.
 - Overlays are used both for actual overlays and for injecting `pkgs.unstable`.
   That pattern works, but makes package provenance less explicit.
@@ -322,7 +322,7 @@ profile or module option.
 
 ### Move Host-Local Packages Into `pkgs/`
 
-These should be moved out of `nixos/laptop/l-werk/1-custom-packages`:
+These should be moved out of `nixos/laptop/l-envil/1-custom-packages`:
 
 - `mxbuild`
 - `azurehound`
@@ -462,7 +462,7 @@ nixos/server/s-sigma/
   hardware/
 ```
 
-For another host, such as `l-werk` or `l-esp`, enabling the profile later should
+For another host, such as `l-envil` or `l-esp`, enabling the profile later should
 be a small change:
 
 ```nix
@@ -531,9 +531,9 @@ easier. The current setup works, but the intent is split across host-local files
 - `nixos/laptop/l-esp/llms/default.nix`
 - `nixos/laptop/l-esp/llms/ollama.nix`
 - `nixos/laptop/l-esp/llms/lmstudio.nix`
-- `nixos/laptop/l-werk/llms/ollama.nix`
-- `nixos/laptop/l-werk/llms/lmstudio.nix`
-- `nixos/laptop/l-werk/llms/web-ui-ollama.nix`
+- `nixos/laptop/l-envil/llms/ollama.nix`
+- `nixos/laptop/l-envil/llms/lmstudio.nix`
+- `nixos/laptop/l-envil/llms/web-ui-ollama.nix`
 
 The repeated concepts are:
 
@@ -624,7 +624,7 @@ llmModelSets.heavy = llmModelSets.default ++ [
 ];
 ```
 
-Then `l-esp` can use a lighter set and `l-werk` can use a CUDA/heavy set.
+Then `l-esp` can use a lighter set and `l-envil` can use a CUDA/heavy set.
 
 ### Package Selection
 
@@ -662,7 +662,7 @@ local.nix.cudaCache
 It is also imported through `library/01-general` so hosts that already use the
 shared library get the option definitions. The module auto-enables only when the
 evaluated NixOS config declares the Nvidia driver or Nvidia kernel modules. This
-means `l-esp` and `l-werk` get the CUDA cache automatically, while `s-sigma`
+means `l-esp` and `l-envil` get the CUDA cache automatically, while `s-sigma`
 does not as long as Nvidia remains disabled there.
 
 The current public CUDA cache configured by the module is:
@@ -695,7 +695,7 @@ Practical first step:
 
 1. Keep the public CUDA cache module auto-enabled from declared Nvidia driver
    usage.
-2. Test with `nix build --dry-run` for `l-esp` and `l-werk` to see whether
+2. Test with `nix build --dry-run` for `l-esp` and `l-envil` to see whether
    `ollama-cuda` downloads or builds.
 3. If cache misses still happen often, decide separately whether a remote builder
    or private cache is worth adding later.
@@ -735,8 +735,8 @@ Do not create a full option module first. Start by extracting the duplication:
    = [ pkgs.lmstudio ];`.
 2. Create `profiles/nixos/llm/ollama-base.nix` that enables Ollama but leaves
    package, host binding, and model list overridable by the host.
-3. Keep `l-esp` and `l-werk` model lists in host-local files initially.
-4. Move `l-werk`'s Open WebUI module to `profiles/nixos/llm/open-webui.nix`, but
+3. Keep `l-esp` and `l-envil` model lists in host-local files initially.
+4. Move `l-envil`'s Open WebUI module to `profiles/nixos/llm/open-webui.nix`, but
    keep it opt-in.
 5. After both laptops evaluate, consider a real `services.local.llm` option
    module.
@@ -781,7 +781,7 @@ nixos/laptop/l-esp/
 
 Keep reusable service stacks outside host directories unless they are truly
 single-host. For example, `llms`, `android`, and `unmount-pentest-directory` may
-be reusable workstation profiles if both `l-werk` and `l-esp` can use them.
+be reusable workstation profiles if both `l-envil` and `l-esp` can use them.
 
 For servers, keep role modules explicit:
 
@@ -856,7 +856,7 @@ For every cleanup step:
 
 ```sh
 nix eval .#nixosConfigurations.l-esp.config.system.build.toplevel.drvPath
-nix eval .#nixosConfigurations.l-werk.config.system.build.toplevel.drvPath
+nix eval .#nixosConfigurations.l-envil.config.system.build.toplevel.drvPath
 nix eval .#nixosConfigurations.s-sigma.config.system.build.toplevel.drvPath
 ```
 

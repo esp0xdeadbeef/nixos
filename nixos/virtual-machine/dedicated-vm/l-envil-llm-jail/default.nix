@@ -6,10 +6,12 @@
 , name
 , outPath
 , modulesPath
+, profiles
 , ...
 }:
 
 let
+  hostName = builtins.baseNameOf (builtins.dirOf __curPos.file);
   codexUser = "deadbeef";
 in
 {
@@ -23,6 +25,9 @@ in
 
     "${outPath}/library/01-general/system/garbage-collection.nix"
     "${outPath}/library/01-general/system/autoupdate.nix"
+    "${outPath}/library/02-window-manager-i3"
+    profiles.nixos.shell.zsh-prompt
+    "${outPath}/modules/nixos/local-users.nix"
 
     ./codex
     ./disko.nix
@@ -32,14 +37,7 @@ in
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
 
-  swapDevices = [
-    {
-      device = "/persist/var/lib/swapfile";
-      size = 45 * 1024;
-    }
-  ];
-
-  networking.hostName = "codex-jail";
+  networking.hostName = hostName;
 
   nixpkgs = {
     overlays = [
@@ -60,8 +58,6 @@ in
       settings = {
         experimental-features = "nix-command flakes";
         flake-registry = "";
-        max-jobs = "auto";
-        cores = 0;
         nix-path = config.nix.nixPath;
       };
 
@@ -94,7 +90,6 @@ in
     "sd_mod"
     "sr_mod"
   ];
-  time.timeZone = "Europe/Amsterdam";
 
   fileSystems."/boot".neededForBoot = true;
   fileSystems."/persist".neededForBoot = true;
@@ -142,9 +137,7 @@ in
       extraGroups = [ "wheel" ];
 
       openssh.authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILNntUmNyQ+OYSEGHlXSBOQSWsJkXnx8E+zhfhGFRDuy deadbeef@l-portal"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID3aMs0pSWWYY3Sah8zYP0cJKW7SO/5F8Z7QjM359C+i root@nixos"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMzXcHAi4fHzfTfajlh34I0hzQ29BqHT2DRJ/o9G1nvT"
       ];
 
       shell = pkgs.zsh;
@@ -190,59 +183,45 @@ in
   ];
 
   environment.systemPackages = with pkgs; [
-    git
-    vim
-    neovim
-    tmux
-    tmuxp
-    sops
-    curl
-    wget
-    jq
-    gron
-    ripgrep
-    fd
-    htop
     btop
-    pciutils
-    usbutils
-    iproute2
-    iputils
-    bind
-    nmap
-    tcpdump
-    traceroute
-    mtr
-    netcat-openbsd
-    socat
-    nftables
     conntrack-tools
-    ethtool
-    iptables
-    procps
-    lsof
-    file
-    tree
-    unzip
-    zip
-    rsync
-    moreutils
-    nixpkgs-fmt
-    nil
-    statix
     deadnix
-    shellcheck
+    ethtool
+    fd
+    file
     gcc
     gdb
+    gh
     gnumake
+    gron
+    htop
+    iproute2
+    iptables
+    iputils
+    moreutils
+    netcat-openbsd
+    nil
+    nixpkgs-fmt
+    nodejs
+    pciutils
     pkg-config
     python3
     ruff
-    nodejs
-    gh
-  ];
+    shellcheck
+    socat
+    statix
+    tmuxp
+    tree
+    unzip
+    usbutils
+    zip
+  ] ++ (with inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}; [
+    claude-code
+    qwen-code
+  ]);
 
-  programs.zsh.enable = true;
+  local.shell.zshPrompt.enable = true;
+  local.users.primary.name = codexUser;
 
   #environment.interactiveShellInit = ''
   #  ZSH_THEME=agnoster
@@ -279,12 +258,37 @@ in
       "/var/lib/nixos"
       "/var/lib/systemd"
       "/var/log"
-      "/home/deadbeef"
       "/root"
     ];
 
     files = [
       "/etc/machine-id"
+    ];
+
+    users.${codexUser}.directories = [
+      ".claude"
+      ".codex"
+      ".config/claude"
+      ".config/codex"
+      ".config/hermes"
+      ".config/opencode"
+      ".config/qwen"
+      ".config/qwen-code"
+      ".local/share/claude"
+      ".local/share/codex"
+      ".local/share/hermes"
+      ".local/share/opencode"
+      ".local/share/qwen"
+      ".local/share/qwen-code"
+      ".cache/claude"
+      ".cache/codex"
+      ".cache/hermes"
+      ".cache/opencode"
+      ".cache/qwen"
+      ".cache/qwen-code"
+      ".npm-global"
+      ".opencode"
+      ".qwen"
     ];
   };
 

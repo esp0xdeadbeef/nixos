@@ -1,8 +1,7 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
+{ config
+, lib
+, pkgs
+, ...
 }:
 let
   cfg = config.local.shell.zshPrompt;
@@ -26,11 +25,11 @@ let
   color =
     if hostName == "s-sigma" then
       "red"
-    else if hostName == "l-werk" then
+    else if hostName == "l-envil" then
       "green"
     else if hostName == "l-esp" then
       "yellow"
-    else if hostName == "l-x13s" then
+    else if hostName == "l-portal" then
       "cyan"
     else if hostName == "s-agents" then
       "magenta"
