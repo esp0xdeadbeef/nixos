@@ -113,7 +113,7 @@ in
                   typeset __prompt_user_color="blue"
                 fi
 
-                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b:%F{244}${role}%F{${color}}] - %F{blue}[%~]%F{${color}} - %F{244}[%D{%a %b %d, %H:%M}]%f
+                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b:%F{244}${role}%F{${color}}] - %F{244}[%~]%F{${color}} - %F{244}[%D{%a %b %d, %H:%M}]%f
         %F{${color}}└─%f%(?.%F{green}.%F{red})[%#]%f '
                 RPROMPT=""
       '';
