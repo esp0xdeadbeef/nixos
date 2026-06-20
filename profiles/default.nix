@@ -16,6 +16,9 @@
       i3 = import ./nixos/desktop/i3.nix;
       sway = import ./nixos/desktop/sway.nix;
     };
+    containers = {
+      firefox-vnc = import ./nixos/containers/firefox-vnc.nix;
+    };
     editors = {
       neovim = import ./nixos/editors/neovim;
     };

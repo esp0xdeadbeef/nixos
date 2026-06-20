@@ -1,8 +1,7 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
+{ config
+, pkgs
+, lib
+, ...
 }:
 
 {
@@ -18,5 +17,15 @@
     randomizedDelaySec = "15min";
     operation = "boot";
     allowReboot = false;
+  };
+
+  systemd.services.nixos-upgrade = {
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+
+    serviceConfig = {
+      Restart = "on-failure";
+      RestartSec = "2h";
+    };
   };
 }

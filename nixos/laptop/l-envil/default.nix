@@ -32,6 +32,7 @@ in
     profiles.nixos.llm.lmstudio
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm.open-webui
+    profiles.nixos.containers.firefox-vnc
 
     ./1-custom-packages/burp-fix.nix
     ./android
