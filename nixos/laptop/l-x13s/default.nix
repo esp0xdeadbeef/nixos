@@ -12,6 +12,7 @@
   imports = [
     ./wifi.nix
 
+    profiles.nixos.base.default
     profiles.nixos.laptop.default
 
     ./hardware/bootloader.nix

@@ -1,12 +1,18 @@
-{ lib
-, outPath
-, pkgs
-, hostName
-, installDisk
-, ...
+{
+  lib,
+  outPath,
+  pkgs,
+  hostName,
+  installDisk,
+  ...
 }:
 {
   networking.hostName = lib.mkForce hostName;
+
+  imports = [
+    "${outPath}/profiles/nixos/base/common.nix"
+    "${outPath}/profiles/nixos/nixpkgs/allow-unfree.nix"
+  ];
 
   fileSystems."/boot".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;

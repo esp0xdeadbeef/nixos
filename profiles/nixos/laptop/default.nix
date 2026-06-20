@@ -1,4 +1,7 @@
+{ profiles, ... }:
 {
-  services.hardware.bolt.enable = true;
-  services.fwupd.enable = true;
+  imports = [
+    profiles.nixos.laptop.dock
+    profiles.nixos.laptop.power
+  ];
 }

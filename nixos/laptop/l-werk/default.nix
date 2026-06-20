@@ -1,13 +1,14 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{ inputs
-, outputs
-, lib
-, config
-, pkgs
-, profiles
-, outPath
-, ...
+{
+  inputs,
+  outputs,
+  lib,
+  config,
+  pkgs,
+  profiles,
+  outPath,
+  ...
 }:
 {
   imports = [
@@ -30,9 +31,7 @@
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm.open-webui
 
-    ./1-custom-packages/azurehound/package.nix
     ./1-custom-packages/burp-fix.nix
-    ./1-custom-packages/mxbuild/package.nix
     ./android
     ./hardware/audio-and-bluetooth.nix
     ./hardware/bootloader.nix
@@ -148,6 +147,8 @@
 
   environment = {
     systemPackages = [
+      pkgs.azurehound
+      pkgs.mxbuild
       (pkgs.writeShellScriptBin "qemu-system-x86_64-uefi" ''
         qemu-system-x86_64 \
           -bios ${pkgs.OVMF.fd}/FV/OVMF.fd \

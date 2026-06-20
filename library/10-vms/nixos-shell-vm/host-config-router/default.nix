@@ -8,6 +8,7 @@
   pkgs,
   name,
   outPath,
+  profiles,
   ...
 }:
 {
@@ -18,6 +19,8 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
+    profiles.nixos.base.common
+    profiles.nixos.nixpkgs.allow-unfree
     # inputs.nvf.nixosModules.default
     # inputs.nixvim.nixosModules.nixvim
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"

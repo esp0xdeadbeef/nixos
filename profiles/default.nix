@@ -1,18 +1,35 @@
 {
   nixos = {
-    base = import ./nixos/base;
+    base = {
+      default = import ./nixos/base;
+      common = import ./nixos/base/common.nix;
+      maintenance = import ./nixos/base/maintenance.nix;
+      system = import ./nixos/base/system.nix;
+    };
     boot = {
       usb-removable = import ./nixos/boot/usb-removable.nix;
     };
     desktop = {
       common = import ./nixos/desktop/common.nix;
+      gnome = import ./nixos/desktop/gnome.nix;
       i3 = import ./nixos/desktop/i3.nix;
+      sway = import ./nixos/desktop/sway.nix;
     };
     packages = {
       workstation = import ./nixos/packages/workstation.nix;
     };
+    nixpkgs = {
+      allow-unfree = import ./nixos/nixpkgs/allow-unfree.nix;
+    };
+    network = {
+      workstation = import ./nixos/network/workstation.nix;
+    };
     virtualization = {
+      docker = import ./nixos/virtualization/docker.nix;
       host = import ./nixos/virtualization/host.nix;
+      libvirt = import ./nixos/virtualization/libvirt.nix;
+      lxc = import ./nixos/virtualization/lxc.nix;
+      podman = import ./nixos/virtualization/podman.nix;
     };
     llm = {
       lmstudio = import ./nixos/llm/lmstudio.nix;
@@ -24,6 +41,8 @@
     };
     laptop = {
       default = import ./nixos/laptop;
+      dock = import ./nixos/laptop/dock.nix;
+      power = import ./nixos/laptop/power.nix;
     };
     vm-host = {
       nixos-shell = import ./nixos/vm-host/nixos-shell;

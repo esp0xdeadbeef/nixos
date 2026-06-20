@@ -1,6 +1,9 @@
-{ pkgs, ... }:
+{ pkgs, profiles, ... }:
 {
   imports = [
+    profiles.nixos.nixpkgs.allow-unfree
+    profiles.nixos.base.common
+
     ../../modules/nixos/cuda-cache.nix
     ../../modules/nixos/local-users.nix
 
