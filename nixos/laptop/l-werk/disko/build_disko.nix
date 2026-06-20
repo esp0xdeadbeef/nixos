@@ -1,9 +1,31 @@
+{ lib, ... }:
+
+let
+  laptopHibernateSwapSize = import ../../../../library/disko/laptop-hibernate-swap-size.nix;
+in
 {
+  boot.initrd.luks.devices = {
+    crypted = {
+      keyFile = lib.mkForce null;
+      crypttabExtraOpts = lib.mkAfter [
+        "tpm2-device=auto"
+        "tpm2-pcrs=7"
+      ];
+    };
+    cryptswap = {
+      keyFile = lib.mkForce null;
+      crypttabExtraOpts = lib.mkAfter [
+        "tpm2-device=auto"
+        "tpm2-pcrs=7"
+      ];
+    };
+  };
+
   disko.devices = {
     disk = {
       vda = {
         type = "disk";
-        device = "/dev/sda";
+        device = "/dev/nvme0n1";
         content = {
           type = "gpt";
           partitions = {
@@ -13,7 +35,7 @@
               priority = 1; # Needs to be first partition
             };
             ESP = {
-              size = "512M";
+              size = "1G";
               type = "EF00";
               content = {
                 type = "filesystem";
@@ -22,6 +44,22 @@
                 mountOptions = [
                   "defaults"
                 ];
+              };
+            };
+            swap = {
+              size = laptopHibernateSwapSize { ramGiB = 64; };
+              content = {
+                type = "luks";
+                name = "cryptswap";
+                settings = {
+                  allowDiscards = true;
+                  keyFile = "/tmp/disk.key";
+                };
+                content = {
+                  type = "swap";
+                  discardPolicy = "both";
+                  resumeDevice = true;
+                };
               };
             };
             luks = {
@@ -62,14 +100,6 @@
                       ];
                       mountpoint = "/persist";
                     };
-                    # "/swap" = {
-                    #   mountpoint = "/.swapvol";
-                    #   swap = {
-                    #     swapfile.size = "20M";
-                    #     swapfile2.size = "20M";
-                    #     swapfile2.path = "rel-path";
-                    #   };
-                    # };
                   };
                   mountpoint = "/partition-root";
                 };

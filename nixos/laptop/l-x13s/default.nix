@@ -4,12 +4,15 @@
   lib,
   config,
   pkgs,
+  profiles,
   outPath,
   ...
 }:
 {
   imports = [
     ./wifi.nix
+
+    profiles.nixos.laptop.default
 
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix

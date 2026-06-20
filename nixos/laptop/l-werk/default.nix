@@ -1,27 +1,34 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  outPath,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, profiles
+, outPath
+, ...
 }:
 {
-  # You can import other NixOS modules here
   imports = [
-    # If you want to use modules your own flake exports (from modules/nixos):
-    # outputs.nixosModules.example
-
-    # Or modules from other flakes (such as nixos-hardware):
-    # inputs.hardware.nixosModules.common-cpu-intel
-    # inputs.hardware.nixosModules.common-ssd
-
-    # You can also split up your configuration and import pieces of it here:
-    # cd /home/deadbeef/github/nixos/nixos/l-werk ; ./generate-imports.sh
     inputs.lanzaboote.nixosModules.lanzaboote
+    inputs.disko.nixosModules.disko
+    inputs.nixos-hardware.nixosModules.common-cpu-intel
+    inputs.nixos-hardware.nixosModules.common-gpu-intel
+    inputs.nixos-hardware.nixosModules.common-gpu-nvidia
+    inputs.nixos-hardware.nixosModules.common-pc-laptop
+    inputs.nixos-hardware.nixosModules.common-pc-laptop-ssd
+    inputs.impermanence.nixosModules.impermanence
+    inputs.home-manager.nixosModules.home-manager
+    inputs.sops-nix.nixosModules.sops
+
+    profiles.nixos.workstation.full
+    profiles.nixos.desktop.i3
+    profiles.nixos.boot.usb-removable
+    profiles.nixos.laptop.default
+    profiles.nixos.llm.lmstudio
+    profiles.nixos.llm.ollama-base
+    profiles.nixos.llm.open-webui
 
     ./1-custom-packages/azurehound/package.nix
     ./1-custom-packages/burp-fix.nix
@@ -34,24 +41,12 @@
     ./hardware/nvidia.nix
     ./hardware/sound-fix.nix
     ./hardware/swap-and-tmpfs.nix
-    ./llms/lmstudio.nix
+    ./disko/build_disko.nix
     ./llms/ollama.nix
-    ./llms/web-ui-ollama.nix
     ./lxc/bind-to-lxc.nix
     ./neovim-on-steroids/neovim.nix
     ./unmount-pentest-directory/unmount-hook.nix
     ./work-packages/wordlists/packages.nix
-
-    "${outPath}/library/01-general"
-
-    "${outPath}/library/04-window-manager-other"
-
-    # ../99-testing/autologin-ssh-and-tty.nix
-    # ../99-testing/autologin.nix
-
-    inputs.impermanence.nixosModules.impermanence
-    inputs.home-manager.nixosModules.home-manager
-    inputs.sops-nix.nixosModules.sops
   ];
 
   security.pam.services.login.enableGnomeKeyring = true;
@@ -67,11 +62,17 @@
       inputs.sops-nix.homeManagerModules.sops
     ];
     extraSpecialArgs = {
-      inherit inputs outputs;
+      inherit
+        inputs
+        outPath
+        outputs
+        profiles
+        ;
+      primaryUserHome = config.local.users.primary.homeDirectory;
+      primaryUser = config.local.users.primary.resolvedName;
     };
     users = {
-      # Import your home-manager configuration
-      deadbeef = import "${outPath}/home-manager/l-werk/home.nix";
+      ${config.local.users.primary.resolvedName} = import "${outPath}/home-manager/l-werk/home.nix";
     };
   };
 
@@ -97,6 +98,8 @@
     config = {
       # Disable if you don't want unfree packages
       allowUnfree = true;
+      cudaCapabilities = [ "8.6" ];
+      cudaForwardCompat = false;
     };
   };
 
@@ -125,23 +128,20 @@
 
   networking.hostName = "l-werk";
   networking.networkmanager.enable = true;
-  time.timeZone = "Europe/Amsterdam";
+  hardware.intelgpu.vaapiDriver = "intel-media-driver";
+  local.users.primary.name = "deadbeef";
 
   sops.secrets."deadbeef-passwd" = {
     neededForUsers = true; # make it available before the user is created
   };
-  # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
+
   users.users = {
-    # FIXME: Replace with your username
     deadbeef = {
       hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
-      # initialPassword = " ";
       isNormalUser = true;
       openssh.authorizedKeys.keys = [
-        # TODO: Add your SSH public key(s) here, if you plan on using SSH to connect
         # "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILNntUmNyQ+OYSEGHlXSBOQSWsJkXnx8E+zhfhGFRDuy deadbeef@l-x13s"
       ];
-      # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];
     };
   };
@@ -155,18 +155,13 @@
       '')
     ];
   };
-  # This setups a SSH server. Very important if you're setting up a headless system.
-  # Feel free to remove if you don't need it.
-  # services.openssh = {
-  #   enable = false;
-  #   settings = {
-  #     # Opinionated: forbid root login through SSH.
-  #     PermitRootLogin = "no";
-  #     # Opinionated: use keys only.
-  #     # Remove if you want to SSH using passwords
-  #     PasswordAuthentication = true;
-  #   };
-  # };
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "no";
+      PasswordAuthentication = true;
+    };
+  };
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   system.stateVersion = "24.11";

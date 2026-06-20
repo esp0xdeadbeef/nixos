@@ -1,8 +1,8 @@
 keys:
   - &l-x13s-deadbeef age1a5nn59ea7ut9kw2gu20nv067ptd06zr53vdehlus2mrdgnpny4lsu25nrz
   - &l-x13s-root age15z0s6nul3tyn96acegegjsh0rjhalwt2un0vxlltk98qan5aratqfumu56
-  - &l-werk-root age1lm7ug2rpxh29qu9h38yecqnsu69g6p2qy2v2eesp4uhc43z0x9qs28cwlw
-  - &l-werk-deadbeef age1z6k6e4ywawn44u83tmwv9304ufaq4ahteszuadechj34jcp9tusqevrm6d
+  - &l-werk-root age1t07vak4hlf47esar8temleglsa2c3lde24q6eu78aaq4a0n0ndqqc0mhp5
+  - &l-werk-deadbeef age1d7v0j80lqu7672upwc2fazux9h5e6xt6wmy7wp2svytpzxmc6vysqjp0q8
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
   - &l-esp-deadbeef age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
   - &s-sigma-nixos-proxmox-replacement age172vz7pyznaj5sattexdjg43aekx5qv9sjs49axshrlty6ndrdeyskajktk

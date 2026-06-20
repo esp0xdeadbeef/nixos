@@ -1,7 +1,6 @@
-{
-  config,
-  lib,
-  ...
+{ config
+, lib
+, ...
 }:
 
 let
@@ -9,9 +8,11 @@ let
 
   containsNvidiaModule =
     modules:
-    lib.any (
-      module: module == "nvidia" || lib.hasPrefix "nvidia_" module || lib.hasPrefix "nvidia-" module
-    ) modules;
+    lib.any
+      (
+        module: module == "nvidia" || lib.hasPrefix "nvidia_" module || lib.hasPrefix "nvidia-" module
+      )
+      modules;
 
   configuredKernelModules =
     (config.boot.kernelModules or [ ]) ++ (config.boot.initrd.kernelModules or [ ]);
@@ -23,7 +24,10 @@ let
   nvidiaDriverConfigured =
     lib.elem "nvidia" (config.services.xserver.videoDrivers or [ ])
     || containsNvidiaModule configuredKernelModules
-    || lib.any (name: lib.hasInfix "nvidia" name) configuredExtraModulePackages;
+    || lib.any (name: lib.hasInfix "nvidia" name) configuredExtraModulePackages
+    || (config.hardware.nvidia.modesetting.enable or false)
+    || (config.hardware.nvidia.prime.offload.enable or false)
+    || (config.hardware.nvidia-container-toolkit.enable or false);
 
   cacheEnabled = cfg.enable || (cfg.autoEnable && nvidiaDriverConfigured);
 

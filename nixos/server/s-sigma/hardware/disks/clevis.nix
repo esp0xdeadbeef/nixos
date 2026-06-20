@@ -3,6 +3,12 @@
 {
   boot.initrd.systemd.enable = true;
 
+  # s-sigma is bare metal without TPM. Disk unlock is handled by Clevis/Tang
+  # over initrd networking, so disable systemd's TPM wait path explicitly.
+  boot.initrd.systemd.tpm2.enable = false;
+  boot.kernelParams = [ "systemd.tpm2_wait=0" ];
+  systemd.tpm2.enable = false;
+
   boot.initrd.luks.devices."crypted" = {
     allowDiscards = true;
   };
@@ -20,7 +26,7 @@
     networkConfig.Address = "192.168.1.98/24";
   };
 
-  # dit is de ENIGE wijziging:
+  # Be conservative during boot: initrd networking or Tang may be a little late.
   boot.initrd.systemd.services."cryptsetup-clevis-crypted" = {
     serviceConfig = {
       Restart = "on-failure";

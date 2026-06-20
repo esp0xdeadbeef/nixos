@@ -16,6 +16,7 @@
     "pd_ignore_unused"
     "arm64.nopauth"
     "pci=realloc,resource_alignment=21@0006:00:00.0"
+    "systemd.tpm2_wait=0"
   ];
 
   boot.initrd.kernelModules = [
@@ -44,4 +45,7 @@
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.configurationLimit = 10;
+
+  boot.initrd.systemd.tpm2.enable = false;
+  systemd.tpm2.enable = false;
 }

@@ -19,6 +19,12 @@
       ollama-base = import ./nixos/llm/ollama-base.nix;
       open-webui = import ./nixos/llm/open-webui.nix;
     };
+    impermanence = {
+      default = import ./nixos/impermanence;
+    };
+    laptop = {
+      default = import ./nixos/laptop;
+    };
     vm-host = {
       nixos-shell = import ./nixos/vm-host/nixos-shell;
     };

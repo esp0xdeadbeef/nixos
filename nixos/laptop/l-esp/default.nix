@@ -19,6 +19,7 @@
     profiles.nixos.workstation.full
     profiles.nixos.desktop.i3
     profiles.nixos.boot.usb-removable
+    profiles.nixos.laptop.default
     profiles.nixos.workstation.pentest-cleanup
     profiles.nixos.vm-host.nixos-shell
 
@@ -38,8 +39,6 @@
     intelBusId = "PCI:00:02:0";
     nvidiaBusId = "PCI:01:00:0";
   };
-
-  services.fwupd.enable = true;
 
   # programs.nixvim = {
   #   enable = true;
@@ -119,8 +118,15 @@
 
   networking.hostName = "l-esp";
   networking.networkmanager.enable = true;
+  environment.etc.hosts.enable = lib.mkForce true;
   local.users.primary.name = "deadbeef";
   security.pam.services.login.enableGnomeKeyring = true;
+  systemd.tmpfiles.rules = [
+    "d /home/deadbeef/.quickget/windows-10 0755 deadbeef users -"
+    "h /home/deadbeef/.quickget/windows-10 - - - - +C"
+    "d /home/deadbeef/.quickget/windows-11 0755 deadbeef users -"
+    "h /home/deadbeef/.quickget/windows-11 - - - - +C"
+  ];
   environment.interactiveShellInit = ''
     ZSH_THEME=robbyrussell
   '';

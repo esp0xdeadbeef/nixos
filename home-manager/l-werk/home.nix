@@ -1,11 +1,10 @@
-args@{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  sopsSecrets,
-  ...
+args@{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, sopsSecrets
+, ...
 }:
 let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
@@ -38,6 +37,7 @@ in
     ./i3/packages.nix
     ./rclone-wrapper/rclone.nix
     ./remmina/config.nix
+    ./work-microsoft.nix
 
     ../01-general/darkmode/config.nix
     ../01-general/editors/vscode.nix
@@ -97,9 +97,7 @@ in
         htop
         # need this because screenshareing is fcked because microslob is doing its thing:
         #teams-for-linux
-        intune-portal
         xdotool
-        azure-cli
         i3status-rust
         discord
         obsidian
@@ -117,7 +115,6 @@ in
         exploitdb
         netexec
         #certipy
-        teams-for-linux
         slack
         (burpsuite.override { iconName = "pro"; })
         gh

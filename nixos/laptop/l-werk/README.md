@@ -1,202 +1,222 @@
+# l-werk rebuild
 
-# Before setting up
+This host is installed through disko. Do not hand-create partitions or run
+`nixos-generate-config` for normal rebuilds.
 
-1. use the gnome iso (vim installed by default)
-2. disable sec boot for the setup (otherwise you can not find the iso / image)
-3. sed this file with the ip and path to this file like so (so the documentation will be easier to read):
+## Live ISO
 
-```bash
-sed -i 's|/home/deadbeef/github/nixos|<your-new-path>|g' /home/deadbeef/github/nixos/nixos/l-werk/README.md
-sed -i 's/192.168.1.165/<your-new-ip>/g' /home/deadbeef/github/nixos/nixos/l-werk/README.md
-```
-
-
-# Setup the disks like this:
-
+1. Boot a NixOS live ISO in UEFI mode.
+2. For Secure Boot enrollment, put the firmware in setup mode before install.
+3. SSH into the live system and become root.
 
 ```bash
-# host that contain the nixos configuration:
-rsync -va /home/deadbeef/github/nixos nixos@192.168.1.165:~/github/
-```
-
-```bash
-# inside the ssh session:
-ssh nixos@192.168.1.165
+ssh nixos@192.168.1.151
 sudo -i
-PATH_TO_DISKO="/home/nixos/github/nixos/nixos/l-werk/disko/build_disko.nix"
-head -c 512 /dev/urandom > /tmp/disk.key
-sed -i 's|/dev/sda|/dev/nvme0n1|g' $PATH_TO_DISKO
-sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- --mode destroy,format,mount $PATH_TO_DISKO
-cryptsetup luksAddKey /dev/disk/by-partlabel/disk-vda-luks -d /tmp/disk.key
-# generate the hardware configuration
-nixos-generate-config --root /mnt/
 ```
 
-To sign the keys:
-```bash
-nix-shell -p sbctl --run 'sbctl create-keys'
-
-
-# only need to do this if you're not using MS products, and want to wipe all the EFI keys:
-mkdir -p /mnt/persist/var/lib/sbctl
-cp -r /var/lib/sbctl/* /mnt/persist/var/lib/sbctl
-
-
-# generate keys that proxmox bios understands:
-nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/PK/PK.pem -out /mnt/boot/PK.cer'
-nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/KEK/KEK.pem -out /mnt/boot/KEK.cer'
-nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer'
-
-```
-
-
-# Generate the hardware configuration
+If the live root account is used during recovery:
 
 ```bash
-# host that contain the nixos configuration:
-rsync -va nixos@192.168.1.165:/mnt/etc/nixos/hardware-configuration.nix /home/deadbeef/github/nixos/nixos/l-werk/hardware/hardware-configuration.nix
+ssh root@192.168.1.151
 ```
+
+## Copy config
+
+From the machine that has this repo:
 
 ```bash
-# rsync everything back from the host that contains the configs to the vm:
-rsync -va /home/deadbeef/github/nixos nixos@192.168.1.165:~/github/
+rsync -a --delete /home/deadbeef/github/nixos/ nixos@192.168.1.151:~/github/nixos/
 ```
 
-# Installing the vm:
+On the live system:
 
 ```bash
-nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/nixos-24.11#nixos-install -- --impure --flake path:/home/nixos/github/nixos#l-werk
-# .....
-# setting root password...
-# New password: 
-# Retype new password: 
-# passwd: password updated successfully
-# installation finished!
-# reboot now, we can not setup the tpm, because the driver is not loaded in the live env and we are not in sec mode
-reboot
-# change the settings in your bios to secure boot, delete the PK keys, add the new keys generated in /boot/ (one by one.)
+sudo -i
+cd /home/nixos/github/nixos
 ```
+
+## Disk layout
+
+The disko config is `nixos/laptop/l-werk/disko/build_disko.nix`.
+
+Current layout:
+
+- `/dev/nvme0n1p1`: BIOS boot partition
+- `/dev/nvme0n1p2`: 1G EFI system partition mounted at `/boot`
+- `/dev/nvme0n1p3`: LUKS encrypted swap, mapped as `cryptswap`
+- `/dev/nvme0n1p4`: LUKS encrypted btrfs root, mapped as `crypted`
+
+The temporary install password/key is `nixos`. Change it after the first boot.
+`/tmp/disk.key` is only for disko/bootstrap formatting. It must not be used by
+the installed initrd after reboot.
 
 ```bash
-sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/nvme0n1p3
-# 🔐 Please enter current passphrase for disk /dev/sda3: •                       
-# New TPM2 token enrolled as key slot 2.
-# we can not do the next step because:
-ls /boot/
-# db.cer  EFI  KEK.cer  loader  PK.cer
+printf nixos > /tmp/disk.key
+chmod 600 /tmp/disk.key
 
-# if the output is like this we can enroll the keys:
-nix-shell -p sbctl --run 'sbctl status'
-# Installed:      ✓ sbctl is installed
-# Owner GUID:     c48257e4-f5b8-447a-9ae9-c78aae5e7021
-# Setup Mode:     ✗ Enabled
-# Secure Boot:    ✗ Disabled
-# Vendor Keys:    none
-
-
-# with microsoft:
-nix-shell -p sbctl --run 'sbctl enroll-keys -m'
-# Enrolling keys to EFI variables...
-# With vendor keys from microsoft...✓ 
-# Enrolled keys to the EFI variables!
-nix-shell -p sbctl --run 'sbctl status'
-# Installed:      ✓ sbctl is installed
-# Owner GUID:     c48257e4-f5b8-447a-9ae9-c78aae5e7021
-# Setup Mode:     ✓ Disabled
-# Secure Boot:    ✗ Disabled
-# Vendor Keys:    microsoft
-
-# without microsoft (read the wiki - know what you're doing - https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot):
-nix-shell -p sbctl --run 'sbctl enroll-keys'
-
-# add them to the bios (boot into the firmware) -> secureboot -> add PK KEK db cer files from the first entry (boot directory)
-reboot
+nix --extra-experimental-features "nix-command flakes" run github:nix-community/disko/latest -- \
+  --yes-wipe-all-disks \
+  --mode destroy,format,mount \
+  /home/nixos/github/nixos/nixos/laptop/l-werk/disko/build_disko.nix
 ```
 
-# Setup the environment so it is using safeboot
+## SOPS keys
+
+Create host age keys before install and add the public keys to `.sops.yaml`.
+Then re-encrypt the l-werk secrets.
 
 ```bash
+mkdir -p /mnt/persist/root/.config/sops/age
+mkdir -p /mnt/persist/home/deadbeef/.config/sops/age
 
+nix shell nixpkgs#age -c age-keygen -o /mnt/persist/root/.config/sops/age/keys.txt
+nix shell nixpkgs#age -c age-keygen -o /mnt/persist/home/deadbeef/.config/sops/age/keys.txt
 
-# check if you're enrolled:
-nix-shell -p sbctl --run 'sbctl status'
-# Installed:	✓ sbctl is installed
-# Owner GUID:	839f409d-60b2-458a-8524-80ee6aa9a295
-# Setup Mode:	✓ Disabled
-# Secure Boot:	✓ Enabled
-# Vendor Keys:	none
+nix shell nixpkgs#age -c age-keygen -y /mnt/persist/root/.config/sops/age/keys.txt
+nix shell nixpkgs#age -c age-keygen -y /mnt/persist/home/deadbeef/.config/sops/age/keys.txt
 
-
-# use this setting on fysical devices (7 is important here):
-# doesn't look like applicable to us, this works for me 
-# https://superuser.com/questions/1640985/how-to-enable-bitlocker-when-booting-windows-10-from-a-non-microsoft-boot-manage
-# It still works for me though in a qemu image on proxmox:
-sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/nvme0n1p3
+chown -R 1000:100 /mnt/persist/home/deadbeef/.config
 ```
 
+For this rebuild, `deadbeef-passwd` is set to `nixos`.
 
-# Switch to a different config
-
+## Install
 
 ```bash
-# deadbeef i my user (ssh) don't worry about the eavedropping error in ssh, to get rid of the errors, rm the last two LINES of the `~/.ssh/known_hosts` of your host, then do a rsync:
-rsync -va /home/deadbeef/github/nixos deadbeef@192.168.1.165:~/github/
-nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname)
-nixos-rebuild boot --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+2+7+12 --wipe-slot=tpm2 /dev/sda3 && reboot
+nixos-install --no-root-passwd --impure --flake path:/home/nixos/github/nixos#l-werk
 ```
 
-# sops
-
-Add the keys to /home/deadbeef/github/nixos/secrets/
+If the repo was copied as root instead:
 
 ```bash
-~/nixos-switch.sh                                                                              1 ↵
-building the system configuration...
-Installing Lanzaboote to "/boot"...
-Collecting garbage...
-Successfully installed Lanzaboote.
-activating the configuration...
-generating machine-specific age key...
-# created: 2025-09-06T03:57:35+02:00
-# public key: age1l7dapm3z3w77hwvgrz6clnxzguchfp0qx997ddtv25fnrw8m6elsfsk35q
-AGE-SECRET-KEY-redacted
-sops-install-secrets: Imported /persist/etc/ssh/ssh_host_rsa_key as GPG key with fingerprint 0adf57b94141ea0eff10ed80a00a382bac2569db
-sops-install-secrets: Imported /home/deadbeef/.ssh/id_ed25519 as age key with fingerprint age12ghkem2kyy89htjqd7fv7az34gg5g87zcdtzm0gq23tdll60avtsqsz7vk
-/nix/store/ff49sadsyjzk6xqhn575rawv8qyc84y3-sops-install-secrets-0.0.1/bin/sops-install-secrets: failed to decrypt '/nix/store/3viv7d3zhjx9770xqfv3qzlqm956ihfd-l-werk-default.yaml': Error getting data key: 0 successful groups required, got 0
-Activation script snippet 'setupSecretsForUsers' failed (1)
-warning: password file ‘/run/secrets-for-users/deadbeef-passwd’ does not exist
-setting up /etc...
-warning: /root/.nix-defexpr/channels exists, but channels have been disabled.
-warning: /nix/var/nix/profiles/per-user/root/channels exists, but channels have been disabled.
-warning: /root/.nix-defexpr/channels exists, but channels have been disabled.
-Due to https://github.com/NixOS/nix/issues/9574, Nix may still use these channels when NIX_PATH is unset.
-Delete the above directory or directories to prevent this.
-Failed to run activate script
-reloading user units for gdm...
-reloading user units for deadbeef...
-restarting sysinit-reactivation.target
-the following new units were started: libvirtd.service, NetworkManager-dispatcher.service, run-secrets\x2dfor\x2dusers.d.mount, sysinit-reactivation.target, systemd-tmpfiles-resetup.service
-warning: the following units failed: home-manager-deadbeef.service
-× home-manager-deadbeef.service - Home Manager environment for deadbeef
-     Loaded: loaded (/etc/systemd/system/home-manager-deadbeef.service; enabled; preset: ignored)
-     Active: failed (Result: exit-code) since Sat 2025-09-06 03:57:37 CEST; 270ms ago
- Invocation: 3a6939ac8ecb48daa893aaa98d0bf080
-    Process: 28839 ExecStart=/nix/store/2bkpj12f380wh0dfci43s6dszikdracn-hm-setup-env /nix/store/apmw85amnh05jm6y2drwyp7x5pz0f0vp-home-manager-generation (code=exited, status=1/FAILURE)
-   Main PID: 28839 (code=exited, status=1/FAILURE)
-         IP: 0B in, 0B out
-         IO: 4.7M read, 0B written
-   Mem peak: 6.2M
-        CPU: 245ms
-
-sep 06 03:57:37 l-werk hm-activate-deadbeef[28839]: Activating reloadSystemd
-sep 06 03:57:37 l-werk hm-activate-deadbeef[29174]: Starting units: sops-nix.service
-sep 06 03:57:37 l-werk hm-activate-deadbeef[29174]: sops-nix.service failed
-sep 06 03:57:37 l-werk hm-activate-deadbeef[28839]: Activating sops-nix
-sep 06 03:57:37 l-werk systemctl[29211]: Job for sops-nix.service failed because the control process exited with error code.
-sep 06 03:57:37 l-werk systemctl[29211]: See "systemctl --user status sops-nix.service" and "journalctl --user -xeu sops-nix.service" for details.
-sep 06 03:57:37 l-werk systemd[1]: home-manager-deadbeef.service: Main process exited, code=exited, status=1/FAILURE
-sep 06 03:57:37 l-werk systemd[1]: home-manager-deadbeef.service: Failed with result 'exit-code'.
-sep 06 03:57:37 l-werk systemd[1]: Failed to start Home Manager environment for deadbeef.
-sep 06 03:57:37 l-werk systemd[1]: home-manager-deadbeef.service: Consumed 245ms CPU time, 6.2M memory peak, 4.7M read from disk.
-warning: error(s) occurred while switching to the new configuration
+nixos-install --no-root-passwd --impure --flake path:/root/github/nixos#l-werk
 ```
+
+## TPM unlock
+
+Enroll both encrypted devices. Root is `p4`, encrypted swap is `p3`.
+`--wipe-slot=tpm2` only wipes TPM2 tokens on the LUKS device being enrolled, so
+it is safe to use once for root and once for swap.
+
+```bash
+systemd-cryptenroll --unlock-key-file=/tmp/disk.key --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p4
+systemd-cryptenroll --unlock-key-file=/tmp/disk.key --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p3
+```
+
+If `/tmp/disk.key` is gone, use the current LUKS passphrase when prompted.
+During this bootstrap that is `nixos`.
+
+The runtime initrd must have no `/tmp/disk.key` dependency. Check:
+
+```bash
+nix eval .#nixosConfigurations.l-werk.config.boot.initrd.luks.devices.crypted.keyFile
+nix eval .#nixosConfigurations.l-werk.config.boot.initrd.luks.devices.crypted.crypttabExtraOpts
+nix eval .#nixosConfigurations.l-werk.config.boot.initrd.luks.devices.cryptswap.crypttabExtraOpts
+```
+
+Expected:
+
+```text
+null
+[ "tpm2-device=auto" "tpm2-pcrs=7" ]
+[ "tpm2-device=auto" "tpm2-pcrs=7" ]
+```
+
+After Secure Boot mode changes, firmware updates, or key enrollment changes,
+re-enroll the TPM token from the installed system:
+
+```bash
+sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p4
+sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p3
+```
+
+## Secure Boot
+
+l-werk uses Lanzaboote with:
+
+```nix
+boot.lanzaboote.enable = true;
+boot.lanzaboote.autoGenerateKeys.enable = true;
+boot.lanzaboote.pkiBundle = "/persist/var/lib/sbctl";
+```
+
+After install, while the firmware is in setup mode, enroll the keys:
+
+```bash
+nixos-enter --root /mnt -c 'sbctl status'
+nixos-enter --root /mnt -c 'sbctl create-keys'
+nixos-install --no-root-passwd --impure --flake path:/root/github/nixos#l-werk
+nixos-enter --root /mnt -c 'sbctl enroll-keys -m'
+nixos-enter --root /mnt -c 'sbctl status'
+```
+
+If enrollment fails because `PK`, `KEK`, or `db` efivars are immutable, clear
+the immutable bit on the mentioned efivar files and run enrollment again:
+
+```bash
+chattr -i /sys/firmware/efi/efivars/KEK-* /sys/firmware/efi/efivars/db-*
+nixos-enter --root /mnt -c 'sbctl enroll-keys -m'
+```
+
+Use `-m` when Microsoft vendor keys are needed. Without Microsoft vendor keys:
+
+```bash
+nixos-enter --root /mnt -c 'sbctl enroll-keys'
+```
+
+Then enable Secure Boot in firmware and boot the installed system.
+
+To verify signatures from the live ISO:
+
+```bash
+nix shell nixpkgs#sbsigntool -c sbverify --list /mnt/boot/EFI/BOOT/BOOTX64.EFI
+nix shell nixpkgs#sbsigntool -c sbverify --list /mnt/boot/EFI/systemd/systemd-bootx64.efi
+nix shell nixpkgs#sbsigntool -c sbverify --list /mnt/boot/EFI/Linux/*.efi
+```
+
+## CUDA
+
+l-werk has an NVIDIA RTX A1000 Laptop GPU. Keep
+`nixpkgs.config.cudaCapabilities = [ "8.6" ];` so CUDA packages such as
+Ollama and Hashcat target this GPU instead of compiling every architecture.
+The public NixOS CUDA cache is auto-enabled by the shared CUDA cache module
+when NVIDIA support is configured.
+
+## Work apps
+
+Teams, Azure CLI, and Intune are disabled by default. Re-enable them in Home
+Manager with:
+
+```nix
+local.work.microsoft.enable = true;
+```
+
+## Thunderbolt docks
+
+Laptop dock support is shared through `profiles.nixos.laptop.default`. See:
+
+```text
+profiles/nixos/laptop/README.md
+```
+
+That profile enables `bolt` for Thunderbolt authorization and `fwupd` for
+firmware updates. For a Lenovo ThinkPad Thunderbolt 4 Dock, start with:
+
+```bash
+boltctl list
+sudo boltctl authorize <uuid>
+sudo boltctl enroll <uuid>
+nmcli device status
+```
+
+## After first boot
+
+```bash
+ssh deadbeef@192.168.1.151
+nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#l-werk
+sbctl status
+systemd-cryptenroll /dev/nvme0n1p4
+systemd-cryptenroll /dev/nvme0n1p3
+```
+
+Replace the temporary passwords and any placeholder SOPS values immediately.

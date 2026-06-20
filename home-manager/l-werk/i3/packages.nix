@@ -1,9 +1,8 @@
-{
-  config,
-  lib,
-  pkgs,
-  sopsSecrets,
-  ...
+{ config
+, lib
+, pkgs
+, sopsSecrets
+, ...
 }:
 let
   thunar = pkgs.thunar or pkgs.xfce.thunar;
@@ -364,7 +363,9 @@ in
       for_window [class="discord"] move to workspace "5"
       for_window [class="Spotify"] move to workspace 4
       for_window [class="Slack"] move window to workspace 5
-      for_window [class="teams-for-linux"] move window to workspace 5
+      ${lib.optionalString config.local.work.microsoft.enable ''
+        for_window [class="teams-for-linux"] move window to workspace 5
+      ''}
       #for_window [class="*Microsoft Teams classic"] move window to workspace 5
       #for_window [class="microsoft teams - preview"] move window to workspace 5
       #for_window [class="Microsoft Teams - Preview"] move window to workspace 5
@@ -381,7 +382,9 @@ in
       exec --no-startup-id xsetroot -solid "#000000"
       #exec --no-startup-id ${pkgs.picom}/bin/picom
       #exec_always --no-startup-id xss-lock -- i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png & 
-      exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux
+      ${lib.optionalString config.local.work.microsoft.enable ''
+        exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux
+      ''}
       exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
       exec --no-startup-id ${pkgs.spotify}/bin/spotify
       exec --no-startup-id ${pkgs.dunst}/bin/dunst

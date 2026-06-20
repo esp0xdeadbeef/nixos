@@ -1,15 +1,8 @@
-{ config, pkgs, inputs, ... }:
-
-let
-  pkgs-unstable = import inputs.nixpkgs-unstable {
-    system = pkgs.stdenv.hostPlatform.system;
-    config = config.nixpkgs.config;
-  };
-in
+{ pkgs, ... }:
 {
   services.ollama = {
     enable = true;
-    package = pkgs-unstable.ollama-cuda;
+    package = pkgs.unstable.ollama-cuda;
     #acceleration = "cuda";
 
     loadModels = [

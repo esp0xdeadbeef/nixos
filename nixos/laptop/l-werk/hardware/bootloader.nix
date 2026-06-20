@@ -22,6 +22,7 @@
   # Lanzaboote configuration
   boot.lanzaboote = {
     enable = true;
+    autoGenerateKeys.enable = true;
     pkiBundle = "/persist/var/lib/sbctl";
   };
   # allow nesting in vms:
@@ -29,7 +30,8 @@
 
   # Initrd settings
   boot.initrd.systemd.enable = true;
-  #boot.initrd.systemd.enableTpm2 = true;
+  boot.initrd.systemd.tpm2.enable = true;
+  systemd.tpm2.enable = true;
 
   # System packages for Secure Boot debugging
   environment.systemPackages = with pkgs; [
