@@ -31,6 +31,9 @@
       lxc = import ./nixos/virtualization/lxc.nix;
       podman = import ./nixos/virtualization/podman.nix;
     };
+    llm-clients = {
+      agents = import ./nixos/llm-clients/agents.nix;
+    };
     llm = {
       lmstudio = import ./nixos/llm/lmstudio.nix;
       ollama-base = import ./nixos/llm/ollama-base.nix;

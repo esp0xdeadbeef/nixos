@@ -1,8 +1,7 @@
-{
-  lib,
-  pkgs,
-  self,
-  ...
+{ lib
+, pkgs
+, self
+, ...
 }:
 # for testing, use:
 # nix run path:/home/deadbeef/github/nixos#nixosConfigurations.<vm-hostname>.config.system.build.nixos-shell
@@ -21,6 +20,10 @@ in
     (mkVM "s-nebula" {
       description = "Nebula VM (nixos-shell)";
       repository = "path:${self.lib.vmSourceForHost "s-nebula"}";
+    })
+    (mkVM "s-agents" {
+      description = "Agent workbench VM (nixos-shell)";
+      repository = "path:${self.lib.vmSourceForHost "s-agents"}";
     })
     (mkVM "s-router-legacy-edge" {
       description = "s-router-legacy-edge VM (nixos-shell)";
