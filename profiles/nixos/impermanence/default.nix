@@ -1,12 +1,12 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
+{ config
+, lib
+, pkgs
+, ...
 }:
 
 let
   cfg = config.local.impermanence;
+  isWorkstationHost = lib.hasPrefix "l-" config.networking.hostName;
 
   persistenceType = lib.types.listOf lib.types.anything;
 
@@ -51,6 +51,204 @@ let
       mode = "0700";
     }
   ];
+
+  getPkgName = pkg: pkg.pname or (lib.getName pkg);
+
+  homePackages =
+    lib.attrByPath
+      [
+        "home-manager"
+        "users"
+        cfg.primaryUser
+        "home"
+        "packages"
+      ]
+      [ ]
+      config;
+
+  installedPackageNames = map getPkgName (config.environment.systemPackages ++ homePackages);
+
+  hasPackage = packageNames: lib.any (name: lib.elem name installedPackageNames) packageNames;
+
+  hasLlmAgent = hasPackage [
+    "claude-code"
+    "claw-code"
+    "codex"
+    "crush"
+    "forgecode"
+    "gitclaw"
+    "hermes-agent"
+    "hermes-desktop"
+    "hermes-hud"
+    "mimo-code"
+    "nanocoder"
+    "oh-my-codex"
+    "omp"
+    "openclaw"
+    "opencode"
+    "openfang"
+    "pi"
+    "picoclaw"
+    "qwen-code"
+    "reasonix"
+    "vessel-browser"
+    "zeroclaw"
+  ];
+
+  hasDiscordClient = hasPackage [
+    "discord"
+    "discord-canary"
+    "discord-ptb"
+    "legcord"
+    "vesktop"
+    "webcord"
+  ];
+
+  desktopAppDirs =
+    lib.optionals (hasPackage [ "1password-gui" "1password" ]) [
+      ".config/1Password"
+    ]
+    ++ lib.optionals (hasPackage [ "vscode" ]) [
+      ".config/Code"
+      ".vscode"
+    ]
+    ++ lib.optionals (hasPackage [ "vscodium" ]) [
+      ".config/VSCodium"
+      ".vscode-oss"
+    ]
+    ++ lib.optionals (hasPackage [ "signal-desktop" ]) [
+      ".config/Signal"
+    ]
+    ++ lib.optionals (hasPackage [ "chromium" ]) [
+      ".config/chromium"
+    ]
+    ++ lib.optionals (hasPackage [ "google-chrome" ]) [
+      ".config/google-chrome"
+      ".pki/nssdb"
+    ]
+    ++ lib.optionals (hasPackage [ "dropbox" "maestral" ]) [
+      ".config/dropbox"
+      ".config/maestral"
+      ".dropbox"
+      ".dropbox-dist"
+    ]
+    ++ lib.optionals (hasPackage [ "obsidian" ]) [
+      ".config/obsidian"
+    ]
+    ++ lib.optionals (hasPackage [ "qbittorrent" ]) [
+      ".config/qBittorrent"
+    ]
+    ++ lib.optionals (hasPackage [ "remmina" ]) [
+      ".local/share/remmina"
+      ".config/freerdp/server"
+      ".config/remmina"
+      ".cache/remmina"
+    ]
+    ++ lib.optionals (hasPackage [ "slack" ]) [
+      ".config/slack"
+    ]
+    ++ lib.optionals (hasPackage [ "spotify" ]) [
+      ".config/spotify"
+    ]
+    ++ lib.optionals (hasPackage [ "teams-for-linux" ]) [
+      ".config/teams-for-linux"
+    ]
+    ++ lib.optionals (hasPackage [ "zoom-us" "zoom" ]) [
+      ".config/zoom"
+    ]
+    ++ lib.optionals (hasPackage [ "lmstudio" ]) [
+      ".lmstudio"
+    ]
+    ++ lib.optionals (hasPackage [ "mitmproxy" ]) [
+      ".mitmproxy"
+    ]
+    ++ lib.optionals (hasPackage [ "firefox" "librewolf" "zen" "zen-browser" ]) [
+      ".mozilla"
+    ]
+    ++ lib.optionals (hasPackage [ "quickemu" ]) [
+      ".quickget"
+    ];
+
+  llmAgentDirs = [
+    ".config/claude"
+    ".config/codex"
+    ".config/crush"
+    ".config/hermes"
+    ".config/mimo-code"
+    ".config/nanocoder"
+    ".config/opencode"
+    ".config/qwen"
+    ".config/qwen-code"
+    ".config/reasonix"
+    ".config/vessel-browser"
+    ".cache/claude"
+    ".cache/codex"
+    ".cache/hermes"
+    ".cache/opencode"
+    ".cache/qwen"
+    ".cache/qwen-code"
+    ".claude"
+    ".codex"
+    ".gemini"
+    ".opencode"
+    ".qwen"
+    ".local/share/claude"
+    ".local/share/codex"
+    ".local/share/hermes"
+    ".local/share/opencode"
+    ".local/share/qwen"
+    ".local/share/qwen-code"
+  ];
+
+  discordClientDirs = [
+    ".config/discord"
+    ".config/Discord"
+    ".config/discordcanary"
+    ".config/discordptb"
+    ".config/legcord"
+    ".cache/discord"
+    ".cache/Discord"
+    ".local/share/discord"
+    ".local/share/Discord"
+  ];
+
+  workstationUserDirs = [
+    "pentest"
+    "firefox-pentest-profile"
+    "Documents"
+    "Music"
+    "Pictures"
+    "Videos"
+    ".BurpSuite"
+    ".java/.userPrefs/burp"
+    ".local/share/PrismLauncher"
+    ".config/autorandr"
+    ".config/kdeconnect"
+    ".config/rclone"
+    ".continue"
+    ".ZAP/plugin"
+  ];
+
+  noCowUserDirs =
+    lib.unique (
+      (lib.optionals hasLlmAgent llmAgentDirs)
+      ++ (lib.optionals hasDiscordClient discordClientDirs)
+      ++ desktopAppDirs
+    );
+
+  noCowUserTmpfiles =
+    lib.concatMap
+      (
+        dir:
+        let
+          path = "${cfg.persistPath}/home/${cfg.primaryUser}/${dir}";
+        in
+        [
+          "d ${path} 0700 ${cfg.primaryUser} users -"
+          "h ${path} - - - - +C"
+        ]
+      )
+      noCowUserDirs;
 in
 {
   options.local.impermanence = {
@@ -121,6 +319,7 @@ in
       default = [ ];
       description = "Additional primary-user files persisted under persistPath.";
     };
+
   };
 
   config = lib.mkIf cfg.enable {
@@ -220,6 +419,7 @@ in
       "d ${cfg.persistPath}/home/${cfg.primaryUser}/.local/share/containers 0700 ${cfg.primaryUser} users -"
       "h ${cfg.persistPath}/home/${cfg.primaryUser}/.local/share/containers - - - - +C"
     ]
+    ++ noCowUserTmpfiles
     ++ cfg.extraTmpfiles;
 
     environment.persistence.${cfg.persistPath} = {
@@ -250,63 +450,24 @@ in
       users.${cfg.primaryUser} = {
         directories = [
           "github"
-          "pentest"
-          "firefox-pentest-profile"
-          "Documents"
-          "Music"
-          "Pictures"
-          "Videos"
           "vms"
           "vms/isos"
           "vms/disks"
           "vms/nvrams"
-          ".BurpSuite"
-          ".java/.userPrefs/burp"
-          ".local/share/PrismLauncher"
           ".local/share/lxc"
           ".local/share/containers"
           ".local/share/nvim"
-          ".local/share/remmina"
           ".local/share/direnv"
-          ".config/1Password"
-          ".config/Code"
-          ".config/Signal"
-          ".config/VSCodium"
-          ".config/autorandr"
-          ".config/chromium"
-          ".config/discord"
-          ".config/dropbox"
-          ".config/freerdp/server"
           ".config/gh"
-          ".config/google-chrome"
-          ".config/kdeconnect"
-          ".config/legcord"
           ".config/libvirt/qemu"
-          ".config/maestral"
           ".config/nix"
-          ".config/obsidian"
-          ".config/qBittorrent"
-          ".config/rclone"
-          ".config/remmina"
-          ".config/slack"
           ".config/sops"
-          ".config/spotify"
-          ".config/teams-for-linux"
-          ".config/zoom"
-          ".dropbox"
-          ".dropbox-dist"
           ".cache/nix-index"
-          ".cache/remmina"
-          ".continue"
-          ".lmstudio"
-          ".mitmproxy"
-          ".mozilla"
-          ".pki/nssdb"
-          ".quickget"
-          ".vscode"
-          ".vscode-oss"
-          ".ZAP/plugin"
         ]
+        ++ lib.optionals isWorkstationHost workstationUserDirs
+        ++ desktopAppDirs
+        ++ lib.optionals hasLlmAgent llmAgentDirs
+        ++ lib.optionals hasDiscordClient discordClientDirs
         ++ secureUserDirs
         ++ cfg.extraUserDirectories;
 

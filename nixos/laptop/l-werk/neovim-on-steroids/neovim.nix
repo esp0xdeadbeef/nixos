@@ -19,7 +19,6 @@ in
 {
   programs.neovim = {
     enable = true;
-    defaultEditor = true;
     configure.customRC = ''
       luafile ${./nvim.lua}
     '';

@@ -6,6 +6,7 @@
       maintenance = import ./nixos/base/maintenance.nix;
       system = import ./nixos/base/system.nix;
     };
+    core = import ./nixos/core;
     boot = {
       usb-removable = import ./nixos/boot/usb-removable.nix;
     };
@@ -15,11 +16,17 @@
       i3 = import ./nixos/desktop/i3.nix;
       sway = import ./nixos/desktop/sway.nix;
     };
+    editors = {
+      neovim = import ./nixos/editors/neovim;
+    };
     packages = {
       workstation = import ./nixos/packages/workstation.nix;
     };
     nixpkgs = {
       allow-unfree = import ./nixos/nixpkgs/allow-unfree.nix;
+    };
+    shell = {
+      zsh-prompt = import ./nixos/shell/zsh-prompt.nix;
     };
     network = {
       workstation = import ./nixos/network/workstation.nix;

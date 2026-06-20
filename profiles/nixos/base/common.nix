@@ -1,10 +1,5 @@
 { pkgs, ... }:
 {
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-  };
-
   environment.systemPackages = with pkgs; [
     age
     curl
@@ -13,7 +8,6 @@
     jq
     lsof
     mtr
-    neovim
     procps
     ripgrep
     sops

@@ -4,7 +4,6 @@
 
   programs.neovim = {
     enable = true;
-    defaultEditor = true;
   };
 
   programs.direnv.enable = true;

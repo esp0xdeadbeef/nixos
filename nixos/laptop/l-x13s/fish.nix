@@ -31,7 +31,7 @@
       pull.rebase = false;
       push.autoSetupRemote = true;
 
-      core.editor = "nvim";
+      core.editor = "vim";
     };
   };
 
@@ -103,7 +103,7 @@
 
       # Default editor.
       if not set -q EDITOR
-        set -gx EDITOR nvim
+        set -gx EDITOR vim
       end
 
       # Secrets / GitHub auth.
@@ -138,6 +138,13 @@
       if type -q starship
         starship init fish | source
       end
+
+      # Bash-style previous-command expansion.
+      function __deadbeef_last_history_item
+        echo $history[1]
+      end
+
+      abbr --add !! --position anywhere --function __deadbeef_last_history_item
 
       # --- Hard fzf bindings ---
       # These are explicit so Ctrl-R works even if fzf's packaged fish

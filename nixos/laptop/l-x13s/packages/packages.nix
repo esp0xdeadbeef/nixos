@@ -2,8 +2,6 @@
 {
   environment.etc.hosts.enable = false;
   programs.firefox.enable = true;
-  programs.neovim.enable = true;
-  programs.neovim.defaultEditor = true;
   security.polkit.enable = true;
   # #services.openssh.enable = true;
   # #services.openssh.settings.X11Forwarding = true;
@@ -55,7 +53,6 @@
     rlwrap
     lastpass-cli
     tpm2-tss
-    neovim
     responder
     playerctl
     autorandr

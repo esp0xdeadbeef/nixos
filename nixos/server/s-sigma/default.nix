@@ -1,14 +1,14 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  name,
-  outPath,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, name
+, outPath
+, profiles
+, ...
 }:
 {
   # You can import other NixOS modules here
@@ -31,9 +31,13 @@
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
-    # still need to destill this:
-    "${outPath}/library/01-general"
-    "${outPath}/library/02-window-manager-i3"
+    profiles.nixos.core
+    profiles.nixos.base.maintenance
+    profiles.nixos.nixpkgs.allow-unfree
+    profiles.nixos.shell.zsh-prompt
+    profiles.nixos.virtualization.lxc
+    profiles.nixos.virtualization.podman
+
     # autologin for this vm
     #../../99-testing
     "${outPath}/library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix"
@@ -54,14 +58,21 @@
 
   time.timeZone = "Europe/Amsterdam";
 
-  programs.neovim.enable = true;
-  programs.neovim.defaultEditor = true;
-
-  environment.systemPackages = with pkgs; [
-    sops
-    age
-    dmenu
-  ];
+  services.xserver = {
+    enable = true;
+    windowManager.i3 = {
+      enable = true;
+      extraPackages = with pkgs; [
+        dmenu
+        i3lock
+        i3status
+      ];
+    };
+    xkb.layout = "us";
+  };
+  services.displayManager.defaultSession = "none+i3";
+  services.displayManager.gdm.enable = true;
+  security.pam.services.i3lock.enable = true;
 
   home-manager = {
     sharedModules = [
@@ -71,7 +82,6 @@
       inherit inputs outputs;
     };
     users = {
-      # Import your home-manager configuration
       deadbeef = import "${outPath}/home-manager/${name}/home.nix";
     };
   };
@@ -146,6 +156,7 @@
       ];
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
       extraGroups = [ "wheel" ];
+      shell = pkgs.zsh;
     };
   };
 
@@ -164,10 +175,7 @@
 
   boot.loader.systemd-boot.configurationLimit = 12;
 
-  environment.interactiveShellInit = ''
-    ZSH_THEME=xiong-chiamiov
-    alias vim=nvim
-  '';
+  local.shell.zshPrompt.enable = true;
 
   security.sudo.enable = true;
   security.sudo.extraRules = [

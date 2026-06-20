@@ -1,6 +1,11 @@
 {
   description = "esp0xdeadbeef nix config";
 
+  nixConfig = {
+    extra-substituters = [ "https://cache.numtide.com" ];
+    extra-trusted-public-keys = [ "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=" ];
+  };
+
   inputs = {
     nixpkgs-stable = {
       url = "github:nixos/nixpkgs/nixos-26.05";
@@ -124,11 +129,10 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      home-manager,
-      ...
+    { self
+    , nixpkgs
+    , home-manager
+    , ...
     }@inputs:
     let
       lib = nixpkgs.lib;
@@ -182,9 +186,12 @@
           { };
 
       # Discover all hosts automatically
-      hosts = lib.foldl' (
-        acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
-      ) { } hostRoots;
+      hosts = lib.foldl'
+        (
+          acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
+        )
+        { }
+        hostRoots;
 
       allHostAbs = lib.mapAttrsToList (_: v: "${root}/${v}") hosts;
 
@@ -207,7 +214,7 @@
               inGit = lib.hasPrefix "${root}/.git" p;
             in
             # include everything EXCEPT other hosts and .git
-            !(inOther || inGit);
+              !(inOther || inGit);
         };
     in
     {
@@ -234,27 +241,29 @@
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------
-      nixosConfigurations = lib.mapAttrs (
-        name: path:
-        nixpkgs.lib.nixosSystem {
-          system = hostSystemFor name;
+      nixosConfigurations = lib.mapAttrs
+        (
+          name: path:
+            nixpkgs.lib.nixosSystem {
+              system = hostSystemFor name;
 
-          specialArgs = {
-            inherit
-              inputs
-              outputs
-              profiles
-              self
-              name
-              ;
-            outPath = self.outPath;
-          };
+              specialArgs = {
+                inherit
+                  inputs
+                  outputs
+                  profiles
+                  self
+                  name
+                  ;
+                outPath = self.outPath;
+              };
 
-          modules = [
-            outputs.nixosModules.pythonPycachePrefix
-            (./. + "/${path}")
-          ];
-        }
-      ) hosts;
+              modules = [
+                outputs.nixosModules.pythonPycachePrefix
+                (./. + "/${path}")
+              ];
+            }
+        )
+        hosts;
     };
 }

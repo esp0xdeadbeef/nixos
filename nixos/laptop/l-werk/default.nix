@@ -1,14 +1,13 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  profiles,
-  outPath,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, profiles
+, outPath
+, ...
 }:
 {
   imports = [
@@ -43,7 +42,6 @@
     ./disko/build_disko.nix
     ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
-    ./neovim-on-steroids/neovim.nix
     ./unmount-pentest-directory/unmount-hook.nix
     ./work-packages/wordlists/packages.nix
   ];
@@ -53,8 +51,6 @@
   sops.defaultSopsFile = "${outPath}/secrets/l-werk-default.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
-
-  programs.zsh.ohMyZsh.theme = "clean";
 
   home-manager = {
     sharedModules = [

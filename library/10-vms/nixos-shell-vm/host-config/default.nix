@@ -1,15 +1,14 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  name,
-  outPath,
-  profiles,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, name
+, outPath
+, profiles
+, ...
 }:
 {
   # You can import other NixOS modules here
@@ -19,7 +18,8 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
-    profiles.nixos.base.common
+    profiles.nixos.core
+    profiles.nixos.shell.zsh-prompt
     profiles.nixos.nixpkgs.allow-unfree
     # inputs.nvf.nixosModules.default
     # inputs.nixvim.nixosModules.nixvim
@@ -103,10 +103,7 @@
   #networking.networkmanager.enable = true;
   # unlock gnome shit at unlock:
   security.pam.services.login.enableGnomeKeyring = true;
-  environment.interactiveShellInit = ''
-    ZSH_THEME=alanpeabody
-
-  '';
+  local.shell.zshPrompt.enable = true;
 
   sops.secrets."deadbeef-passwd" = {
     neededForUsers = true; # make it available before the user is created

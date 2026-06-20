@@ -1,9 +1,8 @@
 { pkgs, ... }:
 
 let
-  unstablePkgs = pkgs.unstable;
+  unstablePkgs = pkgs.unstable or pkgs;
 in
-
 {
   programs.neovim = {
     enable = true;
@@ -42,16 +41,14 @@ in
   environment.systemPackages = with pkgs; [
     bash-language-server
     fd
-    git
-    jq
     lua-language-server
     nil
     nixfmt
     nodejs
     prettier
     pyright
-    ripgrep
     typescript-language-server
+    vim
     vscode-langservers-extracted
     yaml-language-server
   ];

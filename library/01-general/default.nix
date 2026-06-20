@@ -2,7 +2,8 @@
 {
   imports = [
     profiles.nixos.nixpkgs.allow-unfree
-    profiles.nixos.base.common
+    profiles.nixos.core
+    profiles.nixos.shell.zsh-prompt
 
     ../../modules/nixos/cuda-cache.nix
     ../../modules/nixos/local-users.nix

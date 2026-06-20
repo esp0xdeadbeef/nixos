@@ -5,4 +5,8 @@
     profiles.nixos.laptop.power
     profiles.nixos.llm-clients.agents
   ];
+
+  local.shell.zshPrompt = {
+    enable = true;
+  };
 }

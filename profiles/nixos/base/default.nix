@@ -1,14 +1,14 @@
-{
-  outPath,
-  profiles,
-  ...
+{ outPath
+, profiles
+, ...
 }:
 {
   imports = [
     profiles.nixos.nixpkgs.allow-unfree
-    profiles.nixos.base.common
+    profiles.nixos.core
     profiles.nixos.base.system
     profiles.nixos.base.maintenance
+    profiles.nixos.shell.zsh-prompt
 
     "${outPath}/modules/nixos/cuda-cache.nix"
     "${outPath}/modules/nixos/local-users.nix"

@@ -1,12 +1,11 @@
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  profiles,
-  outPath,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, profiles
+, outPath
+, ...
 }:
 {
   imports = [
@@ -26,7 +25,6 @@
     ./connect-nas
     ./hardware
     ./llms
-    ./neovim-configuration
     #./osee
     ./signal
     ./torrents
@@ -127,9 +125,6 @@
     "d /home/deadbeef/.quickget/windows-11 0755 deadbeef users -"
     "h /home/deadbeef/.quickget/windows-11 - - - - +C"
   ];
-  environment.interactiveShellInit = ''
-    ZSH_THEME=robbyrussell
-  '';
 
   sops.secrets."${config.local.users.primary.resolvedName}-passwd" = {
     neededForUsers = true;
