@@ -1,11 +1,15 @@
-{ pkgs, ... }:
+{
+  lib,
+  options,
+  pkgs,
+  ...
+}:
 
 {
   programs.fish.enable = true;
   programs.zsh.enable = true;
 
-  users.users.deadbeef.shell = pkgs.fish;
-  users.users.root.shell = pkgs.fish;
+  users.defaultUserShell = lib.mkDefault pkgs.zsh;
 
   environment.systemPackages = with pkgs; [
     fish
@@ -325,21 +329,23 @@
     '';
   };
 
-  environment.persistence."/persist" = {
-    users.deadbeef.directories = [
-      ".local/share/fish"
-      ".local/share/zoxide"
-      ".config/fish"
-      ".config/starship"
-      ".config/ripgrep"
-    ];
+  environment.persistence = lib.mkIf (options.environment ? persistence) {
+    "/persist" = {
+      users.deadbeef.directories = [
+        ".local/share/fish"
+        ".local/share/zoxide"
+        ".config/fish"
+        ".config/starship"
+        ".config/ripgrep"
+      ];
 
-    users.root.directories = [
-      ".local/share/fish"
-      ".local/share/zoxide"
-      ".config/fish"
-      ".config/starship"
-      ".config/ripgrep"
-    ];
+      users.root.directories = [
+        ".local/share/fish"
+        ".local/share/zoxide"
+        ".config/fish"
+        ".config/starship"
+        ".config/ripgrep"
+      ];
+    };
   };
 }

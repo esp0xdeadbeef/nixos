@@ -26,6 +26,7 @@
       allow-unfree = import ./nixos/nixpkgs/allow-unfree.nix;
     };
     shell = {
+      fish = import ./nixos/shell/fish.nix;
       zsh-prompt = import ./nixos/shell/zsh-prompt.nix;
     };
     network = {

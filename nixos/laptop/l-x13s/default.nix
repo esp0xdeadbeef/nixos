@@ -34,7 +34,6 @@
     "${outPath}/library/01-general/desktop/fonts.nix"
 
     #"${outPath}/library/01-general/desktop/shell-env.nix"
-    ./fish.nix
 
     inputs.sops-nix.nixosModules.sops
   ];

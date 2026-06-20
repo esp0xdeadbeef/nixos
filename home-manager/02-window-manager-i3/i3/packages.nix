@@ -355,7 +355,7 @@ in
 
       # disable numlock
       exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
-      exec_always --no-startup-id ${pkgs.autotiling}/bin/autotiling
+      exec_always --no-startup-id ${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -f "[.]autotiling-wrapped" || true; exec ${pkgs.autotiling}/bin/autotiling --splitratio 1.61'
 
       # dropbox is whining about shit:
       #exec --no-startup-id ${pkgs.maestral-gui}/bin/maestral_qt

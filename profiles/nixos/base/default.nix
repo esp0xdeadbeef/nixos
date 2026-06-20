@@ -1,6 +1,7 @@
-{ outPath
-, profiles
-, ...
+{
+  outPath,
+  profiles,
+  ...
 }:
 {
   imports = [
@@ -8,6 +9,7 @@
     profiles.nixos.core
     profiles.nixos.base.system
     profiles.nixos.base.maintenance
+    profiles.nixos.shell.fish
     profiles.nixos.shell.zsh-prompt
 
     "${outPath}/modules/nixos/cuda-cache.nix"
