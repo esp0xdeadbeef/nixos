@@ -28,7 +28,6 @@
       ];
       files = [
         ".zsh_history"
-        ".zshrc"
       ];
     };
   };

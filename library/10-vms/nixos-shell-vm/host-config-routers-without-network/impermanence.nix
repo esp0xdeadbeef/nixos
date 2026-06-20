@@ -46,7 +46,6 @@
 
         files = [
           ".zsh_history"
-          ".zshrc"
         ];
       };
     };
@@ -58,8 +57,4 @@
     fsType = "tmpfs";
     options = [ "mode=755" ];
   };
-
-  systemd.tmpfiles.rules = [
-    "f /persist/home/deadbeef/.zshrc 0644 deadbeef users -"
-  ];
 }

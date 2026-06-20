@@ -33,6 +33,8 @@
     ./persist-state-disk.nix
   ];
 
+  home-manager.backupFileExtension = "hm-backup";
+
   networking.hostName = name;
 
   sops.defaultSopsFile = "${outPath}/secrets/${config.networking.hostName}.yaml";
