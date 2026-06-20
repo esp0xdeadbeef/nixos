@@ -1,7 +1,13 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.local.shell.zshPrompt;
   hostName = config.networking.hostName or "unknown";
+  defaultUser = config.local.users.primary.resolvedName;
 
   role =
     if hostName == "s-sigma" then
@@ -70,38 +76,46 @@ in
       };
 
       interactiveShellInit = lib.mkAfter ''
-        setopt prompt_subst
-        setopt hist_ignore_all_dups
-        setopt share_history
-        autoload -Uz colors && colors
+                setopt prompt_subst
+                setopt hist_ignore_all_dups
+                setopt share_history
+                autoload -Uz colors && colors
 
-        export HISTSIZE=1000000000
-        export SAVEHIST=1000000000
-        if [[ -z "$HISTFILE" ]]; then
-          if [[ -d "/persist/$HOME" ]]; then
-            export HISTFILE="/persist/$HOME/.zsh_history"
-          else
-            export HISTFILE="$HOME/.zsh_history"
-          fi
-        fi
+                export HISTSIZE=1000000000
+                export SAVEHIST=1000000000
+                if [[ -z "$HISTFILE" ]]; then
+                  if [[ -d "/persist/$HOME" ]]; then
+                    export HISTFILE="/persist/$HOME/.zsh_history"
+                  else
+                    export HISTFILE="$HOME/.zsh_history"
+                  fi
+                fi
 
-        if [[ -r "$HOME/.aliases" ]]; then
-          source "$HOME/.aliases"
-        fi
+                if [[ -r "$HOME/.aliases" ]]; then
+                  source "$HOME/.aliases"
+                fi
 
-        if [[ -x "${pkgs.fzf}/bin/fzf" ]]; then
-          source <(${pkgs.fzf}/bin/fzf --zsh)
-        fi
+                if [[ -x "${pkgs.fzf}/bin/fzf" ]]; then
+                  source <(${pkgs.fzf}/bin/fzf --zsh)
+                fi
 
-        if [[ -n "$SSH_CONNECTION" ]]; then
-          typeset __prompt_host="ssh:${hostName}"
-        else
-          typeset __prompt_host="${hostName}"
-        fi
+                if [[ -n "$SSH_CONNECTION" ]]; then
+                  typeset __prompt_host="ssh:${hostName}"
+                else
+                  typeset __prompt_host="${hostName}"
+                fi
 
-        PROMPT='%F{${color}}┌─[%B%n@$__prompt_host%b:%F{244}${role}%F{${color}}] - %F{blue}[%~]%F{${color}} - %F{244}[%D{%a %b %d, %H:%M}]%f
-%F{${color}}└─%f%(?.%F{green}.%F{red})[%#]%f '
-        RPROMPT=""
+                if [[ "$USER" == "root" ]]; then
+                  typeset __prompt_user_color="red"
+                elif [[ "$USER" == "${defaultUser}" ]]; then
+                  typeset __prompt_user_color="green"
+                else
+                  typeset __prompt_user_color="blue"
+                fi
+
+                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b:%F{244}${role}%F{${color}}] - %F{blue}[%~]%F{${color}} - %F{244}[%D{%a %b %d, %H:%M}]%f
+        %F{${color}}└─%f%(?.%F{green}.%F{red})[%#]%f '
+                RPROMPT=""
       '';
     };
   };

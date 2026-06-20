@@ -1,14 +1,15 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{ inputs
-, outputs
-, lib
-, config
-, pkgs
-, name
-, outPath
-, profiles
-, ...
+{
+  inputs,
+  outputs,
+  lib,
+  config,
+  pkgs,
+  name,
+  outPath,
+  profiles,
+  ...
 }:
 {
   # You can import other NixOS modules here
@@ -19,6 +20,7 @@
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
     profiles.nixos.shell.zsh-prompt
+    "${outPath}/modules/nixos/local-users.nix"
     # inputs.nvf.nixosModules.default
     # inputs.nixvim.nixosModules.nixvim
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"

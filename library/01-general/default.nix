@@ -1,12 +1,17 @@
-{ pkgs, profiles, ... }:
+{
+  outPath,
+  pkgs,
+  profiles,
+  ...
+}:
 {
   imports = [
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.core
     profiles.nixos.shell.zsh-prompt
 
-    ../../modules/nixos/cuda-cache.nix
-    ../../modules/nixos/local-users.nix
+    "${outPath}/modules/nixos/cuda-cache.nix"
+    "${outPath}/modules/nixos/local-users.nix"
 
     ./desktop/applet-nm.nix
     ./desktop/fonts.nix

@@ -37,7 +37,7 @@
 
     inputs.sops-nix.nixosModules.sops
   ];
-  sops.defaultSopsFile = ../../../secrets/l-x13s-default.yaml;
+  sops.defaultSopsFile = "${outPath}/secrets/l-x13s-default.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
   sops.secrets."deadbeef-passwd" = {
@@ -50,11 +50,11 @@
       inputs.sops-nix.homeManagerModules.sops
     ];
     extraSpecialArgs = {
-      inherit inputs outputs;
+      inherit inputs outputs outPath;
     };
 
     users = {
-      deadbeef = import ../../../home-manager/l-x13s/home.nix;
+      deadbeef = import "${outPath}/home-manager/l-x13s/home.nix";
     };
   };
 

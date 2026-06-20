@@ -1,14 +1,15 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{ inputs
-, outputs
-, lib
-, config
-, pkgs
-, name
-, outPath
-, profiles
-, ...
+{
+  inputs,
+  outputs,
+  lib,
+  config,
+  pkgs,
+  name,
+  outPath,
+  profiles,
+  ...
 }:
 {
   # You can import other NixOS modules here
@@ -35,6 +36,7 @@
     profiles.nixos.base.maintenance
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.shell.zsh-prompt
+    "${outPath}/modules/nixos/local-users.nix"
     profiles.nixos.virtualization.lxc
     profiles.nixos.virtualization.podman
 

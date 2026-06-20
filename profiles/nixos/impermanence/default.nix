@@ -1,7 +1,8 @@
-{ config
-, lib
-, pkgs
-, ...
+{
+  config,
+  lib,
+  pkgs,
+  ...
 }:
 
 let
@@ -105,9 +106,14 @@ let
   ];
 
   desktopAppDirs =
-    lib.optionals (hasPackage [ "1password-gui" "1password" ]) [
-      ".config/1Password"
-    ]
+    lib.optionals
+      (hasPackage [
+        "1password-gui"
+        "1password"
+      ])
+      [
+        ".config/1Password"
+      ]
     ++ lib.optionals (hasPackage [ "vscode" ]) [
       ".config/Code"
       ".vscode"
@@ -126,12 +132,18 @@ let
       ".config/google-chrome"
       ".pki/nssdb"
     ]
-    ++ lib.optionals (hasPackage [ "dropbox" "maestral" ]) [
-      ".config/dropbox"
-      ".config/maestral"
-      ".dropbox"
-      ".dropbox-dist"
-    ]
+    ++
+      lib.optionals
+        (hasPackage [
+          "dropbox"
+          "maestral"
+        ])
+        [
+          ".config/dropbox"
+          ".config/maestral"
+          ".dropbox"
+          ".dropbox-dist"
+        ]
     ++ lib.optionals (hasPackage [ "obsidian" ]) [
       ".config/obsidian"
     ]
@@ -153,18 +165,32 @@ let
     ++ lib.optionals (hasPackage [ "teams-for-linux" ]) [
       ".config/teams-for-linux"
     ]
-    ++ lib.optionals (hasPackage [ "zoom-us" "zoom" ]) [
-      ".config/zoom"
-    ]
+    ++
+      lib.optionals
+        (hasPackage [
+          "zoom-us"
+          "zoom"
+        ])
+        [
+          ".config/zoom"
+        ]
     ++ lib.optionals (hasPackage [ "lmstudio" ]) [
       ".lmstudio"
     ]
     ++ lib.optionals (hasPackage [ "mitmproxy" ]) [
       ".mitmproxy"
     ]
-    ++ lib.optionals (hasPackage [ "firefox" "librewolf" "zen" "zen-browser" ]) [
-      ".mozilla"
-    ]
+    ++
+      lib.optionals
+        (hasPackage [
+          "firefox"
+          "librewolf"
+          "zen"
+          "zen-browser"
+        ])
+        [
+          ".mozilla"
+        ]
     ++ lib.optionals (hasPackage [ "quickemu" ]) [
       ".quickget"
     ];
@@ -229,26 +255,22 @@ let
     ".ZAP/plugin"
   ];
 
-  noCowUserDirs =
-    lib.unique (
-      (lib.optionals hasLlmAgent llmAgentDirs)
-      ++ (lib.optionals hasDiscordClient discordClientDirs)
-      ++ desktopAppDirs
-    );
+  noCowUserDirs = lib.unique (
+    (lib.optionals hasLlmAgent llmAgentDirs)
+    ++ (lib.optionals hasDiscordClient discordClientDirs)
+    ++ desktopAppDirs
+  );
 
-  noCowUserTmpfiles =
-    lib.concatMap
-      (
-        dir:
-        let
-          path = "${cfg.persistPath}/home/${cfg.primaryUser}/${dir}";
-        in
-        [
-          "d ${path} 0700 ${cfg.primaryUser} users -"
-          "h ${path} - - - - +C"
-        ]
-      )
-      noCowUserDirs;
+  noCowUserTmpfiles = lib.concatMap (
+    dir:
+    let
+      path = "${cfg.persistPath}/home/${cfg.primaryUser}/${dir}";
+    in
+    [
+      "d ${path} 0700 ${cfg.primaryUser} users -"
+      "h ${path} - - - - +C"
+    ]
+  ) noCowUserDirs;
 in
 {
   options.local.impermanence = {
@@ -405,6 +427,7 @@ in
     systemd.tmpfiles.rules = [
       "d ${cfg.persistPath}/etc 0755 root root -"
       "d ${cfg.persistPath}/etc/ssh 0755 root root -"
+      "d ${cfg.persistPath}/var/cache 0755 root root -"
       "d /mnt/current_pentest 0755 root root -"
       "d ${cfg.persistPath}/var/lib/libvirt/images 0711 root root -"
       "h ${cfg.persistPath}/var/lib/libvirt/images - - - - +C"

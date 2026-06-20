@@ -11,7 +11,7 @@ let
 
   fabric = {
     intentPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
-    inventoryPath = ../inventory.nix;
+    inventoryPath = "${outPath}/nixos/virtual-machine/nixos-shell-vm/inventory.nix";
   };
 
   cpmBuilt = inputs.network-control-plane-model.libBySystem.${system}.compileAndBuildFromPaths {

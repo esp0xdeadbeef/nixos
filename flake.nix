@@ -129,10 +129,11 @@
   };
 
   outputs =
-    { self
-    , nixpkgs
-    , home-manager
-    , ...
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      ...
     }@inputs:
     let
       lib = nixpkgs.lib;
@@ -186,12 +187,9 @@
           { };
 
       # Discover all hosts automatically
-      hosts = lib.foldl'
-        (
-          acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
-        )
-        { }
-        hostRoots;
+      hosts = lib.foldl' (
+        acc: base: acc // lib.mapAttrs (name: _: "${base}/${name}") (listDirs base)
+      ) { } hostRoots;
 
       allHostAbs = lib.mapAttrsToList (_: v: "${root}/${v}") hosts;
 
@@ -214,7 +212,7 @@
               inGit = lib.hasPrefix "${root}/.git" p;
             in
             # include everything EXCEPT other hosts and .git
-              !(inOther || inGit);
+            !(inOther || inGit);
         };
     in
     {
@@ -230,40 +228,48 @@
 
       formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
 
-      overlays = if builtins.pathExists ./overlays then import ./overlays { inherit inputs; } else { };
+      overlays =
+        if builtins.pathExists ./overlays then
+          import ./overlays {
+            inherit inputs;
+            outPath = root;
+          }
+        else
+          { };
 
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
       homeManagerModules =
-        if builtins.pathExists ./modules/home-manager then import ./modules/home-manager else { };
+        if builtins.pathExists ./modules/home-manager then
+          import ./modules/home-manager { outPath = root; }
+        else
+          { };
 
       inherit profiles;
 
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------
-      nixosConfigurations = lib.mapAttrs
-        (
-          name: path:
-            nixpkgs.lib.nixosSystem {
-              system = hostSystemFor name;
+      nixosConfigurations = lib.mapAttrs (
+        name: path:
+        nixpkgs.lib.nixosSystem {
+          system = hostSystemFor name;
 
-              specialArgs = {
-                inherit
-                  inputs
-                  outputs
-                  profiles
-                  self
-                  name
-                  ;
-                outPath = self.outPath;
-              };
+          specialArgs = {
+            inherit
+              inputs
+              outputs
+              profiles
+              self
+              name
+              ;
+            outPath = self.outPath;
+          };
 
-              modules = [
-                outputs.nixosModules.pythonPycachePrefix
-                (./. + "/${path}")
-              ];
-            }
-        )
-        hosts;
+          modules = [
+            outputs.nixosModules.pythonPycachePrefix
+            (./. + "/${path}")
+          ];
+        }
+      ) hosts;
     };
 }

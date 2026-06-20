@@ -1,10 +1,12 @@
-args@{ inputs
-, outputs
-, lib
-, config
-, pkgs
-, sopsSecrets
-, ...
+args@{
+  inputs,
+  outputs,
+  lib,
+  config,
+  pkgs,
+  outPath,
+  sopsSecrets,
+  ...
 }:
 let
   _ = builtins.trace "HOME.NIX got: ${lib.concatStringsSep ", " (builtins.attrNames args)}" null;
@@ -39,20 +41,20 @@ in
     ./remmina/config.nix
     ./work-microsoft.nix
 
-    ../01-general/darkmode/config.nix
-    ../01-general/editors/vscode.nix
-    ../01-general/pdf-reader/packages.nix
-    ../01-general/pentesting/packages.nix
-    ../01-general/virt-manager-config/default.nix
+    "${outPath}/home-manager/01-general/darkmode/config.nix"
+    "${outPath}/home-manager/01-general/editors/vscode.nix"
+    "${outPath}/home-manager/01-general/pdf-reader/packages.nix"
+    "${outPath}/home-manager/01-general/pentesting/packages.nix"
+    "${outPath}/home-manager/01-general/virt-manager-config/default.nix"
 
     # ../02-window-manager-i3/i3/packages.nix
-    ../02-window-manager-i3/i3status-rust/packages.nix
+    "${outPath}/home-manager/02-window-manager-i3/i3status-rust/packages.nix"
 
     inputs.sops-nix.homeManagerModules.sops
   ];
 
   sops = {
-    defaultSopsFile = ../../secrets/l-werk-default-deadbeef.yaml;
+    defaultSopsFile = "${outPath}/secrets/l-werk-default-deadbeef.yaml";
 
     age = {
       sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];

@@ -4,6 +4,7 @@
   lib,
   config,
   pkgs,
+  outPath,
   ...
 }:
 {
@@ -17,7 +18,7 @@
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
     # ./steam/packages.nix
-    ../01-general/darkmode/config.nix
+    "${outPath}/home-manager/01-general/darkmode/config.nix"
     ./configs/i3/packages.nix
     ./configs/i3status-rust/packages.nix
   ];

@@ -1,3 +1,5 @@
+{ outPath, ... }:
+
 {
-  desktopI3 = import ../../profiles/home-manager/desktop-i3;
+  desktopI3 = import "${outPath}/profiles/home-manager/desktop-i3";
 }
