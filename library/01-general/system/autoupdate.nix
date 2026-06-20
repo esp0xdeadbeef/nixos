@@ -10,6 +10,7 @@
     enable = true;
     flake = "github:esp0xdeadbeef/nixos#" + config.networking.hostName;
     flags = [
+      "--accept-flake-config"
       "--impure"
       "--no-write-lock-file"
     ];
