@@ -12,6 +12,7 @@ let
   #   wifi-mac
   #   wifi-<name>-ssid
   #   wifi-<name>-password
+  #   wifi-<name>-key-mgmt
   #
   # Example:
   #   wifi-h-h-ssid
@@ -29,7 +30,7 @@ let
 
   wifiSecretNames = lib.filter
     (
-      key: key == "wifi-mac" || builtins.match "^wifi-.*-(ssid|password)$" key != null
+      key: key == "wifi-mac" || builtins.match "^wifi-.*-(ssid|password|key-mgmt)$" key != null
     )
     sopsKeys;
 in
@@ -43,12 +44,17 @@ in
 
   systemd.services.networkmanager-ensure-wifi-profiles = {
     description = "Create NetworkManager Wi-Fi profiles from SOPS secrets";
-    wantedBy = [ "multi-user.target" ];
+    wantedBy = [
+      "multi-user.target"
+      "NetworkManager-wait-online.service"
+    ];
 
     after = [
       "NetworkManager.service"
       "sops-nix.service"
     ];
+
+    before = [ "NetworkManager-wait-online.service" ];
 
     wants = [
       "NetworkManager.service"
@@ -88,6 +94,7 @@ in
         ssid_key="$(basename "$ssid_file")"
         prefix="''${ssid_key%-ssid}"
         password_file="$secrets_dir/''${prefix}-password"
+        key_mgmt_file="$secrets_dir/''${prefix}-key-mgmt"
 
         if [ ! -e "$password_file" ]; then
           echo "Missing password secret for $ssid_key: expected ''${prefix}-password" >&2
@@ -96,6 +103,19 @@ in
 
         ssid="$(tr -d '\n\r' < "$ssid_file")"
         password="$(tr -d '\n\r' < "$password_file")"
+        key_mgmt="sae"
+
+        if [ -e "$key_mgmt_file" ]; then
+          key_mgmt="$(tr -d '\n\r ' < "$key_mgmt_file")"
+        fi
+
+        case "$key_mgmt" in
+          sae|wpa-psk) ;;
+          *)
+            echo "Unsupported key management in $key_mgmt_file: $key_mgmt" >&2
+            exit 1
+            ;;
+        esac
 
         # Use the secret prefix as connection id, not the real SSID.
         # Example: wifi-h-h
@@ -114,12 +134,16 @@ in
 
         nmcli connection modify "$conn_id" \
           connection.autoconnect yes \
+          connection.autoconnect-priority 100 \
+          connection.permissions "" \
           802-11-wireless.ssid "$ssid" \
           802-11-wireless.cloned-mac-address "$mac" \
-          802-11-wireless-security.key-mgmt wpa-psk \
+          802-11-wireless-security.key-mgmt "$key_mgmt" \
           802-11-wireless-security.psk "$password" \
           ipv4.method auto \
-          ipv6.method auto
+          ipv4.may-fail no \
+          ipv6.method auto \
+          ipv6.may-fail yes
       done
 
       if [ "$found_any" -eq 0 ]; then
