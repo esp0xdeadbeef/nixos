@@ -40,6 +40,11 @@
     "msm"
   ];
 
+  boot.initrd.extraFirmwarePaths = [
+    "qcom/a660_sqe.fw"
+    "qcom/a660_gmu.bin"
+  ];
+
   boot.loader.grub.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.systemd-boot.enable = true;
