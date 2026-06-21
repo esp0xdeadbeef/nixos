@@ -60,6 +60,7 @@
       default = import ./nixos/laptop;
       dock = import ./nixos/laptop/dock.nix;
       power = import ./nixos/laptop/power.nix;
+      xlayoutdisplay-hotplug = import ./nixos/laptop/xlayoutdisplay-hotplug.nix;
     };
     vm-host = {
       nixos-shell = import ./nixos/vm-host/nixos-shell;
