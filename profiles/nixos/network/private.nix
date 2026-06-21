@@ -176,6 +176,12 @@ in
         profiles = builtins.listToAttrs (map mkProfile wifiPrefixes);
       };
 
+      system.activationScripts.removePersistentPrivateNetworkManagerProfiles = lib.stringAfter [ "etc" ] ''
+        for profile in ${lib.escapeShellArgs wifiPrefixes}; do
+          rm -f "/etc/NetworkManager/system-connections/$profile.nmconnection"
+        done
+      '';
+
       systemd.services.NetworkManager-ensure-profiles = {
         before = [ "NetworkManager-wait-online.service" ];
         wantedBy = [ "NetworkManager-wait-online.service" ];
