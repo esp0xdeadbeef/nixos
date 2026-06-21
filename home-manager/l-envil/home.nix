@@ -19,6 +19,15 @@ let
   stablePkgs = import inputs.nixpkgs-stable {
     config.allowUnfree = true;
   };
+  xlayoutdisplayConfig = pkgs.writeText "xlayoutdisplay-l-envil" ''
+    wait=2
+    rate=60
+    dpi=144
+    primary=eDP-1
+    order=DP-2-1-6
+    order=DP-1
+    order=eDP-1
+  '';
 in
 {
   home.activation.debugArgs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -92,6 +101,7 @@ in
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
+  home.file.".xlayoutdisplay".source = xlayoutdisplayConfig;
 
   home.packages =
     let

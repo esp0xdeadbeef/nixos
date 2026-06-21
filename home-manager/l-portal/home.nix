@@ -6,6 +6,17 @@
 , outPath
 , ...
 }:
+let
+  xlayoutdisplayConfig = pkgs.writeText "xlayoutdisplay-l-portal" ''
+    wait=2
+    rate=60
+    dpi=120
+    primary=eDP-1
+    order=DP-2
+    order=DP-1
+    order=eDP-1
+  '';
+in
 {
   imports = [
     # If you want to use modules your own flake exports (from modules/home-manager):
@@ -49,6 +60,8 @@
   home.username = "deadbeef";
   home.homeDirectory = "/home/deadbeef";
   home.enableNixpkgsReleaseCheck = false;
+
+  home.file.".xlayoutdisplay".source = xlayoutdisplayConfig;
 
   home.packages = with pkgs; [
     htop

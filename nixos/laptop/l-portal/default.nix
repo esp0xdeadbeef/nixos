@@ -106,6 +106,7 @@ in
   networking.hostName = hostName;
   networking.networkmanager.enable = true;
   services.autorandr.enable = lib.mkForce false;
+  local.laptop.xlayoutdisplayHotplug.maxExternalMode = "2560x1440";
   security.rtkit.enable = true;
   hardware.enableRedistributableFirmware = true;
 
