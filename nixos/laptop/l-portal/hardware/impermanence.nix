@@ -8,7 +8,7 @@
   local.impermanence = {
     enable = true;
     rootMapperName = "root";
-    persistSshHostKeys = false;
+    persistSshHostKeys = true;
     colordMode = "0755";
 
     extraSystemDirectories = [
