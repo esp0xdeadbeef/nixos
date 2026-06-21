@@ -120,78 +120,97 @@
   networking.networkmanager.enable = true;
   services.autorandr.enable = lib.mkForce false;
   local.laptop.autorandrDefault.enable = false;
-  services.udev.extraRules = ''
-    ACTION=="change", SUBSYSTEM=="drm", TAG+="systemd", ENV{SYSTEMD_WANTS}+="xlayoutdisplay-hotplug.service"
-  '';
-  systemd.services.xlayoutdisplay-hotplug = {
+  systemd.services.xlayoutdisplay-hotplug = let
+    applyLayout = pkgs.writeShellScript "xlayoutdisplay-apply" ''
+      set -eu
+
+      uid=""
+
+      while read -r session _; do
+        [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Type --value)" = "x11" ] || continue
+        [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Active --value)" = "yes" ] || continue
+
+        uid="$(${pkgs.systemd}/bin/loginctl show-session "$session" -p User --value)"
+        break
+      done < <(${pkgs.systemd}/bin/loginctl list-sessions --no-legend)
+
+      if [ -z "$uid" ]; then
+        echo "No active X11 session found; skipping display layout." >&2
+        exit 0
+      fi
+
+      home="$(${pkgs.getent}/bin/getent passwd "$uid" | ${pkgs.coreutils}/bin/cut -d: -f6)"
+      if [ -z "$home" ]; then
+        echo "No home directory found for uid $uid; skipping display layout." >&2
+        exit 0
+      fi
+
+      display=""
+      for socket in /tmp/.X11-unix/X*; do
+        [ -S "$socket" ] || continue
+        [ "$(${pkgs.coreutils}/bin/stat -c %u "$socket")" = "$uid" ] || continue
+        display=":''${socket##*/X}"
+        break
+      done
+
+      if [ -z "$display" ]; then
+        echo "No X11 socket found for uid $uid; skipping display layout." >&2
+        exit 0
+      fi
+
+      xauthority=""
+      for pid in $(${pkgs.procps}/bin/pgrep -x Xorg || true); do
+        [ "$(${pkgs.coreutils}/bin/stat -c %u "/proc/$pid")" = "$uid" ] || continue
+
+        xauthority="$(
+          ${pkgs.coreutils}/bin/tr '\0' '\n' < "/proc/$pid/cmdline" \
+            | ${pkgs.gawk}/bin/awk 'prev { print; exit } $0 == "-auth" { prev = 1 }'
+        )"
+        [ -n "$xauthority" ] && break
+      done
+
+      if [ -z "$xauthority" ]; then
+        echo "No Xauthority path found for uid $uid; skipping display layout." >&2
+        exit 0
+      fi
+
+      export HOME="$home"
+      export DISPLAY="$display"
+      export XAUTHORITY="$xauthority"
+      export XDG_RUNTIME_DIR="/run/user/$uid"
+
+      exec ${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w 2
+    '';
+
+    monitorLayout = pkgs.writeShellScript "xlayoutdisplay-hotplug-monitor" ''
+      set -eu
+
+      ${applyLayout} || true
+
+      ${pkgs.systemd}/bin/udevadm monitor --kernel --udev --subsystem-match=drm \
+        | while read -r line; do
+            case "$line" in
+              KERNEL* | UDEV*)
+                ${pkgs.coreutils}/bin/sleep 2
+                ${applyLayout} || true
+                ;;
+            esac
+          done
+    '';
+  in {
     description = "Apply xlayoutdisplay after display hotplug";
+    wantedBy = [ "graphical.target" ];
+    after = [ "display-manager.service" ];
+    path = [
+      pkgs.xrandr
+      pkgs.xrdb
+    ];
 
     serviceConfig = {
-      Type = "oneshot";
-      ExecStart =
-        let
-          applyLayout = pkgs.writeShellScript "xlayoutdisplay-hotplug" ''
-            set -eu
-
-            uid=""
-
-            while read -r session _; do
-              [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Type --value)" = "x11" ] || continue
-              [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Active --value)" = "yes" ] || continue
-
-              uid="$(${pkgs.systemd}/bin/loginctl show-session "$session" -p User --value)"
-              break
-            done < <(${pkgs.systemd}/bin/loginctl list-sessions --no-legend)
-
-            if [ -z "$uid" ]; then
-              echo "No active X11 session found; skipping display layout." >&2
-              exit 0
-            fi
-
-            home="$(${pkgs.getent}/bin/getent passwd "$uid" | ${pkgs.coreutils}/bin/cut -d: -f6)"
-            if [ -z "$home" ]; then
-              echo "No home directory found for uid $uid; skipping display layout." >&2
-              exit 0
-            fi
-
-            display=""
-            for socket in /tmp/.X11-unix/X*; do
-              [ -S "$socket" ] || continue
-              [ "$(${pkgs.coreutils}/bin/stat -c %u "$socket")" = "$uid" ] || continue
-              display=":''${socket##*/X}"
-              break
-            done
-
-            if [ -z "$display" ]; then
-              echo "No X11 socket found for uid $uid; skipping display layout." >&2
-              exit 0
-            fi
-
-            xauthority=""
-            for pid in $(${pkgs.procps}/bin/pgrep -x Xorg || true); do
-              [ "$(${pkgs.coreutils}/bin/stat -c %u "/proc/$pid")" = "$uid" ] || continue
-
-              xauthority="$(
-                ${pkgs.coreutils}/bin/tr '\0' '\n' < "/proc/$pid/cmdline" \
-                  | ${pkgs.gawk}/bin/awk 'prev { print; exit } $0 == "-auth" { prev = 1 }'
-              )"
-              [ -n "$xauthority" ] && break
-            done
-
-            if [ -z "$xauthority" ]; then
-              echo "No Xauthority path found for uid $uid; skipping display layout." >&2
-              exit 0
-            fi
-
-            export HOME="$home"
-            export DISPLAY="$display"
-            export XAUTHORITY="$xauthority"
-            export XDG_RUNTIME_DIR="/run/user/$uid"
-
-            exec ${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w 5
-          '';
-        in
-        "${applyLayout}";
+      Type = "simple";
+      ExecStart = "${monitorLayout}";
+      Restart = "on-failure";
+      RestartSec = "5s";
     };
   };
   local.workstation.android.enable = true;
