@@ -14,6 +14,7 @@ in
   imports = [
     profiles.nixos.base.default
     profiles.nixos.laptop.default
+    profiles.nixos.boot.usb-removable
 
     inputs.disko.nixosModules.disko
 
