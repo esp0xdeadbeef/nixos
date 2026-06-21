@@ -35,6 +35,12 @@
       '';
     in
     {
+      xlayoutdisplay = prev.xlayoutdisplay.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [
+          "${outPath}/patches/xlayoutdisplay-max-resolution.patch"
+        ];
+      });
+
       libvirt =
         builtins.trace
           "WARNING: local libvirt credential workaround overlay is active; remove it once nixpkgs fixes the 26.05 LoadCredentialEncrypted libvirt regression."

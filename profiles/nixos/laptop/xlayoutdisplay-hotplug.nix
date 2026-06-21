@@ -121,11 +121,14 @@ let
     if [ -n "$dpi" ]; then
       ${pkgs.coreutils}/bin/printf 'dpi=%s\n' "$dpi" >> "$runtime_home/.xlayoutdisplay"
     fi
+    ${lib.optionalString (cfg.maxResolution != null) ''
+      ${pkgs.coreutils}/bin/printf 'max-resolution=%s\n' "${cfg.maxResolution}" >> "$runtime_home/.xlayoutdisplay"
+    ''}
 
     export HOME="$runtime_home"
     export PATH="${lib.makeBinPath [ pkgs.xrandr pkgs.xrdb ]}:$PATH"
 
-    exec ${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w ${toString cfg.waitSeconds}
+    ${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w ${toString cfg.waitSeconds}
   '';
 
   monitorLayout = pkgs.writeShellScript "xlayoutdisplay-hotplug-monitor" ''
@@ -178,11 +181,11 @@ in
       description = "Seconds to wait after the last hotplug event before applying the layout.";
     };
 
-    maxExternalMode = lib.mkOption {
+    maxResolution = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
       example = "2560x1440";
-      description = "Maximum external display mode used by host-specific display policy.";
+      description = "Maximum display mode xlayoutdisplay may choose.";
     };
 
     configLines = lib.mkOption {

@@ -107,7 +107,7 @@ in
   networking.networkmanager.enable = true;
   services.autorandr.enable = lib.mkForce false;
   # 4k blackscreens l-portal's external outputs because the framebuffer is too small.
-  local.laptop.xlayoutdisplayHotplug.maxExternalMode = "2560x1440";
+  local.laptop.xlayoutdisplayHotplug.maxResolution = "2560x1440";
   local.laptop.xlayoutdisplayHotplug.configLines = [
     "wait=2"
     "rate=60"

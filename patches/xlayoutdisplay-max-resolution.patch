@@ -1,0 +1,62 @@
+diff -r -N '--unified=0' xlayoutdisplay-old/main.cpp xlayoutdisplay-new/main.cpp
+--- xlayoutdisplay-old/main.cpp	2026-06-21 12:04:19.243314251 +0200
++++ xlayoutdisplay-new/main.cpp	2026-06-21 12:05:05.112949613 +0200
+@@ -58,0 +59 @@
++        "     [ --max-resolution ] arg  maximum output mode, e.g. 2560x1440\n"
+@@ -87,0 +89,2 @@
++        } else if (match[1] == "max-resolution") {
++            settings.maxResolution = match[2];
+diff -r -N '--unified=0' xlayoutdisplay-old/src/Settings.h xlayoutdisplay-new/src/Settings.h
+--- xlayoutdisplay-old/src/Settings.h	2026-06-21 12:04:19.243871848 +0200
++++ xlayoutdisplay-new/src/Settings.h	2026-06-21 12:05:05.113134405 +0200
+@@ -30,0 +31 @@
++    std::string maxResolution;
+diff -r -N '--unified=0' xlayoutdisplay-old/src/calculations.cpp xlayoutdisplay-new/src/calculations.cpp
+--- xlayoutdisplay-old/src/calculations.cpp	2026-06-21 12:04:19.243921745 +0200
++++ xlayoutdisplay-new/src/calculations.cpp	2026-06-21 12:05:05.113261990 +0200
+@@ -21,0 +22 @@
++#include <regex>
+@@ -25,0 +27,24 @@
++static bool parseModeSize(const string &mode, unsigned int *width, unsigned int *height) {
++    smatch match;
++    if (!regex_match(mode, match, regex("([0-9]+)x([0-9]+)")) || match.size() != 3) {
++        return false;
++    }
++
++    *width = static_cast<unsigned int>(stoul(match[1]));
++    *height = static_cast<unsigned int>(stoul(match[2]));
++    return true;
++}
++
++static shared_ptr<const Mode> cappedOptimalMode(const Output &output, const string &maxMode) {
++    unsigned int maxWidth;
++    unsigned int maxHeight;
++    if (maxMode.empty() || !parseModeSize(maxMode, &maxWidth, &maxHeight)) {
++        return output.optimalMode;
++    }
++
++    for (const auto &mode : reverseSort(output.modes))
++        if (mode->width <= maxWidth && mode->height <= maxHeight)
++            return mode;
++    return output.optimalMode;
++}
++
+@@ -82,0 +108,4 @@
++    ltrOutputs(outputs, "");
++}
++
++void ltrOutputs(const list<shared_ptr<Output>> &outputs, const string &maxResolution) {
+@@ -90 +119 @@
+-            output->desiredMode = output->optimalMode;
++            output->desiredMode = cappedOptimalMode(*output, maxResolution);
+diff -r -N '--unified=0' xlayoutdisplay-old/src/calculations.h xlayoutdisplay-new/src/calculations.h
+--- xlayoutdisplay-old/src/calculations.h	2026-06-21 12:04:19.243973636 +0200
++++ xlayoutdisplay-new/src/calculations.h	2026-06-21 12:05:05.113356189 +0200
+@@ -34,0 +35 @@
++void ltrOutputs(const std::list<std::shared_ptr<Output>> &outputs, const std::string &maxResolution);
+diff -r -N '--unified=0' xlayoutdisplay-old/src/layout.cpp xlayoutdisplay-new/src/layout.cpp
+--- xlayoutdisplay-old/src/layout.cpp	2026-06-21 12:04:19.244030844 +0200
++++ xlayoutdisplay-new/src/layout.cpp	2026-06-21 12:05:05.113437897 +0200
+@@ -74 +74 @@
+-        ltrOutputs(outputs);
++        ltrOutputs(outputs, settings.maxResolution);
