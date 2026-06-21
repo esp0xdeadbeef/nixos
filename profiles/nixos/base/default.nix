@@ -9,6 +9,7 @@
     profiles.nixos.core
     profiles.nixos.base.system
     profiles.nixos.base.maintenance
+    profiles.nixos.network.private
     profiles.nixos.shell.fish
     profiles.nixos.shell.zsh-prompt
 

@@ -33,6 +33,7 @@
       zsh-prompt = import ./nixos/shell/zsh-prompt.nix;
     };
     network = {
+      private = import ./nixos/network/private.nix;
       workstation = import ./nixos/network/workstation.nix;
     };
     virtualization = {

@@ -51,6 +51,7 @@ in
   ];
 
   security.pam.services.login.enableGnomeKeyring = true;
+  local.network.private.enable = false;
 
   sops.defaultSopsFile = "${outPath}/secrets/${hostName}-default.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
