@@ -1,14 +1,13 @@
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  outPath,
-  profiles,
-  primaryUser,
-  primaryUserHome,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, outPath
+, profiles
+, primaryUser
+, primaryUserHome
+, ...
 }:
 let
   unstablePkgs = pkgs.unstable;
@@ -31,7 +30,6 @@ in
     ./configs/sway/packages.nix
     ./configs/tmuxp/packages.nix
     ./projects
-    "${outPath}/home-manager/01-general/pentesting/packages.nix"
     profiles.home-manager.desktop-i3
 
     # update nix-index database
@@ -109,15 +107,12 @@ in
         rofi
         remmina
         legcord
-        ffuf
         distrobox
         xlayoutdisplay
       ];
 
       unstable = with unstablePkgs; [
         # firefox
-        exploitdb
-        netexec
         gh
       ];
     in

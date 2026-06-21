@@ -4,9 +4,6 @@
   lib,
   ...
 }:
-let
-  unstablePkgs = pkgs.unstable;
-in
 {
   environment.etc.hosts.enable = false;
   programs.firefox.enable = true;
@@ -121,8 +118,5 @@ in
       wireshark
       tshark
       # ventoy-full
-    ])
-    ++ [
-      unstablePkgs.zap
-    ];
+    ]);
 }

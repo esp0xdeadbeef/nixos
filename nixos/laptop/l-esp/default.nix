@@ -21,7 +21,6 @@
     profiles.nixos.laptop.default
     profiles.nixos.workstation.android
     profiles.nixos.workstation.pentesting
-    profiles.nixos.workstation.pentest-cleanup
     profiles.nixos.vm-host.nixos-shell
 
     ./connect-nas

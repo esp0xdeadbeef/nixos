@@ -4,6 +4,7 @@ args@{ inputs
 , config
 , pkgs
 , outPath
+, profiles
 , sopsSecrets
 , ...
 }:
@@ -44,7 +45,6 @@ in
     "${outPath}/home-manager/01-general/darkmode/config.nix"
     "${outPath}/home-manager/01-general/editors/vscode.nix"
     "${outPath}/home-manager/01-general/pdf-reader/packages.nix"
-    "${outPath}/home-manager/01-general/pentesting/packages.nix"
     "${outPath}/home-manager/01-general/virt-manager-config/default.nix"
 
     # ../02-window-manager-i3/i3/packages.nix
@@ -107,18 +107,13 @@ in
         flameshot
         rofi
         remmina
-        ffuf
         black
         tmuxp
 
       ];
       unstable = with unstablePkgs; [
         # firefox
-        exploitdb
-        netexec
-        #certipy
         slack
-        (burpsuite.override { iconName = "pro"; })
         gh
       ];
     in

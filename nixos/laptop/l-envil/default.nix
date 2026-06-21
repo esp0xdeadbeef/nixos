@@ -47,8 +47,6 @@ in
     ./disko/build_disko.nix
     ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
-    ./unmount-pentest-directory/unmount-hook.nix
-    ./work-packages/wordlists/packages.nix
   ];
 
   security.pam.services.login.enableGnomeKeyring = true;
@@ -150,7 +148,6 @@ in
 
   environment = {
     systemPackages = [
-      pkgs.azurehound
       pkgs.mxbuild
       (pkgs.writeShellScriptBin "qemu-system-x86_64-uefi" ''
         qemu-system-x86_64 \
