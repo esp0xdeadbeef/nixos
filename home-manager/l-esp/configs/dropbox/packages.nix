@@ -32,10 +32,14 @@ in
   systemd.user.services.maestral = {
     Unit = {
       Description = "Maestral Dropbox Client";
-      After = [ "network-online.target" ];
+      After = [
+        "graphical-session.target"
+        "network-online.target"
+      ];
+      PartOf = [ "graphical-session.target" ];
     };
     Install = {
-      WantedBy = [ "default.target" ];
+      WantedBy = [ "graphical-session.target" ];
     };
     Service = {
       ExecStart = "${pkgs.maestral-gui}/bin/maestral_qt";

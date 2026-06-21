@@ -137,6 +137,7 @@ let
         "dropbox"
         "maestral"
         "maestral-gui"
+        "maestral-qt"
       ])
       [
         ".config/dropbox"
