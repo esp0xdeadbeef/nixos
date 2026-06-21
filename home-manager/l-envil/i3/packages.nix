@@ -385,7 +385,7 @@ in
       ${lib.optionalString config.local.work.microsoft.enable ''
         exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux
       ''}
-      exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
+      #exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
       exec --no-startup-id ${pkgs.spotify}/bin/spotify
       exec --no-startup-id ${pkgs.dunst}/bin/dunst
       #exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux

@@ -13,7 +13,7 @@ in
 {
   options.local.i3.display.startupCommand = lib.mkOption {
     type = lib.types.nullOr lib.types.str;
-    default = "${pkgs.autorandr}/bin/autorandr";
+    default = null;
     description = "Display layout command to run when i3 starts.";
   };
 

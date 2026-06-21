@@ -329,7 +329,7 @@ in
       exec --no-startup-id xsetroot -solid "#333333" #gray
       exec --no-startup-id xsetroot -solid "#000000"
       exec --no-startup-id ${pkgs.picom}/bin/picom
-      exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
+      #exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
       exec --no-startup-id ${pkgs.dunst}/bin/dunst
       exec --no-startup-id ${pkgs.legcord}/bin/legcord
 

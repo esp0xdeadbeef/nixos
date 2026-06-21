@@ -130,7 +130,6 @@ in
 
   networking.hostName = hostName;
   networking.networkmanager.enable = true;
-  local.laptop.xlayoutdisplayHotplug.enable = true;
   hardware.intelgpu.vaapiDriver = "intel-media-driver";
   local.users.primary.name = "deadbeef";
 

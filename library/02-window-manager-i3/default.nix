@@ -15,7 +15,7 @@
   #home.file.".config/i3status-rust/get_ipv6.sh".source = /etc/nixos/i3status-rust/get_ipv6.sh;
   #home.file.".config/i3status-rust/gpu-load.sh".source = /etc/nixos/i3status-rust/gpu-load.sh;
 
-  services.autorandr.enable = true;
+  services.autorandr.enable = false;
   programs.dconf.enable = true;
 
   security.pam.services.i3lock.enable = true;

@@ -95,7 +95,11 @@ let
 in
 {
   options.local.laptop.xlayoutdisplayHotplug = {
-    enable = lib.mkEnableOption "xlayoutdisplay hotplug monitor";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = config.services.xserver.windowManager.i3.enable;
+      description = "Whether to run the xlayoutdisplay hotplug monitor.";
+    };
 
     waitSeconds = lib.mkOption {
       type = lib.types.ints.positive;
@@ -119,7 +123,7 @@ in
     };
   };
 
-  config = lib.mkIf (cfg.enable && config.services.xserver.windowManager.i3.enable) {
+  config = lib.mkIf cfg.enable {
     systemd.services.xlayoutdisplay-hotplug = {
       description = "Apply xlayoutdisplay after display hotplug";
       wantedBy = [ "graphical.target" ];
