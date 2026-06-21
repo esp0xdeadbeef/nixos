@@ -304,7 +304,7 @@ in
       bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
       bindsym $mod+c exec google-chrome-stable
       bindsym $mod+F3 exec ${pkgs.spotify}/bin/spotify
-      exec --no-startup-id ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1
+      exec_always --no-startup-id ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'
       exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet
 
       # flameshot crashes
