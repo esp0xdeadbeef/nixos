@@ -119,7 +119,7 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
+  config = lib.mkIf (cfg.enable && config.services.xserver.windowManager.i3.enable) {
     systemd.services.xlayoutdisplay-hotplug = {
       description = "Apply xlayoutdisplay after display hotplug";
       wantedBy = [ "graphical.target" ];
