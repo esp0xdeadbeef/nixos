@@ -4,6 +4,7 @@
 , config
 , pkgs
 , outPath
+, profiles
 , ...
 }:
 let
@@ -28,9 +29,8 @@ in
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
     # ./steam/packages.nix
-    "${outPath}/home-manager/01-general/darkmode/config.nix"
-    ./configs/i3/packages.nix
-    ./configs/i3status-rust/packages.nix
+    profiles.home-manager.desktop.legcord
+    profiles.home-manager.desktop-i3
   ];
   nixpkgs = {
     # You can add overlays here
@@ -60,8 +60,22 @@ in
   home.username = "deadbeef";
   home.homeDirectory = "/home/deadbeef";
   home.enableNixpkgsReleaseCheck = false;
+  sops.defaultSopsFile = "${outPath}/secrets/l-portal-default.yaml";
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
+  sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 
   home.file.".xlayoutdisplay".source = xlayoutdisplayConfig;
+  local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
+  local.desktop.legcord.enable = true;
+  local.i3.extraConfig = lib.mkAfter ''
+    # l-portal additions
+    bindsym $mod+F2 exec teams
+    bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
+
+    for_window [class="Slack"] move window to workspace 5
+    for_window [class="burp-StartBurp" title="^Burp Suite Professional$"] move container to workspace 10
+    for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
+  '';
 
   home.packages = with pkgs; [
     htop
@@ -70,11 +84,11 @@ in
     i3status-rust
     # discord
     obsidian
-    vscode
     # google-chrome
     flameshot
     rofi
     remmina
+    spotify-player
     home-manager
   ];
 

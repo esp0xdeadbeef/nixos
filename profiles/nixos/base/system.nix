@@ -1,6 +1,8 @@
 { outPath, ... }:
 {
-  nix.settings.accept-flake-config = true;
+  nix.settings = {
+    accept-flake-config = true;
+  };
 
   imports = [
     "${outPath}/library/01-general/system/locale.nix"

@@ -27,9 +27,9 @@ in
     ./configs/flameshot/packages.nix
     ./configs/git/config.nix
     ./configs/nixpkgs-allowunfree/packages.nix
-    ./configs/sway/packages.nix
     ./configs/tmuxp/packages.nix
     ./projects
+    profiles.home-manager.desktop.legcord
     profiles.home-manager.desktop-i3
 
     # update nix-index database
@@ -87,6 +87,7 @@ in
   };
 
   local.i3.display.startupCommand = "${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w 2";
+  local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
 
   home.activation.seedXlayoutdisplayConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     target="$HOME/.xlayoutdisplay"
@@ -106,7 +107,6 @@ in
         flameshot
         rofi
         remmina
-        legcord
         distrobox
         xlayoutdisplay
       ];
@@ -117,6 +117,8 @@ in
       ];
     in
     stable ++ unstable;
+
+  local.desktop.legcord.enable = true;
 
   # Enable home-manager
   programs.home-manager.enable = true;

@@ -80,7 +80,8 @@
       inputs.sops-nix.homeManagerModules.sops
     ];
     extraSpecialArgs = {
-      inherit inputs outputs;
+      inherit inputs outputs profiles;
+      inherit outPath;
     };
     users = {
       deadbeef = import "${outPath}/home-manager/${name}/home.nix";

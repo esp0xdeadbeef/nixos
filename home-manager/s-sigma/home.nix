@@ -5,6 +5,8 @@
 , lib
 , config
 , pkgs
+, profiles
+, outPath
 , ...
 }:
 {
@@ -18,6 +20,7 @@
 
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
+    profiles.home-manager.desktop-i3
   ];
   nixpkgs = {
     # You can add overlays here
@@ -48,6 +51,10 @@
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
+  sops.defaultSopsFile = "${outPath}/secrets/s-sigma-root.yaml";
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
+  local.i3.modifier = "Mod1";
+  local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
 
   home.packages = with pkgs; [
     btop

@@ -74,6 +74,10 @@
   };
 
   home-manager = {
+    desktop = {
+      window-manager = import ./home-manager/desktop/window-manager.nix;
+      legcord = import ./home-manager/desktop/legcord.nix;
+    };
     desktop-i3 = import ./home-manager/desktop-i3;
   };
 }

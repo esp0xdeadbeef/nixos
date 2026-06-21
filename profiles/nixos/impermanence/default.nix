@@ -1,8 +1,7 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
+{ config
+, lib
+, pkgs
+, ...
 }:
 
 let
@@ -133,17 +132,17 @@ let
       ".pki/nssdb"
     ]
     ++
-      lib.optionals
-        (hasPackage [
-          "dropbox"
-          "maestral"
-        ])
-        [
-          ".config/dropbox"
-          ".config/maestral"
-          ".dropbox"
-          ".dropbox-dist"
-        ]
+    lib.optionals
+      (hasPackage [
+        "dropbox"
+        "maestral"
+      ])
+      [
+        ".config/dropbox"
+        ".config/maestral"
+        ".dropbox"
+        ".dropbox-dist"
+      ]
     ++ lib.optionals (hasPackage [ "obsidian" ]) [
       ".config/obsidian"
     ]
@@ -166,14 +165,14 @@ let
       ".config/teams-for-linux"
     ]
     ++
-      lib.optionals
-        (hasPackage [
-          "zoom-us"
-          "zoom"
-        ])
-        [
-          ".config/zoom"
-        ]
+    lib.optionals
+      (hasPackage [
+        "zoom-us"
+        "zoom"
+      ])
+      [
+        ".config/zoom"
+      ]
     ++ lib.optionals (hasPackage [ "lmstudio" ]) [
       ".lmstudio"
     ]
@@ -181,16 +180,16 @@ let
       ".mitmproxy"
     ]
     ++
-      lib.optionals
-        (hasPackage [
-          "firefox"
-          "librewolf"
-          "zen"
-          "zen-browser"
-        ])
-        [
-          ".mozilla"
-        ]
+    lib.optionals
+      (hasPackage [
+        "firefox"
+        "librewolf"
+        "zen"
+        "zen-browser"
+      ])
+      [
+        ".mozilla"
+      ]
     ++ lib.optionals (hasPackage [ "quickemu" ]) [
       ".quickget"
     ];
@@ -261,16 +260,18 @@ let
     ++ desktopAppDirs
   );
 
-  noCowUserTmpfiles = lib.concatMap (
-    dir:
-    let
-      path = "${cfg.persistPath}/home/${cfg.primaryUser}/${dir}";
-    in
-    [
-      "d ${path} 0700 ${cfg.primaryUser} users -"
-      "h ${path} - - - - +C"
-    ]
-  ) noCowUserDirs;
+  noCowUserTmpfiles = lib.concatMap
+    (
+      dir:
+      let
+        path = "${cfg.persistPath}/home/${cfg.primaryUser}/${dir}";
+      in
+      [
+        "d ${path} 0700 ${cfg.primaryUser} users -"
+        "h ${path} - - - - +C"
+      ]
+    )
+    noCowUserDirs;
 in
 {
   options.local.impermanence = {
@@ -501,6 +502,9 @@ in
           ".zsh_history"
           ".zshrc"
           ".aliases"
+        ]
+        ++ lib.optionals (hasPackage [ "spotify-player" ]) [
+          ".cache/spotify-player/credentials.json"
         ]
         ++ cfg.extraUserFiles;
       };

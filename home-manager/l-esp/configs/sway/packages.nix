@@ -1,9 +1,8 @@
-{
-  config,
-  lib,
-  pkgs,
-  sopsSecrets,
-  ...
+{ config
+, lib
+, pkgs
+, sopsSecrets
+, ...
 }:
 let
   thunar = pkgs.thunar or pkgs.xfce.thunar;
@@ -272,7 +271,6 @@ in
       bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
 
       bindsym $mod+i exec ${thunar}/bin/thunar
-      bindsym $mod+F4 exec ${pkgs.legcord}/bin/legcord
 
       bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
       bindsym $mod+c exec google-chrome-stable
@@ -300,7 +298,6 @@ in
       for_window [class="Chromium" title=".*"] move container to workspace 2
       for_window [class="Spotify"] move to workspace 4
       for_window [class="discord"] move to workspace 5
-      for_window [class="legcord"] move to workspace 5
       for_window [class="Navigator" class="firefox"] move window to workspace 8
       for_window [class="Firefox"] move window to workspace 8
       for_window [class="firefox"] move window to workspace 8
@@ -318,7 +315,6 @@ in
       exec --no-startup-id ${pkgs.picom}/bin/picom
       exec --no-startup-id ${pkgs.autorandr}/bin/autorandr
       exec --no-startup-id ${pkgs.dunst}/bin/dunst
-      exec --no-startup-id ${pkgs.legcord}/bin/legcord
 
       # disable numlock
       exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off

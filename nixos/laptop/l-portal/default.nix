@@ -54,7 +54,7 @@ in
       inputs.sops-nix.homeManagerModules.sops
     ];
     extraSpecialArgs = {
-      inherit inputs outputs outPath;
+      inherit inputs outputs profiles outPath;
     };
 
     users = {
@@ -106,6 +106,7 @@ in
   networking.hostName = hostName;
   networking.networkmanager.enable = true;
   services.autorandr.enable = lib.mkForce false;
+  # 4k blackscreens l-portal's external outputs because the framebuffer is too small.
   local.laptop.xlayoutdisplayHotplug.maxExternalMode = "2560x1440";
   security.rtkit.enable = true;
   hardware.enableRedistributableFirmware = true;

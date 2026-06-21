@@ -46,18 +46,11 @@ in
     # inputs.nix-colors.homeManagerModules.default
 
     # You can also split up your configuration and import pieces of it here:
-    ./i3/packages.nix
+    profiles.home-manager.desktop.legcord
+    profiles.home-manager.desktop-i3
     ./rclone-wrapper/rclone.nix
     ./remmina/config.nix
     ./work-microsoft.nix
-
-    "${outPath}/home-manager/01-general/darkmode/config.nix"
-    "${outPath}/home-manager/01-general/editors/vscode.nix"
-    "${outPath}/home-manager/01-general/pdf-reader/packages.nix"
-    "${outPath}/home-manager/01-general/virt-manager-config/default.nix"
-
-    # ../02-window-manager-i3/i3/packages.nix
-    "${outPath}/home-manager/02-window-manager-i3/i3status-rust/packages.nix"
 
     inputs.sops-nix.homeManagerModules.sops
   ];
@@ -102,6 +95,27 @@ in
     homeDirectory = "/home/deadbeef";
   };
   home.file.".xlayoutdisplay".source = xlayoutdisplayConfig;
+  local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
+  local.desktop.legcord.enable = true;
+  local.i3.extraConfig = lib.mkAfter ''
+    # l-envil additions
+    #bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
+    bindsym $mod+F4 exec ${pkgs.discord}/bin/discord
+    bindsym $mod+F2 exec teams
+    bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
+    bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-office-libvirt.remmina"
+    bindsym $mod+p exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-pentest-libvirt.remmina"
+
+    for_window [class="burp-StartBurp" title="^Burp Suite Professional$"] move container to workspace 10
+    for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
+    for_window [class="Slack"] move window to workspace 5
+    ${lib.optionalString config.local.work.microsoft.enable ''
+      for_window [class="teams-for-linux"] move window to workspace 5
+    ''}
+    ${lib.optionalString config.local.work.microsoft.enable ''
+      exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux
+    ''}
+  '';
 
   home.packages =
     let
