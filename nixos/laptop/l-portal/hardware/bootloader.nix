@@ -43,6 +43,7 @@
   boot.initrd.extraFirmwarePaths = [
     "qcom/a660_sqe.fw"
     "qcom/a660_gmu.bin"
+    "qcom/sc8280xp/LENOVO/21BX/qcdxkmsuc8280.mbn"
   ];
 
   boot.loader.grub.enable = lib.mkForce false;
