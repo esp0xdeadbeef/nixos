@@ -1,5 +1,6 @@
 { config
 , lib
+, pkgs
 , outPath
 , ...
 }:
@@ -187,6 +188,11 @@ in
         wantedBy = [ "NetworkManager-wait-online.service" ];
         unitConfig.ConditionPathExists = config.sops.templates."networkmanager-private.env".path;
       };
+
+      systemd.services.NetworkManager-wait-online.serviceConfig.ExecStart = lib.mkForce [
+        ""
+        "${pkgs.networkmanager}/bin/nm-online -q -t 120"
+      ];
     })
   ];
 }
