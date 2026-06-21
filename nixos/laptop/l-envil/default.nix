@@ -29,6 +29,7 @@ in
     profiles.nixos.desktop.i3
     profiles.nixos.boot.usb-removable
     profiles.nixos.laptop.default
+    profiles.nixos.workstation.android
     profiles.nixos.workstation.pentesting
     profiles.nixos.llm.lmstudio
     profiles.nixos.llm.ollama-base
@@ -36,7 +37,6 @@ in
     profiles.nixos.containers.firefox-vnc
 
     ./1-custom-packages/burp-fix.nix
-    ./android
     ./hardware/audio-and-bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
@@ -53,6 +53,7 @@ in
 
   security.pam.services.login.enableGnomeKeyring = true;
   local.network.private.enable = false;
+  local.workstation.android.enable = true;
 
   sops.defaultSopsFile = "${outPath}/secrets/${hostName}-default.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
