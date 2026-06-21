@@ -15,7 +15,6 @@
     ./nix-specific/packages.nix
     ./password-managers/1password.nix
     ./pdf/packages.nix
-    ./pentesting/packages.nix
     ./rdp/packages.nix
     ./scripting-languages/packages.nix
     ./services/packages.nix

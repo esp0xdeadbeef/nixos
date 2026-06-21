@@ -37,23 +37,15 @@
     navi
     nixfmt
     pulseaudio
-    feroxbuster
-    nuclei
-    gau
     nmap
     azure-cli
     # inotify service (otherwise flameshot crashes)
     dunst
     unzip
-    sqlmap
-    enum4linux
-    enum4linux-ng
-    metasploit
     samba4Full
     rlwrap
     lastpass-cli
     tpm2-tss
-    responder
     playerctl
     autorandr
     gh
@@ -75,13 +67,11 @@
     autotiling
     lshw
     # neofetch
-    hashcat
     fzf
     git
     traceroute
     tmux
     dig
-    zap
     bindfs
     xclip
     wget
@@ -114,7 +104,6 @@
     flameshot
     rofi
     remmina
-    mitmproxy
   ];
 
 }

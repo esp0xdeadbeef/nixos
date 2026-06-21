@@ -47,9 +47,9 @@ The repo currently has these broad areas:
   currently mostly empty.
 - `overlays/`: overlay exports, currently `additions`, `modifications`, and
   `unstable-packages`.
-- `pkgs/`: flake package export point, currently mostly empty.
+- `pkgs/`: flake package export point, including reusable tools such as
+  `pentest-workspace`.
 - `secrets/`: SOPS data and key-management notes.
-- `start-pentest-tbd-where-to-put/`: separate flake/tooling area.
 
 ## Main Problems
 

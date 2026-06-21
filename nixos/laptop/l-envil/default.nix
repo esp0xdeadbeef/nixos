@@ -29,6 +29,7 @@ in
     profiles.nixos.desktop.i3
     profiles.nixos.boot.usb-removable
     profiles.nixos.laptop.default
+    profiles.nixos.workstation.pentesting
     profiles.nixos.llm.lmstudio
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm.open-webui

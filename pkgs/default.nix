@@ -3,4 +3,5 @@
 pkgs: {
   mxbuild = pkgs.callPackage ./mxbuild { };
   pentest-powershell = pkgs.callPackage ./pentest-powershell { };
+  pentest-workspace = pkgs.callPackage ./pentest-workspace { };
 }

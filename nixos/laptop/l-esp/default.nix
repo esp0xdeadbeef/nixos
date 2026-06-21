@@ -19,6 +19,7 @@
     profiles.nixos.desktop.i3
     profiles.nixos.boot.usb-removable
     profiles.nixos.laptop.default
+    profiles.nixos.workstation.pentesting
     profiles.nixos.workstation.pentest-cleanup
     profiles.nixos.vm-host.nixos-shell
 
@@ -116,7 +117,7 @@
 
   networking.hostName = "l-esp";
   networking.networkmanager.enable = true;
-  environment.etc.hosts.enable = lib.mkForce true;
+  environment.etc.hosts.enable = false;
   local.users.primary.name = "deadbeef";
   security.pam.services.login.enableGnomeKeyring = true;
   systemd.tmpfiles.rules = [

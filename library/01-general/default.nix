@@ -38,7 +38,6 @@
     ./packages/nix-specific/packages.nix
     ./packages/password-managers/1password.nix
     ./packages/pdf/packages.nix
-    ./packages/pentesting/packages.nix
     ./packages/rdp/packages.nix
     ./packages/scripting-languages/packages.nix
     ./packages/services/packages.nix

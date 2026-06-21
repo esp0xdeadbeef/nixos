@@ -65,6 +65,7 @@
     };
     workstation = {
       full = import ./nixos/workstation/full.nix;
+      pentesting = import ./nixos/workstation/pentesting.nix;
       pentest-cleanup = import ./nixos/workstation/pentest-cleanup.nix;
     };
   };

@@ -60,10 +60,8 @@
     vscode
     # google-chrome
     flameshot
-    ffuf
     rofi
     remmina
-    mitmproxy
     home-manager
   ];
 
