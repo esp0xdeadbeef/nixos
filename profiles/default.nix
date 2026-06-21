@@ -56,6 +56,7 @@
       default = import ./nixos/impermanence;
     };
     laptop = {
+      autorandr-default = import ./nixos/laptop/autorandr-default.nix;
       default = import ./nixos/laptop;
       dock = import ./nixos/laptop/dock.nix;
       power = import ./nixos/laptop/power.nix;

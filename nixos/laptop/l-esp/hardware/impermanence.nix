@@ -12,5 +12,9 @@
     extraSystemDirectories = [
       "/etc/nebula"
     ];
+
+    extraUserFiles = [
+      ".xlayoutdisplay"
+    ];
   };
 }
