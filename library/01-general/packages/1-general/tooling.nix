@@ -150,7 +150,10 @@
 
       # formatting tools like:
       # mkfs.ext4 /dev/sdX1
+      dosfstools
       e2fsprogs
+      exfatprogs
+      parted
     ];
   };
 }
