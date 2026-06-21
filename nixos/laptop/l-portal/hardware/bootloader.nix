@@ -18,6 +18,17 @@
     "systemd.tpm2_wait=0"
   ];
 
+  boot.kernelPatches = [
+    {
+      name = "enable-iso9660-joliet";
+      patch = null;
+      extraStructuredConfig = with lib.kernel; {
+        JOLIET = yes;
+        ZISOFS = yes;
+      };
+    }
+  ];
+
   boot.initrd.kernelModules = [
     "nvme"
     "phy-qcom-qmp-pcie"
