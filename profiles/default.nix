@@ -8,6 +8,7 @@
     };
     core = import ./nixos/core;
     boot = {
+      clevis-tang-unlock = import ./nixos/boot/clevis-tang-unlock.nix;
       usb-removable = import ./nixos/boot/usb-removable.nix;
     };
     desktop = {

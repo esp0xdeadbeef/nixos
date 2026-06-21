@@ -1,9 +1,12 @@
 { config
 , pkgs
 , lib
+, profiles
 , ...
 }:
 {
+  imports = [ profiles.nixos.boot.clevis-tang-unlock ];
+
   hardware.deviceTree = {
     enable = true;
     filter = lib.mkDefault "sc8280xp-lenovo-thinkpad-x13s*.dtb";
@@ -22,7 +25,7 @@
     {
       name = "enable-iso9660-joliet";
       patch = null;
-      extraStructuredConfig = with lib.kernel; {
+      structuredExtraConfig = with lib.kernel; {
         JOLIET = yes;
         ZISOFS = yes;
       };
@@ -64,4 +67,18 @@
 
   boot.initrd.systemd.tpm2.enable = false;
   systemd.tpm2.enable = false;
+
+  local.boot.clevisTangUnlock = {
+    enable = builtins.pathExists ./root.jwe;
+    deviceName = "root";
+    secretFile =
+      if builtins.pathExists ./root.jwe then
+        ./root.jwe
+      else
+        null;
+    network = {
+      interface = "wlP6p1s0";
+      waitOnlineTimeout = 30;
+    };
+  };
 }
