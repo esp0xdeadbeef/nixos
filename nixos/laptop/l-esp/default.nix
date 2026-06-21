@@ -185,15 +185,29 @@
     monitorLayout = pkgs.writeShellScript "xlayoutdisplay-hotplug-monitor" ''
       set -eu
 
+      pending_apply=""
+
+      schedule_apply() {
+        if [ -n "$pending_apply" ] && ${pkgs.procps}/bin/kill -0 "$pending_apply" 2>/dev/null; then
+          ${pkgs.procps}/bin/kill "$pending_apply" 2>/dev/null || true
+          wait "$pending_apply" 2>/dev/null || true
+        fi
+
+        (
+          ${pkgs.coreutils}/bin/sleep 4
+          ${applyLayout} || true
+        ) &
+        pending_apply="$!"
+      }
+
+      trap 'if [ -n "$pending_apply" ]; then ${pkgs.procps}/bin/kill "$pending_apply" 2>/dev/null || true; fi' EXIT
+
       ${applyLayout} || true
 
-      ${pkgs.systemd}/bin/udevadm monitor --kernel --udev --subsystem-match=drm \
+      ${pkgs.systemd}/bin/udevadm monitor --kernel --udev --subsystem-match=drm --subsystem-match=usb \
         | while read -r line; do
             case "$line" in
-              KERNEL* | UDEV*)
-                ${pkgs.coreutils}/bin/sleep 2
-                ${applyLayout} || true
-                ;;
+              KERNEL* | UDEV*) schedule_apply ;;
             esac
           done
     '';
