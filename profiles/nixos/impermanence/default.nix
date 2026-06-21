@@ -136,10 +136,12 @@ let
       (hasPackage [
         "dropbox"
         "maestral"
+        "maestral-gui"
       ])
       [
         ".config/dropbox"
         ".config/maestral"
+        ".local/share/maestral"
         ".dropbox"
         ".dropbox-dist"
       ]

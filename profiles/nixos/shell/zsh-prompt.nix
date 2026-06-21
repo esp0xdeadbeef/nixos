@@ -51,7 +51,11 @@ in
         fzf
       ];
 
-      variables.HISTSIZE = "100000000";
+      variables = {
+        EDITOR = "vim";
+        VISUAL = "vim";
+        HISTSIZE = "100000000";
+      };
     };
 
     users.defaultUserShell = lib.mkOverride 900 pkgs.zsh;
@@ -82,6 +86,8 @@ in
 
                 export HISTSIZE=1000000000
                 export SAVEHIST=1000000000
+                export EDITOR="''${EDITOR:-vim}"
+                export VISUAL="''${VISUAL:-vim}"
                 if [[ -z "$HISTFILE" ]]; then
                   if [[ -d "/persist/$HOME" ]]; then
                     export HISTFILE="/persist/$HOME/.zsh_history"
