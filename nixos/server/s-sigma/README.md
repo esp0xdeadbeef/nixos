@@ -1,4 +1,3 @@
-
 # VM Orchestration Design Specification
 
 This repository defines the design and operational model for managing virtual machines using a **NAS-centric control plane**.
@@ -11,33 +10,33 @@ The orchestration model is inspired by **ISA-88 / PackML**, applying its state-m
 
 * `./orchestrator/`  
     Contains the conceptual and logical design of the orchestration system, including:
-    
+
     * State machines for coordinators, hosts, and virtual machines
-        
+
     * Interaction rules and control flow
-        
+
     * Expected filesystem layout and ownership of state
-        
+
     * Failure handling and recovery semantics
-        
+
 
 ## Design Principles
 
 * **NAS as source of truth**  
     All authoritative state is stored on the NAS. Local state is ephemeral and reconstructible.
-    
+
 * **Deterministic behavior**  
     Every component operates as a finite state machine with explicit transitions.
-    
+
 * **Decoupled orchestration**  
     Hosts do not coordinate directly with each other; all coordination flows through shared state.
-    
+
 * **Declarative intent, imperative execution**  
     Desired state is declared in the filesystem; agents reconcile actual state accordingly.
-    
+
 * **Predictable recovery**  
     Power loss, host failure, or network interruptions converge to a known-safe state.
-    
+
 
 This repository focuses on _design correctness and clarity_, not implementation convenience.
 
@@ -152,14 +151,26 @@ rsync -va /home/deadbeef/github/nixos nixos@192.168.1.150:~/github/
 
 Auto-decrypt LUKS via Tang server - no password at boot.
 
+The Tang endpoint is declared in `hardware/disks/clevis.nix`:
+
+```nix
+local.boot.clevisTangUnlock.tang = {
+  host = "192.168.1.75";
+  port = 7500;
+};
+```
+
 ## Generate JWE on the target machine
 
 ```bash
 ssh nixos@192.168.1.150
 sudo -i
-cd /home/deadbeef/github/nixos/nixos/s-sigma/hardware/disks/ 
+cd /home/deadbeef/github/nixos/nixos/s-sigma/hardware/disks/
 ./clevis-init-jwe.sh # you will be prompted for your luks password
 ```
+
+The helper defaults to `TANG_HOST=192.168.1.75` and `TANG_PORT=7500`. Override
+those environment variables before running it if the Tang endpoint changes.
 
 Output should look like this:
 

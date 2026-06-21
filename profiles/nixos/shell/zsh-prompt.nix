@@ -112,7 +112,50 @@ in
                   typeset __prompt_user_color="blue"
                 fi
 
-                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b:%F{244}${role}%F{${color}}] - %F{244}[%~]%F{${color}} - %F{244}[%D{%a %b %d, %H:%M}]%f
+                __prompt_git_main_state() {
+                  local git_dir branch upstream head upstream_head symbol color label
+                  local -a git_timeout
+
+                  git_timeout=("${pkgs.coreutils}/bin/timeout" "0.3")
+                  git_cmd="${pkgs.git}/bin/git"
+                  git_dir="$("''${git_timeout[@]}" "$git_cmd" rev-parse --git-dir 2>/dev/null)" || return 0
+                  [[ -n "$git_dir" ]] || return 0
+
+                  branch="$("''${git_timeout[@]}" "$git_cmd" symbolic-ref --quiet --short HEAD 2>/dev/null || "''${git_timeout[@]}" "$git_cmd" rev-parse --short HEAD 2>/dev/null)" || branch="detached"
+                  upstream="$("''${git_timeout[@]}" "$git_cmd" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)" || upstream=""
+                  head="$("''${git_timeout[@]}" "$git_cmd" rev-parse --verify HEAD 2>/dev/null)" || return 0
+                  upstream_head="$(
+                    if [[ -n "$upstream" ]]; then
+                      "''${git_timeout[@]}" "$git_cmd" rev-parse --verify "$upstream" 2>/dev/null
+                    fi
+                  )"
+
+                  if [[ -z "$upstream" ]]; then
+                    symbol="✗"
+                    color="red"
+                    label="no-upstream"
+                  elif ! "''${git_timeout[@]}" "$git_cmd" diff --quiet --ignore-submodules -- 2>/dev/null || ! "''${git_timeout[@]}" "$git_cmd" diff --cached --quiet --ignore-submodules -- 2>/dev/null; then
+                    symbol="✗"
+                    color="red"
+                    label="dirty"
+                  elif [[ -z "$upstream_head" || "$head" != "$upstream_head" ]]; then
+                    symbol="✗"
+                    color="red"
+                    label="$upstream"
+                  else
+                    symbol="✓"
+                    color="green"
+                    label=""
+                  fi
+
+                  if [[ -n "$label" ]]; then
+                    printf ' - %%F{244}[%s]%%f %%F{%s}[%s %s]%%f' "$branch" "$color" "$symbol" "$label"
+                  else
+                    printf ' - %%F{244}[%s]%%f %%F{%s}[%s]%%f' "$branch" "$color" "$symbol"
+                  fi
+                }
+
+                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b:%F{244}${role}%F{${color}}] - %F{244}[%~]%F{${color}}$(__prompt_git_main_state) - %F{244}[%D{%a %b %d, %H:%M}]%f
         %F{${color}}└─%f%(?.%F{green}.%F{red})[%#]%f '
                 RPROMPT=""
       '';

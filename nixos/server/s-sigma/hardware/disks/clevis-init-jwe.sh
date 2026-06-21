@@ -6,7 +6,9 @@ set -euo pipefail
 ###############################################################################
 # Configuration
 ###############################################################################
-TANG_URL="http://192.168.1.75:7500"
+TANG_HOST="${TANG_HOST:-192.168.1.75}"
+TANG_PORT="${TANG_PORT:-7500}"
+TANG_URL="${TANG_URL:-http://${TANG_HOST}:${TANG_PORT}}"
 LUKS_DEV="/dev/disk/by-partlabel/disk-root-luks"
 JWE_OUT="/tmp/nvme0n1p1.jwe"
 
@@ -80,4 +82,3 @@ printf '%s' "$CLEVIS_PASS" | \
 
 echo "🎉 SUCCESS: Clevis key added and verified"
 echo "📄 JWE stored at: $JWE_OUT"
-

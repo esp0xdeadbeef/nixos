@@ -228,7 +228,35 @@
         else
           { };
 
-      formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixpkgs-fmt);
+      formatter = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        pkgs.writeShellApplication {
+          name = "fmt-nix-only";
+          runtimeInputs = [ pkgs.nixpkgs-fmt ];
+          text = ''
+            if [ "$#" -eq 0 ]; then
+              exec nixpkgs-fmt .
+            fi
+
+            nix_files=()
+            for path in "$@"; do
+              case "$path" in
+                *.nix) nix_files+=("$path") ;;
+              esac
+            done
+
+            if [ "''${#nix_files[@]}" -eq 0 ]; then
+              echo "No .nix files supplied; skipping formatter." >&2
+              exit 0
+            fi
+
+            exec nixpkgs-fmt "''${nix_files[@]}"
+          '';
+        }
+      );
 
       overlays =
         if builtins.pathExists ./overlays then

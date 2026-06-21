@@ -1,3 +1,6 @@
+let
+  swapSize = "24G";
+in
 {
   disko.devices = {
     disk = {
@@ -22,6 +25,21 @@
                   "fmask=0022"
                   "dmask=0022"
                 ];
+              };
+            };
+            swap = {
+              size = swapSize;
+              content = {
+                type = "luks";
+                name = "cryptswap";
+                settings = {
+                  allowDiscards = true;
+                  keyFile = "/tmp/disk.key";
+                };
+                content = {
+                  type = "swap";
+                  discardPolicy = "both";
+                };
               };
             };
             luks = {

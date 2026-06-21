@@ -4,6 +4,10 @@
 , profiles
 , ...
 }:
+let
+  initrdWifiConfig = /persist/etc/diskunlock/wpa_supplicant.conf;
+  hasInitrdWifiConfig = builtins.pathExists initrdWifiConfig;
+in
 {
   imports = [ profiles.nixos.boot.clevis-tang-unlock ];
 
@@ -76,9 +80,33 @@
         ./root.jwe
       else
         null;
+    tang = {
+      host = "192.168.1.75";
+      port = 7500;
+    };
     network = {
       interface = "wlP6p1s0";
       waitOnlineTimeout = 30;
     };
+    wifi = {
+      enable = hasInitrdWifiConfig;
+      interface = "wlP6p1s0";
+      configFile =
+        if hasInitrdWifiConfig then
+          initrdWifiConfig
+        else
+          null;
+      timeout = 30;
+    };
+    kernelModules = [
+      "ath11k_pci"
+      "ath11k"
+      "mac80211"
+      "cfg80211"
+      "mhi_pci_generic"
+      "mhi"
+      "qrtr_mhi"
+      "qrtr"
+    ];
   };
 }

@@ -15,9 +15,12 @@ in
     profiles.nixos.base.default
     profiles.nixos.laptop.default
 
+    inputs.disko.nixosModules.disko
+
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
+    ./disko.nix
     ./packages/packages.nix
     ./packages/widevine.nix
 

@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 let
   cfg = config.local.boot.clevisTangUnlock;
 
@@ -7,6 +7,9 @@ let
       { Address = cfg.network.address; }
     else
       { DHCP = "yes"; };
+
+  tangUrl = "http://${cfg.tang.host}:${toString cfg.tang.port}";
+  wifiSecretPath = "/run/initrd-wpa_supplicant.conf";
 in
 {
   options.local.boot.clevisTangUnlock = {
@@ -22,6 +25,25 @@ in
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = "Clevis JWE file used to decrypt the generated LUKS key.";
+    };
+
+    tang = {
+      host = lib.mkOption {
+        type = lib.types.str;
+        description = "Tang server host used for this Clevis binding.";
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        description = "Tang server TCP port used for this Clevis binding.";
+      };
+
+      url = lib.mkOption {
+        type = lib.types.str;
+        readOnly = true;
+        default = tangUrl;
+        description = "Rendered Tang URL for documentation and helper scripts.";
+      };
     };
 
     network = {
@@ -41,6 +63,28 @@ in
         type = lib.types.int;
         default = 30;
         description = "Seconds to wait for initrd network before falling back to passphrase unlock.";
+      };
+    };
+
+    wifi = {
+      enable = lib.mkEnableOption "Wi-Fi association before Clevis/Tang unlock in initrd";
+
+      interface = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = cfg.network.interface;
+        description = "Wireless interface to associate in initrd.";
+      };
+
+      configFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = "Host-local wpa_supplicant config copied into initrd secrets.";
+      };
+
+      timeout = lib.mkOption {
+        type = lib.types.int;
+        default = 30;
+        description = "Seconds to wait for wpa_supplicant association in initrd.";
       };
     };
 
@@ -71,6 +115,14 @@ in
         assertion = cfg.secretFile != null;
         message = "local.boot.clevisTangUnlock.secretFile must be set when Clevis/Tang unlock is enabled.";
       }
+      {
+        assertion = !cfg.wifi.enable || cfg.wifi.interface != null;
+        message = "local.boot.clevisTangUnlock.wifi.interface must be set when initrd Wi-Fi unlock is enabled.";
+      }
+      {
+        assertion = !cfg.wifi.enable || cfg.wifi.configFile != null;
+        message = "local.boot.clevisTangUnlock.wifi.configFile must be set when initrd Wi-Fi unlock is enabled.";
+      }
     ];
 
     boot.initrd.systemd.enable = true;
@@ -95,6 +147,53 @@ in
         matchConfig.Name = cfg.network.interface;
         inherit networkConfig;
       };
+    };
+
+    boot.initrd.secrets = lib.mkIf cfg.wifi.enable {
+      ${wifiSecretPath} = cfg.wifi.configFile;
+    };
+
+    boot.initrd.systemd.initrdBin = lib.mkIf cfg.wifi.enable (with pkgs; [
+      coreutils
+      gnugrep
+      iproute2
+      wpa_supplicant
+    ]);
+
+    boot.initrd.systemd.services.initrd-wifi = lib.mkIf cfg.wifi.enable {
+      description = "Associate Wi-Fi for Clevis/Tang unlock";
+      wantedBy = [ "sysinit.target" ];
+      wants = [ "initrd-nixos-copy-secrets.service" ];
+      after = [
+        "initrd-nixos-copy-secrets.service"
+        "systemd-udev-settle.service"
+      ];
+      before = [
+        "systemd-networkd.service"
+        "systemd-networkd-wait-online.service"
+        "cryptsetup-pre.target"
+      ];
+      unitConfig.DefaultDependencies = false;
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        set -euo pipefail
+
+        ip link set '${cfg.wifi.interface}' up
+        wpa_supplicant -B -i '${cfg.wifi.interface}' -c '${wifiSecretPath}'
+
+        for _ in $(seq 1 ${toString cfg.wifi.timeout}); do
+          if wpa_cli -i '${cfg.wifi.interface}' status | grep -q '^wpa_state=COMPLETED$'; then
+            exit 0
+          fi
+          sleep 1
+        done
+
+        wpa_cli -i '${cfg.wifi.interface}' status || true
+        exit 1
+      '';
     };
 
     boot.initrd.systemd.services."cryptsetup-clevis-${cfg.deviceName}" = {

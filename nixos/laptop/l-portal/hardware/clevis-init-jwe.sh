@@ -3,7 +3,9 @@
 
 set -euo pipefail
 
-TANG_URL="http://192.168.1.75:7500"
+TANG_HOST="${TANG_HOST:-192.168.1.75}"
+TANG_PORT="${TANG_PORT:-7500}"
+TANG_URL="${TANG_URL:-http://${TANG_HOST}:${TANG_PORT}}"
 LUKS_DEV="/dev/disk/by-partlabel/disk-nvme0n1-luks"
 JWE_OUT="./root.jwe"
 
