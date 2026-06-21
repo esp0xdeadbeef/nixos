@@ -7,17 +7,6 @@
 , profiles
 , ...
 }:
-let
-  xlayoutdisplayConfig = pkgs.writeText "xlayoutdisplay-l-portal" ''
-    wait=2
-    rate=60
-    dpi=120
-    primary=eDP-1
-    order=DP-2
-    order=DP-1
-    order=eDP-1
-  '';
-in
 {
   imports = [
     # If you want to use modules your own flake exports (from modules/home-manager):
@@ -64,7 +53,6 @@ in
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 
-  home.file.".xlayoutdisplay".source = xlayoutdisplayConfig;
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
   local.desktop.legcord.enable = true;
   local.i3.extraConfig = lib.mkAfter ''

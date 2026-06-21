@@ -1,6 +1,11 @@
 { lib, config, pkgs, ... }:
 let
   cfg = config.local.laptop.xlayoutdisplayHotplug;
+  primaryUser = config.local.users.primary.resolvedName;
+  primaryHome = config.local.users.primary.homeDirectory;
+  xlayoutdisplayConfig = pkgs.writeText "xlayoutdisplay-config" (
+    lib.concatStringsSep "\n" cfg.configLines + "\n"
+  );
 
   applyLayout = pkgs.writeShellScript "xlayoutdisplay-apply" ''
     set -eu
@@ -59,6 +64,66 @@ let
     export DISPLAY="$display"
     export XAUTHORITY="$xauthority"
     export XDG_RUNTIME_DIR="/run/user/$uid"
+
+    runtime_home="$XDG_RUNTIME_DIR/xlayoutdisplay"
+    ${pkgs.coreutils}/bin/mkdir -p "$runtime_home"
+
+    config_file="$home/.xlayoutdisplay"
+    if [ -f "$config_file" ]; then
+      ${pkgs.gnugrep}/bin/grep -v '^dpi=' "$config_file" > "$runtime_home/.xlayoutdisplay" || true
+    else
+      : > "$runtime_home/.xlayoutdisplay"
+    fi
+
+    dpi="$(
+      ${pkgs.xrandr}/bin/xrandr --query \
+        | ${pkgs.gawk}/bin/awk '
+          function consider(line,    mode, parts, width) {
+            if (line !~ / connected/) {
+              return
+            }
+            if (line !~ /[0-9]+x[0-9]+\+/) {
+              return
+            }
+
+            match(line, /[0-9]+x[0-9]+\+/)
+            mode = substr(line, RSTART, RLENGTH - 1)
+            split(mode, parts, "x")
+            width = parts[1] + 0
+
+            if (min_width == "" || width < min_width) {
+              min_width = width
+            }
+          }
+
+          / connected/ {
+            consider($0)
+          }
+
+          END {
+            if (min_width == "") {
+              exit
+            }
+
+            if (min_width <= 1600) {
+              print 96
+            } else if (min_width <= 1920) {
+              print 120
+            } else if (min_width <= 2560) {
+              print 132
+            } else {
+              print 144
+            }
+          }
+        '
+    )"
+
+    if [ -n "$dpi" ]; then
+      ${pkgs.coreutils}/bin/printf 'dpi=%s\n' "$dpi" >> "$runtime_home/.xlayoutdisplay"
+    fi
+
+    export HOME="$runtime_home"
+    export PATH="${lib.makeBinPath [ pkgs.xrandr pkgs.xrdb ]}:$PATH"
 
     exec ${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w ${toString cfg.waitSeconds}
   '';
@@ -119,9 +184,45 @@ in
       example = "2560x1440";
       description = "Maximum external display mode used by host-specific display policy.";
     };
+
+    configLines = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      example = [
+        "wait=2"
+        "rate=60"
+        "primary=eDP-1"
+        "order=eDP-1"
+      ];
+      description = "Lines written to the primary user's .xlayoutdisplay file.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.configLines == [ ] || primaryUser != null && primaryHome != null;
+        message = "local.laptop.xlayoutdisplayHotplug.configLines requires local.users.primary.name to resolve to a user.";
+      }
+    ];
+
+    system.activationScripts.xlayoutdisplayConfig = lib.mkIf (cfg.configLines != [ ]) ''
+      target="${primaryHome}/.xlayoutdisplay"
+      tmp="$(${pkgs.coreutils}/bin/mktemp)"
+
+      ${pkgs.coreutils}/bin/cat ${xlayoutdisplayConfig} > "$tmp"
+      ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$target")"
+
+      if [ -e "$target" ]; then
+        ${pkgs.coreutils}/bin/cat "$tmp" > "$target"
+      else
+        ${pkgs.coreutils}/bin/install -m 0644 "$tmp" "$target"
+      fi
+
+      ${pkgs.coreutils}/bin/chown ${primaryUser}:users "$target"
+      ${pkgs.coreutils}/bin/rm -f "$tmp"
+    '';
+
     systemd.services.xlayoutdisplay-hotplug = {
       description = "Apply xlayoutdisplay after display hotplug";
       wantedBy = [ "graphical.target" ];

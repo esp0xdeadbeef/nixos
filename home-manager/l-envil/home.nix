@@ -19,15 +19,6 @@ let
   stablePkgs = import inputs.nixpkgs-stable {
     config.allowUnfree = true;
   };
-  xlayoutdisplayConfig = pkgs.writeText "xlayoutdisplay-l-envil" ''
-    wait=2
-    rate=60
-    dpi=144
-    primary=eDP-1
-    order=DP-2-1-6
-    order=DP-1
-    order=eDP-1
-  '';
 in
 {
   home.activation.debugArgs = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -94,13 +85,11 @@ in
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
-  home.file.".xlayoutdisplay".source = xlayoutdisplayConfig;
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
   local.desktop.legcord.enable = true;
   local.i3.extraConfig = lib.mkAfter ''
     # l-envil additions
     #bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
-    bindsym $mod+F4 exec ${pkgs.discord}/bin/discord
     bindsym $mod+F2 exec teams
     bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
     bindsym $mod+o exec ${pkgs.remmina}/bin/remmina -c "/home/deadbeef/.local/share/remmina/group_rdp_1-win11-office-libvirt.remmina"

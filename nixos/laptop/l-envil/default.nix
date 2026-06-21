@@ -130,6 +130,14 @@ in
   networking.networkmanager.enable = true;
   hardware.intelgpu.vaapiDriver = "intel-media-driver";
   local.users.primary.name = "deadbeef";
+  local.laptop.xlayoutdisplayHotplug.configLines = [
+    "wait=2"
+    "rate=60"
+    "primary=eDP-1"
+    "order=DP-2-1-6"
+    "order=DP-1"
+    "order=eDP-1"
+  ];
 
   sops.secrets."deadbeef-passwd" = {
     neededForUsers = true; # make it available before the user is created

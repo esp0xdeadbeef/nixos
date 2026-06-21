@@ -1,5 +1,6 @@
 { config
 , lib
+, osConfig ? null
 , pkgs
 , sopsSecrets
 , ...
@@ -7,6 +8,13 @@
 
 let
   cfg = config.local.i3.statusRust;
+  os = if osConfig == null then { } else osConfig;
+  systemPackageNames = map (pkg: pkg.pname or pkg.name or "") (os.environment.systemPackages or [ ]);
+  hasNvidia =
+    lib.elem "nvidia" (os.services.xserver.videoDrivers or [ ])
+    || lib.attrByPath [ "hardware" "nvidia" "prime" "nvidiaBusId" ] "" os != "";
+  hasRocmSmi = lib.any (name: lib.hasInfix "rocm-smi" name) systemPackageNames;
+  hasGpuStatus = hasNvidia || hasRocmSmi;
 in
 {
   options.local.i3.statusRust.enable = lib.mkOption {
@@ -16,7 +24,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.file."/.config/i3status-rust/gpu-load.sh" = {
+    home.file."/.config/i3status-rust/gpu-load.sh" = lib.mkIf hasGpuStatus {
       text = ''
         #!/usr/bin/env bash
 
@@ -34,10 +42,7 @@ in
           GPU_LOAD=$(rocm-smi --showuse | grep "GPU use" | rev | awk '{print $1}')
           GPU_TYPE="amd"
         else
-          STATE="Error"
-          TEXT="No GPU tool available"
-          echo "{\"icon\":\"\",\"state\":\"$STATE\", \"text\": \"$TEXT\"}"
-          exit 1
+          exit 0
         fi
 
         # Determine the state based on GPU load percentage
@@ -61,13 +66,13 @@ in
         TEXT="GPU ($GPU_TYPE): $GPU_LOAD%"
         TEXT="GPU: $GPU_LOAD%"
         # Output the JSON block
-        echo "{\"icon\":\"\",\"state\":\"$STATE\", \"text\": \"$TEXT\"}"
+        printf '{"icon":"","state":"%s","text":"%s"}\n' "$STATE" "$TEXT"
       '';
       executable = true;
     };
 
-    sops.templates.i3status-rust = {
-      content = ''
+    home.file.".config/i3status-rust/config.toml" = {
+      text = ''
         # Config for i3blocks-rs
         icons_format = "{icon}"
 
@@ -134,11 +139,14 @@ in
         warning_cpu = 50
         critical_cpu = 90
 
-        [[block]]
-        block = "custom"
-        command = "~/.config/i3status-rust/gpu-load.sh"
-        interval = 1
-        json = true
+        ${lib.optionalString hasGpuStatus ''
+          [[block]]
+          block = "custom"
+          command = "~/.config/i3status-rust/gpu-load.sh"
+          interval = 1
+          json = true
+          hide_when_empty = true
+        ''}
 
         [[block]]
         block = "battery"
@@ -151,7 +159,6 @@ in
         interval = 1
         format = " $timestamp.datetime(f:'%Y-%m-%d %R:%S') "
       '';
-      path = "${config.home.homeDirectory}/.config/i3status-rust/config.toml";
     };
   };
 }

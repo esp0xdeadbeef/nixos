@@ -11,15 +11,6 @@
 }:
 let
   unstablePkgs = pkgs.unstable;
-  xlayoutdisplayConfig = pkgs.writeText "xlayoutdisplay-l-esp" ''
-    wait=2
-    rate=60
-    dpi=144
-    primary=eDP-1
-    order=DP-1-0.1.6
-    order=HDMI-1-0
-    order=eDP-1
-  '';
 in
 {
   imports = [
@@ -86,16 +77,7 @@ in
     homeDirectory = primaryUserHome;
   };
 
-  local.i3.display.startupCommand = "${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w 2";
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
-
-  home.activation.seedXlayoutdisplayConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    target="$HOME/.xlayoutdisplay"
-
-    if [ ! -e "$target" ]; then
-      install -m 0644 ${xlayoutdisplayConfig} "$target"
-    fi
-  '';
 
   home.packages =
     let

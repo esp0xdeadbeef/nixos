@@ -46,11 +46,9 @@
       # set-option -g history-limit 100000
       set-option -g update-environment "DBUS_SESSION_BUS_ADDRESS DISPLAY SSH_AUTH_SOCK XAUTHORITY"
 
-      bind-key -T copy-mode-vi 'y' send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard > /dev/null'; \
-
       bind-key -T copy-mode-vi 'v' send -X begin-selection     # Begin selection in copy mode.
       bind-key -T copy-mode-vi 'C-v' send -X rectangle-toggle  # Begin selection in copy mode.
-      bind-key -T copy-mode-vi 'y' send -X copy-selection      # Yank selection in copy mode.
+      bind-key -T copy-mode-vi 'y' send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard > /dev/null'
 
 
       # set -g status-right '#[fg=black,bg=color15] #{cpu_percentage}  %H:%M '

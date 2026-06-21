@@ -119,6 +119,14 @@
   networking.networkmanager.enable = true;
   services.autorandr.enable = lib.mkForce false;
   local.laptop.autorandrDefault.enable = false;
+  local.laptop.xlayoutdisplayHotplug.configLines = [
+    "wait=2"
+    "rate=60"
+    "primary=eDP-1"
+    "order=DP-1-0.1.6"
+    "order=HDMI-1-0"
+    "order=eDP-1"
+  ];
   local.workstation.android.enable = true;
   environment.etc.hosts.enable = false;
   local.users.primary.name = "deadbeef";
