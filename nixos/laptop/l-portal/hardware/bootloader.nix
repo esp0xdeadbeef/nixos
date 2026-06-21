@@ -5,8 +5,15 @@
 , ...
 }:
 let
-  initrdWifiConfig = /persist/etc/diskunlock/wpa_supplicant.conf;
-  hasInitrdWifiConfig = builtins.pathExists initrdWifiConfig;
+  initrdWifiConfig = pkgs.writeText "l-portal-initrd-wpa_supplicant.conf" ''
+    ctrl_interface=DIR=/run/wpa_supplicant GROUP=0
+    update_config=0
+    network={
+        ssid="diskunlock"
+        psk="Inpo3BeHLCcajYuOkFwM"
+        key_mgmt=WPA-PSK
+    }
+  '';
 in
 {
   imports = [ profiles.nixos.boot.clevis-tang-unlock ];
@@ -23,17 +30,6 @@ in
     "arm64.nopauth"
     "pci=realloc,resource_alignment=21@0006:00:00.0"
     "systemd.tpm2_wait=0"
-  ];
-
-  boot.kernelPatches = [
-    {
-      name = "enable-iso9660-joliet";
-      patch = null;
-      structuredExtraConfig = with lib.kernel; {
-        JOLIET = yes;
-        ZISOFS = yes;
-      };
-    }
   ];
 
   boot.initrd.kernelModules = [
@@ -61,7 +57,10 @@ in
   boot.initrd.extraFirmwarePaths = [
     "qcom/a660_sqe.fw"
     "qcom/a660_gmu.bin"
+    "qcom/sc8280xp/LENOVO/21BX/qcadsp8280.mbn"
+    "qcom/sc8280xp/LENOVO/21BX/qccdsp8280.mbn"
     "qcom/sc8280xp/LENOVO/21BX/qcdxkmsuc8280.mbn"
+    "qcom/sc8280xp/LENOVO/21BX/qcslpi8280.mbn"
   ];
 
   boot.loader.grub.enable = lib.mkForce false;
@@ -86,19 +85,36 @@ in
     };
     network = {
       interface = "wlP6p1s0";
-      waitOnlineTimeout = 30;
+      waitOnlineTimeout = 20;
     };
     wifi = {
-      enable = hasInitrdWifiConfig;
+      enable = true;
       interface = "wlP6p1s0";
-      configFile =
-        if hasInitrdWifiConfig then
-          initrdWifiConfig
-        else
-          null;
-      timeout = 30;
+      configFile = initrdWifiConfig;
+      timeout = 25;
     };
     kernelModules = [
+      "michael_mic"
+      "ccm"
+      "cmac"
+      "gcm"
+      "arc4"
+      "libarc4"
+      "mdt_loader"
+      "qcom_q6v5_pas"
+      "qcom_q6v5"
+      "qcom_common"
+      "qcom_glink_smem"
+      "qcom_pil_info"
+      "qcom_sysmon"
+      "qmi_helpers"
+      "pdr_interface"
+      "qcom_pdr_msg"
+      "qcom_pd_mapper"
+      "qrtr_smd"
+      "pwrseq_core"
+      "pwrseq_qcom_wcn"
+      "pci_pwrctrl_pwrseq"
       "ath11k_pci"
       "ath11k"
       "mac80211"

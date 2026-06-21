@@ -132,7 +132,10 @@ in
     boot.kernelParams = lib.mkBefore [ "systemd.tpm2_wait=0" ];
     systemd.tpm2.enable = false;
 
-    boot.initrd.luks.devices.${cfg.deviceName}.allowDiscards = lib.mkDefault true;
+    boot.initrd.luks.devices.${cfg.deviceName} = {
+      allowDiscards = lib.mkDefault true;
+      keyFile = lib.mkDefault "/clevis-${cfg.deviceName}/decrypted";
+    };
 
     boot.initrd.clevis.enable = true;
     boot.initrd.clevis.useTang = true;
@@ -156,7 +159,11 @@ in
     boot.initrd.systemd.initrdBin = lib.mkIf cfg.wifi.enable (with pkgs; [
       coreutils
       gnugrep
+      gnused
+      iw
       iproute2
+      kmod
+      util-linux
       wpa_supplicant
     ]);
 
@@ -175,24 +182,71 @@ in
       ];
       unitConfig.DefaultDependencies = false;
       serviceConfig = {
-        Type = "oneshot";
+        Type = "forking";
+        PIDFile = "/run/initrd-wpa_supplicant.pid";
         RemainAfterExit = true;
       };
       script = ''
         set -euo pipefail
 
-        ip link set '${cfg.wifi.interface}' up
-        wpa_supplicant -B -i '${cfg.wifi.interface}' -c '${wifiSecretPath}'
+        dump_debug() {
+          echo "--- initrd wifi debug: links ---" >&2
+          ip link show >&2 || true
+          echo "--- initrd wifi debug: addresses ---" >&2
+          ip addr show >&2 || true
+          echo "--- initrd wifi debug: modules ---" >&2
+          lsmod >&2 || true
+          echo "--- initrd wifi debug: rfkill/iw ---" >&2
+          iw dev >&2 || true
+          echo "--- initrd wifi debug: remoteproc ---" >&2
+          for state in /sys/class/remoteproc/remoteproc*/state; do
+            [ -e "$state" ] || continue
+            echo "$state=$(cat "$state")" >&2
+          done
+          echo "--- initrd wifi debug: wpa control dir ---" >&2
+          ls -la /run /run/wpa_supplicant >&2 || true
+          echo "--- initrd wifi debug: wpa log ---" >&2
+          sed -n '1,240p' /run/initrd-wpa_supplicant.log >&2 || true
+          echo "--- initrd wifi debug: dmesg ---" >&2
+          dmesg | grep -Ei 'ath11k|mhi|wlan|wlP|wifi|firmware|remoteproc|qcom|qrtr|pwrseq|wpa|cfg80211|mac80211' >&2 || true
+        }
 
+        echo "initrd-wifi: loading configured modules" >&2
+        for module in ${lib.escapeShellArgs cfg.kernelModules}; do
+          if modprobe "$module"; then
+            echo "initrd-wifi: loaded module $module" >&2
+          else
+            echo "initrd-wifi: module $module failed or is unavailable" >&2
+          fi
+        done
+
+        echo "initrd-wifi: waiting for interface '${cfg.wifi.interface}'" >&2
+        found_interface=0
         for _ in $(seq 1 ${toString cfg.wifi.timeout}); do
-          if wpa_cli -i '${cfg.wifi.interface}' status | grep -q '^wpa_state=COMPLETED$'; then
-            exit 0
+          if [ -e '/sys/class/net/${cfg.wifi.interface}' ]; then
+            found_interface=1
+            break
           fi
           sleep 1
         done
+        if [ "$found_interface" != 1 ]; then
+          echo "Timed out waiting for Wi-Fi interface '${cfg.wifi.interface}'" >&2
+          dump_debug
+          exit 1
+        fi
 
-        wpa_cli -i '${cfg.wifi.interface}' status || true
-        exit 1
+        echo "initrd-wifi: interface '${cfg.wifi.interface}' appeared" >&2
+        mkdir -p /run/wpa_supplicant
+        chmod 700 /run/wpa_supplicant
+        ip link set '${cfg.wifi.interface}' up
+
+        echo "initrd-wifi: starting wpa_supplicant for '${cfg.wifi.interface}'" >&2
+        wpa_supplicant -B -d \
+          -P /run/initrd-wpa_supplicant.pid \
+          -f /run/initrd-wpa_supplicant.log \
+          -i '${cfg.wifi.interface}' \
+          -c '${wifiSecretPath}' \
+          -C /run/wpa_supplicant
       '';
     };
 

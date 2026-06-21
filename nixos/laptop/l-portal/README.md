@@ -136,14 +136,21 @@ sudo mkdir -p /mnt/src/nixos /mnt/root-cache /mnt/tmp /mnt/persist/etc/ssh /mnt/
 sudo chown -R ubuntu:ubuntu /mnt/src
 ```
 
-Bootstrap the persisted sops key before installation. The current
-`l-portal-default.yaml` can be decrypted with the `deadbeef` age key, so copy
-that key into root's persisted sops location:
+Bootstrap the persisted root SSH key before installation and derive the sops age
+identity from it. Add the printed age recipient to `.sops.yaml`, then run
+`sops updatekeys -y secrets/l-portal-default.yaml` before installing:
 
 ```bash
 sudo install -d -m 0700 /mnt/persist/root/.ssh /mnt/persist/root/.config/sops/age
-sudo install -m 0600 /path/to/deadbeef/id_ed25519 /mnt/persist/root/.ssh/id_ed25519
-sudo install -m 0600 /path/to/deadbeef/keys.txt /mnt/persist/root/.config/sops/age/keys.txt
+sudo ssh-keygen -t ed25519 -N "" -f /mnt/persist/root/.ssh/id_ed25519 -q
+sudo nix --extra-experimental-features 'nix-command flakes' \
+  --accept-flake-config \
+  shell nixpkgs#ssh-to-age -c ssh-to-age -private-key \
+  -i /mnt/persist/root/.ssh/id_ed25519 \
+  -o /mnt/persist/root/.config/sops/age/keys.txt
+sudo chmod 0600 /mnt/persist/root/.ssh/id_ed25519 /mnt/persist/root/.config/sops/age/keys.txt
+sudo /mnt/nix/var/nix/profiles/system/sw/bin/age-keygen \
+  -y /mnt/persist/root/.config/sops/age/keys.txt
 ```
 
 The Ubuntu live overlay is too small for the full desktop closure. Put the repo,
@@ -167,10 +174,12 @@ Build and install on the X13s:
 cd /mnt/src/nixos
 sudo env XDG_CACHE_HOME=/mnt/root-cache TMPDIR=/mnt/tmp \
   nix --extra-experimental-features 'nix-command flakes' \
+  --accept-flake-config \
   build --impure .#nixosConfigurations.l-portal.config.system.build.toplevel
 
 sudo env XDG_CACHE_HOME=/mnt/root-cache TMPDIR=/mnt/tmp \
   nix --extra-experimental-features 'nix-command flakes' \
+  --accept-flake-config \
   run github:NixOS/nixpkgs/nixos-26.05#nixos-install -- \
   --impure --no-root-passwd --flake path:/mnt/src/nixos#l-portal
 ```

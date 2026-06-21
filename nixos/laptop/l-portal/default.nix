@@ -109,6 +109,10 @@ in
   security.rtkit.enable = true;
   hardware.enableRedistributableFirmware = true;
 
+  specialisation.manual-unlock.configuration = {
+    local.boot.clevisTangUnlock.enable = lib.mkForce false;
+  };
+
   users.mutableUsers = false;
 
   users.users = {

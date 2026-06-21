@@ -4,20 +4,12 @@
 , ...
 }:
 {
-  boot.initrd.luks.devices = {
+  boot.initrd.luks.devices = lib.mkForce {
     root = {
-      keyFile = lib.mkForce null;
-    };
-    cryptswap = {
-      keyFile = lib.mkForce null;
+      device = "/dev/disk/by-partlabel/disk-nvme0n1-luks";
+      allowDiscards = true;
     };
   };
-
-  swapDevices = [
-    {
-      device = "/dev/mapper/cryptswap";
-    }
-  ];
 
   networking.useDHCP = lib.mkDefault true;
 
