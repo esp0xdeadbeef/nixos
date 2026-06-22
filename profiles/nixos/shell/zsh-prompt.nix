@@ -105,9 +105,9 @@ in
                 fi
 
                 if [[ -n "$SSH_CONNECTION" ]]; then
-                  typeset __prompt_host="ssh:${hostName}"
+                  typeset __prompt_host_prefix="%F{244}ssh:%F{${color}}"
                 else
-                  typeset __prompt_host="${hostName}"
+                  typeset __prompt_host_prefix=""
                 fi
 
                 if [[ "$USER" == "root" ]]; then
@@ -161,7 +161,7 @@ in
                   fi
                 }
 
-                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b%F{${color}}:%F{244}${role}%F{${color}}]%F{244} - %F{${color}}[%F{244}%~%F{${color}}]$(__prompt_git_main_state)%F{244} - %F{${color}}[%F{244}%D{%Y-%m-%d %H:%M}%F{${color}}]%f
+                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{244}@$__prompt_host_prefix${hostName}%b%F{${color}}:%F{244}${role}%F{${color}}]%F{244} - %F{${color}}[%F{244}%~%F{${color}}]$(__prompt_git_main_state)%F{244} - %F{${color}}[%F{244}%D{%Y-%m-%d %H:%M}%F{${color}}]%f
         %F{${color}}└─[%(?.%F{green}.%F{red})%#%F{${color}}]%f '
                 RPROMPT=""
       '';
