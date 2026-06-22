@@ -5,6 +5,7 @@
   home.packages = with pkgs; [
     # sway itself:
     sway
+    autotiling
     # lock screen
     swaylock
     # ??
@@ -14,11 +15,14 @@
     wofi
     # Notification daemon for Wayland
     mako
+    networkmanagerapplet
+    polkit_gnome
     # simular to xclip 
     wl-clipboard
     # brightness
     brightnessctl
     # audio
+    pamixer
     pavucontrol
     # screenshot tooling:
     grim

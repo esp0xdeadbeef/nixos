@@ -10,7 +10,10 @@ let
   thunar = pkgs.thunar or pkgs.xfce.thunar;
   modifier = config.local.i3.modifier;
   statusCommand = config.local.i3.statusCommand;
-  extraConfig = config.local.i3.extraConfig;
+  extraConfig = ''
+    ${config.local.i3.extraConfig}
+    ${config.local.tilingManagerSettings.extraConfig}
+  '';
   displayStartupCommand = config.local.i3.display.startupCommand;
   spotifyEnabled = config.local.i3.spotify.enable;
   spotifyCommand = config.local.i3.spotify.command;

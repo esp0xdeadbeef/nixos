@@ -86,8 +86,9 @@ in
     homeDirectory = "/home/deadbeef";
   };
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
+  local.sway.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
   local.desktop.legcord.enable = true;
-  local.i3.extraConfig = lib.mkAfter ''
+  local.tilingManagerSettings.extraConfig = lib.mkAfter ''
     # l-envil additions
     #bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
     bindsym $mod+F2 exec teams
@@ -102,7 +103,7 @@ in
       for_window [class="teams-for-linux"] move window to workspace 5
     ''}
     ${lib.optionalString config.local.work.microsoft.enable ''
-      exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux
+      exec ${pkgs.teams-for-linux}/bin/teams-for-linux
     ''}
   '';
 

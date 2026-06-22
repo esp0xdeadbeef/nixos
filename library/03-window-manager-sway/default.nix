@@ -8,8 +8,8 @@
     wdisplays
   ];
   # programs.sway.enable = true;
-  # services.displayManager.defaultSession =  "sway";
-  # services.xserver.displayManager.gdm.enable = true;
+  services.displayManager.defaultSession = "sway";
+  services.displayManager.gdm.enable = true;
   # services.displayManager.sddm.enable = true;
   programs.xwayland.enable = true;
   # Enable the gnome-keyring secrets vault.
@@ -20,12 +20,6 @@
     enable = true;
     wrapperFeatures.gtk = true;
   };
-
-  environment.loginShellInit = ''
-    if [ -z "''${DISPLAY:-}" ] && [ -z "''${WAYLAND_DISPLAY:-}" ] && [ "$(tty)" = "/dev/tty1" ]; then
-      exec sway
-    fi
-  '';
 
   fonts = {
     packages = with pkgs; [

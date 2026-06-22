@@ -19,44 +19,54 @@ let
       "${pkgs.spotify}/bin/spotify"
     else
       "${pkgs.alacritty}/bin/alacritty --title spotify-player -e ${spotifyPlayerPersistent}/bin/spotify-player-persistent";
-in
-
-{
-  options.local.i3 = {
+  windowManagerOptions = name: statusBar: {
     modifier = lib.mkOption {
       type = lib.types.str;
       default = "Mod4";
-      description = "i3 modifier key.";
+      description = "${name} modifier key.";
     };
 
     statusCommand = lib.mkOption {
       type = lib.types.str;
       default = "${pkgs.i3status}/bin/i3status";
-      description = "Command used by i3bar for status output.";
+      description = "Command used by ${statusBar} for status output.";
     };
 
     extraConfig = lib.mkOption {
       type = lib.types.lines;
       default = "";
-      description = "Additional lines appended to the generated i3 config.";
+      description = "Additional lines appended to the generated ${name} config.";
     };
 
     display.startupCommand = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Display layout command to run when i3 starts.";
+      description = "Display layout command to run when ${name} starts.";
     };
 
     spotify.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enable Spotify i3 bindings and autostart.";
+      description = "Enable Spotify ${name} bindings and autostart.";
     };
 
     spotify.command = lib.mkOption {
       type = lib.types.str;
       default = spotifyCommand;
-      description = "Command launched by the i3 Spotify binding and autostart.";
+      description = "Command launched by the ${name} Spotify binding and autostart.";
     };
+  };
+in
+
+{
+  options.local = {
+    tilingManagerSettings.extraConfig = lib.mkOption {
+      type = lib.types.lines;
+      default = "";
+      description = "Additional config appended to all generated tiling window-manager configs.";
+    };
+
+    i3 = windowManagerOptions "i3" "i3bar";
+    sway = windowManagerOptions "Sway" "swaybar";
   };
 }
