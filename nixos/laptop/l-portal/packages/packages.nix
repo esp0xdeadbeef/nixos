@@ -85,7 +85,6 @@
     kubectl
     docker
     kind
-    brave
     python3.pkgs.evdev
     python3.pkgs.pygraphviz
     podman-compose

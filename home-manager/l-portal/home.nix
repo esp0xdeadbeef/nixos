@@ -53,6 +53,17 @@
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 
+  xdg.mimeApps = {
+    enable = true;
+    defaultApplications = {
+      "text/html" = [ "chromium-browser.desktop" ];
+      "application/pdf" = [ "okularApplication_pdf.desktop" ];
+      "x-scheme-handler/http" = [ "chromium-browser.desktop" ];
+      "x-scheme-handler/https" = [ "chromium-browser.desktop" ];
+      "x-scheme-handler/about" = [ "chromium-browser.desktop" ];
+    };
+  };
+
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
   local.desktop.legcord.enable = true;
   local.i3.extraConfig = lib.mkAfter ''

@@ -58,6 +58,7 @@
     laptop = {
       autorandr-default = import ./nixos/laptop/autorandr-default.nix;
       default = import ./nixos/laptop;
+      desktop-apps = import ./nixos/laptop/desktop-apps.nix;
       dock = import ./nixos/laptop/dock.nix;
       power = import ./nixos/laptop/power.nix;
       xlayoutdisplay-hotplug = import ./nixos/laptop/xlayoutdisplay-hotplug.nix;
