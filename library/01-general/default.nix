@@ -48,6 +48,7 @@
     ./packages/virtualization/packages.nix
     ./packages/window-managers/X-org/i3-wm/packages.nix
     ./packages/window-managers/X-org/packages.nix
+    ./security
     ./secrets/import-secrets.nix
     ./system/autoupdate.nix
     ./system/locale.nix
