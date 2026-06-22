@@ -71,7 +71,7 @@ in
 
             # xss-lock grabs a logind suspend inhibit lock and will use i3lock to lock the
             # screen before suspend. Use loginctl lock-session to lock your screen.
-            exec --no-startup-id ${pkgs.xset}/bin/xset s off
+            exec --no-startup-id ${pkgs.xset}/bin/xset s off -dpms
             exec --no-startup-id ${pkgs.xss-lock}/bin/xss-lock --transfer-sleep-lock -- ${pkgs.i3lock}/bin/i3lock -n -c 202020
 
             # NetworkManager is the most popular way to manage wireless networks on Linux,
