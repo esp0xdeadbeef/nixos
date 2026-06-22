@@ -2412,3 +2412,39 @@ new generation: /nix/store/qy8g5lx3s6f93asczhkzjwf188xld80l-nixos-system-l-porta
 ```
 
 A reboot is required before the new module blacklists can be verified.
+
+### l-portal: stop-state / cleanup
+
+After repeated cold hibernate restore tests, the normal profile was restored to
+a non-debug baseline:
+
+- Default boot uses the normal X13s kernel parameters only.
+- Debug kernel logging, softlockup panic/reboot, power-key-ignore handling, and
+  hibernate isolation module blacklists live only in the `debug` specialisation.
+- The `manual-unlock` specialisation remains the Clevis-off boot path.
+- `system.autoUpgrade` is enabled again in the normal profile.
+- `systemd-hibernate.service` is intentionally blocked in the normal profile.
+
+The one expected NixOS warning is:
+
+```text
+l-portal: systemctl hibernate is intentionally blocked because X13s cold hibernate restore currently crashes after image restore; use documented debug sysfs tests only.
+```
+
+Runtime verification after the cleanup switch:
+
+```text
+systemd-hibernate.service override:
+ExecStart=
+ExecStart=/nix/store/...-l-portal-block-hibernate
+
+sudo systemctl start systemd-hibernate.service
+rc=1
+ERROR: hibernate is disabled on l-portal.
+Reason: X13s cold hibernate restore currently crashes after the image is restored.
+See: nixos/laptop/l-portal/hibernate-analyse.md
+```
+
+The running kernel can still show old debug parameters until the next reboot if
+the machine was booted through the debug entry. That does not mean the default
+boot entry still contains them.
