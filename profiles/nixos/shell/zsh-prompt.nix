@@ -155,14 +155,14 @@ in
                   fi
 
                   if [[ -n "$label" ]]; then
-                    printf ' - %%F{244}[%s]%%f %%F{%s}[%s %s]%%f' "$branch" "$color" "$symbol" "$label"
+                    printf ' %%F{244}- %%F{${color}}[%%F{244}%s%%F{${color}}] [%%F{%s}%s%%F{244} %s%%F{${color}}]%%f' "$branch" "$color" "$symbol" "$label"
                   else
-                    printf ' - %%F{244}[%s]%%f %%F{%s}[%s]%%f' "$branch" "$color" "$symbol"
+                    printf ' %%F{244}- %%F{${color}}[%%F{244}%s%%F{${color}}] [%%F{%s}%s%%F{${color}}]%%f' "$branch" "$color" "$symbol"
                   fi
                 }
 
-                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b:%F{244}${role}%F{${color}}] - %F{244}[%~]%F{${color}}$(__prompt_git_main_state) - %F{244}[%D{%a %b %d, %H:%M}]%f
-        %F{${color}}└─%f%(?.%F{green}.%F{red})[%#]%f '
+                PROMPT='%F{${color}}┌─[%B%F{$__prompt_user_color}%n%F{${color}}@$__prompt_host%b%F{${color}}:%F{244}${role}%F{${color}}]%F{244} - %F{${color}}[%F{244}%~%F{${color}}]$(__prompt_git_main_state)%F{244} - %F{${color}}[%F{244}%D{%Y-%m-%d %H:%M}%F{${color}}]%f
+        %F{${color}}└─[%(?.%F{green}.%F{red})%#%F{${color}}]%f '
                 RPROMPT=""
       '';
     };
