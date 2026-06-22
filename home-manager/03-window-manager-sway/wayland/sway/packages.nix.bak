@@ -9,14 +9,11 @@
     swaylock
     # ??
     swayidle
-    # bar
-    waybar
-
-    # rofi but then wayland:
-    rofi-wayland
+    # rofi includes Wayland support on current nixpkgs:
+    rofi
     wofi
     # Notification daemon for Wayland
-    mako 
+    mako
     # simular to xclip 
     wl-clipboard
     # brightness

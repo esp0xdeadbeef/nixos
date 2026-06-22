@@ -20,6 +20,13 @@
     enable = true;
     wrapperFeatures.gtk = true;
   };
+
+  environment.loginShellInit = ''
+    if [ -z "''${DISPLAY:-}" ] && [ -z "''${WAYLAND_DISPLAY:-}" ] && [ "$(tty)" = "/dev/tty1" ]; then
+      exec sway
+    fi
+  '';
+
   fonts = {
     packages = with pkgs; [
       noto-fonts
@@ -27,8 +34,7 @@
       noto-fonts-color-emoji
       font-awesome
       source-han-sans
-      source-han-sans-japanese
-      source-han-serif-japanese
+      source-han-serif
     ];
     fontconfig.defaultFonts = {
       serif = [

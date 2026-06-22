@@ -1,38 +1,127 @@
 { config, pkgs, ... }:
 
+let
+  modifier = config.local.i3.modifier;
+  statusCommand = config.local.i3.statusCommand;
+in
 {
   # Sway Configuration
   home.file.".config/sway/config".text = ''
-    set $mod Mod4
-    exec waybar
+    set $mod ${modifier}
+
+    font pango:monospace 10
+    floating_modifier $mod
+    focus_follows_mouse no
+    gaps inner 2
+    gaps outer 2
+    smart_gaps on
+
     exec mako
-    exec swayidle -w timeout 300 'swaylock -f' timeout 600 'systemctl suspend'
+    exec swayidle -w timeout 300 'swaylock -f -c 202020' timeout 600 'systemctl suspend'
 
-    # Basic keybindings
     bindsym $mod+Return exec alacritty
-    bindsym $mod+d exec rofi -show drun
-    bindsym $mod+Shift+q kill
-    bindsym $mod+Shift+e exec "swaymsg exit"
+    bindsym $mod+q kill
+    bindsym $mod+d exec rofi -modi drun,run -show drun
+    bindsym $mod+Shift+d exec rofi -show window
 
-    # Workspaces
-    set $workspace1 "1: "
-    set $workspace2 "2: "
-    set $workspace3 "3: "
-    bindsym $mod+1 workspace $workspace1
-    bindsym $mod+2 workspace $workspace2
-    bindsym $mod+3 workspace $workspace3
+    bindsym $mod+j focus left
+    bindsym $mod+k focus down
+    bindsym $mod+l focus up
+    bindsym $mod+semicolon focus right
+    bindsym $mod+Left focus left
+    bindsym $mod+Down focus down
+    bindsym $mod+Up focus up
+    bindsym $mod+Right focus right
 
-    # Floating mode
+    bindsym $mod+Shift+j move left
+    bindsym $mod+Shift+k move down
+    bindsym $mod+Shift+l move up
+    bindsym $mod+Shift+semicolon move right
+    bindsym $mod+Shift+Left move left
+    bindsym $mod+Shift+Down move down
+    bindsym $mod+Shift+Up move up
+    bindsym $mod+Shift+Right move right
+
+    bindsym $mod+h split h
+    bindsym $mod+v split v
+    bindsym $mod+f fullscreen toggle
+    bindsym $mod+s layout stacking
+    bindsym $mod+w layout tabbed
+    bindsym $mod+e layout toggle split
+
     bindsym $mod+Shift+space floating toggle
-  '';
+    bindsym $mod+space focus mode_toggle
+    bindsym $mod+a focus parent
 
-  # Waybar Configuration
-  home.file.".config/waybar/config".text = ''
-    {
-      "layer": "top",
-      "modules-left": ["sway/workspaces", "sway/mode"],
-      "modules-center": ["clock"],
-      "modules-right": ["battery", "network", "pulseaudio"]
+    set $ws1 "1"
+    set $ws2 "2"
+    set $ws3 "3"
+    set $ws4 "4"
+    set $ws5 "5"
+    set $ws6 "6"
+    set $ws7 "7"
+    set $ws8 "8"
+    set $ws9 "9"
+    set $ws10 "10"
+
+    bindsym $mod+1 workspace number $ws1
+    bindsym $mod+2 workspace number $ws2
+    bindsym $mod+3 workspace number $ws3
+    bindsym $mod+4 workspace number $ws4
+    bindsym $mod+5 workspace number $ws5
+    bindsym $mod+6 workspace number $ws6
+    bindsym $mod+7 workspace number $ws7
+    bindsym $mod+8 workspace number $ws8
+    bindsym $mod+9 workspace number $ws9
+    bindsym $mod+0 workspace number $ws10
+
+    bindsym $mod+Shift+1 move container to workspace number $ws1
+    bindsym $mod+Shift+2 move container to workspace number $ws2
+    bindsym $mod+Shift+3 move container to workspace number $ws3
+    bindsym $mod+Shift+4 move container to workspace number $ws4
+    bindsym $mod+Shift+5 move container to workspace number $ws5
+    bindsym $mod+Shift+6 move container to workspace number $ws6
+    bindsym $mod+Shift+7 move container to workspace number $ws7
+    bindsym $mod+Shift+8 move container to workspace number $ws8
+    bindsym $mod+Shift+9 move container to workspace number $ws9
+    bindsym $mod+Shift+0 move container to workspace number $ws10
+
+    bindsym $mod+Shift+c reload
+    bindsym $mod+Shift+r reload
+    bindsym $mod+Shift+e exec "swaymsg exit"
+    bindsym $mod+Escape exec swaylock -f -c 202020
+    bindsym $mod+comma move workspace to output left
+    bindsym $mod+period move workspace to output right
+
+    mode "resize" {
+      bindsym j resize shrink width 10 px
+      bindsym k resize grow height 10 px
+      bindsym l resize shrink height 10 px
+      bindsym semicolon resize grow width 10 px
+      bindsym Left resize shrink width 10 px
+      bindsym Down resize grow height 10 px
+      bindsym Up resize shrink height 10 px
+      bindsym Right resize grow width 10 px
+      bindsym Return mode "default"
+      bindsym Escape mode "default"
+      bindsym $mod+r mode "default"
+    }
+    bindsym $mod+t mode "resize"
+
+    bar {
+      status_command ${statusCommand}
+      position bottom
+      modifier $mod
+      workspace_min_width 40
+      colors {
+        separator #282a36
+        background #282a3670
+        statusline #f8f8f2
+        focused_workspace #50fa7b70 #50fa7b #282a36
+        active_workspace #8be9fd70 #8be9fd #282a36
+        inactive_workspace #282a3670 #282a3670 #f8f8f2
+        urgent_workspace #2f343a70 #ff555570 #282a36
+      }
     }
   '';
 }
