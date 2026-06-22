@@ -164,6 +164,10 @@ let
     ++ lib.optionals (hasPackage [ "spotify" ]) [
       ".config/spotify"
     ]
+    ++ lib.optionals (hasPackage [ "spotify-player" ]) [
+      ".config/spotify-player"
+      ".cache/spotify-player"
+    ]
     ++ lib.optionals (hasPackage [ "teams-for-linux" ]) [
       ".config/teams-for-linux"
     ]
@@ -509,9 +513,6 @@ in
           ".zsh_history"
           ".zshrc"
           ".aliases"
-        ]
-        ++ lib.optionals (hasPackage [ "spotify-player" ]) [
-          ".cache/spotify-player/credentials.json"
         ]
         ++ cfg.extraUserFiles;
       };
