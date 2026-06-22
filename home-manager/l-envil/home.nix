@@ -38,7 +38,7 @@ in
 
     # You can also split up your configuration and import pieces of it here:
     profiles.home-manager.desktop.legcord
-    profiles.home-manager.desktop-i3
+    profiles.home-manager.desktop-sway
     ./rclone-wrapper/rclone.nix
     ./remmina/config.nix
     ./work-microsoft.nix

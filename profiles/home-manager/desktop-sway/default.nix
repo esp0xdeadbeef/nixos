@@ -1,0 +1,12 @@
+{ outPath, ... }:
+{
+  imports = [
+    "${outPath}/profiles/home-manager/desktop/window-manager.nix"
+    "${outPath}/home-manager/01-general/darkmode/config.nix"
+    "${outPath}/home-manager/01-general/editors/vscode.nix"
+    "${outPath}/home-manager/01-general/pdf-reader/packages.nix"
+    "${outPath}/home-manager/01-general/virt-manager-config/default.nix"
+    "${outPath}/home-manager/03-window-manager-sway/wayland/sway/packages.nix.bak"
+    "${outPath}/home-manager/03-window-manager-sway/wayland/sway/configs.nix.bak"
+  ];
+}

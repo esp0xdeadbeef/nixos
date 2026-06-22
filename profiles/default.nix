@@ -80,5 +80,6 @@
       legcord = import ./home-manager/desktop/legcord.nix;
     };
     desktop-i3 = import ./home-manager/desktop-i3;
+    desktop-sway = import ./home-manager/desktop-sway;
   };
 }
