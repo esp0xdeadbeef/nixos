@@ -78,7 +78,33 @@ let
     dpi="$(
       ${pkgs.xrandr}/bin/xrandr --query \
         | ${pkgs.gawk}/bin/awk '
-          function consider(line,    mode, parts, width) {
+          function bucket(pixel_width, physical_dpi) {
+            if (connected_count == 1 && physical_dpi > 0) {
+              if (physical_dpi >= 240) {
+                return 192
+              } else if (physical_dpi >= 180) {
+                return 168
+              } else if (physical_dpi >= 150) {
+                return 144
+              } else if (physical_dpi >= 120) {
+                return 120
+              }
+
+              return 96
+            }
+
+            if (pixel_width <= 1600) {
+              return 96
+            } else if (pixel_width <= 1920) {
+              return 120
+            } else if (pixel_width <= 2560) {
+              return 132
+            }
+
+            return 144
+          }
+
+          function consider(line,    mode, mode_parts, width, mm, mm_parts, mm_width, physical_dpi) {
             if (line !~ / connected/) {
               return
             }
@@ -86,13 +112,29 @@ let
               return
             }
 
+            connected_count += 1
+
             match(line, /[0-9]+x[0-9]+\+/)
             mode = substr(line, RSTART, RLENGTH - 1)
-            split(mode, parts, "x")
-            width = parts[1] + 0
+            split(mode, mode_parts, "x")
+            width = mode_parts[1] + 0
 
             if (min_width == "" || width < min_width) {
               min_width = width
+            }
+
+            if (line ~ /[0-9]+mm x [0-9]+mm/) {
+              match(line, /[0-9]+mm x [0-9]+mm/)
+              mm = substr(line, RSTART, RLENGTH)
+              gsub(/mm/, "", mm)
+              split(mm, mm_parts, " x ")
+              mm_width = mm_parts[1] + 0
+              if (mm_width > 0) {
+                physical_dpi = width * 25.4 / mm_width
+                if (max_physical_dpi == "" || physical_dpi > max_physical_dpi) {
+                  max_physical_dpi = physical_dpi
+                }
+              }
             }
           }
 
@@ -105,15 +147,7 @@ let
               exit
             }
 
-            if (min_width <= 1600) {
-              print 96
-            } else if (min_width <= 1920) {
-              print 120
-            } else if (min_width <= 2560) {
-              print 132
-            } else {
-              print 144
-            }
+            print bucket(min_width, max_physical_dpi)
           }
         '
     )"
