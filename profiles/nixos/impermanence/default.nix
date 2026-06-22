@@ -1,7 +1,8 @@
-{ config
-, lib
-, pkgs
-, ...
+{
+  config,
+  lib,
+  pkgs,
+  ...
 }:
 
 let
@@ -70,6 +71,12 @@ let
 
   hasPackage = packageNames: lib.any (name: lib.elem name installedPackageNames) packageNames;
 
+  normalUserNames = lib.filter (
+    name: name != "root" && (config.users.users.${name}.isNormalUser or false)
+  ) (lib.attrNames config.users.users);
+
+  userGroup = user: config.users.users.${user}.group or "users";
+
   hasLlmAgent = hasPackage [
     "claude-code"
     "claw-code"
@@ -132,20 +139,20 @@ let
       ".pki/nssdb"
     ]
     ++
-    lib.optionals
-      (hasPackage [
-        "dropbox"
-        "maestral"
-        "maestral-gui"
-        "maestral-qt"
-      ])
-      [
-        ".config/dropbox"
-        ".config/maestral"
-        ".local/share/maestral"
-        ".dropbox"
-        ".dropbox-dist"
-      ]
+      lib.optionals
+        (hasPackage [
+          "dropbox"
+          "maestral"
+          "maestral-gui"
+          "maestral-qt"
+        ])
+        [
+          ".config/dropbox"
+          ".config/maestral"
+          ".local/share/maestral"
+          ".dropbox"
+          ".dropbox-dist"
+        ]
     ++ lib.optionals (hasPackage [ "obsidian" ]) [
       ".config/obsidian"
     ]
@@ -166,20 +173,19 @@ let
     ]
     ++ lib.optionals (hasPackage [ "spotify-player" ]) [
       ".config/spotify-player"
-      ".cache/spotify-player"
     ]
     ++ lib.optionals (hasPackage [ "teams-for-linux" ]) [
       ".config/teams-for-linux"
     ]
     ++
-    lib.optionals
-      (hasPackage [
-        "zoom-us"
-        "zoom"
-      ])
-      [
-        ".config/zoom"
-      ]
+      lib.optionals
+        (hasPackage [
+          "zoom-us"
+          "zoom"
+        ])
+        [
+          ".config/zoom"
+        ]
     ++ lib.optionals (hasPackage [ "lmstudio" ]) [
       ".lmstudio"
     ]
@@ -187,16 +193,16 @@ let
       ".mitmproxy"
     ]
     ++
-    lib.optionals
-      (hasPackage [
-        "firefox"
-        "librewolf"
-        "zen"
-        "zen-browser"
-      ])
-      [
-        ".mozilla"
-      ]
+      lib.optionals
+        (hasPackage [
+          "firefox"
+          "librewolf"
+          "zen"
+          "zen-browser"
+        ])
+        [
+          ".mozilla"
+        ]
     ++ lib.optionals (hasPackage [ "quickemu" ]) [
       ".quickget"
     ];
@@ -267,18 +273,96 @@ let
     ++ desktopAppDirs
   );
 
-  noCowUserTmpfiles = lib.concatMap
-    (
-      dir:
+  spotifyPlayerFiles = lib.optionals (hasPackage [ "spotify-player" ]) [
+    ".cache/spotify-player/credentials.json"
+    ".cache/spotify-player/user_client_token.json"
+  ];
+
+  spotifyPlayerTmpfiles = lib.optionals (hasPackage [ "spotify-player" ]) (
+    lib.concatMap (
+      user:
       let
-        path = "${cfg.persistPath}/home/${cfg.primaryUser}/${dir}";
+        group = userGroup user;
       in
       [
-        "d ${path} 0700 ${cfg.primaryUser} users -"
+        "d /home/${user}/.cache/spotify-player 0700 ${user} ${group} -"
+        "d ${cfg.persistPath}/home/${user}/.cache/spotify-player 0700 ${user} ${group} -"
+      ]
+    ) normalUserNames
+  );
+
+  sharedUserDirectories = [
+    "github"
+    "vms"
+    "vms/isos"
+    "vms/disks"
+    "vms/nvrams"
+    ".local/share/lxc"
+    ".local/share/containers"
+    ".local/share/nvim"
+    ".local/share/direnv"
+    ".config/gh"
+    ".config/libvirt/qemu"
+    ".config/nix"
+    ".config/sops"
+    ".cache/nix-index"
+  ]
+  ++ lib.optionals isWorkstationHost workstationUserDirs
+  ++ desktopAppDirs
+  ++ lib.optionals hasLlmAgent llmAgentDirs
+  ++ lib.optionals hasDiscordClient discordClientDirs
+  ++ secureUserDirs
+  ++ cfg.extraUserDirectories;
+
+  sharedUserFiles = [
+    ".local/state/wireplumber/default-nodes"
+    ".screenrc"
+    ".ZAP/config.xml"
+    ".zsh_history"
+    ".zshrc"
+    ".aliases"
+  ]
+  ++ spotifyPlayerFiles
+  ++ cfg.extraUserFiles;
+
+  sharedUserPersistence = lib.genAttrs normalUserNames (_user: {
+    directories = sharedUserDirectories;
+    files = sharedUserFiles;
+  });
+
+  sharedUserTmpfiles = lib.concatMap (
+    user:
+    let
+      group = userGroup user;
+    in
+    [
+      "d /home/${user}/.cache 0755 ${user} ${group} -"
+      "d ${cfg.persistPath}/home/${user}/.cache 0755 ${user} ${group} -"
+      "d /home/${user}/.cache/nix-index 0755 ${user} ${group} -"
+      "d ${cfg.persistPath}/home/${user}/.cache/nix-index 0755 ${user} ${group} -"
+      "d ${cfg.persistPath}/home/${user}/vms/disks 0755 ${user} ${group} -"
+      "h ${cfg.persistPath}/home/${user}/vms/disks - - - - +C"
+      "d ${cfg.persistPath}/home/${user}/.local/share/lxc 0755 ${user} ${group} -"
+      "h ${cfg.persistPath}/home/${user}/.local/share/lxc - - - - +C"
+      "d ${cfg.persistPath}/home/${user}/.local/share/containers 0700 ${user} ${group} -"
+      "h ${cfg.persistPath}/home/${user}/.local/share/containers - - - - +C"
+    ]
+  ) normalUserNames;
+
+  noCowUserTmpfiles = lib.concatMap (
+    user:
+    lib.concatMap (
+      dir:
+      let
+        path = "${cfg.persistPath}/home/${user}/${dir}";
+        group = userGroup user;
+      in
+      [
+        "d ${path} 0700 ${user} ${group} -"
         "h ${path} - - - - +C"
       ]
-    )
-    noCowUserDirs;
+    ) noCowUserDirs
+  ) normalUserNames;
 in
 {
   options.local.impermanence = {
@@ -442,17 +526,9 @@ in
       "d /mnt/current_pentest 0755 root root -"
       "d ${cfg.persistPath}/var/lib/libvirt/images 0711 root root -"
       "h ${cfg.persistPath}/var/lib/libvirt/images - - - - +C"
-      "d ${cfg.persistPath}/home/${cfg.primaryUser}/vms/disks 0755 ${cfg.primaryUser} users -"
-      "h ${cfg.persistPath}/home/${cfg.primaryUser}/vms/disks - - - - +C"
-      "d /home/${cfg.primaryUser}/.cache 0755 ${cfg.primaryUser} users -"
-      "d ${cfg.persistPath}/home/${cfg.primaryUser}/.cache 0755 ${cfg.primaryUser} users -"
-      "d /home/${cfg.primaryUser}/.cache/nix-index 0755 ${cfg.primaryUser} users -"
-      "d ${cfg.persistPath}/home/${cfg.primaryUser}/.cache/nix-index 0755 ${cfg.primaryUser} users -"
-      "d ${cfg.persistPath}/home/${cfg.primaryUser}/.local/share/lxc 0755 ${cfg.primaryUser} users -"
-      "h ${cfg.persistPath}/home/${cfg.primaryUser}/.local/share/lxc - - - - +C"
-      "d ${cfg.persistPath}/home/${cfg.primaryUser}/.local/share/containers 0700 ${cfg.primaryUser} users -"
-      "h ${cfg.persistPath}/home/${cfg.primaryUser}/.local/share/containers - - - - +C"
     ]
+    ++ sharedUserTmpfiles
+    ++ spotifyPlayerTmpfiles
     ++ noCowUserTmpfiles
     ++ cfg.extraTmpfiles;
 
@@ -482,40 +558,7 @@ in
       ]
       ++ cfg.extraSystemFiles;
 
-      users.${cfg.primaryUser} = {
-        directories = [
-          "github"
-          "vms"
-          "vms/isos"
-          "vms/disks"
-          "vms/nvrams"
-          ".local/share/lxc"
-          ".local/share/containers"
-          ".local/share/nvim"
-          ".local/share/direnv"
-          ".config/gh"
-          ".config/libvirt/qemu"
-          ".config/nix"
-          ".config/sops"
-          ".cache/nix-index"
-        ]
-        ++ lib.optionals isWorkstationHost workstationUserDirs
-        ++ desktopAppDirs
-        ++ lib.optionals hasLlmAgent llmAgentDirs
-        ++ lib.optionals hasDiscordClient discordClientDirs
-        ++ secureUserDirs
-        ++ cfg.extraUserDirectories;
-
-        files = [
-          ".local/state/wireplumber/default-nodes"
-          ".screenrc"
-          ".ZAP/config.xml"
-          ".zsh_history"
-          ".zshrc"
-          ".aliases"
-        ]
-        ++ cfg.extraUserFiles;
-      };
+      users = sharedUserPersistence;
     };
   };
 }

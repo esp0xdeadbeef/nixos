@@ -2,11 +2,23 @@
 
 let
   spotifyAvailable = lib.meta.availableOn pkgs.stdenv.hostPlatform pkgs.spotify;
+  spotifyPlayerPersistent = pkgs.writeShellScriptBin "spotify-player-persistent" ''
+    set -eu
+
+    persist_home="/persist$HOME"
+    config_args=()
+
+    if [ -d "$persist_home/.config/spotify-player" ]; then
+      config_args=(--config-folder "$persist_home/.config/spotify-player")
+    fi
+
+    exec ${pkgs.spotify-player}/bin/spotify_player "''${config_args[@]}" "$@"
+  '';
   spotifyCommand =
     if spotifyAvailable then
       "${pkgs.spotify}/bin/spotify"
     else
-      "${pkgs.alacritty}/bin/alacritty --title spotify-player -e ${pkgs.spotify-player}/bin/spotify_player";
+      "${pkgs.alacritty}/bin/alacritty --title spotify-player -e ${spotifyPlayerPersistent}/bin/spotify-player-persistent";
 in
 
 {
