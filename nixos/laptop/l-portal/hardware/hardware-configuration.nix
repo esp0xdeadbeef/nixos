@@ -10,7 +10,6 @@
     after = [ "systemd-cryptsetup@root.service" ];
     before = [
       "systemd-cryptsetup@cryptswap.service"
-      "systemd-hibernate-resume.service"
     ];
     unitConfig.DefaultDependencies = false;
     serviceConfig.Type = "oneshot";
@@ -31,6 +30,12 @@
       device = "/dev/disk/by-partlabel/disk-nvme0n1-swap";
       allowDiscards = true;
       keyFile = "/run/cryptswap.key";
+      crypttabExtraOpts = [
+        "nofail"
+        "tries=1"
+        "timeout=5s"
+        "x-systemd.device-timeout=5s"
+      ];
     };
   };
 

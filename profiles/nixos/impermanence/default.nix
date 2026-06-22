@@ -465,6 +465,7 @@ in
         "/var/lib/nixos"
         "/var/lib/sbctl"
         "/var/lib/systemd/coredump"
+        "/var/lib/systemd/timers"
         "/etc/NetworkManager/system-connections"
         "/var/lib/libvirt"
         (colordDir cfg.colordMode)
