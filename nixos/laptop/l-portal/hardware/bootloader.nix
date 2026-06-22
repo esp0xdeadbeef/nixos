@@ -119,7 +119,6 @@ in
       "ath11k"
       "mac80211"
       "cfg80211"
-      "mhi_pci_generic"
       "mhi"
       "qrtr_mhi"
       "qrtr"

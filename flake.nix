@@ -86,12 +86,8 @@
       # inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # X13s-only hardware module from:
-    # https://github.com/NixOS/nixos-hardware/pull/1751
-    #
-    # This avoids dragging every other host onto the unmerged PR branch.
     nixos-hardware-x13s = {
-      url = "github:BrainWart/nixos-hardware/x13s-updates";
+      url = "github:NixOS/nixos-hardware";
       # inputs.nixpkgs.follows = "nixpkgs";
     };
 

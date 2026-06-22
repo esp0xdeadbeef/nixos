@@ -26,6 +26,28 @@ The repo config currently references these fixed device paths.
 The swap is a real partition, not a swapfile. That keeps btrfs scrub simple and
 avoids having scrub jobs special-case `/persist/var/lib/swapfile`.
 
+The swap partition is persistent LUKS, not random encrypted swap. Hibernate
+requires the resume image to survive reboot, so `randomEncryption = true` is not
+compatible with this host. The initrd opens `root` first, either through the
+default Clevis/Tang boot entry or through the `manual-unlock` boot entry. After
+`/persist` is available from the unlocked root filesystem, initrd opens
+`cryptswap` with a staged copy of `/persist/etc/diskunlock/cryptswap.key` and
+uses it as the resume device. The staging is required because hibernate resume
+must run before the normal `/sysroot/persist` mount exists.
+
+Expected runtime state:
+
+```bash
+cat /proc/cmdline | grep -o 'resume=[^ ]*'
+# resume=/dev/mapper/cryptswap
+
+lsblk -o NAME,TYPE,FSTYPE,LABEL,PARTLABEL,UUID /dev/nvme0n1
+# nvme0n1p2 should be crypto_LUKS, opened as cryptswap
+
+swapon --show
+# /dev/mapper/cryptswap should be active
+```
+
 ## Initrd Wi-Fi Unlock
 
 `l-portal` can unlock root through Clevis/Tang during initrd. The Tang server is
@@ -106,6 +128,121 @@ rm -f /tmp/disk.key
 
 Use the manual path below if the live environment cannot run SSH reliably or if
 you want to do the format and install steps by hand.
+
+## Swap Keyfile
+
+`cryptswap` is unlocked with a keyfile stored inside the encrypted root
+filesystem. Create it after installation or after reformatting the swap
+partition:
+
+```bash
+sudo install -d -m 0700 /persist/etc/diskunlock
+sudo dd if=/dev/urandom of=/persist/etc/diskunlock/cryptswap.key bs=64 count=1
+sudo chmod 0400 /persist/etc/diskunlock/cryptswap.key
+
+printf '<current-swap-luks-passphrase>' | sudo cryptsetup luksAddKey \
+  /dev/disk/by-partlabel/disk-nvme0n1-swap \
+  /persist/etc/diskunlock/cryptswap.key \
+  --key-file -
+
+sudo cryptsetup open --test-passphrase \
+  /dev/disk/by-partlabel/disk-nvme0n1-swap \
+  --key-file /persist/etc/diskunlock/cryptswap.key
+```
+
+This keyfile is encrypted at rest because it lives inside the root LUKS
+container. It does not involve Clevis/Tang; Clevis only affects how `root` is
+opened in the default boot entry. During initrd, a small service mounts the
+persist subvolume read-only, copies the key to `/run/cryptswap.key`, unmounts
+the subvolume, and only then lets `cryptswap` start.
+
+## Rotate LUKS Passphrase
+
+The install examples use a temporary LUKS passphrase via `/tmp/disk.key`. Do not
+leave production machines on that password.
+
+Root and swap do not need to share the same human passphrase. Rotate the root
+passphrase and Clevis binding for root separately from the swap keyfile. Keep a
+manual fallback passphrase on `cryptswap` only if you want to be able to recover
+the swap container without the persisted keyfile.
+
+From the running system:
+
+```bash
+old='<old-luks-passphrase>'
+new='<new-luks-passphrase>'
+
+printf '%s' "$new" > /tmp/new-luks.key
+chmod 600 /tmp/new-luks.key
+
+printf '%s' "$old" | sudo cryptsetup luksAddKey \
+  /dev/disk/by-partlabel/disk-nvme0n1-luks \
+  /tmp/new-luks.key \
+  --key-file -
+```
+
+Verify root unlocks with the new passphrase:
+
+```bash
+printf '%s' "$new" | sudo cryptsetup open --test-passphrase \
+  /dev/disk/by-partlabel/disk-nvme0n1-luks \
+  --key-file -
+```
+
+Refresh the Clevis binding so initrd receives the new unlock secret:
+
+```bash
+cd /home/deadbeef/github/nixos/nixos/laptop/l-portal/hardware
+TANG_HOST=192.168.1.75 TANG_PORT=7500 sudo ./clevis-init-jwe.sh
+```
+
+Rebuild after committing or syncing the updated `root.jwe`:
+
+```bash
+cd /home/deadbeef/github/nixos
+sudo nixos-rebuild switch --flake .#l-portal
+```
+
+Only after a successful reboot and hibernate test, remove the old passphrase from
+the root LUKS header. Check keyslots first:
+
+```bash
+sudo cryptsetup luksDump /dev/disk/by-partlabel/disk-nvme0n1-luks
+```
+
+Then remove the old root passphrase:
+
+```bash
+printf '%s' "$old" | sudo cryptsetup luksRemoveKey \
+  /dev/disk/by-partlabel/disk-nvme0n1-luks \
+  --key-file -
+```
+
+To rotate the swap keyfile, add a new keyfile first, verify it, then remove the
+old keyfile from the swap LUKS header:
+
+```bash
+sudo dd if=/dev/urandom of=/persist/etc/diskunlock/cryptswap.key.new bs=64 count=1
+sudo chmod 0400 /persist/etc/diskunlock/cryptswap.key.new
+
+sudo cryptsetup luksAddKey \
+  /dev/disk/by-partlabel/disk-nvme0n1-swap \
+  /persist/etc/diskunlock/cryptswap.key.new \
+  --key-file /persist/etc/diskunlock/cryptswap.key
+
+sudo cryptsetup open --test-passphrase \
+  /dev/disk/by-partlabel/disk-nvme0n1-swap \
+  --key-file /persist/etc/diskunlock/cryptswap.key.new
+
+sudo cryptsetup luksRemoveKey \
+  /dev/disk/by-partlabel/disk-nvme0n1-swap \
+  --key-file /persist/etc/diskunlock/cryptswap.key
+
+sudo mv /persist/etc/diskunlock/cryptswap.key.new \
+  /persist/etc/diskunlock/cryptswap.key
+
+rm -f /tmp/new-luks.key
+```
 
 ## Install From Ubuntu Live ARM USB
 

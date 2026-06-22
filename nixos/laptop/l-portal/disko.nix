@@ -30,13 +30,17 @@ in
             swap = {
               size = swapSize;
               content = {
-                type = "swap";
-                randomEncryption = true;
-                discardPolicy = "both";
-                mountOptions = [
-                  "nofail"
-                  "x-systemd.device-timeout=10s"
-                ];
+                type = "luks";
+                name = "cryptswap";
+                settings = {
+                  allowDiscards = true;
+                  keyFile = "/tmp/disk.key";
+                };
+                content = {
+                  type = "swap";
+                  discardPolicy = "both";
+                  resumeDevice = true;
+                };
               };
             };
             luks = {
