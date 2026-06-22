@@ -111,6 +111,42 @@ let
     "webcord"
   ];
 
+  hasBurp = hasPackage [
+    "burpsuite"
+    "burp"
+  ];
+
+  hasZap = hasPackage [
+    "zap"
+    "zaproxy"
+  ];
+
+  hasContinue = hasPackage [
+    "vscode-extension-Continue-continue"
+    "vscode-extension-continue-continue"
+    "continue"
+  ];
+
+  hasVirtualMachines =
+    (config.virtualisation.libvirtd.enable or false)
+    || hasPackage [
+      "virt-manager"
+      "quickemu"
+    ];
+
+  hasLxc =
+    (config.virtualisation.lxc.enable or false)
+    || (config.virtualisation.incus.enable or false)
+    || hasPackage [
+      "lxc"
+      "incus"
+    ];
+
+  hasContainerState =
+    hasLxc
+    || (config.virtualisation.podman.enable or false)
+    || (config.virtualisation.docker.enable or false);
+
   desktopAppDirs =
     lib.optionals
       (hasPackage [
@@ -250,6 +286,10 @@ let
     ".local/share/Discord"
   ];
 
+  containerStateDirs = lib.optionals hasContainerState [
+    ".local/share/containers"
+  ];
+
   workstationUserDirs = [
     "pentest"
     "firefox-pentest-profile"
@@ -257,19 +297,26 @@ let
     "Music"
     "Pictures"
     "Videos"
-    ".BurpSuite"
-    ".java/.userPrefs/burp"
     ".local/share/PrismLauncher"
     ".config/autorandr"
     ".config/kdeconnect"
     ".config/rclone"
+  ]
+  ++ lib.optionals hasContinue [
     ".continue"
+  ]
+  ++ lib.optionals hasBurp [
+    ".BurpSuite"
+    ".java/.userPrefs/burp"
+  ]
+  ++ lib.optionals hasZap [
     ".ZAP/plugin"
   ];
 
   noCowUserDirs = lib.unique (
     (lib.optionals hasLlmAgent llmAgentDirs)
     ++ (lib.optionals hasDiscordClient discordClientDirs)
+    ++ containerStateDirs
     ++ desktopAppDirs
   );
 
@@ -293,20 +340,24 @@ let
 
   sharedUserDirectories = [
     "github"
-    "vms"
-    "vms/isos"
-    "vms/disks"
-    "vms/nvrams"
-    ".local/share/lxc"
-    ".local/share/containers"
     ".local/share/nvim"
     ".local/share/direnv"
     ".config/gh"
-    ".config/libvirt/qemu"
     ".config/nix"
     ".config/sops"
     ".cache/nix-index"
   ]
+  ++ lib.optionals hasVirtualMachines [
+    "vms"
+    "vms/isos"
+    "vms/disks"
+    "vms/nvrams"
+    ".config/libvirt/qemu"
+  ]
+  ++ lib.optionals hasLxc [
+    ".local/share/lxc"
+  ]
+  ++ containerStateDirs
   ++ lib.optionals isWorkstationHost workstationUserDirs
   ++ desktopAppDirs
   ++ lib.optionals hasLlmAgent llmAgentDirs
@@ -317,10 +368,12 @@ let
   sharedUserFiles = [
     ".local/state/wireplumber/default-nodes"
     ".screenrc"
-    ".ZAP/config.xml"
     ".zsh_history"
     ".zshrc"
     ".aliases"
+  ]
+  ++ lib.optionals hasZap [
+    ".ZAP/config.xml"
   ]
   ++ spotifyPlayerFiles
   ++ cfg.extraUserFiles;
@@ -340,12 +393,14 @@ let
       "d ${cfg.persistPath}/home/${user}/.cache 0755 ${user} ${group} -"
       "d /home/${user}/.cache/nix-index 0755 ${user} ${group} -"
       "d ${cfg.persistPath}/home/${user}/.cache/nix-index 0755 ${user} ${group} -"
+    ]
+    ++ lib.optionals hasVirtualMachines [
       "d ${cfg.persistPath}/home/${user}/vms/disks 0755 ${user} ${group} -"
       "h ${cfg.persistPath}/home/${user}/vms/disks - - - - +C"
+    ]
+    ++ lib.optionals hasLxc [
       "d ${cfg.persistPath}/home/${user}/.local/share/lxc 0755 ${user} ${group} -"
       "h ${cfg.persistPath}/home/${user}/.local/share/lxc - - - - +C"
-      "d ${cfg.persistPath}/home/${user}/.local/share/containers 0700 ${user} ${group} -"
-      "h ${cfg.persistPath}/home/${user}/.local/share/containers - - - - +C"
     ]
   ) normalUserNames;
 
@@ -390,12 +445,6 @@ in
       type = lib.types.bool;
       default = true;
       description = "Rotate the ephemeral btrfs /root subvolume during initrd.";
-    };
-
-    persistSshHostKeys = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Store OpenSSH host keys under the persistent root.";
     };
 
     colordMode = lib.mkOption {
@@ -503,18 +552,6 @@ in
         umount /btrfs_tmp
       '';
     };
-
-    services.openssh.hostKeys = lib.mkIf cfg.persistSshHostKeys [
-      {
-        type = "ed25519";
-        path = "${cfg.persistPath}/etc/ssh/ssh_host_ed25519_key";
-      }
-      {
-        type = "rsa";
-        bits = 4096;
-        path = "${cfg.persistPath}/etc/ssh/ssh_host_rsa_key";
-      }
-    ];
 
     programs.fuse.userAllowOther = true;
     environment.systemPackages = with pkgs; [ btrfs-progs ];

@@ -2,6 +2,7 @@
 {
   imports = [
     "${outPath}/profiles/home-manager/desktop/window-manager.nix"
+    "${outPath}/profiles/home-manager/desktop/pentest-windows.nix"
     "${outPath}/home-manager/01-general/darkmode/config.nix"
     "${outPath}/home-manager/01-general/editors/vscode.nix"
     "${outPath}/home-manager/01-general/pdf-reader/packages.nix"

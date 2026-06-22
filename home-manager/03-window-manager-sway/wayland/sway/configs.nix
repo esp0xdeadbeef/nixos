@@ -3,6 +3,18 @@
 let
   modifier = config.local.sway.modifier;
   statusCommand = config.local.sway.statusCommand;
+  editScreenshot = pkgs.writeShellScriptBin "sway-edit-screenshot" ''
+    set -eu
+
+    dir="$HOME/Pictures/Screenshots"
+    mkdir -p "$dir"
+    file="$dir/screenshot-$(${pkgs.coreutils}/bin/date +%Y%m%d-%H%M%S).png"
+
+    ${pkgs.sway-contrib.grimshot}/bin/grimshot save anything - \
+      | ${pkgs.swappy}/bin/swappy -f - -o "$file"
+
+    ${pkgs.wl-clipboard}/bin/wl-copy < "$file"
+  '';
   extraConfig = ''
     ${config.local.sway.extraConfig}
     ${config.local.tilingManagerSettings.extraConfig}
@@ -24,8 +36,10 @@ in
     rofi
     slurp
     sway
+    sway-contrib.grimshot
     swayidle
     swaylock
+    swappy
     wl-clipboard
     wofi
   ];
@@ -120,6 +134,7 @@ in
     bindsym $mod+Shift+r reload
     bindsym $mod+Shift+e exec ${pkgs.sway}/bin/swaymsg exit
     bindsym $mod+Escape exec ${pkgs.swaylock}/bin/swaylock -f -c 202020
+    bindsym $mod+Print+Shift exec ${editScreenshot}/bin/sway-edit-screenshot
     bindsym $mod+comma move workspace to output left
     bindsym $mod+period move workspace to output right
     bindsym $mod+bracketright exec ${pkgs.pamixer}/bin/pamixer --increase 10

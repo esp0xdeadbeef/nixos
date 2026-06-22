@@ -66,15 +66,6 @@
 
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
   local.desktop.legcord.enable = true;
-  local.i3.extraConfig = lib.mkAfter ''
-    # l-portal additions
-    bindsym $mod+F2 exec teams
-    bindsym $mod+Print+Shift exec "sway-screenshot -m window -- mirage"
-
-    for_window [class="Slack"] move window to workspace 5
-    for_window [class="burp-StartBurp" title="^Burp Suite Professional$"] move container to workspace 10
-    for_window [class="burp-StartBurp" title="Automatic project backup"] move container to workspace 10
-  '';
 
   home.packages = with pkgs; [
     htop
