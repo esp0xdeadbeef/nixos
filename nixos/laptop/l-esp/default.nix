@@ -124,6 +124,7 @@
     "rate=60"
     "primary=eDP-1"
     "order=DP-1-0.1.6"
+    "order=DP-1-1"
     "order=HDMI-1-0"
     "order=eDP-1"
   ];
