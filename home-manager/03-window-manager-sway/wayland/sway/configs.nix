@@ -11,6 +11,25 @@ let
   spotifyCommand = config.local.sway.spotify.command;
 in
 {
+  home.packages = with pkgs; [
+    alacritty
+    autotiling
+    brightnessctl
+    grim
+    mako
+    networkmanagerapplet
+    pamixer
+    pavucontrol
+    polkit_gnome
+    rofi
+    slurp
+    sway
+    swayidle
+    swaylock
+    wl-clipboard
+    wofi
+  ];
+
   # Sway Configuration
   home.file.".config/sway/config".text = ''
     set $mod ${modifier}
@@ -22,17 +41,17 @@ in
     gaps outer 2
     smart_gaps on
 
-    exec mako
-    exec swayidle -w before-sleep 'swaylock -f -c 202020'
+    exec ${pkgs.mako}/bin/mako
+    exec ${pkgs.swayidle}/bin/swayidle -w before-sleep '${pkgs.swaylock}/bin/swaylock -f -c 202020'
     exec ${pkgs.networkmanagerapplet}/bin/nm-applet --indicator
     exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'
     exec_always ${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -f "[.]autotiling-wrapped" || true; exec ${pkgs.autotiling}/bin/autotiling --splitratio 1.61'
     ${lib.optionalString spotifyEnabled "exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify >/dev/null || ${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify_player >/dev/null || exec ${spotifyCommand}'"}
 
-    bindsym $mod+Return exec alacritty
+    bindsym $mod+Return exec ${pkgs.alacritty}/bin/alacritty
     bindsym $mod+q kill
-    bindsym $mod+d exec rofi -modi drun,run -show drun
-    bindsym $mod+Shift+d exec rofi -show window
+    bindsym $mod+d exec ${pkgs.rofi}/bin/rofi -modi drun\,run -show drun
+    bindsym $mod+Shift+d exec ${pkgs.rofi}/bin/rofi -show window
     ${lib.optionalString spotifyEnabled "bindsym $mod+F3 exec ${spotifyCommand}"}
 
     bindsym $mod+j focus left
@@ -99,8 +118,8 @@ in
 
     bindsym $mod+Shift+c reload
     bindsym $mod+Shift+r reload
-    bindsym $mod+Shift+e exec "swaymsg exit"
-    bindsym $mod+Escape exec swaylock -f -c 202020
+    bindsym $mod+Shift+e exec ${pkgs.sway}/bin/swaymsg exit
+    bindsym $mod+Escape exec ${pkgs.swaylock}/bin/swaylock -f -c 202020
     bindsym $mod+comma move workspace to output left
     bindsym $mod+period move workspace to output right
     bindsym $mod+bracketright exec ${pkgs.pamixer}/bin/pamixer --increase 10
@@ -110,7 +129,6 @@ in
     for_window [class="Chromium" title=".*"] move container to workspace 2
     for_window [class="Spotify"] move to workspace 4
     for_window [title="spotify-player"] move to workspace 4
-    for_window [class="discord"] move to workspace 5
     for_window [class="X2GoAgent"] move window to workspace 7
     for_window [class="Navigator" class="firefox"] move window to workspace 8
     for_window [class="Firefox"] move window to workspace 8

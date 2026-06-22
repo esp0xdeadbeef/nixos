@@ -78,14 +78,11 @@
 
   home.packages = with pkgs; [
     htop
-    xdotool
     azure-cli
-    i3status-rust
     # discord
     obsidian
     # google-chrome
     flameshot
-    rofi
     remmina
     spotify-player
     home-manager

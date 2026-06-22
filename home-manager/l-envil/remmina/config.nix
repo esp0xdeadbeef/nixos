@@ -6,6 +6,8 @@
 }:
 
 {
+  home.packages = [ pkgs.remmina ];
+
   sops = {
     secrets.remminaPentestIP = { };
     secrets.remminaOfficeIP = { };

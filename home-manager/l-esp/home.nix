@@ -78,16 +78,12 @@ in
   };
 
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
-
   home.packages =
     let
       stable = with pkgs; [
-        xdotool
-        i3status-rust
         obsidian
         google-chrome
         flameshot
-        rofi
         remmina
         distrobox
         xlayoutdisplay
