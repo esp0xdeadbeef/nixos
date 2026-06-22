@@ -81,7 +81,7 @@ let
           function bucket(pixel_width, physical_dpi) {
             if (connected_count == 1 && physical_dpi > 0) {
               if (physical_dpi >= 240) {
-                return 192
+                return 216
               } else if (physical_dpi >= 180) {
                 return 168
               } else if (physical_dpi >= 150) {
