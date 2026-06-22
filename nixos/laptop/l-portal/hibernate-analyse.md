@@ -2448,3 +2448,140 @@ See: nixos/laptop/l-portal/hibernate-analyse.md
 The running kernel can still show old debug parameters until the next reboot if
 the machine was booted through the debug entry. That does not mean the default
 boot entry still contains them.
+
+### l-portal: long `pm_test` delay runtime test
+
+Question tested: maybe the failure is timing/race related and only appears if
+the hibernate test phase stays frozen longer than the default 5 seconds.
+
+Runtime-only change:
+
+```text
+echo 60 > /sys/module/hibernate/parameters/pm_test_delay
+```
+
+The value was restored to `5` after each test. No NixOS config change was made.
+
+`devices` test:
+
+```text
+marker=pmtest-devices-delay60-20260622-203210
+echo devices > /sys/power/pm_test
+echo shutdown > /sys/power/disk
+echo disk > /sys/power/state
+result: rc=0, same boot id, pm_test reset to none
+```
+
+Important kernel lines:
+
+```text
+PM: hibernation: hibernation debug: Waiting for 60 second(s).
+mhi-pci-generic 0004:01:00.0: device recovery started
+mhi mhi1_*: PM: parent mhi1 should not be sleeping
+WARNING: CPU ... drivers/clk/qcom/clk-branch.c:87 clk_branch_toggle
+cci_resume_runtime ... [i2c_qcom_cci]
+Failed to enable clk 'camnoc_axi': -16
+mhi-pci-generic 0004:01:00.0: failed to suspend device: -16
+PM: hibernation: hibernation exit
+```
+
+`platform` test:
+
+```text
+marker=pmtest-platform-delay60-20260622-203345
+echo platform > /sys/power/pm_test
+echo shutdown > /sys/power/disk
+echo disk > /sys/power/state
+result: rc=0, same boot id, pm_test reset to none
+```
+
+Important kernel lines:
+
+```text
+PM: hibernation: hibernation debug: Waiting for 60 second(s).
+mhi mhi0: Requested to power ON
+mhi mhi0: Power on setup success
+mhi mhi0: Wait for device to enter SBL or Mission mode
+ath11k_pci 0006:01:00.0: chip_id ...
+ath11k_pci 0006:01:00.0: fw_version ... 2024-04-17 ...
+mhi-pci-generic 0004:01:00.0: device recovery started
+mhi mhi1_*: PM: parent mhi1 should not be sleeping
+mhi-pci-generic 0004:01:00.0: failed to suspend device: -16
+PM: hibernation: hibernation exit
+```
+
+Conclusion:
+
+- Long `pm_test` does not reproduce the black-screen cold restore failure by
+  itself.
+- It does reproduce suspicious resume/suspend activity in the same families as
+  the real failure: MHI/ath11k/QMI and Qualcomm camera/CCI/clock handling.
+- The remaining differentiator is still the real cold hibernate restore path,
+  where the kernel image is restored after firmware/hardware changed state.
+
+### l-portal: long `pm_test` with Wi-Fi/ath11k unloaded
+
+The user suggested making the test closer to a real cold restore by keeping the
+test phase near the real boot/restore duration and removing Wi-Fi/ath11k from
+the equation. The dock ethernet path was available at `192.168.1.146`, so the
+test could keep observability while internal Wi-Fi was disabled.
+
+Runtime-only setup:
+
+```text
+nmcli radio wifi off
+nmcli device disconnect wlP6p1s0
+ip link set wlP6p1s0 down
+modprobe -r ath11k_pci ath11k
+echo 180 > /sys/module/hibernate/parameters/pm_test_delay
+echo platform > /sys/power/pm_test
+echo shutdown > /sys/power/disk
+echo disk > /sys/power/state
+```
+
+Marker:
+
+```text
+pmtest-platform-delay180-no-wifi-20260622-211106
+```
+
+Result:
+
+```text
+rc=0
+same boot id
+pm_test reset to none
+hibernate pm_test_delay reset to 5
+```
+
+The machine stayed reachable after the test over ethernet, but the ethernet
+link briefly returned as `DOWN` in the immediate post-test marker and came back
+about two seconds later.
+
+Important kernel lines:
+
+```text
+drivers/net/wireless/ath/ath11k/qmi.c:2932 module ath11k ... has 32 allocated at module unload
+PM: hibernation: hibernation debug: Waiting for 180 second(s).
+[last unloaded: ath11k]
+mhi-pci-generic 0004:01:00.0: device recovery started
+usb usb1..usb6: root hub lost power or was reset
+usb ... WARN: invalid context state for evaluate context command
+r8152 ... reset SuperSpeed USB device
+systemd-journald.service: Failed with result 'watchdog'
+mhi-pci-generic 0004:01:00.0: reset
+mhi-pci-generic 0004:01:00.0: reset failed
+mhi-pci-generic 0004:01:00.0: Recovery failed: -25
+WARNING: CPU ... drivers/irqchip/irq-gic-v3-its.c:3643 its_msi_teardown
+```
+
+Conclusion:
+
+- This is more realistic than the earlier 60s tests because it matches the
+  rough cold restore duration and removes internal Wi-Fi/ath11k while using
+  ethernet for observation.
+- It still does not reproduce the full cold hibernate black-screen failure.
+- It does show that long platform hibernate testing destabilizes USB, MHI, and
+  interrupt/MSI teardown paths even without ath11k loaded.
+- After the test, `ath11k_pci` was reloaded and Wi-Fi returned on
+  `192.168.1.88`.
