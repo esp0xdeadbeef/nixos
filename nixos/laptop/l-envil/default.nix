@@ -130,16 +130,6 @@ in
   networking.networkmanager.enable = true;
   warnings = [
     "l-envil: systemd-hibernate.service disables systemd's user.slice freezer because hibernate froze immediately after freezing user.slice; remove this once the upstream/systemd sleep-stack issue is fixed."
-    "l-envil: temporary hibernate debug kernel parameters are enabled: no_console_suspend, ignore_loglevel, initcall_debug, pm_debug_messages, drm.debug=0x1e."
-  ];
-  boot.kernelParams = [
-    "no_console_suspend"
-    "ignore_loglevel"
-    "printk.time=1"
-    "log_buf_len=16M"
-    "initcall_debug"
-    "pm_debug_messages"
-    "drm.debug=0x1e"
   ];
   environment.etc."systemd/sleep.conf.d/10-hibernate-shutdown-mode.conf".text = ''
     [Sleep]

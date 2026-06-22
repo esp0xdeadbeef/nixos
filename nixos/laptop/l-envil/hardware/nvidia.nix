@@ -16,7 +16,7 @@
   services.supergfxd.enable = true;
 
   hardware.nvidia.modesetting.enable = true;
-  hardware.nvidia.powerManagement.enable = false;
+  hardware.nvidia.powerManagement.enable = true;
   hardware.nvidia.powerManagement.finegrained = false;
   hardware.nvidia.open = true;
   hardware.nvidia.nvidiaSettings = true;
