@@ -95,6 +95,10 @@ in
                     export HISTFILE="$HOME/.zsh_history"
                   fi
                 fi
+                if [[ -n "$HISTFILE" ]]; then
+                  mkdir -p -- "''${HISTFILE:h}" 2>/dev/null || true
+                  touch -- "$HISTFILE" 2>/dev/null || true
+                fi
 
                 if [[ -r "$HOME/.aliases" ]]; then
                   source "$HOME/.aliases"
