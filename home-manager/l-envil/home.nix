@@ -106,6 +106,12 @@ in
       exec ${pkgs.teams-for-linux}/bin/teams-for-linux
     ''}
   '';
+  local.sway.extraConfig = lib.mkAfter ''
+    for_window [app_id="Slack"] move window to workspace 5
+    ${lib.optionalString config.local.work.microsoft.enable ''
+      for_window [app_id="teams-for-linux"] move window to workspace 5
+    ''}
+  '';
 
   home.packages =
     let

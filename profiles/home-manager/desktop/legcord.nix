@@ -29,5 +29,9 @@ in
       for_window [class="legcord"] move to workspace 5
       exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f "share/lib/[l]egcord/resources/app.asar" >/dev/null || exec ${legcordPersistent}/bin/legcord-persistent'
     '';
+
+    local.sway.extraConfig = lib.mkAfter ''
+      for_window [app_id="legcord"] move to workspace 5
+    '';
   };
 }
