@@ -71,7 +71,8 @@ in
 
             # xss-lock grabs a logind suspend inhibit lock and will use i3lock to lock the
             # screen before suspend. Use loginctl lock-session to lock your screen.
-            #exec --no-startup-id ${pkgs.xss-lock}/bin/xss-lock --transfer-sleep-lock -- i3lock --nofork
+            exec --no-startup-id ${pkgs.xset}/bin/xset s off
+            exec --no-startup-id ${pkgs.xss-lock}/bin/xss-lock --transfer-sleep-lock -- ${pkgs.i3lock}/bin/i3lock -n -c 202020
 
             # NetworkManager is the most popular way to manage wireless networks on Linux,
             # and nm-applet is a desktop environment-independent system tray GUI for it.
@@ -311,7 +312,7 @@ in
 
             bindsym $mod+i exec ${thunar}/bin/thunar
 
-        bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -i /home/deadbeef/Pictures/background/captureWebpageEachMonitorDifferentPage/img/combined_screenshot.png
+        bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -c 202020
         bindsym $mod+c exec google-chrome-stable
         ${lib.optionalString spotifyEnabled "bindsym $mod+F3 exec ${spotifyCommand}"}
         exec_always --no-startup-id ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'

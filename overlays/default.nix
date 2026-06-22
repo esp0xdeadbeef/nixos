@@ -37,7 +37,10 @@
     {
       xlayoutdisplay = prev.xlayoutdisplay.overrideAttrs (old: {
         patches = (old.patches or [ ]) ++ [
-          "${outPath}/patches/xlayoutdisplay-max-resolution.patch"
+          # Keep this as a direct path instead of "${outPath}/...".
+          # Referencing outPath makes the derivation depend on the whole flake
+          # source and can force rebuilds when unrelated repository files change.
+          ../patches/xlayoutdisplay-max-resolution.patch
         ];
       });
 

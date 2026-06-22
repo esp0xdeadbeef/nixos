@@ -365,7 +365,10 @@ in
     boot.initrd.systemd.services.rotateBtrfsRoot = lib.mkIf cfg.rotateBtrfsRoot.enable {
       description = "Rotate /root Btrfs subvolume and prune old roots";
       wantedBy = [ "initrd.target" ];
-      after = [ "systemd-cryptsetup@${cfg.rootMapperName}.service" ];
+      after = [
+        "systemd-cryptsetup@${cfg.rootMapperName}.service"
+        "systemd-hibernate-resume.service"
+      ];
       before = [ "sysroot.mount" ];
       unitConfig.DefaultDependencies = false;
       serviceConfig.Type = "oneshot";

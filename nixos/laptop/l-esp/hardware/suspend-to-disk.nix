@@ -20,4 +20,10 @@
   boot.kernelParams = [
     "resume_offset=13769397"
   ];
+
+  # This driver only exposes DDR5 SPD temperature sensors on this laptop, and
+  # currently fails noisily during suspend/hibernate restore:
+  # spd5118_resume [spd5118] returns -6.
+  boot.blacklistedKernelModules = [ "spd5118" ];
+
 }
