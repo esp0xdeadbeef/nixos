@@ -36,6 +36,7 @@
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.shell.zsh-prompt
     "${outPath}/modules/nixos/local-users.nix"
+    profiles.nixos.virtualization.libvirt
     profiles.nixos.virtualization.lxc
     profiles.nixos.virtualization.podman
 

@@ -5,12 +5,12 @@
   ...
 }:
 let
-  primaryUser = config.local.users.primary.resolvedName;
+  normalUserNames = lib.attrNames (
+    lib.filterAttrs (_: user: user.isNormalUser or false) config.users.users
+  );
 in
-lib.mkIf (primaryUser != null) {
-  users.users.${primaryUser} = {
-    extraGroups = [ "libvirtd" ];
-  };
+{
+  users.groups.libvirtd.members = normalUserNames;
 
   virtualisation.libvirtd = {
     enable = true;
