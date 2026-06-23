@@ -49,7 +49,6 @@
       variant = "";
     };
   };
-  programs.sway.enable = true;
   services.displayManager.defaultSession = "none+i3";
   #programs.xwayland.enable = true;
   services.gnome.gnome-keyring.enable = true;

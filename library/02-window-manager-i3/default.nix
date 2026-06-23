@@ -56,5 +56,4 @@
   #environment.variables.GTK_THEME = "Adwaita:dark";
   services.gnome.gnome-keyring.enable = true;
 
-  programs.sway.enable = true;
 }
