@@ -556,6 +556,16 @@ in
     programs.fuse.userAllowOther = true;
     environment.systemPackages = with pkgs; [ btrfs-progs ];
 
+    systemd.services.sshd-keygen = lib.mkIf config.services.openssh.enable {
+      requires = [ "etc-ssh.mount" ];
+      after = [ "etc-ssh.mount" ];
+    };
+
+    systemd.services.sshd = lib.mkIf config.services.openssh.enable {
+      requires = [ "etc-ssh.mount" ];
+      after = [ "etc-ssh.mount" ];
+    };
+
     systemd.tmpfiles.rules = [
       "d ${cfg.persistPath}/etc 0755 root root -"
       "d ${cfg.persistPath}/etc/ssh 0755 root root -"
