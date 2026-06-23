@@ -338,6 +338,22 @@ let
     ) normalUserNames
   );
 
+  generatedSshEtcEntries = lib.filterAttrs (
+    name: entry: lib.hasPrefix "ssh/" name && (entry ? source)
+  ) config.environment.etc;
+
+  generatedSshEtcTmpfiles =
+    [
+      "d ${cfg.persistPath}/etc/ssh/authorized_keys.d 0755 root root -"
+    ]
+    ++ lib.mapAttrsToList (
+      name: entry:
+      if lib.hasPrefix "ssh/authorized_keys.d/" name then
+        "C+ ${cfg.persistPath}/etc/${name} 0644 root root - ${entry.source}"
+      else
+        "L+ ${cfg.persistPath}/etc/${name} - - - - ${entry.source}"
+    ) generatedSshEtcEntries;
+
   sharedUserDirectories = [
     "github"
     ".local/share/nvim"
@@ -577,6 +593,7 @@ in
     ++ sharedUserTmpfiles
     ++ spotifyPlayerTmpfiles
     ++ noCowUserTmpfiles
+    ++ generatedSshEtcTmpfiles
     ++ cfg.extraTmpfiles;
 
     environment.persistence.${cfg.persistPath} = {
