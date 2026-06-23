@@ -1,4 +1,4 @@
-{ outPath, ... }:
+{ lib, outPath, pkgs, ... }:
 {
   imports = [
     "${outPath}/profiles/home-manager/desktop/window-manager.nix"
@@ -10,4 +10,13 @@
     "${outPath}/home-manager/02-window-manager-i3/i3/packages.nix"
     "${outPath}/home-manager/02-window-manager-i3/i3status-rust/packages.nix"
   ];
+
+  home.packages = [
+    pkgs.copyq
+  ];
+
+  local.i3.extraConfig = lib.mkAfter ''
+    exec --no-startup-id ${pkgs.copyq}/bin/copyq
+    bindsym $mod+Shift+v exec --no-startup-id ${pkgs.copyq}/bin/copyq show
+  '';
 }
