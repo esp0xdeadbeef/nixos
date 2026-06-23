@@ -170,6 +170,13 @@ let
     ++ lib.optionals (hasPackage [ "chromium" ]) [
       ".config/chromium"
     ]
+    ++ lib.optionals (hasPackage [
+      "CopyQ"
+      "copyq"
+    ]) [
+      ".config/copyq"
+      ".local/share/copyq"
+    ]
     ++ lib.optionals (hasPackage [ "google-chrome" ]) [
       ".config/google-chrome"
       ".pki/nssdb"
