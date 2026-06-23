@@ -39,6 +39,8 @@
       '';
     in
     {
+      navi = inputs.cheat-sheets.packages.${final.stdenv.hostPlatform.system}.navi;
+
       xlayoutdisplay = prev.xlayoutdisplay.overrideAttrs (old: {
         patches = (old.patches or [ ]) ++ [
           # Keep this as a direct path instead of "${outPath}/...".

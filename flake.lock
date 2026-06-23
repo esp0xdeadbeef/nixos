@@ -58,6 +58,26 @@
         "type": "github"
       }
     },
+    "cheat-sheets": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1782190230,
+        "narHash": "sha256-s61lQkafu5IEvRz/qExU2G7UfpW8u3hdPyG9lI/KXb0=",
+        "owner": "esp0xdeadbeef",
+        "repo": "cheat.sheets",
+        "rev": "c38b4a14c8e027393ce5fc16b3fb62aa453fa210",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esp0xdeadbeef",
+        "repo": "cheat.sheets",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1781825982,
@@ -2131,6 +2151,7 @@
     },
     "root": {
       "inputs": {
+        "cheat-sheets": "cheat-sheets",
         "disko": "disko",
         "hardware": "hardware",
         "home-manager": "home-manager",

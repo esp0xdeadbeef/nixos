@@ -49,6 +49,11 @@
       url = "github:numtide/llm-agents.nix";
     };
 
+    cheat-sheets = {
+      url = "github:esp0xdeadbeef/cheat.sheets";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
     };
