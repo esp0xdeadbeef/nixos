@@ -215,7 +215,16 @@
 
       packages =
         if builtins.pathExists ./pkgs then
-          forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system})
+          forAllSystems (
+            system:
+            let
+              pkgs = nixpkgs.legacyPackages.${system};
+            in
+            import ./pkgs {
+              inherit pkgs system;
+              inherit (pkgs) lib;
+            }
+          )
         else
           { };
 

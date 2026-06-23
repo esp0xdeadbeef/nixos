@@ -264,11 +264,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1782178791,
-        "narHash": "sha256-xXxFBULrDScXv67Z9djleSRGvZuQl1S3QzLHVBaXo8U=",
+        "lastModified": 1782180246,
+        "narHash": "sha256-jDXyzgRtViPSj38evX6dkqMXISulDrx8aTVLTxHQnYI=",
         "owner": "numtide",
         "repo": "llm-agents.nix",
-        "rev": "316b26a86893100cd0811954021ba13acb1165cf",
+        "rev": "d4bdfa7950b2e27b553f8c1fd92f6f44b926f776",
         "type": "github"
       },
       "original": {
@@ -518,11 +518,11 @@
         "nixpkgs-network": "nixpkgs-network_3"
       },
       "locked": {
-        "lastModified": 1782179111,
-        "narHash": "sha256-7s3MSKIMXCPFtt9LF2MtQdPTF2DTDBs/TMKa+yGcnAo=",
+        "lastModified": 1782183522,
+        "narHash": "sha256-OzbML3SBOpA2seBqAodeQk0o+d9mkOWDQJ4MrnyhxuI=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "eb0f57c8aa83b16d3d6dd788bc76512a2ce4917f",
+        "rev": "907398207e51e99768005973a7c60b4a12f72df0",
         "type": "github"
       },
       "original": {
@@ -1037,11 +1037,11 @@
     },
     "network-labs_2": {
       "locked": {
-        "lastModified": 1782179092,
-        "narHash": "sha256-rTja6kFdTqzHSJOK5AtYIF1gCZr+fP4HPxXwPbQKPcs=",
+        "lastModified": 1782183518,
+        "narHash": "sha256-Ud2yveig2pbda6//WuX5OTMZizWrF66lHuobftkyYs8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-labs",
-        "rev": "7543f323766d75ae851294a6801a05d61cb1170b",
+        "rev": "fb7d2fb52bd6fb30912d2150add206206086fa64",
         "type": "github"
       },
       "original": {
@@ -1232,11 +1232,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1782179258,
-        "narHash": "sha256-U0gHTF6uus27R4Bp2PX+svaQuOmRpMEsGILeztkEaa0=",
+        "lastModified": 1782183523,
+        "narHash": "sha256-+X7/a4Uqz37SE0tWQtTFUbtdU1OeuH0E8w3/gnFGCdE=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-access-endpoint-nixos",
-        "rev": "0a2279cc443f7c854cbdc532cff847b7930b2ac0",
+        "rev": "5c84e115fa5d192a068a210d55cbdd1e87b057cf",
         "type": "github"
       },
       "original": {
