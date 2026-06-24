@@ -17,10 +17,18 @@ let
   hasGpuStatus = hasNvidia || hasRocmSmi;
 in
 {
-  options.local.i3.statusRust.enable = lib.mkOption {
-    type = lib.types.bool;
-    default = true;
-    description = "Enable the shared i3status-rust Home Manager config.";
+  options.local.i3.statusRust = {
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable the shared i3status-rust Home Manager config.";
+    };
+
+    battery.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = os.services.upower.enable or false;
+      description = "Whether to show the battery block.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -87,15 +95,17 @@ in
         [icons]
         icons = "awesome6"
         [icons.overrides]
-        bat_charging = "\uf1e6 CHR" # fa-plug
-        bat = [
-            "\uf244", # fa-battery-empty
-            "\uf243", # fa-battery-quarter
-            "\uf242", # fa-battery-half
-            "\uf241", # fa-battery-three-quarters
-            "\uf240", # fa-battery-full
-        ]
-        bat_not_available = "\uf244 ? UNK" # fa-battery-empty
+        ${lib.optionalString cfg.battery.enable ''
+          bat_charging = "\uf1e6 CHR" # fa-plug
+          bat = [
+              "\uf244", # fa-battery-empty
+              "\uf243", # fa-battery-quarter
+              "\uf242", # fa-battery-half
+              "\uf241", # fa-battery-three-quarters
+              "\uf240", # fa-battery-full
+          ]
+          bat_not_available = "\uf244 ? UNK" # fa-battery-empty
+        ''}
 
         [[block]]
         block = "net"
@@ -148,11 +158,13 @@ in
           hide_when_empty = true
         ''}
 
-        [[block]]
-        block = "battery"
-        format = "$icon $percentage {$time |}"
-        device = "DisplayDevice"
-        driver = "upower"
+        ${lib.optionalString cfg.battery.enable ''
+          [[block]]
+          block = "battery"
+          format = "$icon $percentage {$time |}"
+          device = "DisplayDevice"
+          driver = "upower"
+        ''}
 
         [[block]]
         block = "time"
