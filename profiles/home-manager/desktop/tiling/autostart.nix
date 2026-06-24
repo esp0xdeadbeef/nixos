@@ -1,6 +1,13 @@
-{ config, lib, pkgs, ... }:
+{ config
+, lib
+, osConfig ? null
+, pkgs
+, ...
+}:
 
 let
+  os = if osConfig == null then { } else osConfig;
+  networkManagerEnabled = os.networking.networkmanager.enable or false;
   copyqStart = pkgs.writeShellScriptBin "copyq-start" ''
     set -eu
 
@@ -41,9 +48,8 @@ in
     exec --no-startup-id ${pkgs.dex}/bin/dex --autostart --environment i3
     exec --no-startup-id ${pkgs.xset}/bin/xset s off -dpms
     exec --no-startup-id ${pkgs.xss-lock}/bin/xss-lock --transfer-sleep-lock -- ${pkgs.i3lock}/bin/i3lock -n -c 202020
-    exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet
     exec_always --no-startup-id ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'
-    exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet
+    ${lib.optionalString networkManagerEnabled "exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet"}
     exec --no-startup-id export XDG_SESSION_TYPE=x11
     exec --no-startup-id xsetroot -solid "#333333"
     exec --no-startup-id xsetroot -solid "#000000"
@@ -58,7 +64,7 @@ in
   local.tiling.generated.sway.autostart = ''
     exec ${pkgs.mako}/bin/mako
     exec ${pkgs.swayidle}/bin/swayidle -w before-sleep '${pkgs.swaylock}/bin/swaylock -f -c 202020'
-    exec ${pkgs.networkmanagerapplet}/bin/nm-applet --indicator
+    ${lib.optionalString networkManagerEnabled "exec ${pkgs.networkmanagerapplet}/bin/nm-applet --indicator"}
     exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'
     exec_always ${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -f "[.]autotiling-wrapped" || true; exec ${pkgs.autotiling}/bin/autotiling --splitratio 1.61'
     ${lib.optionalString swaySpotifyEnabled "exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify >/dev/null || ${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify_player >/dev/null || exec ${swaySpotifyCommand}'"}

@@ -1,9 +1,13 @@
 { config
+, lib
+, osConfig ? null
 , pkgs
 , ...
 }:
 
 let
+  os = if osConfig == null then { } else osConfig;
+  networkManagerEnabled = os.networking.networkmanager.enable or false;
   modifier = config.local.sway.modifier;
   generated = config.local.tiling.generated.sway;
   extraConfig = ''
@@ -18,7 +22,6 @@ in
     brightnessctl
     grim
     mako
-    networkmanagerapplet
     pamixer
     pavucontrol
     polkit_gnome
@@ -30,6 +33,8 @@ in
     swappy
     wl-clipboard
     wofi
+  ] ++ lib.optionals networkManagerEnabled [
+    pkgs.networkmanagerapplet
   ];
 
   home.file.".config/sway/config".text = ''
