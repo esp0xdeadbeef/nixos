@@ -7,6 +7,7 @@
     "${outPath}/home-manager/01-general/editors/vscode.nix"
     "${outPath}/home-manager/01-general/pdf-reader/packages.nix"
     "${outPath}/home-manager/01-general/virt-manager-config/default.nix"
+    "${outPath}/profiles/home-manager/nix/github-access-token.nix"
     "${outPath}/home-manager/03-window-manager-sway/wayland/sway/configs.nix"
     "${outPath}/home-manager/02-window-manager-i3/i3status-rust/packages.nix"
   ];

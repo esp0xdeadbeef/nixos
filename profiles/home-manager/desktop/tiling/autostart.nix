@@ -53,7 +53,6 @@ in
     exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
     exec_always --no-startup-id ${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -f "[.]autotiling-wrapped" || true; exec ${pkgs.autotiling}/bin/autotiling --splitratio 1.61'
     ${lib.optionalString i3SpotifyEnabled "exec_always --no-startup-id ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify >/dev/null || ${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify_player >/dev/null || exec ${i3SpotifyCommand}'"}
-    exec_always --no-startup-id bash -c "echo -e \"extra-experimental-features = nix-command flakes\naccess-tokens = github.com=$(${pkgs.gh}/bin/gh auth token)\" > ~/.config/nix/nix.conf"
   '';
 
   local.tiling.generated.sway.autostart = ''

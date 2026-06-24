@@ -201,7 +201,8 @@ in
     bindsym $mod+Shift+r reload
     bindsym $mod+Shift+e exec ${pkgs.sway}/bin/swaymsg exit
     bindsym $mod+Escape exec ${pkgs.swaylock}/bin/swaylock -f -c 202020
-    bindsym $mod+Print+Shift exec ${editScreenshot}/bin/sway-edit-screenshot
+    bindsym Print exec ${editScreenshot}/bin/sway-edit-screenshot
+    bindsym $mod+Shift+Print exec ${editScreenshot}/bin/sway-edit-screenshot
     bindsym $mod+comma move workspace to output left
     bindsym $mod+period move workspace to output right
     bindsym $mod+bracketright exec ${pkgs.pamixer}/bin/pamixer --increase 10
