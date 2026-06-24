@@ -617,6 +617,7 @@ in
         "/var/lib/sbctl"
         "/var/lib/systemd/coredump"
         "/var/lib/systemd/timers"
+        "/var/lib/systemd/timesync"
         "/etc/ssh"
         "/etc/NetworkManager/system-connections"
         "/var/lib/libvirt"
