@@ -64,23 +64,13 @@ Conventional commits: `type(scope): description`
 - Both are also encrypted to the PGP key `7088C7421873E0DB97FF17C2245CAB70B4C225E9`. It lives on misterio's yubikey.
 - **Never** read secrets into context. Ask the user to do it.
 
-## Building and Deploying
+## Checking
 
-- Format check: `nix fmt`
-- Build a host (test if it builds): `nixos-rebuild build --flake .#{host}`
+- Format touched Nix files with `nix fmt -- <files>`.
+- Run `nix flake check --all-systems` after meaningful Nix changes.
 
-- Deploy to this host: use nixos-rebuild: `nixos-rebuild switch --flake .`
-- Deploy to another host: use deploy.sh: `./deploy.sh {host}`
-
-- Production, uses CI/CD: Hydra at `hydra.m7.rs` builds all hosts on push; hosts auto-upgrade from the latest successful build (see `modules/nixos/hydra-auto-upgrade.nix`). No need to deploy manually, unless quickly iterating locally.
-
-### Post-deploy verification
-
-After deploying a host, verify the correct revision landed:
-
-1. `ssh {host} -- nix flake metadata self --json | jq .revision -r` — get the deployed commit hash (first 8 chars).
-2. `jj log -r 'commit_id("{hash}")'` — map it to a change ID and commit description.
-3. Confirm it's the expected commit (should be at or near `main` / the tip of the stack).
+Do not run `nixos-rebuild switch`, deploy scripts, or other apply/deploy commands
+unless the user explicitly asks for that.
 
 ## Vdirsyncer Calendar Collections
 
