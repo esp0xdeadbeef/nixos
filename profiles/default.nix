@@ -33,6 +33,9 @@
       fish = import ./nixos/shell/fish.nix;
       zsh-prompt = import ./nixos/shell/zsh-prompt.nix;
     };
+    ssh = {
+      deadbeef-authorized-keys = import ./nixos/ssh/deadbeef-authorized-keys.nix;
+    };
     network = {
       private = import ./nixos/network/private.nix;
       workstation = import ./nixos/network/workstation.nix;
