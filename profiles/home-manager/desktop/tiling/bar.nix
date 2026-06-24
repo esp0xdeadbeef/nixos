@@ -5,7 +5,7 @@
       status_command ${config.local.i3.statusCommand}
       font ${config.local.tilingManagerSettings.statusBarFont}
       modifier $mod
-      workspace_min_width 40
+      workspace_min_width 30
       colors {
         separator #282a36
         background #282a3670
@@ -24,7 +24,7 @@
       font ${config.local.tilingManagerSettings.statusBarFont}
       position bottom
       modifier $mod
-      workspace_min_width 40
+      workspace_min_width 30
       colors {
         separator #282a36
         background #282a3670

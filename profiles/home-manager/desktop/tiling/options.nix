@@ -70,7 +70,7 @@ in
 
     tilingManagerSettings.statusBarFont = lib.mkOption {
       type = lib.types.str;
-      default = "pango:DejaVu Sans Mono, Font Awesome 6 Free Solid, Font Awesome 6 Free Regular, Font Awesome 6 Brands Regular, Noto Color Emoji 10";
+      default = "pango:DejaVu Sans Mono, Font Awesome 6 Free Solid, Font Awesome 6 Free Regular, Font Awesome 6 Brands Regular, Noto Color Emoji 7";
       description = "Font used by generated tiling window-manager status bars.";
     };
 

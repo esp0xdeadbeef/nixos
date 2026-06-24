@@ -139,14 +139,10 @@ in
   systemd.services.systemd-hibernate.environment.SYSTEMD_SLEEP_FREEZE_USER_SESSIONS = "false";
   hardware.intelgpu.vaapiDriver = "intel-media-driver";
   local.users.primary.name = "deadbeef";
-  local.laptop.xlayoutdisplayHotplug.configLines = [
-    "wait=2"
-    "rate=60"
-    "primary=eDP-1"
-    "order=DP-2-1-6"
-    "order=DP-1"
-    "order=eDP-1"
-  ];
+  local.laptop.monitorLayouts.samsungLu28r55Desk = {
+    enable = true;
+    internalScale = "1.25x1.25";
+  };
 
   sops.secrets."deadbeef-passwd" = {
     neededForUsers = true; # make it available before the user is created

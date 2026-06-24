@@ -126,15 +126,11 @@ in
     ];
   };
   # 4k blackscreens l-portal's external outputs because the framebuffer is too small.
-  local.laptop.xlayoutdisplayHotplug.maxResolution = "2560x1440";
-  local.laptop.xlayoutdisplayHotplug.configLines = [
-    "wait=2"
-    "rate=60"
-    "primary=eDP-1"
-    "order=DP-2"
-    "order=DP-1"
-    "order=eDP-1"
-  ];
+  local.laptop.monitorLayouts.samsungLu28r55Desk = {
+    enable = true;
+    externalScale = "1x1";
+    maxResolution = "2560x1440";
+  };
   security.rtkit.enable = true;
   hardware.enableRedistributableFirmware = true;
 

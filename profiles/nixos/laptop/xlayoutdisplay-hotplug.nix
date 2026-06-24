@@ -11,53 +11,72 @@ let
     set -eu
 
     uid=""
+    home=""
+    display="''${DISPLAY:-}"
+    xauthority="''${XAUTHORITY:-}"
 
-    while read -r session _; do
-      [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Type --value)" = "x11" ] || continue
-      [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Active --value)" = "yes" ] || continue
-
-      uid="$(${pkgs.systemd}/bin/loginctl show-session "$session" -p User --value)"
-      break
-    done < <(${pkgs.systemd}/bin/loginctl list-sessions --no-legend)
-
-    if [ -z "$uid" ]; then
-      echo "No active X11 session found; skipping display layout." >&2
-      exit 0
+    if [ -n "$display" ]; then
+      uid="$(${pkgs.coreutils}/bin/id -u)"
+      home="''${HOME:-}"
+      if [ -z "$home" ]; then
+        home="$(${pkgs.getent}/bin/getent passwd "$uid" | ${pkgs.coreutils}/bin/cut -d: -f6)"
+      fi
+      if [ -z "$xauthority" ] && [ -f "$home/.Xauthority" ]; then
+        xauthority="$home/.Xauthority"
+      fi
     fi
 
-    home="$(${pkgs.getent}/bin/getent passwd "$uid" | ${pkgs.coreutils}/bin/cut -d: -f6)"
-    if [ -z "$home" ]; then
-      echo "No home directory found for uid $uid; skipping display layout." >&2
-      exit 0
-    fi
+    if [ -z "$display" ] || [ -z "$xauthority" ]; then
+      uid=""
+      home=""
 
-    display=""
-    for socket in /tmp/.X11-unix/X*; do
-      [ -S "$socket" ] || continue
-      [ "$(${pkgs.coreutils}/bin/stat -c %u "$socket")" = "$uid" ] || continue
-      display=":''${socket##*/X}"
-      break
-    done
+      while read -r session _; do
+        [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Type --value)" = "x11" ] || continue
+        [ "$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Active --value)" = "yes" ] || continue
 
-    if [ -z "$display" ]; then
-      echo "No X11 socket found for uid $uid; skipping display layout." >&2
-      exit 0
-    fi
+        uid="$(${pkgs.systemd}/bin/loginctl show-session "$session" -p User --value)"
+        break
+      done < <(${pkgs.systemd}/bin/loginctl list-sessions --no-legend)
 
-    xauthority=""
-    for pid in $(${pkgs.procps}/bin/pgrep -x Xorg || true); do
-      [ "$(${pkgs.coreutils}/bin/stat -c %u "/proc/$pid")" = "$uid" ] || continue
+      if [ -z "$uid" ]; then
+        echo "No active X11 session found; skipping display layout." >&2
+        exit 0
+      fi
 
-      xauthority="$(
-        ${pkgs.coreutils}/bin/tr '\0' '\n' < "/proc/$pid/cmdline" \
-          | ${pkgs.gawk}/bin/awk 'prev { print; exit } $0 == "-auth" { prev = 1 }'
-      )"
-      [ -n "$xauthority" ] && break
-    done
+      home="$(${pkgs.getent}/bin/getent passwd "$uid" | ${pkgs.coreutils}/bin/cut -d: -f6)"
+      if [ -z "$home" ]; then
+        echo "No home directory found for uid $uid; skipping display layout." >&2
+        exit 0
+      fi
 
-    if [ -z "$xauthority" ]; then
-      echo "No Xauthority path found for uid $uid; skipping display layout." >&2
-      exit 0
+      display=""
+      for socket in /tmp/.X11-unix/X*; do
+        [ -S "$socket" ] || continue
+        [ "$(${pkgs.coreutils}/bin/stat -c %u "$socket")" = "$uid" ] || continue
+        display=":''${socket##*/X}"
+        break
+      done
+
+      if [ -z "$display" ]; then
+        echo "No X11 socket found for uid $uid; skipping display layout." >&2
+        exit 0
+      fi
+
+      xauthority=""
+      for pid in $(${pkgs.procps}/bin/pgrep -x Xorg || true); do
+        [ "$(${pkgs.coreutils}/bin/stat -c %u "/proc/$pid")" = "$uid" ] || continue
+
+        xauthority="$(
+          ${pkgs.coreutils}/bin/tr '\0' '\n' < "/proc/$pid/cmdline" \
+            | ${pkgs.gawk}/bin/awk 'prev { print; exit } $0 == "-auth" { prev = 1 }'
+        )"
+        [ -n "$xauthority" ] && break
+      done
+
+      if [ -z "$xauthority" ]; then
+        echo "No Xauthority path found for uid $uid; skipping display layout." >&2
+        exit 0
+      fi
     fi
 
     export HOME="$home"
@@ -70,91 +89,11 @@ let
 
     config_file="$home/.xlayoutdisplay"
     if [ -f "$config_file" ]; then
-      ${pkgs.gnugrep}/bin/grep -v '^dpi=' "$config_file" > "$runtime_home/.xlayoutdisplay" || true
+      ${pkgs.coreutils}/bin/cp "$config_file" "$runtime_home/.xlayoutdisplay"
     else
       : > "$runtime_home/.xlayoutdisplay"
     fi
 
-    dpi="$(
-      ${pkgs.xrandr}/bin/xrandr --query \
-        | ${pkgs.gawk}/bin/awk '
-          function bucket(pixel_width, physical_dpi) {
-            if (connected_count == 1 && physical_dpi > 0) {
-              if (physical_dpi >= 240) {
-                return 216
-              } else if (physical_dpi >= 180) {
-                return 168
-              } else if (physical_dpi >= 150) {
-                return 144
-              } else if (physical_dpi >= 120) {
-                return 120
-              }
-
-              return 96
-            }
-
-            if (pixel_width <= 1600) {
-              return 96
-            } else if (pixel_width <= 1920) {
-              return 120
-            } else if (pixel_width <= 2560) {
-              return 132
-            }
-
-            return 144
-          }
-
-          function consider(line,    mode, mode_parts, width, mm, mm_parts, mm_width, physical_dpi) {
-            if (line !~ / connected/) {
-              return
-            }
-            if (line !~ /[0-9]+x[0-9]+\+/) {
-              return
-            }
-
-            connected_count += 1
-
-            match(line, /[0-9]+x[0-9]+\+/)
-            mode = substr(line, RSTART, RLENGTH - 1)
-            split(mode, mode_parts, "x")
-            width = mode_parts[1] + 0
-
-            if (min_width == "" || width < min_width) {
-              min_width = width
-            }
-
-            if (line ~ /[0-9]+mm x [0-9]+mm/) {
-              match(line, /[0-9]+mm x [0-9]+mm/)
-              mm = substr(line, RSTART, RLENGTH)
-              gsub(/mm/, "", mm)
-              split(mm, mm_parts, " x ")
-              mm_width = mm_parts[1] + 0
-              if (mm_width > 0) {
-                physical_dpi = width * 25.4 / mm_width
-                if (max_physical_dpi == "" || physical_dpi > max_physical_dpi) {
-                  max_physical_dpi = physical_dpi
-                }
-              }
-            }
-          }
-
-          / connected/ {
-            consider($0)
-          }
-
-          END {
-            if (min_width == "") {
-              exit
-            }
-
-            print bucket(min_width, max_physical_dpi)
-          }
-        '
-    )"
-
-    if [ -n "$dpi" ]; then
-      ${pkgs.coreutils}/bin/printf 'dpi=%s\n' "$dpi" >> "$runtime_home/.xlayoutdisplay"
-    fi
     ${lib.optionalString (cfg.maxResolution != null) ''
       ${pkgs.coreutils}/bin/printf 'max-resolution=%s\n' "${cfg.maxResolution}" >> "$runtime_home/.xlayoutdisplay"
     ''}
@@ -258,6 +197,10 @@ in
 
       ${pkgs.coreutils}/bin/chown ${primaryUser}:users "$target"
       ${pkgs.coreutils}/bin/rm -f "$tmp"
+    '';
+
+    services.xserver.displayManager.sessionCommands = ''
+      ${applyLayout} || true
     '';
 
     systemd.services.xlayoutdisplay-hotplug = {
