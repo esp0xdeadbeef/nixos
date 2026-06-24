@@ -7,6 +7,9 @@ let
   i3SpotifyCommand = config.local.i3.spotify.command;
   swaySpotifyEnabled = config.local.sway.spotify.enable;
   swaySpotifyCommand = config.local.sway.spotify.command;
+  packageNames = map lib.getName (config.home.packages or [ ]);
+  hasPackage = names: lib.any (name: lib.elem name packageNames) names;
+  hasTeams = hasPackage [ "teams-for-linux" ];
   editScreenshot = pkgs.writeShellScriptBin "sway-edit-screenshot" ''
     set -eu
 
@@ -44,6 +47,7 @@ in
     bindsym $mod+q kill
     bindsym $mod+d exec --no-startup-id "${pkgs.rofi}/bin/rofi -modi drun,run -show drun"
     bindsym $mod+Shift+d exec --no-startup-id "${pkgs.rofi}/bin/rofi -show window"
+    ${lib.optionalString hasTeams "bindsym $mod+F2 exec --no-startup-id ${pkgs.teams-for-linux}/bin/teams-for-linux"}
 
     bindsym $mod+j focus left
     bindsym $mod+k focus down
@@ -153,6 +157,7 @@ in
     bindsym $mod+q kill
     bindsym $mod+d exec ${pkgs.rofi}/bin/rofi -modi drun\,run -show drun
     bindsym $mod+Shift+d exec ${pkgs.rofi}/bin/rofi -show window
+    ${lib.optionalString hasTeams "bindsym $mod+F2 exec ${pkgs.teams-for-linux}/bin/teams-for-linux"}
     ${lib.optionalString swaySpotifyEnabled "bindsym $mod+F3 exec ${swaySpotifyCommand}"}
 
     bindsym $mod+j focus left

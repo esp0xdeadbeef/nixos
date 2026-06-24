@@ -1,4 +1,9 @@
-{ ... }:
+{ config, lib, ... }:
+let
+  packageNames = map lib.getName (config.home.packages or [ ]);
+  hasPackage = names: lib.any (name: lib.elem name packageNames) names;
+  hasTeams = hasPackage [ "teams-for-linux" ];
+in
 {
   local.tiling.generated.i3.windowRules = ''
     for_window [class="google-chrome" class="Google-chrome"] move window to workspace 2
@@ -14,6 +19,9 @@
     for_window [class="Dropbox"] move window to workspace 10
     for_window [class="Maestral"] move window to workspace 10
     for_window [class="maestral"] move window to workspace 10
+    ${lib.optionalString hasTeams ''
+      for_window [class="teams-for-linux"] move window to workspace 5
+    ''}
   '';
 
   local.tiling.generated.sway.windowRules = ''
@@ -29,5 +37,8 @@
     for_window [class="Dropbox"] move window to workspace 10
     for_window [class="Maestral"] move window to workspace 10
     for_window [class="maestral"] move window to workspace 10
+    ${lib.optionalString hasTeams ''
+      for_window [app_id="teams-for-linux"] move window to workspace 5
+    ''}
   '';
 }

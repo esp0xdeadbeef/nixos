@@ -26,7 +26,8 @@ in
     inputs.sops-nix.nixosModules.sops
 
     profiles.nixos.workstation.full
-    profiles.nixos.desktop.sway
+    profiles.nixos.desktop.i3
+    # profiles.nixos.desktop.sway
     profiles.nixos.boot.usb-removable
     profiles.nixos.hardware.clock-sync
     profiles.nixos.laptop.default

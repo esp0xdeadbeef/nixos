@@ -19,7 +19,8 @@ in
 
     # You can also split up your configuration and import pieces of it here:
     profiles.home-manager.desktop.legcord
-    profiles.home-manager.desktop-sway
+    profiles.home-manager.desktop-i3
+    # profiles.home-manager.desktop-sway
     ./desktop.nix
     ./rclone-wrapper/rclone.nix
     ./remmina/config.nix

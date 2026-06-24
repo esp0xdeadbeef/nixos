@@ -31,6 +31,13 @@ let
   swaySpotifyEnabled = config.local.sway.spotify.enable;
   swaySpotifyCommand = config.local.sway.spotify.command;
   displayStartupCommand = config.local.i3.display.startupCommand;
+  packageNames =
+    let
+      systemPackages = os.environment.systemPackages or [ ];
+    in
+    map lib.getName (systemPackages ++ (config.home.packages or [ ]));
+  hasPackage = names: lib.any (name: lib.elem name packageNames) names;
+  hasTeams = hasPackage [ "teams-for-linux" ];
 in
 {
   home.packages = [
@@ -63,6 +70,7 @@ in
     exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
     exec_always --no-startup-id ${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -f "[.]autotiling-wrapped" || true; exec ${pkgs.autotiling}/bin/autotiling --splitratio 1.61'
     ${lib.optionalString i3SpotifyEnabled "exec_always --no-startup-id ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify >/dev/null || ${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify_player >/dev/null || exec ${i3SpotifyCommand}'"}
+    ${lib.optionalString hasTeams "exec_always --no-startup-id ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u \"$USER\" -x teams-for-linux >/dev/null || exec ${pkgs.teams-for-linux}/bin/teams-for-linux'"}
   '';
 
   local.tiling.generated.sway.autostart = ''
@@ -72,5 +80,6 @@ in
     exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'
     exec_always ${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -f "[.]autotiling-wrapped" || true; exec ${pkgs.autotiling}/bin/autotiling --splitratio 1.61'
     ${lib.optionalString swaySpotifyEnabled "exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify >/dev/null || ${pkgs.procps}/bin/pgrep -u \"$USER\" -x spotify_player >/dev/null || exec ${swaySpotifyCommand}'"}
+    ${lib.optionalString hasTeams "exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u \"$USER\" -x teams-for-linux >/dev/null || exec ${pkgs.teams-for-linux}/bin/teams-for-linux'"}
   '';
 }
