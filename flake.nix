@@ -220,16 +220,23 @@
 
       packages =
         if builtins.pathExists ./pkgs then
-          forAllSystems (
-            system:
-            let
-              pkgs = nixpkgs.legacyPackages.${system};
-            in
-            import ./pkgs {
-              inherit pkgs system;
-              inherit (pkgs) lib;
-            }
-          )
+          forAllSystems
+            (
+              system:
+              let
+                pkgs = import nixpkgs {
+                  inherit system;
+                  config = {
+                    allowUnfree = true;
+                    android_sdk.accept_license = true;
+                  };
+                };
+              in
+              import ./pkgs {
+                inherit pkgs system;
+                inherit (pkgs) lib;
+              }
+            )
         else
           { };
 
