@@ -22,7 +22,6 @@ in
     pamixer
     pavucontrol
     polkit_gnome
-    rofi
     slurp
     sway
     sway-contrib.grimshot

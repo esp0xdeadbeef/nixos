@@ -1,8 +1,7 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
+{ config
+, pkgs
+, lib
+, ...
 }:
 {
   environment.etc.hosts.enable = false;
@@ -30,7 +29,6 @@
     (with pkgs; [
       home-manager
       nix-index
-      arandr
       #hyprland
       #rofi
       #autorandr
@@ -42,8 +40,6 @@
       nixfmt
       pulseaudio
       nmap
-      # inotify service (otherwise flameshot crashes)
-      dunst
       unzip
       samba4Full
       rlwrap
@@ -51,8 +47,6 @@
 
       tpm2-tss
       vim
-      playerctl
-      autorandr
       gh
       sshpass
       man-pages
@@ -68,7 +62,6 @@
       man
       #dex
       pciutils
-      autotiling
       lshw
 
       # virtualization:
@@ -84,7 +77,6 @@
       tmux
       dig
       bindfs
-      xclip
       wget
       obsidian
       #qemu

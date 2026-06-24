@@ -18,12 +18,6 @@ in
   ];
 
   config = {
-    home.packages = [
-      pkgs.arandr
-      pkgs.rofi
-      pkgs.xdotool
-    ];
-
     home.file."/.xprofile" = {
       text = ''
         export $(gnome-keyring-daemon --start --components=secrets,pkcs11,ssh,gpg)

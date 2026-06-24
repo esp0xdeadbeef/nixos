@@ -33,7 +33,6 @@
       enable = true;
       extraPackages = with pkgs; [
         #dmenu
-        rofi
         i3status
         i3lock
         i3blocks

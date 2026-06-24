@@ -1,15 +1,11 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 {
-  environment.systemPackages = with pkgs; [
-    xdotool
-    arandr
-    xclip
-    kubectl
-    docker
-    kind
-    podman-compose
-
-    xkill
-
-  ];
+  config = lib.mkIf config.services.xserver.enable {
+    environment.systemPackages = with pkgs; [
+      arandr
+      xclip
+      xdotool
+      xkill
+    ];
+  };
 }

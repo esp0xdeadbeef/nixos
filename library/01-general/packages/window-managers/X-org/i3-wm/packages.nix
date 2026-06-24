@@ -1,17 +1,17 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 {
-  environment.systemPackages = with pkgs; [
-    playerctl
-    i3status-rust
-    brightnessctl
-    alacritty
-    betterlockscreen
-    ksnip
-    flameshot
-    autorandr
-    rofi
-    # inotify service (otherwise flameshot crashes)
-    dunst
-    autotiling
-  ];
+  config = lib.mkIf config.services.xserver.windowManager.i3.enable {
+    environment.systemPackages = with pkgs; [
+      alacritty
+      autotiling
+      autorandr
+      betterlockscreen
+      brightnessctl
+      dunst
+      flameshot
+      i3status-rust
+      ksnip
+      playerctl
+    ];
+  };
 }

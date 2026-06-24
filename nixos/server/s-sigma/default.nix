@@ -34,6 +34,7 @@
     profiles.nixos.core
     profiles.nixos.base.maintenance
     profiles.nixos.hardware.clock-sync
+    profiles.nixos.laptop.xlayoutdisplay-hotplug
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.shell.zsh-prompt
     "${outPath}/modules/nixos/local-users.nix"
@@ -76,6 +77,7 @@
   services.displayManager.defaultSession = "none+i3";
   services.displayManager.gdm.enable = true;
   security.pam.services.i3lock.enable = true;
+  local.laptop.xlayoutdisplayHotplug.maxResolution = "1680x1050";
 
   home-manager = {
     sharedModules = [

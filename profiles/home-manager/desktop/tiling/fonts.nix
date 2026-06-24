@@ -6,5 +6,6 @@
     pkgs.dejavu_fonts
     pkgs.font-awesome_6
     pkgs.noto-fonts-color-emoji
+    pkgs.rofi
   ];
 }

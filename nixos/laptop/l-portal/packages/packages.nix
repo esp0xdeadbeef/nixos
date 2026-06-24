@@ -32,22 +32,16 @@
 
   environment.systemPackages = with pkgs; [
     nix-index
-    arandr
-    alacritty
     navi
     nixfmt
     pulseaudio
     nmap
     azure-cli
-    # inotify service (otherwise flameshot crashes)
-    dunst
     unzip
     samba4Full
     rlwrap
     lastpass-cli
     tpm2-tss
-    playerctl
-    autorandr
     gh
     sshpass
 
@@ -64,7 +58,6 @@
     mokutil
     man
     pciutils
-    autotiling
     lshw
     # neofetch
     fzf
@@ -73,7 +66,6 @@
     tmux
     dig
     bindfs
-    xclip
     wget
     obsidian
     # spotify
@@ -100,8 +92,6 @@
 
     # discord
     # google-chrome
-    flameshot
-    rofi
     remmina
   ];
 
