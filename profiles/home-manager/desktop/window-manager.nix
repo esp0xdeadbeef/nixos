@@ -19,6 +19,20 @@ let
       "${pkgs.spotify}/bin/spotify"
     else
       "${pkgs.alacritty}/bin/alacritty --title spotify-player -e ${spotifyPlayerPersistent}/bin/spotify-player-persistent";
+  copyqStart = pkgs.writeShellScriptBin "copyq-start" ''
+    set -eu
+
+    copyq_config() {
+      ${pkgs.coreutils}/bin/timeout 5s ${pkgs.copyq}/bin/copyq --start-server config "$@" >/dev/null 2>&1 || true
+    }
+
+    copyq_config maxitems 1000
+    copyq_config expire_tab 0
+    copyq_config save_delay_ms_on_item_added 1000
+    copyq_config save_delay_ms_on_item_modified 1000
+    copyq_config save_delay_ms_on_item_moved 1000
+    copyq_config save_delay_ms_on_item_removed 1000
+  '';
   windowManagerOptions = name: statusBar: {
     modifier = lib.mkOption {
       type = lib.types.str;
@@ -59,6 +73,23 @@ let
 in
 
 {
+  config = {
+    home.packages = [
+      pkgs.copyq
+      copyqStart
+    ];
+
+    local.i3.extraConfig = lib.mkAfter ''
+      exec --no-startup-id ${copyqStart}/bin/copyq-start
+      bindsym $mod+Shift+v exec --no-startup-id ${pkgs.copyq}/bin/copyq show
+    '';
+
+    local.sway.extraConfig = lib.mkAfter ''
+      exec ${copyqStart}/bin/copyq-start
+      bindsym $mod+Shift+v exec ${pkgs.copyq}/bin/copyq show
+    '';
+  };
+
   options.local = {
     tilingManagerSettings.extraConfig = lib.mkOption {
       type = lib.types.lines;
