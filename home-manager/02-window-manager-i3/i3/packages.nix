@@ -19,6 +19,7 @@ in
 
   config = {
     home.packages = [
+      pkgs.arandr
       pkgs.rofi
       pkgs.xdotool
     ];
