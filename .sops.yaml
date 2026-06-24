@@ -1,7 +1,8 @@
 keys:
-  - &l-x13s-deadbeef age1a5nn59ea7ut9kw2gu20nv067ptd06zr53vdehlus2mrdgnpny4lsu25nrz
-  - &l-x13s-root age15z0s6nul3tyn96acegegjsh0rjhalwt2un0vxlltk98qan5aratqfumu56
+  - &l-portal-u age1a5nn59ea7ut9kw2gu20nv067ptd06zr53vdehlus2mrdgnpny4lsu25nrz
+  - &l-portal-r age15z0s6nul3tyn96acegegjsh0rjhalwt2un0vxlltk98qan5aratqfumu56
   - &l-portal-root age1u9tye6zc765aphr3fdvryzwjrw7a3nez4dw7tafveynsvycf7qvskpw6ds
+  - &l-portal-u age19xpat8fwf97nkrxcgatny48sz0chrhml5j5ksrqvkyqkpnzp6qjssf0zzs
   - &l-envil-root age1t07vak4hlf47esar8temleglsa2c3lde24q6eu78aaq4a0n0ndqqc0mhp5
   - &l-envil-deadbeef age1d7v0j80lqu7672upwc2fazux9h5e6xt6wmy7wp2svytpzxmc6vysqjp0q8
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
@@ -27,6 +28,8 @@ keys:
   - &codex-jail age123fj9yey9cvkef5mn6cjqa2e4zrde9wa78ghlkp6vvag7qk65q3qcrat5w
   - &codex-jail-r age1zc8qevlgymsjweav076vk65ae6ef4n9x8fklv6ue45xl4czrqcpqdpepc3
   - &codex-jail-u age198xl6chpupaf6ecyqkcsg2j2mxf0s894csnxxdw6u0m4mjx7qgjqghg498
+  - &s-agents-r age1hclj2nd6nakml6jc5l2fmnl7yye9m7at2v7fvfjzktpw9j6f2apqlgnn2l
+  - &s-agents-u age15xwz0r777f0lw2zkgw86jdgvqa3ey979udj3rxayta6pjle2k9hshu805h
   - &l-envil-llm-jail age1my0wzset83fpqn8aac7kd4zcdjjmeapxnqy6r9qg36jhe7t8x43qdf7frg
   - &l-envil-llm-jail-root age1lm7ug2rpxh29qu9h38yecqnsu69g6p2qy2v2eesp4uhc43z0x9qs28cwlw
   - &l-envil-llm-jail-user age1z6k6e4ywawn44u83tmwv9304ufaq4ahteszuadechj34jcp9tusqevrm6d
@@ -39,8 +42,8 @@ creation_rules:
     encrypted_regex: ".*"
     key_groups:
       - age:
-          - *l-x13s-deadbeef
-          - *l-x13s-root
+          - *l-portal-u
+          - *l-portal-r
           - *l-envil-root
           - *l-envil-deadbeef
           - *l-envil-llm-jail-root
@@ -83,8 +86,8 @@ creation_rules:
     encrypted_regex: ".*"
     key_groups:
       - age:
-          - *l-x13s-deadbeef
-          - *l-x13s-root
+          - *l-portal-u
+          - *l-portal-r
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-test-vm-impermanence-root
@@ -110,7 +113,7 @@ creation_rules:
     encrypted_regex: ".*"
     key_groups:
       - age:
-          - *l-x13s-deadbeef
+          - *l-portal-u
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-vpn-impermanence-root
@@ -119,19 +122,10 @@ creation_rules:
     encrypted_regex: ".*"
     key_groups:
       - age:
-          - *l-x13s-deadbeef
+          - *l-portal-u
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-vpn-impermanence-root
-
-  - path_regex: '^(secrets/)*l-x13s-.*\.(env|ya?ml)$'
-    encrypted_regex: ".*"
-    key_groups:
-      - age:
-          - *l-esp-deadbeef
-          - *l-esp-root
-          - *l-x13s-deadbeef
-          - *l-x13s-root
 
   - path_regex: '^(secrets/)*l-portal-.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
@@ -145,7 +139,7 @@ creation_rules:
     encrypted_regex: ".*"
     key_groups:
       - age:
-          - *l-x13s-deadbeef
+          - *l-portal-u
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-lxc-router-root
@@ -276,9 +270,8 @@ creation_rules:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
-          - *codex-jail
-          - *codex-jail-u
-          - *codex-jail-r
+          - *s-agents-u
+          - *s-agents-r
   - path_regex: '^(secrets/)*s-router-(test|nixos).*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
@@ -332,8 +325,8 @@ creation_rules:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
-          - *l-x13s-deadbeef
-          - *l-x13s-root
+          - *l-portal-u
+          - *l-portal-r
           - *codex-jail
           - *codex-jail-u
           - *codex-jail-r
