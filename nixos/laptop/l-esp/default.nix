@@ -18,6 +18,7 @@
     profiles.nixos.workstation.full
     profiles.nixos.desktop.i3
     profiles.nixos.boot.usb-removable
+    profiles.nixos.hardware.clock-sync
     profiles.nixos.laptop.default
     profiles.nixos.workstation.android
     profiles.nixos.workstation.pentesting

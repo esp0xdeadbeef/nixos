@@ -33,6 +33,7 @@
 
     profiles.nixos.core
     profiles.nixos.base.maintenance
+    profiles.nixos.hardware.clock-sync
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.shell.zsh-prompt
     "${outPath}/modules/nixos/local-users.nix"

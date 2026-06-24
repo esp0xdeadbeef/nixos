@@ -33,8 +33,8 @@
       fish = import ./nixos/shell/fish.nix;
       zsh-prompt = import ./nixos/shell/zsh-prompt.nix;
     };
-    time = {
-      sync-to-hwclock = import ./nixos/time/sync-to-hwclock.nix;
+    hardware = {
+      clock-sync = import ./nixos/hardware/clock-sync.nix;
     };
     ssh = {
       deadbeef-authorized-keys = import ./nixos/ssh/deadbeef-authorized-keys.nix;

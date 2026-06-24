@@ -15,7 +15,7 @@ in
     profiles.nixos.base.default
     profiles.nixos.laptop.default
     profiles.nixos.boot.usb-removable
-    profiles.nixos.time.sync-to-hwclock
+    profiles.nixos.hardware.clock-sync
 
     inputs.disko.nixosModules.disko
 

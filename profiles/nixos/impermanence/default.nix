@@ -613,6 +613,7 @@ in
         ollamaPrivateDir
         "/var/log"
         "/var/lib/bluetooth"
+        "/var/lib/chrony"
         "/var/lib/nixos"
         "/var/lib/sbctl"
         "/var/lib/systemd/coredump"
