@@ -8,19 +8,23 @@
 let
   os = if osConfig == null then { } else osConfig;
   networkManagerEnabled = os.networking.networkmanager.enable or false;
-  copyqStart = pkgs.writeShellScriptBin "copyq-start" ''
+  copyqConfigure = pkgs.writeShellScriptBin "copyq-configure" ''
     set -eu
 
+    copyq_config_file="''${XDG_CONFIG_HOME:-$HOME/.config}/copyq/copyq.conf"
+    ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$copyq_config_file")"
+
     copyq_config() {
-      ${pkgs.coreutils}/bin/timeout 5s ${pkgs.copyq}/bin/copyq --start-server config "$@" >/dev/null 2>&1 || true
+      ${pkgs.crudini}/bin/crudini --set "$copyq_config_file" Options "$1" "$2"
     }
 
-    copyq_config maxitems 1000
-    copyq_config expire_tab 0
-    copyq_config save_delay_ms_on_item_added 1000
-    copyq_config save_delay_ms_on_item_modified 1000
-    copyq_config save_delay_ms_on_item_moved 1000
-    copyq_config save_delay_ms_on_item_removed 1000
+    copyq_config maxitems "1000"
+    copyq_config expire_tab "0"
+    copyq_config save_delay_ms_on_item_added "1000"
+    copyq_config save_delay_ms_on_item_modified "1000"
+    copyq_config save_delay_ms_on_item_moved "1000"
+    copyq_config save_delay_ms_on_item_removed "1000"
+    ${pkgs.crudini}/bin/crudini --set "$copyq_config_file" Plugins 'itemimage\image_editor' '${pkgs.ksnip}/bin/ksnip --edit %1'
   '';
   i3SpotifyEnabled = config.local.i3.spotify.enable;
   i3SpotifyCommand = config.local.i3.spotify.command;
@@ -30,17 +34,17 @@ let
 in
 {
   home.packages = [
-    pkgs.copyq
-    copyqStart
+    copyqConfigure
   ];
 
+  services.copyq.enable = true;
+  systemd.user.services.copyq.Service.ExecStartPre = "${copyqConfigure}/bin/copyq-configure";
+
   local.i3.extraConfig = lib.mkAfter ''
-    exec --no-startup-id ${copyqStart}/bin/copyq-start
     bindsym $mod+Shift+v exec --no-startup-id ${pkgs.copyq}/bin/copyq show
   '';
 
   local.sway.extraConfig = lib.mkAfter ''
-    exec ${copyqStart}/bin/copyq-start
     bindsym $mod+Shift+v exec ${pkgs.copyq}/bin/copyq show
   '';
 
