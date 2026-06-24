@@ -44,17 +44,15 @@ in
         # Check if nvidia-smi is available (for NVIDIA GPU)
         if command -v nvidia-smi &> /dev/null; then
           GPU_LOAD=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits)
-          GPU_TYPE="nvidia"
         # Check if rocm-smi is available (for AMD GPU)
         elif command -v rocm-smi &> /dev/null; then
           GPU_LOAD=$(rocm-smi --showuse | grep "GPU use" | rev | awk '{print $1}')
-          GPU_TYPE="amd"
         else
           exit 0
         fi
 
         # Determine the state based on GPU load percentage
-        if [ "$GPU_LOAD" -le 25 ]; then
+        if [ "$GPU_LOAD" -le 40 ]; then
           STATE="Idle"
           TEXT=""
         elif [ "$GPU_LOAD" -le 50 ]; then
@@ -71,10 +69,9 @@ in
           TEXT=""
         fi
 
-        TEXT="GPU ($GPU_TYPE): $GPU_LOAD%"
-        TEXT="GPU: $GPU_LOAD%"
+        TEXT="$GPU_LOAD%"
         # Output the JSON block
-        printf '{"icon":"","state":"%s","text":"%s"}\n' "$STATE" "$TEXT"
+        printf '{"icon":"gpu","state":"%s","text":"%s"}\n' "$STATE" "$TEXT"
       '';
       executable = true;
     };
@@ -95,6 +92,13 @@ in
         [icons]
         icons = "awesome6"
         [icons.overrides]
+        net_wireless = [
+            "\U000F092F", # nf-md-wifi_strength_outline
+            "\U000F091F", # nf-md-wifi_strength_1
+            "\U000F0922", # nf-md-wifi_strength_2
+            "\U000F0925", # nf-md-wifi_strength_3
+            "\U000F0928", # nf-md-wifi_strength_4
+        ]
         ${lib.optionalString cfg.battery.enable ''
           bat_charging = "\uf1e6 CHR" # fa-plug
           bat = [
