@@ -19,21 +19,26 @@ let
 
     ${pkgs.wl-clipboard}/bin/wl-copy < "$file"
   '';
+  audioKeybindings = execPrefix: ''
+    bindsym XF86AudioRaiseVolume ${execPrefix} ${pkgs.pamixer}/bin/pamixer --increase 10
+    bindsym XF86AudioLowerVolume ${execPrefix} ${pkgs.pamixer}/bin/pamixer --decrease 10
+    bindsym XF86AudioMute ${execPrefix} ${pkgs.pamixer}/bin/pamixer --toggle-mute
+    bindsym XF86AudioMicMute ${execPrefix} ${pkgs.pamixer}/bin/pamixer --default-source --toggle-mute
+    bindsym XF86AudioPlay ${execPrefix} ${pkgs.playerctl}/bin/playerctl play-pause
+    bindsym XF86AudioPause ${execPrefix} ${pkgs.playerctl}/bin/playerctl play-pause
+    bindsym XF86AudioStop ${execPrefix} ${pkgs.playerctl}/bin/playerctl stop
+    bindsym XF86AudioNext ${execPrefix} ${pkgs.playerctl}/bin/playerctl next
+    bindsym XF86AudioPrev ${execPrefix} ${pkgs.playerctl}/bin/playerctl previous
+  '';
+  brightnessKeybindings = execPrefix: ''
+    bindsym XF86MonBrightnessUp ${execPrefix} "${pkgs.brightnessctl}/bin/brightnessctl set +10%"
+    bindsym XF86MonBrightnessDown ${execPrefix} "${pkgs.brightnessctl}/bin/brightnessctl set 10%-"
+  '';
 in
 {
   local.tiling.generated.i3.keybindings = ''
-    set $refresh_i3status killall -SIGUSR1 i3status
-    bindsym XF86AudioRaiseVolume exec --no-startup-id ${pkgs.pulseaudio}/bin/pactl set-sink-volume @DEFAULT_SINK@ +10% && $refresh_i3status
-    bindsym XF86AudioLowerVolume exec --no-startup-id ${pkgs.pulseaudio}/bin/pactl set-sink-volume @DEFAULT_SINK@ -10% && $refresh_i3status
-    bindsym XF86AudioMute exec --no-startup-id ${pkgs.pulseaudio}/bin/pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status
-    bindsym XF86AudioMicMute exec --no-startup-id ${pkgs.pulseaudio}/bin/pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
-    bindsym XF86AudioPlay exec ${pkgs.playerctl}/bin/playerctl play-pause
-    bindsym XF86AudioPause exec ${pkgs.playerctl}/bin/playerctl play-pause
-    bindsym XF86AudioStop exec ${pkgs.playerctl}/bin/playerctl stop
-    bindsym XF86AudioNext exec ${pkgs.playerctl}/bin/playerctl next
-    bindsym XF86AudioPrev exec ${pkgs.playerctl}/bin/playerctl previous
-    bindsym XF86MonBrightnessUp exec --no-startup-id "${pkgs.brightnessctl}/bin/brightnessctl set +10%"
-    bindsym XF86MonBrightnessDown exec --no-startup-id "${pkgs.brightnessctl}/bin/brightnessctl set 10%-"
+    ${audioKeybindings "exec --no-startup-id"}
+    ${brightnessKeybindings "exec --no-startup-id"}
 
     bindsym $mod+Return exec ${pkgs.alacritty}/bin/alacritty
     bindsym $mod+q kill
@@ -141,6 +146,9 @@ in
   '';
 
   local.tiling.generated.sway.keybindings = ''
+    ${audioKeybindings "exec"}
+    ${brightnessKeybindings "exec"}
+
     bindsym $mod+Return exec ${pkgs.alacritty}/bin/alacritty
     bindsym $mod+q kill
     bindsym $mod+d exec ${pkgs.rofi}/bin/rofi -modi drun\,run -show drun
