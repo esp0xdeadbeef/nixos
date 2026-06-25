@@ -65,11 +65,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1782190230,
-        "narHash": "sha256-s61lQkafu5IEvRz/qExU2G7UfpW8u3hdPyG9lI/KXb0=",
+        "lastModified": 1782356586,
+        "narHash": "sha256-rCxoeECMsuoBn6O4YamxlKpFDq+EYNufGaaT4+RrA+I=",
         "owner": "esp0xdeadbeef",
         "repo": "cheat.sheets",
-        "rev": "c38b4a14c8e027393ce5fc16b3fb62aa453fa210",
+        "rev": "5899073b2243508266d8b74763c7736c8e6b5346",
         "type": "github"
       },
       "original": {
