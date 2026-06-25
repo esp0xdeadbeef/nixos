@@ -149,6 +149,12 @@
 
       profiles = import ./profiles;
 
+      sRouterVlan2RuntimeHosts = [
+        "s-router-clab"
+        "s-router-nixos"
+        "s-router-test-clients"
+      ];
+
       # Host architecture overrides.
       #
       # Most hosts are x86_64. The ThinkPad X13s is Qualcomm ARM64, so evaluating
@@ -212,6 +218,83 @@
             # include everything EXCEPT other hosts and .git
               !(inOther || inGit);
         };
+
+      sRouterVlan2RuntimeValidation =
+        hostName: config:
+        let
+          network = config.systemd.network;
+          netdevs = builtins.attrValues (network.netdevs or { });
+          networks = builtins.attrValues (network.networks or { });
+
+          count = pred: values: lib.length (lib.filter pred values);
+          has = value: values: builtins.elem value values;
+          atLeastOne = pred: values: count pred values > 0;
+
+          isDisabled = value: value == false || value == "no" || value == "false";
+          isIpv4Dhcp = value: value == true || value == "yes" || value == "ipv4";
+
+          vlanIf = "eth0.2";
+          vlanId = 2;
+          bridge = "vlan2";
+
+          vlanNetdev = dev:
+            (dev.netdevConfig.Kind or null) == "vlan"
+            && (dev.netdevConfig.Name or null) == vlanIf
+            && (dev.vlanConfig.Id or null) == vlanId;
+
+          bridgeNetdev = dev:
+            (dev.netdevConfig.Kind or null) == "bridge"
+            && (dev.netdevConfig.Name or null) == bridge;
+
+          parentNetwork = net:
+            (net.matchConfig.Name or null) == "eth0"
+            && has vlanIf (net.networkConfig.VLAN or [ ])
+            && isDisabled (net.networkConfig.DHCP or "no");
+
+          vlanNetwork = net:
+            (net.matchConfig.Name or null) == vlanIf
+            && (net.networkConfig.Bridge or null) == bridge
+            && isDisabled (net.networkConfig.DHCP or "no");
+
+          bridgeNetwork = net:
+            (net.matchConfig.Name or null) == bridge
+            && isIpv4Dhcp (net.networkConfig.DHCP or null)
+            && isDisabled (net.networkConfig.IPv6AcceptRA or "no");
+        in
+        {
+          errors =
+            lib.optionals (!atLeastOne vlanNetdev netdevs) [
+              "${hostName}: runtime must define at least one VLAN netdev eth0.2 with vlanConfig.Id = 2"
+            ]
+            ++ lib.optionals (!atLeastOne bridgeNetdev netdevs) [
+              "${hostName}: runtime must define at least one bridge netdev vlan2"
+            ]
+            ++ lib.optionals (!atLeastOne parentNetwork networks) [
+              "${hostName}: runtime must define at least one eth0 network that attaches eth0.2 and disables DHCP"
+            ]
+            ++ lib.optionals (!atLeastOne vlanNetwork networks) [
+              "${hostName}: runtime must define at least one eth0.2 network enslaved into vlan2 with DHCP disabled"
+            ]
+            ++ lib.optionals (!atLeastOne bridgeNetwork networks) [
+              "${hostName}: runtime must define at least one vlan2 network with IPv4 DHCP and IPv6 RA disabled"
+            ];
+        };
+
+      sRouterVlan2RuntimeGate =
+        hostName:
+        { config, ... }:
+        let
+          validation = sRouterVlan2RuntimeValidation hostName config;
+        in
+        {
+          assertions = [
+            {
+              assertion = validation.errors == [ ];
+              message = builtins.concatStringsSep "; " validation.errors;
+            }
+          ];
+        };
+
     in
     {
       lib = repoLib // {
@@ -225,77 +308,24 @@
           mkSRouterVlan2OutputCheck =
             hostName:
             let
-              network = self.nixosConfigurations.${hostName}.config.systemd.network;
-              netdevs = builtins.attrValues (network.netdevs or { });
-              networks = builtins.attrValues (network.networks or { });
-
               require = cond: message: if cond then true else throw message;
-              any = builtins.any;
-              has = value: values: builtins.elem value values;
-
-              isDisabled = value: value == false || value == "no" || value == "false";
-              isIpv4Dhcp = value: value == true || value == "yes" || value == "ipv4";
-
-              vlanIf = "eth0.2";
-              vlanId = 2;
-              bridge = "vlan2";
-
-              vlanNetdevExists = any
-                (
-                  dev:
-                  (dev.netdevConfig.Kind or null) == "vlan"
-                  && (dev.netdevConfig.Name or null) == vlanIf
-                  && (dev.vlanConfig.Id or null) == vlanId
-                )
-                netdevs;
-
-              bridgeNetdevExists = any
-                (
-                  dev: (dev.netdevConfig.Kind or null) == "bridge" && (dev.netdevConfig.Name or null) == bridge
-                )
-                netdevs;
-
-              parentAttachesVlan = any
-                (
-                  net:
-                  (net.matchConfig.Name or null) == "eth0"
-                  && has vlanIf (net.networkConfig.VLAN or [ ])
-                  && isDisabled (net.networkConfig.DHCP or "no")
-                )
-                networks;
-
-              vlanEnslavedToBridge = any
-                (
-                  net:
-                  (net.matchConfig.Name or null) == vlanIf
-                  && (net.networkConfig.Bridge or null) == bridge
-                  && isDisabled (net.networkConfig.DHCP or "no")
-                )
-                networks;
-
-              bridgeHasIpv4DhcpOnly = any
-                (
-                  net:
-                  (net.matchConfig.Name or null) == bridge
-                  && isIpv4Dhcp (net.networkConfig.DHCP or null)
-                  && isDisabled (net.networkConfig.IPv6AcceptRA or "no")
-                )
-                networks;
+              validation = sRouterVlan2RuntimeValidation hostName self.nixosConfigurations.${hostName}.config;
 
               validated =
-                require vlanNetdevExists "${hostName}: final NixOS output is missing VLAN netdev eth0.2 with vlanConfig.Id = 2"
-                && require bridgeNetdevExists "${hostName}: final NixOS output is missing bridge netdev vlan2"
-                && require parentAttachesVlan "${hostName}: final NixOS output does not attach eth0.2 to parent eth0"
-                && require vlanEnslavedToBridge "${hostName}: final NixOS output does not enslave eth0.2 into bridge vlan2"
-                && require bridgeHasIpv4DhcpOnly "${hostName}: final NixOS output does not configure vlan2 for IPv4 DHCP with IPv6 RA disabled";
+                require
+                  (validation.errors == [ ])
+                  (builtins.concatStringsSep "; " validation.errors);
             in
             pkgs.runCommand (if validated then "${hostName}-vlan2-output-check" else "unreachable") { } ''
               printf '%s\n' '${hostName}: VLAN2 output check passed' > "$out"
             '';
         in
-        {
-          s-router-nixos-vlan2-output = mkSRouterVlan2OutputCheck "s-router-nixos";
-        };
+        lib.listToAttrs (map
+          (hostName: {
+            name = "${hostName}-vlan2-output";
+            value = mkSRouterVlan2OutputCheck hostName;
+          })
+          sRouterVlan2RuntimeHosts);
 
       packages =
         if builtins.pathExists ./pkgs then
@@ -391,6 +421,9 @@
               modules = [
                 outputs.nixosModules.pythonPycachePrefix
                 (./. + "/${path}")
+              ]
+              ++ lib.optionals (builtins.elem name sRouterVlan2RuntimeHosts) [
+                (sRouterVlan2RuntimeGate name)
               ];
             }
         )
