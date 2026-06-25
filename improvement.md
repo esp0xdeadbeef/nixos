@@ -42,9 +42,11 @@ The repo currently has these broad areas:
   install notes, and host-local experiments.
 - `home-manager/`: per-user Home Manager configs plus some shared Home Manager
   snippets under `home-manager/01-general` and `home-manager/02-window-manager-i3`.
-- `library/`: shared NixOS configuration bundles and helper modules.
-- `modules/nixos` and `modules/home-manager`: exported module placeholders, but
-  currently mostly empty.
+- `library/`: legacy shared NixOS configuration bundles and helper modules.
+- `profiles/`: named NixOS and Home Manager profiles. This is now the main
+  reusable profile layer.
+- `modules/nixos` and `modules/home-manager`: exported module surfaces, still
+  underused compared with `profiles/`.
 - `overlays/`: overlay exports, currently `additions`, `modifications`, and
   `unstable-packages`.
 - `pkgs/`: flake package export point, including reusable tools such as
@@ -64,10 +66,11 @@ The repo works, but boundaries are blurry:
 - Host files import both true host hardware and higher-level profiles directly.
   This makes it harder to see what is host-specific versus reusable.
 - Some reusable modules live in `library/`, some in `home-manager/01-general`,
-  while exported module directories under `modules/` are nearly empty.
-- Local packages such as `mxbuild`, `azurehound`, and pentest PowerShell tooling
-  live under `nixos/laptop/l-envil/1-custom-packages`, even though they are really
-  packages or package-backed modules.
+  while exported module directories under `modules/` are still not the clear
+  reusable API.
+- `nixos/laptop/l-envil/1-custom-packages/burp-fix.nix` is still host-local.
+  That is fine if it is only `/etc` glue for one laptop, but it should move if
+  it becomes a package or reusable wrapper.
 - Overlays are used both for actual overlays and for injecting `pkgs.unstable`.
   That pattern works, but makes package provenance less explicit.
 - There are old, backup, and experimental files mixed into active trees:
@@ -320,51 +323,20 @@ profile or module option.
 
 ## Packages
 
-### Move Host-Local Packages Into `pkgs/`
-
-These should be moved out of `nixos/laptop/l-envil/1-custom-packages`:
-
-- `mxbuild`
-- `azurehound`
-- pentest PowerShell bundle, if it is still wanted
-- possibly `burp-fix` if it becomes a package or wrapper rather than only `/etc`
-  file links
-
-Recommended shape:
-
-```text
-pkgs/
-  default.nix
-  mxbuild/
-    default.nix
-  azurehound/
-    default.nix
-  pentest-powershell/
-    default.nix
-```
-
-Then expose them from `pkgs/default.nix`:
-
-```nix
-pkgs: {
-  mxbuild = pkgs.callPackage ./mxbuild { };
-  azurehound = pkgs.callPackage ./azurehound { };
-}
-```
-
-Host modules should consume them as `pkgs.mxbuild`, not import derivations from a
-host-local path.
-
 ### Package-Backed Modules
 
 For host features that install a local package and configure system integration,
 split package and module:
 
-- package derivation in `pkgs/mxbuild/default.nix`;
-- NixOS module in `profiles/nixos/mendix-build.nix` or
-  `modules/nixos/mxbuild.nix`.
+- package derivation in `pkgs/<name>/default.nix`;
+- NixOS module in `profiles/nixos/<feature>.nix` or
+  `modules/nixos/<feature>.nix`.
 
 This prevents package build logic from being hidden inside host config.
+
+Keep `burp-fix` host-local only while it is just `l-envil`-specific `/etc` glue.
+If it becomes a reusable wrapper or package, move the derivation into `pkgs/`
+and keep the system integration in a profile or module.
 
 ## NixOS-Shell VM Host Profile
 
@@ -811,38 +783,30 @@ Do not centralize secret names too early; centralize only repeated mechanics.
 
 1. Inventory active imports.
    Use a script or `nix eval` to list every host and its imported top-level
-   profiles. Compare this with the README's generated-importer TODO. Do not move
-   files yet.
+   profiles. Compare this with the README's generated-importer TODO.
 
-2. Create profile directories.
-   Add empty or thin wrapper modules that re-export the current `library/*`
-   modules without behavior changes.
+2. Split remaining broad legacy imports.
+   Keep moving `library/01-general` behavior into focused profiles such as
+   `base`, `desktop`, `virtualization-host`, `packages`, and `pentesting`.
+   Update one non-critical host first.
 
-3. Move local packages into `pkgs/`.
-   Start with `mxbuild`, because it is a normal derivation and a clear example.
-   Keep host behavior identical by replacing only the import path.
-
-4. Split `library/01-general`.
-   Break it into `base`, `desktop`, `virtualization-host`, `packages`, and
-   `pentesting` profiles. Update one non-critical host first.
-
-5. Normalize unstable usage.
+3. Normalize unstable usage.
    Replace ad hoc `import inputs.nixpkgs-unstable` with `pkgs.unstable` or a
    single helper pattern.
 
-6. Populate exported module sets.
+4. Tighten exported module sets.
    Add stable names in `modules/nixos/default.nix` and
    `modules/home-manager/default.nix` after the profile names settle.
 
-7. Remove stale files.
+5. Remove stale files.
    Move `z_old`, `*.bak`, and experiments either to an archive directory or out
    of the flake source if they are not used.
 
-8. Fix root `library/default.nix`.
+6. Fix root `library/default.nix`.
    Make it a real index or delete it if unused. The current duplicate content is
    misleading.
 
-9. Update the README.
+7. Update the README.
    Replace the old importer TODO with the chosen import convention once the
    cleanup is real. Keep the note that the repo originated from
    Misterio77's starter configs, because that is useful context.
@@ -860,12 +824,7 @@ nix eval .#nixosConfigurations.l-envil.config.system.build.toplevel.drvPath
 nix eval .#nixosConfigurations.s-sigma.config.system.build.toplevel.drvPath
 ```
 
-- For package moves:
-
-```sh
-nix build .#mxbuild
-nix build .#azurehound
-```
+- For package changes, build the affected package directly.
 
 - For Home Manager-only moves, eval the affected user config before rebuilding
   the host.
@@ -890,6 +849,6 @@ The desired repo should make these questions easy to answer:
 - Which modules are reusable outside this repo?
 - Which files are host-specific hardware or secrets glue?
 
-The first concrete cleanup should probably be moving `mxbuild` into `pkgs/`,
-because it is low-risk, self-contained, and demonstrates the package/module
-boundary clearly.
+The next concrete cleanup should be reducing direct dependency on
+`library/01-general` by moving one remaining broad import path into focused
+profiles and validating one host at a time.
