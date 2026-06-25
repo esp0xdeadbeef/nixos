@@ -148,7 +148,7 @@
 
   virtualisation = {
     cores = lib.mkDefault 8;
-    memorySize = lib.mkDefault (16 * 1024);
+    memorySize = lib.mkForce (300 * 1024);
     diskSize = lib.mkDefault (40 * 1024);
   };
 }
