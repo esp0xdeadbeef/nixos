@@ -20,7 +20,8 @@
 
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
-    profiles.home-manager.desktop-i3
+    profiles.home-manager.desktop.i3
+    "${outPath}/profiles/home-manager/nix/github-access-token.nix"
   ];
   nixpkgs = {
     # You can add overlays here
@@ -55,6 +56,7 @@
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   local.i3.modifier = "Mod1";
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
+  local.i3.spotify.enable = false;
 
   home.packages = with pkgs; [
     btop
