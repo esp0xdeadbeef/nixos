@@ -46,6 +46,19 @@ in
 
   services.copyq.enable = true;
   systemd.user.services.copyq.Service.ExecStartPre = "${copyqConfigure}/bin/copyq-configure";
+  systemd.user.services.i3lock-before-sleep = {
+    Unit = {
+      Description = "Lock i3 before system sleep";
+      Before = [ "sleep.target" ];
+    };
+
+    Service = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.i3lock}/bin/i3lock -c 202020";
+    };
+
+    Install.WantedBy = [ "sleep.target" ];
+  };
 
   local.i3.extraConfig = lib.mkAfter ''
     bindsym $mod+Shift+v exec --no-startup-id ${pkgs.copyq}/bin/copyq show
@@ -58,7 +71,6 @@ in
   local.tiling.generated.i3.autostart = ''
     exec --no-startup-id ${pkgs.dex}/bin/dex --autostart --environment i3
     exec --no-startup-id ${pkgs.xset}/bin/xset s off -dpms
-    exec --no-startup-id ${pkgs.xss-lock}/bin/xss-lock --transfer-sleep-lock -- ${pkgs.i3lock}/bin/i3lock -n -c 202020
     exec_always --no-startup-id ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'
     ${lib.optionalString networkManagerEnabled "exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet"}
     exec --no-startup-id export XDG_SESSION_TYPE=x11
@@ -74,6 +86,7 @@ in
 
   local.tiling.generated.sway.autostart = ''
     exec ${pkgs.mako}/bin/mako
+    # Keep sleep/hibernate locking, but do not lock after an idle timeout.
     exec ${pkgs.swayidle}/bin/swayidle -w before-sleep '${pkgs.swaylock}/bin/swaylock -f -c 202020'
     ${lib.optionalString networkManagerEnabled "exec ${pkgs.networkmanagerapplet}/bin/nm-applet --indicator"}
     exec_always ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -f polkit-gnome-authentication-agent-1 >/dev/null || exec ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1'

@@ -101,6 +101,58 @@ let
     export HOME="$runtime_home"
     export PATH="${lib.makeBinPath [ pkgs.xrandr pkgs.xrdb ]}:$PATH"
 
+    snapshot_drm_connectors() {
+      for connector in /sys/class/drm/card*-*; do
+        [ -e "$connector/status" ] || continue
+
+        name="''${connector##*/}"
+        status="$(${pkgs.coreutils}/bin/cat "$connector/status" 2>/dev/null || true)"
+        enabled="$(${pkgs.coreutils}/bin/cat "$connector/enabled" 2>/dev/null || true)"
+        modes=0
+        edid="none"
+
+        if [ -f "$connector/modes" ]; then
+          modes="$(${pkgs.coreutils}/bin/wc -l < "$connector/modes")"
+        fi
+
+        if [ -s "$connector/edid" ]; then
+          edid="$(${pkgs.coreutils}/bin/sha256sum "$connector/edid" | ${pkgs.coreutils}/bin/cut -d ' ' -f 1)"
+        fi
+
+        ${pkgs.coreutils}/bin/printf '%s %s %s %s %s\n' "$name" "$status" "$enabled" "$modes" "$edid"
+      done | ${pkgs.coreutils}/bin/sort
+    }
+
+    wait_for_stable_drm() {
+      last=""
+      stable=0
+      deadline=$((SECONDS + ${toString cfg.stabilityTimeoutSeconds}))
+
+      while [ "$SECONDS" -le "$deadline" ]; do
+        ${pkgs.systemd}/bin/udevadm settle --timeout=3 || true
+        current="$(snapshot_drm_connectors)"
+
+        if [ "$current" = "$last" ] && [ -n "$current" ]; then
+          stable=$((stable + 1))
+        else
+          stable=1
+          last="$current"
+        fi
+
+        if [ "$stable" -ge ${toString cfg.stabilitySamples} ]; then
+          return 0
+        fi
+
+        ${pkgs.coreutils}/bin/sleep ${toString cfg.stabilityIntervalSeconds}
+      done
+
+      echo "DRM display topology did not stabilize; skipping layout apply." >&2
+      ${pkgs.coreutils}/bin/printf '%s\n' "$last" >&2
+      return 1
+    }
+
+    wait_for_stable_drm || exit 0
+    ${pkgs.xlayoutdisplay}/bin/xlayoutdisplay --noop -w 0 >/dev/null
     ${pkgs.xlayoutdisplay}/bin/xlayoutdisplay -w ${toString cfg.waitSeconds}
   '';
 
@@ -152,6 +204,24 @@ in
       type = lib.types.ints.unsigned;
       default = 1;
       description = "Seconds to wait after the last hotplug event before applying the layout.";
+    };
+
+    stabilitySamples = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 3;
+      description = "Number of identical DRM connector samples required before applying the layout.";
+    };
+
+    stabilityIntervalSeconds = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 1;
+      description = "Seconds between DRM connector samples.";
+    };
+
+    stabilityTimeoutSeconds = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 20;
+      description = "Maximum seconds to wait for a stable DRM connector topology before skipping the apply.";
     };
 
     maxResolution = lib.mkOption {

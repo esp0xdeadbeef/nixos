@@ -17,13 +17,15 @@ let
     [
       "wait=2"
       "dpi=${toString layout.dpi}"
-      "rate=60"
       "primary=${left}"
       "order=${left}"
       "order=${right}"
       "order=${internal}"
-      "target-resolution=${layout.targetResolution}"
     ]
+    ++ lib.optional (layout.targetResolution != null)
+      "target-resolution=${layout.targetResolution}"
+    ++ lib.optional (layout.rate != null)
+      "rate=${toString layout.rate}"
     ++ lib.optionals (layout.externalScale != null) [
       "scale=${left}=${layout.externalScale}"
       "scale=${right}=${layout.externalScale}"
@@ -59,11 +61,18 @@ in
       description = "Fixed Xft DPI for this monitor layout.";
     };
 
+    rate = lib.mkOption {
+      type = lib.types.nullOr lib.types.ints.positive;
+      default = null;
+      example = 30;
+      description = "Optional refresh rate passed to xlayoutdisplay.";
+    };
+
     targetResolution = lib.mkOption {
-      type = lib.types.str;
+      type = lib.types.nullOr lib.types.str;
       default = "2560x1440";
-      example = "2560x1440";
-      description = "Logical size target for outputs larger than this resolution.";
+      example = null;
+      description = "Optional logical size target for outputs larger than this resolution.";
     };
 
     externalScale = lib.mkOption {

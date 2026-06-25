@@ -122,6 +122,10 @@
   local.laptop.autorandrDefault.enable = false;
   local.laptop.monitorLayouts.samsungLu28r55Desk = {
     enable = true;
+    left = "edid:37a85fea39fa278b";
+    right = "edid:ccc5757174dd0f67";
+    targetResolution = "3840x2160";
+    internalScale = "1x1";
   };
   local.workstation.android.enable = true;
   environment.etc.hosts.enable = false;
