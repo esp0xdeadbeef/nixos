@@ -23,13 +23,14 @@ in
       controlPlane = cpmBuilt;
     })
 
-    (inputs.network-renderer-access-endpoint-nixos.libBySystem.${system}.renderer.hostModuleFromPaths {
+    (inputs.network-renderer-access-endpoint-nixos.libBySystem.${system}.renderer.hostModule {
       inherit hostName labSource;
 
-      intentPath = "${inputs.network-labs}/${labSource}/intent.nix";
-      inventoryPath = "${inputs.network-labs}/${labSource}/inventory-nixos.nix";
-      clientsPath = "${inputs.network-labs}/${labSource}/clients.nix";
-      routingSopsPath = "${inputs.network-labs}/${labSource}/sops-routing-${hostName}.nix";
+      cpm = cpmBuilt;
+      controlPlane = cpmBuilt;
+      inventory = "${inputs.network-labs}/${labSource}/inventory-nixos.nix";
+      clients = "${inputs.network-labs}/${labSource}/clients.nix";
+      sops = "${inputs.network-labs}/${labSource}/sops-routing-${hostName}.nix";
     })
   ];
 }
