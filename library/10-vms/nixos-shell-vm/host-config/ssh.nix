@@ -1,4 +1,10 @@
-{ ... }:
+{ lib
+, outPath
+, ...
+}:
+let
+  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
+in
 {
   services.openssh = {
     enable = true;
@@ -15,9 +21,9 @@
     ];
   };
   users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD"
+    (keyFor "codex-jail")
   ];
   users.users.deadbeef.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD"
+    (keyFor "codex-jail")
   ];
 }

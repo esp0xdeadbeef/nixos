@@ -145,9 +145,7 @@
   users.users.deadbeef = {
     hashedPasswordFile = config.sops.secrets."deadbeef-passwd".path;
     isNormalUser = true;
-    openssh.authorizedKeys.keys = [
-      # "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMjKvRKsu7X9Ll0ymXF1+ArvggVqn3jcLoVCL0MutUzT deadbeef@l-portal"
-    ];
+    openssh.authorizedKeys.keys = [ ];
   };
 
   environment = {

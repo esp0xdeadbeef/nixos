@@ -9,6 +9,7 @@
 }:
 let
   hostName = builtins.baseNameOf (builtins.dirOf __curPos.file);
+  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
 in
 {
   imports = [
@@ -183,11 +184,11 @@ in
       isNormalUser = true;
 
       openssh.authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMjKvRKsu7X9Ll0ymXF1+ArvggVqn3jcLoVCL0MutUzT deadbeef@l-portal"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPqHQoNlgpqtFtwDfWXqnxk8+4BPS0nrOGQrlarOvneo deadbeef@l-esp"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHKV3VELpoQ+bvxIKhcSlmkCQpJPh1Q+YuIDC2/DEjHg root@l-esp"
-        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCiusRhQSFtAGfHuewHQSANtEUP6nQu1S3LVoR/BEs7Fs8u6x8nRZnlQo1+skfjNWvV/5d76CPvUFP228mdhPWYYtkE1Vy+pLAq1UhPuJjOJKgac8MvR4veRyRTAQIWGdmEPa/XKKgekjYT2OKHkHibM2apbg5pFNdFAHSI8Oy7vqSmSVCKVzyoISoChkFpM02+guYS/J8ysyGNj+LW+C3shiwdYfRCnHdsjc9EjWUb++PIDhKwmeHK5yqPffKuc6kE8v9kTXx9JEeP/MQ9f6vZZbChPl71QiEt7Bt22lXiRfatvrdMqHyL7qCs4vFY+pkeY9V1tN2WPnuwcQJRNR2KRtznGMHIg6Sfwd2MT7XQyEoW3VH0m53AoljI/VdYWpUAdfVtNIOvG2BrKwfbZuiPXCPZDXy8zkovO/MO0ux62DLm+hBf103NZWd23P+yAfEyFoa0909NZiyfUtBAzudj69sKTeSwQRR3p8ZoNQfjCvcWvvtcAUpLk54Z+iFuRAc= deadbeef@l-esp"
+        (keyFor "l-portal")
+        (keyFor "l-esp")
+        (keyFor "l-esp-alt")
+        (keyFor "l-esp-root")
+        (keyFor "l-esp-rsa")
       ];
 
       extraGroups = [

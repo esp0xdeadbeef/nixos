@@ -13,6 +13,7 @@
 let
   hostName = builtins.baseNameOf (builtins.dirOf __curPos.file);
   codexUser = "deadbeef";
+  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
 in
 {
   imports = [
@@ -137,7 +138,7 @@ in
       extraGroups = [ "wheel" ];
 
       openssh.authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMzXcHAi4fHzfTfajlh34I0hzQ29BqHT2DRJ/o9G1nvT"
+        (keyFor "l-envil-llm-jail")
       ];
 
       shell = pkgs.zsh;

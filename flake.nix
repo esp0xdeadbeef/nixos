@@ -218,6 +218,85 @@
         inherit vmSourceForHost hosts;
       };
 
+      checks.x86_64-linux =
+        let
+          pkgs = nixpkgs.legacyPackages.x86_64-linux;
+
+          mkSRouterVlan2OutputCheck =
+            hostName:
+            let
+              network = self.nixosConfigurations.${hostName}.config.systemd.network;
+              netdevs = builtins.attrValues (network.netdevs or { });
+              networks = builtins.attrValues (network.networks or { });
+
+              require = cond: message: if cond then true else throw message;
+              any = builtins.any;
+              has = value: values: builtins.elem value values;
+
+              isDisabled = value: value == false || value == "no" || value == "false";
+              isIpv4Dhcp = value: value == true || value == "yes" || value == "ipv4";
+
+              vlanIf = "eth0.2";
+              vlanId = 2;
+              bridge = "vlan2";
+
+              vlanNetdevExists = any
+                (
+                  dev:
+                  (dev.netdevConfig.Kind or null) == "vlan"
+                  && (dev.netdevConfig.Name or null) == vlanIf
+                  && (dev.vlanConfig.Id or null) == vlanId
+                )
+                netdevs;
+
+              bridgeNetdevExists = any
+                (
+                  dev: (dev.netdevConfig.Kind or null) == "bridge" && (dev.netdevConfig.Name or null) == bridge
+                )
+                netdevs;
+
+              parentAttachesVlan = any
+                (
+                  net:
+                  (net.matchConfig.Name or null) == "eth0"
+                  && has vlanIf (net.networkConfig.VLAN or [ ])
+                  && isDisabled (net.networkConfig.DHCP or "no")
+                )
+                networks;
+
+              vlanEnslavedToBridge = any
+                (
+                  net:
+                  (net.matchConfig.Name or null) == vlanIf
+                  && (net.networkConfig.Bridge or null) == bridge
+                  && isDisabled (net.networkConfig.DHCP or "no")
+                )
+                networks;
+
+              bridgeHasIpv4DhcpOnly = any
+                (
+                  net:
+                  (net.matchConfig.Name or null) == bridge
+                  && isIpv4Dhcp (net.networkConfig.DHCP or null)
+                  && isDisabled (net.networkConfig.IPv6AcceptRA or "no")
+                )
+                networks;
+
+              validated =
+                require vlanNetdevExists "${hostName}: final NixOS output is missing VLAN netdev eth0.2 with vlanConfig.Id = 2"
+                && require bridgeNetdevExists "${hostName}: final NixOS output is missing bridge netdev vlan2"
+                && require parentAttachesVlan "${hostName}: final NixOS output does not attach eth0.2 to parent eth0"
+                && require vlanEnslavedToBridge "${hostName}: final NixOS output does not enslave eth0.2 into bridge vlan2"
+                && require bridgeHasIpv4DhcpOnly "${hostName}: final NixOS output does not configure vlan2 for IPv4 DHCP with IPv6 RA disabled";
+            in
+            pkgs.runCommand (if validated then "${hostName}-vlan2-output-check" else "unreachable") { } ''
+              printf '%s\n' '${hostName}: VLAN2 output check passed' > "$out"
+            '';
+        in
+        {
+          s-router-nixos-vlan2-output = mkSRouterVlan2OutputCheck "s-router-nixos";
+        };
+
       packages =
         if builtins.pathExists ./pkgs then
           forAllSystems

@@ -8,6 +8,9 @@
 , ...
 }:
 
+let
+  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
+in
 {
   imports = [
     inputs.nixos-shell.nixosModules.nixos-shell
@@ -22,8 +25,8 @@
 
   services.openssh.enable = true;
   users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMjKvRKsu7X9Ll0ymXF1+ArvggVqn3jcLoVCL0MutUzT deadbeef@l-portal"
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
+    (keyFor "l-portal")
+    (keyFor "l-esp")
   ];
 
   users.users.deadbeef = {

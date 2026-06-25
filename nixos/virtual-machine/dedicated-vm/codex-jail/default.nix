@@ -11,6 +11,7 @@
 
 let
   codexUser = "deadbeef";
+  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
 in
 {
   imports = [
@@ -142,9 +143,9 @@ in
       extraGroups = [ "wheel" ];
 
       openssh.authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMjKvRKsu7X9Ll0ymXF1+ArvggVqn3jcLoVCL0MutUzT deadbeef@l-portal"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID3aMs0pSWWYY3Sah8zYP0cJKW7SO/5F8Z7QjM359C+i root@nixos"
+        (keyFor "l-portal")
+        (keyFor "l-esp")
+        (keyFor "s-sigma-root")
       ];
 
       shell = pkgs.zsh;

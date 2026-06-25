@@ -5,6 +5,9 @@
 , installDisk
 , ...
 }:
+let
+  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
+in
 {
   networking.hostName = lib.mkForce hostName;
 
@@ -94,9 +97,9 @@
   };
 
   users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqEmMbztRhj2zE1dXf5Z+Ow7mXXXE6sNAG4/hrIOrmD deadbeef@codex-jail"
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMjKvRKsu7X9Ll0ymXF1+ArvggVqn3jcLoVCL0MutUzT deadbeef@l-portal"
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMgBgeVe/DSMZQAY8iS1D5Db3IbyteDSW+l79ZFD8Rmg deadbeef@l-esp"
+    (keyFor "codex-jail")
+    (keyFor "l-portal")
+    (keyFor "l-esp")
   ];
 
   networking.firewall.allowedTCPPorts = [ 22 ];
