@@ -120,7 +120,9 @@
   networking.networkmanager.enable = true;
   services.autorandr.enable = lib.mkForce false;
   local.laptop.autorandrDefault.enable = false;
-  local.laptop.monitorLayouts.samsungLu28r55Desk.enable = true;
+  local.laptop.monitorLayouts.samsungLu28r55Desk = {
+    enable = true;
+  };
   local.workstation.android.enable = true;
   environment.etc.hosts.enable = false;
   local.users.primary.name = "deadbeef";

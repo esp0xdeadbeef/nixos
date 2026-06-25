@@ -63,7 +63,6 @@ in
     ${lib.optionalString networkManagerEnabled "exec --no-startup-id ${pkgs.networkmanagerapplet}/bin/nm-applet"}
     exec --no-startup-id export XDG_SESSION_TYPE=x11
     exec --no-startup-id xsetroot -solid "#333333"
-    exec --no-startup-id xsetroot -solid "#000000"
     exec --no-startup-id ${pkgs.picom}/bin/picom
     ${lib.optionalString (displayStartupCommand != null) "exec --no-startup-id ${displayStartupCommand}"}
     exec --no-startup-id ${pkgs.dunst}/bin/dunst

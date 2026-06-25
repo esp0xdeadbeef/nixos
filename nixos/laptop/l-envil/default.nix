@@ -142,7 +142,8 @@ in
   local.users.primary.name = "deadbeef";
   local.laptop.monitorLayouts.samsungLu28r55Desk = {
     enable = true;
-    internalScale = "1.25x1.25";
+    left = "edid:ccc5757174dd0f67";
+    right = "edid:37a85fea39fa278b";
   };
 
   sops.secrets."deadbeef-passwd" = {

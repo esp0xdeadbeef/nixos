@@ -1,6 +1,6 @@
 diff -ruN xlayoutdisplay-old/main.cpp xlayoutdisplay-new/main.cpp
 --- xlayoutdisplay-old/main.cpp	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/main.cpp	2026-06-24 22:18:05.243065832 +0200
++++ xlayoutdisplay-new/main.cpp	2026-06-25 01:49:09.371799327 +0200
 @@ -22,6 +22,7 @@
  #include <getopt.h>
 
@@ -9,19 +9,20 @@ diff -ruN xlayoutdisplay-old/main.cpp xlayoutdisplay-new/main.cpp
  #include "src/util.h"
 
  using namespace std;
-@@ -56,7 +57,10 @@
+@@ -56,7 +57,11 @@
          "  -d [ --dpi ] arg       DPI override\n"
          "  -r [ --rate ] arg      Refresh rate override\n"
          "  -m [ --mirror ]        mirror outputs using the lowest common resolution\n"
 -        "  -o [ --order ] arg     order of outputs, repeat as needed\n"
 +        "     [ --max-resolution ] arg  maximum output mode, e.g. 2560x1440\n"
-+        "     [ --scale ] arg     per-output scale, e.g. edid:abc=1.25x1.25\n"
++        "     [ --target-resolution ] arg  scale larger outputs down to this logical size, e.g. 2560x1440\n"
++        "     [ --scale ] arg     per-output scale, e.g. edid:abc=0.666667x0.666667\n"
 +        "     scale=selector=arg  config-file form of --scale\n"
 +        "  -o [ --order ] arg     order of outputs, repeat as needed; supports edid:<hash>\n"
          "  -p [ --primary ] arg   primary output\n"
          "  -q [ --quiet ]         suppress feedback\n"
          "  -w [ --wait ] arg      wait seconds before running\n";
-@@ -73,7 +77,7 @@
+@@ -73,7 +78,7 @@
 
          // name=val
          smatch match;
@@ -30,7 +31,7 @@ diff -ruN xlayoutdisplay-old/main.cpp xlayoutdisplay-new/main.cpp
              continue;
          }
 
-@@ -85,6 +89,10 @@
+@@ -85,6 +90,12 @@
              settings.mirror = parseBool(match[2]);
          } else if (match[1] == "order") {
              settings.order.push_back(match[2]);
@@ -38,19 +39,22 @@ diff -ruN xlayoutdisplay-old/main.cpp xlayoutdisplay-new/main.cpp
 +            settings.scales.push_back(parseOutputScale(match[2]));
 +        } else if (match[1] == "max-resolution") {
 +            settings.maxResolution = match[2];
++        } else if (match[1] == "target-resolution") {
++            settings.targetResolution = match[2];
          } else if (match[1] == "primary") {
              settings.primary = match[2];
          } else if (match[1] == "quiet") {
-@@ -107,6 +115,8 @@
+@@ -107,6 +118,9 @@
          { "dpi",           required_argument, 0, 'd' },
          { "rate",          required_argument, 0, 'r' },
          { "mirror",        no_argument,       0, 'm' },
 +        { "max-resolution", required_argument, 0, 1000 },
 +        { "scale",         required_argument, 0, 1001 },
++        { "target-resolution", required_argument, 0, 1002 },
          { "order",         required_argument, 0, 'o' },
          { "primary",       required_argument, 0, 'p' },
          { "quiet",         no_argument,       0, 'q' },
-@@ -145,6 +155,12 @@
+@@ -145,6 +159,15 @@
              case 'm':
                  settings.mirror = true;
                  break;
@@ -60,22 +64,26 @@ diff -ruN xlayoutdisplay-old/main.cpp xlayoutdisplay-new/main.cpp
 +            case 1001:
 +                settings.scales.push_back(parseOutputScale(optarg));
 +                break;
++            case 1002:
++                settings.targetResolution = optarg;
++                break;
              case 'o':
                  if (orderFromFile) {
                      settings.order.clear();
 diff -ruN xlayoutdisplay-old/src/DisplayRules.cpp xlayoutdisplay-new/src/DisplayRules.cpp
 --- xlayoutdisplay-old/src/DisplayRules.cpp	1970-01-01 01:00:00.000000000 +0100
-+++ xlayoutdisplay-new/src/DisplayRules.cpp	2026-06-24 22:24:00.047032446 +0200
-@@ -0,0 +1,97 @@
++++ xlayoutdisplay-new/src/DisplayRules.cpp	2026-06-25 01:48:35.842010409 +0200
+@@ -0,0 +1,130 @@
 +/*
 +   Local xlayoutdisplay extensions.
 +*/
 +#include "DisplayRules.h"
 +#include "util.h"
 +
++#include <algorithm>
++#include <cmath>
 +#include <regex>
 +#include <strings.h>
-+#include <system_error>
 +
 +using namespace std;
 +
@@ -129,14 +137,14 @@ diff -ruN xlayoutdisplay-old/src/DisplayRules.cpp xlayoutdisplay-new/src/Display
 +
 +void applyOutputScales(const list<shared_ptr<Output>> &outputs, const vector<OutputScale> &scales) {
 +    for (const auto &scale : scales) {
-+        double scaleX;
-+        double scaleY;
-+        if (!parseScale(scale.scale, &scaleX, &scaleY)) {
-+            throw invalid_argument("invalid scale '" + scale.scale + "'");
-+        }
-+
 +        for (const auto &output : outputs) {
 +            if (outputMatches(scale.selector, output)) {
++                double scaleX;
++                double scaleY;
++                if (!parseScale(scale.scale, &scaleX, &scaleY)) {
++                    throw invalid_argument("invalid scale '" + scale.scale + "'");
++                }
++
 +                output->desiredScaleConfigured = true;
 +                output->desiredScaleX = scaleX;
 +                output->desiredScaleY = scaleY;
@@ -148,7 +156,7 @@ diff -ruN xlayoutdisplay-old/src/DisplayRules.cpp xlayoutdisplay-new/src/Display
 +shared_ptr<const Mode> desiredModeForOutput(const Output &output, const string &maxMode) {
 +    unsigned int maxWidth;
 +    unsigned int maxHeight;
-+    if (maxMode.empty() || !parseModeSize(maxMode, &maxWidth, &maxHeight)) {
++    if (maxMode.empty() || output.name.rfind("eDP", 0) == 0 || !parseModeSize(maxMode, &maxWidth, &maxHeight)) {
 +        return output.optimalMode;
 +    }
 +
@@ -161,13 +169,45 @@ diff -ruN xlayoutdisplay-old/src/DisplayRules.cpp xlayoutdisplay-new/src/Display
 +    return output.optimalMode;
 +}
 +
++void applyTargetResolutionScale(Output &output, const string &targetResolution) {
++    unsigned int targetWidth;
++    unsigned int targetHeight;
++    if (targetResolution.empty() || output.desiredScaleConfigured || !output.desiredMode ||
++        !parseModeSize(targetResolution, &targetWidth, &targetHeight)) {
++        return;
++    }
++
++    const double scaleX = static_cast<double>(targetWidth) / output.desiredMode->width;
++    const double scaleY = static_cast<double>(targetHeight) / output.desiredMode->height;
++    const double scale = min(scaleX, scaleY);
++    if (scale >= 1.0) {
++        return;
++    }
++
++    output.desiredScaleConfigured = true;
++    output.desiredScaleX = scale;
++    output.desiredScaleY = scale;
++}
++
 +int logicalOutputWidth(const Output &output) {
-+    return static_cast<int>(output.desiredMode->width);
++    if (!output.desiredMode) {
++        return 0;
++    }
++
++    return static_cast<int>(ceil(output.desiredMode->width * output.desiredScaleX));
++}
++
++int logicalOutputHeight(const Output &output) {
++    if (!output.desiredMode) {
++        return 0;
++    }
++
++    return static_cast<int>(ceil(output.desiredMode->height * output.desiredScaleY));
 +}
 diff -ruN xlayoutdisplay-old/src/DisplayRules.h xlayoutdisplay-new/src/DisplayRules.h
 --- xlayoutdisplay-old/src/DisplayRules.h	1970-01-01 01:00:00.000000000 +0100
-+++ xlayoutdisplay-new/src/DisplayRules.h	2026-06-24 22:13:18.668363774 +0200
-@@ -0,0 +1,27 @@
++++ xlayoutdisplay-new/src/DisplayRules.h	2026-06-25 01:48:14.153146948 +0200
+@@ -0,0 +1,28 @@
 +/*
 +   Local xlayoutdisplay extensions.
 +*/
@@ -177,7 +217,6 @@ diff -ruN xlayoutdisplay-old/src/DisplayRules.h xlayoutdisplay-new/src/DisplayRu
 +#include "Mode.h"
 +#include "Output.h"
 +
-+#include <list>
 +#include <memory>
 +#include <string>
 +#include <vector>
@@ -192,12 +231,14 @@ diff -ruN xlayoutdisplay-old/src/DisplayRules.h xlayoutdisplay-new/src/DisplayRu
 +bool outputMatches(const std::string &selector, const std::shared_ptr<Output> &output);
 +void applyOutputScales(const std::list<std::shared_ptr<Output>> &outputs, const std::vector<OutputScale> &scales);
 +std::shared_ptr<const Mode> desiredModeForOutput(const Output &output, const std::string &maxMode);
++void applyTargetResolutionScale(Output &output, const std::string &targetResolution);
 +int logicalOutputWidth(const Output &output);
++int logicalOutputHeight(const Output &output);
 +
 +#endif //XLAYOUTDISPLAY_DISPLAYRULES_H
 diff -ruN xlayoutdisplay-old/src/Edid.cpp xlayoutdisplay-new/src/Edid.cpp
 --- xlayoutdisplay-old/src/Edid.cpp	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/Edid.cpp	2026-06-24 22:13:18.668570752 +0200
++++ xlayoutdisplay-new/src/Edid.cpp	2026-06-25 00:56:43.199788900 +0200
 @@ -16,6 +16,9 @@
  #include "Edid.h"
 
@@ -235,9 +276,14 @@ diff -ruN xlayoutdisplay-old/src/Edid.cpp xlayoutdisplay-new/src/Edid.cpp
  unsigned int Edid::maxCmHoriz() const {
      return edid[EDID_BYTE_MAX_CM_HORIZ];
  }
+@@ -54,4 +71,3 @@
+     // nearest 12 dpi
+     return lround((dpiHoriz + dpiVert) / 24) * 12;
+ }
+-
 diff -ruN xlayoutdisplay-old/src/Edid.h xlayoutdisplay-new/src/Edid.h
 --- xlayoutdisplay-old/src/Edid.h	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/Edid.h	2026-06-24 22:13:18.668510179 +0200
++++ xlayoutdisplay-new/src/Edid.h	2026-06-25 00:56:43.199788900 +0200
 @@ -17,6 +17,7 @@
  #define XLAYOUTDISPLAY_EDID_H
 
@@ -265,7 +311,7 @@ diff -ruN xlayoutdisplay-old/src/Edid.h xlayoutdisplay-new/src/Edid.h
  #endif //XLAYOUTDISPLAY_EDID_H
 diff -ruN xlayoutdisplay-old/src/Output.h xlayoutdisplay-new/src/Output.h
 --- xlayoutdisplay-old/src/Output.h	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/Output.h	2026-06-24 22:17:07.966937308 +0200
++++ xlayoutdisplay-new/src/Output.h	2026-06-25 01:02:15.996690027 +0200
 @@ -57,6 +57,9 @@
      bool desiredActive = false;
      std::shared_ptr<const Mode> desiredMode;
@@ -278,7 +324,7 @@ diff -ruN xlayoutdisplay-old/src/Output.h xlayoutdisplay-new/src/Output.h
 
 diff -ruN xlayoutdisplay-old/src/Settings.h xlayoutdisplay-new/src/Settings.h
 --- xlayoutdisplay-old/src/Settings.h	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/Settings.h	2026-06-24 22:13:18.668616327 +0200
++++ xlayoutdisplay-new/src/Settings.h	2026-06-25 01:48:59.977858464 +0200
 @@ -18,6 +18,7 @@
 
  #include <string>
@@ -287,26 +333,27 @@ diff -ruN xlayoutdisplay-old/src/Settings.h xlayoutdisplay-new/src/Settings.h
 
  // user provided settings for this utility
  class Settings {
-@@ -28,6 +29,8 @@
+@@ -28,6 +29,9 @@
      bool noop = false;
      bool mirror = false;
      std::vector<std::string> order;
 +    std::vector<OutputScale> scales;
 +    std::string maxResolution;
++    std::string targetResolution;
      std::string primary;
      bool quiet = false;
      long wait = 0;
 diff -ruN xlayoutdisplay-old/src/calculations.cpp xlayoutdisplay-new/src/calculations.cpp
 --- xlayoutdisplay-old/src/calculations.cpp	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/calculations.cpp	2026-06-24 22:13:18.668946238 +0200
-@@ -15,6 +15,7 @@
++++ xlayoutdisplay-new/src/calculations.cpp	2026-06-25 01:48:55.208888486 +0200
+@@ -14,6 +14,7 @@
+    limitations under the License.
  */
  #include "calculations.h"
- #include "util.h"
 +#include "DisplayRules.h"
+ #include "util.h"
 
  #include <sstream>
- #include <cstring>
 @@ -30,7 +31,7 @@
      stack<shared_ptr<Output>> preferredOutputs;
      for (const auto &name : order) {
@@ -325,23 +372,23 @@ diff -ruN xlayoutdisplay-old/src/calculations.cpp xlayoutdisplay-new/src/calcula
              primary = output;
      }
 
-@@ -80,6 +81,10 @@
+@@ -79,21 +80,22 @@
+     return primary;
  }
 
- void ltrOutputs(const list<shared_ptr<Output>> &outputs) {
-+    ltrOutputs(outputs, "");
-+}
-+
-+void ltrOutputs(const list<shared_ptr<Output>> &outputs, const string &maxResolution) {
+-void ltrOutputs(const list<shared_ptr<Output>> &outputs) {
++void ltrOutputs(const list<shared_ptr<Output>> &outputs, const string &maxResolution, const string &targetResolution) {
      int xpos = 0;
      int ypos = 0;
      for (const auto &output : outputs) {
-@@ -87,13 +92,13 @@
+
          if (output->desiredActive) {
 
-             // set the desired mode to optimal
+-            // set the desired mode to optimal
 -            output->desiredMode = output->optimalMode;
++            // set the desired mode to optimal, capped by maxResolution when configured
 +            output->desiredMode = desiredModeForOutput(*output, maxResolution);
++            applyTargetResolutionScale(*output, targetResolution);
 
              // position the screen
              output->desiredPos = make_shared<Pos>(xpos, ypos);
@@ -352,7 +399,7 @@ diff -ruN xlayoutdisplay-old/src/calculations.cpp xlayoutdisplay-new/src/calcula
          }
      }
  }
-@@ -168,6 +173,7 @@
+@@ -168,6 +170,7 @@
          }
          if (output->edid) {
              ss << ' ' << output->edid->maxCmHoriz() << "cm/" << output->edid->maxCmVert() << "cm";
@@ -362,18 +409,20 @@ diff -ruN xlayoutdisplay-old/src/calculations.cpp xlayoutdisplay-new/src/calcula
              ss << ' ' << output->currentMode->width << 'x' << output->currentMode->height;
 diff -ruN xlayoutdisplay-old/src/calculations.h xlayoutdisplay-new/src/calculations.h
 --- xlayoutdisplay-old/src/calculations.h	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/calculations.h	2026-06-24 22:13:18.669001007 +0200
-@@ -32,6 +32,7 @@
++++ xlayoutdisplay-new/src/calculations.h	2026-06-25 01:48:46.563942910 +0200
+@@ -31,7 +31,8 @@
+                                               const std::string &desiredPrimary, const Monitors &monitors);
 
  // arrange outputs left to right at optimal mode; will mutate contents
- void ltrOutputs(const std::list<std::shared_ptr<Output>> &outputs);
-+void ltrOutputs(const std::list<std::shared_ptr<Output>> &outputs, const std::string &maxResolution);
+-void ltrOutputs(const std::list<std::shared_ptr<Output>> &outputs);
++void ltrOutputs(const std::list<std::shared_ptr<Output>> &outputs, const std::string &maxResolution = "",
++                const std::string &targetResolution = "");
 
  // arrange outputs so that they all mirror at highest common mode; will mutate contents
  // throws runtime_error:
 diff -ruN xlayoutdisplay-old/src/layout.cpp xlayoutdisplay-new/src/layout.cpp
 --- xlayoutdisplay-old/src/layout.cpp	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/layout.cpp	2026-06-24 22:13:18.669161769 +0200
++++ xlayoutdisplay-new/src/layout.cpp	2026-06-25 01:49:16.712753114 +0200
 @@ -19,6 +19,7 @@
  #include "xrdbutil.h"
  #include "xutil.h"
@@ -382,27 +431,33 @@ diff -ruN xlayoutdisplay-old/src/layout.cpp xlayoutdisplay-new/src/layout.cpp
  #include <iostream>
  #include <unistd.h>
 
-@@ -66,12 +67,15 @@
+@@ -63,6 +64,8 @@
+     // order the outputs if the user wishes
+     const list<shared_ptr<Output>> outputs = orderOutputs(currentOutputs, settings.order);
+
++    applyOutputScales(outputs, settings.scales);
++
      // activate ouputs and determine primary
      const shared_ptr<Output> primary = activateOutputs(outputs, settings.primary, monitors);
 
-+    // apply per-output scale before arranging so positions use logical output sizes
-+    applyOutputScales(outputs, settings.scales);
-+
-     // arrange mirrored or left to right
-     if (settings.mirror) {
+@@ -71,7 +74,7 @@
          mirrorOutputs(outputs);
      }
      else {
 -        ltrOutputs(outputs);
-+        ltrOutputs(outputs, settings.maxResolution);
++        ltrOutputs(outputs, settings.maxResolution, settings.targetResolution);
      }
 
      // determine DPI from the primary
 diff -ruN xlayoutdisplay-old/src/xrandrrutil.cpp xlayoutdisplay-new/src/xrandrrutil.cpp
 --- xlayoutdisplay-old/src/xrandrrutil.cpp	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/src/xrandrrutil.cpp	2026-06-24 22:27:16.363235193 +0200
-@@ -18,6 +18,7 @@
++++ xlayoutdisplay-new/src/xrandrrutil.cpp	2026-06-25 01:53:56.956988904 +0200
+@@ -14,14 +14,42 @@
+    limitations under the License.
+ */
+ #include "xrandrrutil.h"
++#include "DisplayRules.h"
+
  #include <sstream>
  #include <cstring>
  #include <cmath>
@@ -410,61 +465,121 @@ diff -ruN xlayoutdisplay-old/src/xrandrrutil.cpp xlayoutdisplay-new/src/xrandrru
  #include <system_error>
 
  using namespace std;
-@@ -45,9 +46,30 @@
-     return static_cast<unsigned int>(round(rate));
- }
 
++static bool hasScaledOutput(const list<shared_ptr<Output>> &outputs) {
++    for (const auto &output : outputs) {
++        if (output->desiredActive && output->desiredScaleConfigured) {
++            return true;
++        }
++    }
++
++    return false;
++}
++
 +static pair<int, int> frameBufferDimensions(const list<shared_ptr<Output>> &outputs) {
 +    int width = 0;
 +    int height = 0;
 +
 +    for (const auto &output : outputs) {
-+        if (!output->desiredActive || !output->desiredMode || !output->desiredPos) {
++        if (!output->desiredActive || !output->desiredPos) {
 +            continue;
 +        }
 +
-+        width = max(width, output->desiredPos->x + static_cast<int>(output->desiredMode->width));
-+        height = max(height, output->desiredPos->y + static_cast<int>(output->desiredMode->height));
++        width = max(width, output->desiredPos->x + logicalOutputWidth(*output));
++        height = max(height, output->desiredPos->y + logicalOutputHeight(*output));
 +    }
 +
 +    return make_pair(width, height);
 +}
 +
+ // stolen from xrandr.c; assuming this works, as we're reliant on xrandr anyway
+ unsigned int refreshFromModeInfo(const XRRModeInfo &modeInfo) {
+     double rate;
+@@ -48,6 +76,12 @@
  const string renderXrandrCmd(const list<shared_ptr<Output>> &outputs, const shared_ptr<Output> &primary, const long &dpi, const long &rate) {
      stringstream ss;
--    ss << "xrandr \\\n --dpi " << dpi;
-+    const auto fb = frameBufferDimensions(outputs);
-+    ss << "xrandr";
-+    if (fb.first > 0 && fb.second > 0) {
-+        ss << " \\\n --fb " << fb.first << "x" << fb.second;
+     ss << "xrandr \\\n --dpi " << dpi;
++    if (hasScaledOutput(outputs)) {
++        const auto fb = frameBufferDimensions(outputs);
++        if (fb.first > 0 && fb.second > 0) {
++            ss << " --fb " << fb.first << "x" << fb.second;
++        }
 +    }
-+    ss << " \\\n --dpi " << dpi;
      for (const auto &output : outputs) {
          ss << " \\\n --output " << output->name;
          if (output->desiredActive && output->desiredMode && output->desiredPos) {
-@@ -59,6 +81,18 @@
+@@ -59,6 +93,14 @@
              }
              ss << " --pos ";
              ss << output->desiredPos->x << "x" << output->desiredPos->y;
++            ss << " --scale ";
++            ss << fixed << setprecision(6);
 +            if (output->desiredScaleConfigured) {
-+                const double rawScaleX = 1.0 / output->desiredScaleX;
-+                const double rawScaleY = 1.0 / output->desiredScaleY;
-+                ss << " --scale ";
-+                ss << fixed << setprecision(2) << rawScaleX << "x" << rawScaleY;
-+                ss << defaultfloat;
-+                if (rawScaleX != 1.0 || rawScaleY != 1.0) {
-+                    ss << " --panning ";
-+                    ss << output->desiredMode->width << "x" << output->desiredMode->height;
-+                    ss << "+" << output->desiredPos->x << "+" << output->desiredPos->y;
-+                }
++                ss << output->desiredScaleX << "x" << output->desiredScaleY;
++            } else {
++                ss << "1.000000x1.000000";
 +            }
++            ss << defaultfloat;
              if (output == primary) {
                  ss << " --primary";
              }
 diff -ruN xlayoutdisplay-old/test/test-calculations.cpp xlayoutdisplay-new/test/test-calculations.cpp
 --- xlayoutdisplay-old/test/test-calculations.cpp	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/test/test-calculations.cpp	2026-06-24 22:13:18.669251444 +0200
-@@ -382,11 +382,11 @@
++++ xlayoutdisplay-new/test/test-calculations.cpp	2026-06-25 01:49:53.212523339 +0200
+@@ -17,6 +17,7 @@
+ #include <gmock/gmock.h>
+
+ #include "../src/calculations.h"
++#include "../src/DisplayRules.h"
+
+ #include "test-MockEdid.h"
+ #include "test-MockMonitors.h"
+@@ -188,6 +189,44 @@
+     EXPECT_EQ(0, output3->desiredPos->y);
+ }
+
++TEST(calculations_ltrOutputs, targetResolutionLeavesNativeQhdUnscaled) {
++    list<shared_ptr<Output>> outputs;
++    list<shared_ptr<const Mode>> modes = {make_shared<Mode>(0, 2560, 1440, 60)};
++
++    shared_ptr<Output> output = make_shared<Output>("DP-1", Output::connected, modes, shared_ptr<Mode>(),
++                                                    modes.front(), shared_ptr<Pos>(), shared_ptr<Edid>());
++    output->desiredActive = true;
++    outputs.push_back(output);
++
++    ltrOutputs(outputs, "", "2560x1440");
++
++    EXPECT_TRUE(output->desiredMode);
++    EXPECT_FALSE(output->desiredScaleConfigured);
++    EXPECT_EQ(1.0, output->desiredScaleX);
++    EXPECT_EQ(1.0, output->desiredScaleY);
++    EXPECT_EQ(2560, logicalOutputWidth(*output));
++    EXPECT_EQ(1440, logicalOutputHeight(*output));
++}
++
++TEST(calculations_ltrOutputs, targetResolutionScalesLargerOutputsDown) {
++    list<shared_ptr<Output>> outputs;
++    list<shared_ptr<const Mode>> modes = {make_shared<Mode>(0, 3840, 2160, 60)};
++
++    shared_ptr<Output> output = make_shared<Output>("DP-1", Output::connected, modes, shared_ptr<Mode>(),
++                                                    modes.front(), shared_ptr<Pos>(), shared_ptr<Edid>());
++    output->desiredActive = true;
++    outputs.push_back(output);
++
++    ltrOutputs(outputs, "", "2560x1440");
++
++    EXPECT_TRUE(output->desiredMode);
++    EXPECT_TRUE(output->desiredScaleConfigured);
++    EXPECT_NEAR(0.666667, output->desiredScaleX, 0.000001);
++    EXPECT_NEAR(0.666667, output->desiredScaleY, 0.000001);
++    EXPECT_EQ(2560, logicalOutputWidth(*output));
++    EXPECT_EQ(1440, logicalOutputHeight(*output));
++}
++
+
+ TEST(calculations_mirrorOutputs, noneActive) {
+
+@@ -382,11 +421,11 @@
      outputs.push_back(act);
 
      const string expected = ""
@@ -478,14 +593,57 @@ diff -ruN xlayoutdisplay-old/test/test-calculations.cpp xlayoutdisplay-new/test/
              " +!10x11 12Hz\n"
              "*  6x7 8Hz\n"
              "   2x3 4Hz\n"
+@@ -497,4 +536,4 @@
+
+     EXPECT_EQ(1, calculated);
+     EXPECT_EQ(expectedExplaination.str(), explaination);
+-}
+\ No newline at end of file
++}
 diff -ruN xlayoutdisplay-old/test/test-xrandrutil.cpp xlayoutdisplay-new/test/test-xrandrutil.cpp
 --- xlayoutdisplay-old/test/test-xrandrutil.cpp	1970-01-01 01:00:01.000000000 +0100
-+++ xlayoutdisplay-new/test/test-xrandrutil.cpp	2026-06-24 22:28:58.330087253 +0200
-@@ -66,6 +66,7 @@
-
-     stringstream expected;
++++ xlayoutdisplay-new/test/test-xrandrutil.cpp	2026-06-25 01:54:04.930938705 +0200
+@@ -68,14 +68,36 @@
      expected << "xrandr \\\n";
-+    expected << " --fb 19x21 \\\n";
      expected << " --dpi 123 \\\n";
      expected << " --output One --off \\\n";
-     expected << " --output Two --mode 1x2 --rate 60 --pos 5x6 --primary \\\n";
+-    expected << " --output Two --mode 1x2 --rate 60 --pos 5x6 --primary \\\n";
++    expected << " --output Two --mode 1x2 --rate 60 --pos 5x6 --scale 1.000000x1.000000 --primary \\\n";
+     expected << " --output Three --off \\\n";
+     expected << " --output Four --off \\\n";
+-    expected << " --output Five --mode 8x9 --rate 60 --pos 11x12";
++    expected << " --output Five --mode 8x9 --rate 60 --pos 11x12 --scale 1.000000x1.000000";
+
+     EXPECT_EQ(expected.str(), renderXrandrCmd(outputs, output2, 123, 60));
+ }
+
++TEST(xrandrutil_renderXrandrCmd, renderScaledOutput) {
++    list<shared_ptr<Output>> outputs;
++
++    shared_ptr<Mode> mode1 = make_shared<Mode>(1, 3840, 2160, 60);
++    shared_ptr<Output> output1 = make_shared<Output>("DP-1", Output::connected, list<shared_ptr<const Mode>>({mode1}),
++                                                     mode1, mode1, make_shared<Pos>(0, 0), shared_ptr<Edid>());
++    output1->desiredActive = true;
++    output1->desiredMode = mode1;
++    output1->desiredPos = make_shared<Pos>(0, 0);
++    output1->desiredScaleConfigured = true;
++    output1->desiredScaleX = 0.666667;
++    output1->desiredScaleY = 0.666667;
++    outputs.push_back(output1);
++
++    stringstream expected;
++    expected << "xrandr \\\n";
++    expected << " --dpi 96 --fb 2561x1441 \\\n";
++    expected << " --output DP-1 --mode 3840x2160 --rate 60 --pos 0x0 --scale 0.666667x0.666667 --primary";
++
++    EXPECT_EQ(expected.str(), renderXrandrCmd(outputs, output1, 96, 60));
++}
++
+ class xrandrutil_modeFromXRR : public ::testing::Test {
+ protected:
+     virtual void SetUp() {
+@@ -110,4 +132,3 @@
+ TEST_F(xrandrutil_modeFromXRR, resourcesNotPresent) {
+     EXPECT_THROW(modeFromXRR(11, nullptr), invalid_argument);
+ }
+-

@@ -9,42 +9,82 @@ let
   };
 
   mkSamsungLu28r55DeskLines = layout:
+    let
+      left = layout.left;
+      right = layout.right;
+      internal = layout.internal;
+    in
     [
       "wait=2"
+      "dpi=${toString layout.dpi}"
       "rate=60"
-      "primary=${samsungLu28r55Desk.left}"
-      "order=${samsungLu28r55Desk.left}"
-      "order=${samsungLu28r55Desk.right}"
-      "order=${samsungLu28r55Desk.internal}"
-      "scale=${samsungLu28r55Desk.left}=${layout.externalScale}"
-      "scale=${samsungLu28r55Desk.right}=${layout.externalScale}"
+      "primary=${left}"
+      "order=${left}"
+      "order=${right}"
+      "order=${internal}"
+      "target-resolution=${layout.targetResolution}"
+    ]
+    ++ lib.optionals (layout.externalScale != null) [
+      "scale=${left}=${layout.externalScale}"
+      "scale=${right}=${layout.externalScale}"
     ]
     ++ lib.optional (layout.internalScale != null)
-      "scale=${samsungLu28r55Desk.internal}=${layout.internalScale}";
+      "scale=${internal}=${layout.internalScale}";
 in
 {
   options.local.laptop.monitorLayouts.samsungLu28r55Desk = {
     enable = lib.mkEnableOption "the shared Samsung LU28R55 dual-monitor desk layout";
 
-    externalScale = lib.mkOption {
+    left = lib.mkOption {
       type = lib.types.str;
-      default = "1.25x1.25";
+      default = samsungLu28r55Desk.left;
+      description = "Selector for the left Samsung LU28R55 monitor.";
+    };
+
+    right = lib.mkOption {
+      type = lib.types.str;
+      default = samsungLu28r55Desk.right;
+      description = "Selector for the right Samsung LU28R55 monitor.";
+    };
+
+    internal = lib.mkOption {
+      type = lib.types.str;
+      default = samsungLu28r55Desk.internal;
+      description = "Selector for the internal laptop panel.";
+    };
+
+    dpi = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 96;
+      description = "Fixed Xft DPI for this monitor layout.";
+    };
+
+    targetResolution = lib.mkOption {
+      type = lib.types.str;
+      default = "2560x1440";
+      example = "2560x1440";
+      description = "Logical size target for outputs larger than this resolution.";
+    };
+
+    externalScale = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
       example = "1x1";
-      description = "Scale applied to both external Samsung LU28R55 monitors.";
+      description = "Optional manual scale applied to both external Samsung LU28R55 monitors.";
     };
 
     internalScale = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      example = "1.25x1.25";
-      description = "Optional best-effort scale for the internal eDP-1 panel.";
+      example = "0.666667x0.666667";
+      description = "Optional manual scale applied to the internal eDP-1 panel.";
     };
 
-    maxResolution = lib.mkOption {
+    externalMaxResolution = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
       example = "2560x1440";
-      description = "Optional maximum output mode for this monitor layout.";
+      description = "Optional maximum mode for external outputs when a host cannot drive the shared monitors at their native mode.";
     };
   };
 
@@ -54,9 +94,9 @@ in
         mkSamsungLu28r55DeskLines cfg.samsungLu28r55Desk;
     }
 
-    (lib.mkIf (cfg.samsungLu28r55Desk.maxResolution != null) {
+    (lib.mkIf (cfg.samsungLu28r55Desk.externalMaxResolution != null) {
       local.laptop.xlayoutdisplayHotplug.maxResolution =
-        cfg.samsungLu28r55Desk.maxResolution;
+        cfg.samsungLu28r55Desk.externalMaxResolution;
     })
   ]);
 }

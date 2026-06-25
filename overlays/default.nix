@@ -41,14 +41,21 @@
     {
       navi = inputs.cheat-sheets.packages.${final.stdenv.hostPlatform.system}.navi;
 
-      xlayoutdisplay = prev.xlayoutdisplay.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [
-          # Keep this as a direct path instead of "${outPath}/...".
-          # Referencing outPath makes the derivation depend on the whole flake
-          # source and can force rebuilds when unrelated repository files change.
-          ../patches/xlayoutdisplay-max-resolution.patch
-        ];
-      });
+      xlayoutdisplay =
+        let
+          expectedVersion = "1.5.1";
+          actualVersion = prev.xlayoutdisplay.version or (final.lib.getVersion prev.xlayoutdisplay.name);
+        in
+        assert final.lib.assertMsg (actualVersion == expectedVersion)
+          "xlayoutdisplay overlay expects ${expectedVersion}, got ${actualVersion}; review patches/xlayoutdisplay-max-resolution.patch before updating xlayoutdisplay.";
+        prev.xlayoutdisplay.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [
+            # Keep this as a direct path instead of "${outPath}/...".
+            # Referencing outPath makes the derivation depend on the whole flake
+            # source and can force rebuilds when unrelated repository files change.
+            ../patches/xlayoutdisplay-max-resolution.patch
+          ];
+        });
 
       libvirt =
         builtins.trace

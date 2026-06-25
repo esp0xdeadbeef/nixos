@@ -77,6 +77,9 @@
   services.displayManager.defaultSession = "none+i3";
   services.displayManager.gdm.enable = true;
   security.pam.services.i3lock.enable = true;
+  local.laptop.xlayoutdisplayHotplug.configLines = [
+    "dpi=96"
+  ];
   local.laptop.xlayoutdisplayHotplug.maxResolution = "1680x1050";
 
   home-manager = {

@@ -128,8 +128,7 @@ in
   # 4k blackscreens l-portal's external outputs because the framebuffer is too small.
   local.laptop.monitorLayouts.samsungLu28r55Desk = {
     enable = true;
-    externalScale = "1x1";
-    maxResolution = "2560x1440";
+    externalMaxResolution = "2560x1440";
   };
   security.rtkit.enable = true;
   hardware.enableRedistributableFirmware = true;
