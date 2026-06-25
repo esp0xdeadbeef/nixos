@@ -42,6 +42,9 @@
   };
 
   users.users.root.openssh.authorizedKeys.keys = lib.mkForce [ ];
+  users.users.deadbeef.shell = pkgs.fish;
+
+  programs.fish.enable = true;
 
   security.sudo.extraRules = [
     {
@@ -120,6 +123,7 @@
   };
 
   home-manager.users.deadbeef = {
+    programs.fish.enable = true;
     programs.zsh.enable = true;
     home.stateVersion = "26.05";
   };

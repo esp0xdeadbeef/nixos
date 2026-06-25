@@ -370,6 +370,34 @@ let
       )
       generatedSshEtcEntries;
 
+  generatedSshEtcActivation = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList
+      (
+        name: entry:
+          let
+            persistTarget = "${cfg.persistPath}/etc/${name}";
+            liveTarget = "/etc/${name}";
+            installTarget =
+              target: ''
+                install -d -m 0755 "$(dirname ${lib.escapeShellArg target})"
+                install -m 0644 ${lib.escapeShellArg entry.source} ${lib.escapeShellArg target}
+              '';
+            linkTarget =
+              target: ''
+                install -d -m 0755 "$(dirname ${lib.escapeShellArg target})"
+                ln -sfn ${lib.escapeShellArg entry.source} ${lib.escapeShellArg target}
+              '';
+            materialize =
+              if lib.hasPrefix "ssh/authorized_keys.d/" name then installTarget else linkTarget;
+          in
+          ''
+            ${materialize persistTarget}
+            ${materialize liveTarget}
+          ''
+      )
+      generatedSshEtcEntries
+  );
+
   sharedUserDirectories = [
     "github"
     ".local/share/nvim"
@@ -401,7 +429,6 @@ let
     ".local/state/wireplumber/default-nodes"
     ".screenrc"
     ".zsh_history"
-    ".zshrc"
     ".aliases"
   ]
   ++ lib.optionals hasZap [
@@ -434,6 +461,18 @@ let
       ++ lib.optionals hasLxc [
         "d ${cfg.persistPath}/home/${user}/.local/share/lxc 0755 ${user} ${group} -"
         "h ${cfg.persistPath}/home/${user}/.local/share/lxc - - - - +C"
+      ]
+    )
+    normalUserNames;
+
+  touchedUserTmpfiles = lib.concatMap
+    (
+      user:
+      let
+        group = userGroup user;
+      in
+      [
+        "f ${cfg.persistPath}/home/${user}/.zshrc 0644 ${user} ${group} -"
       ]
     )
     normalUserNames;
@@ -604,6 +643,12 @@ in
       after = [ "etc-ssh.mount" ];
     };
 
+    system.activationScripts.persistGeneratedSshEtc = lib.mkIf (generatedSshEtcEntries != { }) (
+      lib.stringAfter [ "etc" ] ''
+        ${generatedSshEtcActivation}
+      ''
+    );
+
     systemd.tmpfiles.rules = [
       "d ${cfg.persistPath}/etc 0755 root root -"
       "d ${cfg.persistPath}/etc/ssh 0755 root root -"
@@ -613,6 +658,7 @@ in
       "h ${cfg.persistPath}/var/lib/libvirt/images - - - - +C"
     ]
     ++ sharedUserTmpfiles
+    ++ touchedUserTmpfiles
     ++ spotifyPlayerTmpfiles
     ++ noCowUserTmpfiles
     ++ generatedSshEtcTmpfiles
