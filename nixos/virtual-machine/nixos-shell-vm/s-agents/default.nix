@@ -11,9 +11,9 @@
     profiles.nixos.llm-clients.agents
   ];
 
-  sops.defaultSopsFile = lib.mkForce "${outPath}/secrets/s-agents.yaml";
-  sops.age.sshKeyPaths = lib.mkForce [ "/persist/etc/ssh/ssh_host_ed25519_key" ];
-  sops.age.keyFile = lib.mkForce null;
+  sops.defaultSopsFile = "${outPath}/secrets/s-agents.yaml";
+  sops.age.sshKeyPaths = [ "/persist/etc/ssh/ssh_host_ed25519_key" ];
+  sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 
   sops.secrets = {
     gh-token = {
@@ -31,8 +31,8 @@
     };
   };
 
-  services.getty.autologinUser = lib.mkForce "deadbeef";
-  services.displayManager.autoLogin.enable = lib.mkForce false;
+  #services.getty.autologinUser =  "deadbeef";
+  #services.displayManager.autoLogin.enable = lib.mkForce false;
 
   services.openssh.settings = {
     PermitRootLogin = "no";
