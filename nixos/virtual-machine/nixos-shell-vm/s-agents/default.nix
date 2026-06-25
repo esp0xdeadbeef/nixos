@@ -110,46 +110,18 @@
 
   local.impermanence = {
     enable = true;
+    extraSystemDirectories = [
+      "/var/lib/systemd"
+    ];
+    extraUserDirectories = [
+      ".npm-global"
+    ];
     rotateBtrfsRoot.enable = false;
   };
 
   home-manager.users.deadbeef = {
     programs.zsh.enable = true;
     home.stateVersion = "26.05";
-  };
-
-  environment.persistence."/persist" = {
-    users.deadbeef.directories = lib.mkAfter [
-      ".claude"
-      ".codex"
-      ".config/claude"
-      ".config/codex"
-      ".config/hermes"
-      ".config/opencode"
-      ".config/qwen"
-      ".config/qwen-code"
-      ".local/share/claude"
-      ".local/share/codex"
-      ".local/share/hermes"
-      ".local/share/opencode"
-      ".local/share/qwen"
-      ".local/share/qwen-code"
-      ".cache/claude"
-      ".cache/codex"
-      ".cache/hermes"
-      ".cache/opencode"
-      ".cache/qwen"
-      ".cache/qwen-code"
-      ".npm-global"
-      ".opencode"
-      ".qwen"
-    ];
-
-    directories = lib.mkAfter [
-      "/root"
-      "/var/log"
-      "/var/lib/systemd"
-    ];
   };
 
   virtualisation = {
