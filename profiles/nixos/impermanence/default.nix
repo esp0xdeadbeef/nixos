@@ -1,8 +1,7 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
+{ config
+, lib
+, pkgs
+, ...
 }:
 
 let
@@ -71,9 +70,11 @@ let
 
   hasPackage = packageNames: lib.any (name: lib.elem name installedPackageNames) packageNames;
 
-  normalUserNames = lib.filter (
-    name: name != "root" && (config.users.users.${name}.isNormalUser or false)
-  ) (lib.attrNames config.users.users);
+  normalUserNames = lib.filter
+    (
+      name: name != "root" && (config.users.users.${name}.isNormalUser or false)
+    )
+    (lib.attrNames config.users.users);
 
   userGroup = user: config.users.users.${user}.group or "users";
 
@@ -170,10 +171,11 @@ let
     ++ lib.optionals (hasPackage [ "chromium" ]) [
       ".config/chromium"
     ]
-    ++ lib.optionals (hasPackage [
-      "CopyQ"
-      "copyq"
-    ]) [
+    ++ lib.optionals
+      (hasPackage [
+        "CopyQ"
+        "copyq"
+      ]) [
       ".config/copyq"
       ".local/share/copyq"
     ]
@@ -182,20 +184,20 @@ let
       ".pki/nssdb"
     ]
     ++
-      lib.optionals
-        (hasPackage [
-          "dropbox"
-          "maestral"
-          "maestral-gui"
-          "maestral-qt"
-        ])
-        [
-          ".config/dropbox"
-          ".config/maestral"
-          ".local/share/maestral"
-          ".dropbox"
-          ".dropbox-dist"
-        ]
+    lib.optionals
+      (hasPackage [
+        "dropbox"
+        "maestral"
+        "maestral-gui"
+        "maestral-qt"
+      ])
+      [
+        ".config/dropbox"
+        ".config/maestral"
+        ".local/share/maestral"
+        ".dropbox"
+        ".dropbox-dist"
+      ]
     ++ lib.optionals (hasPackage [ "obsidian" ]) [
       ".config/obsidian"
     ]
@@ -221,14 +223,14 @@ let
       ".config/teams-for-linux"
     ]
     ++
-      lib.optionals
-        (hasPackage [
-          "zoom-us"
-          "zoom"
-        ])
-        [
-          ".config/zoom"
-        ]
+    lib.optionals
+      (hasPackage [
+        "zoom-us"
+        "zoom"
+      ])
+      [
+        ".config/zoom"
+      ]
     ++ lib.optionals (hasPackage [ "lmstudio" ]) [
       ".lmstudio"
     ]
@@ -236,16 +238,16 @@ let
       ".mitmproxy"
     ]
     ++
-      lib.optionals
-        (hasPackage [
-          "firefox"
-          "librewolf"
-          "zen"
-          "zen-browser"
-        ])
-        [
-          ".mozilla"
-        ]
+    lib.optionals
+      (hasPackage [
+        "firefox"
+        "librewolf"
+        "zen"
+        "zen-browser"
+      ])
+      [
+        ".mozilla"
+      ]
     ++ lib.optionals (hasPackage [ "quickemu" ]) [
       ".quickget"
     ];
@@ -271,6 +273,7 @@ let
     ".claude"
     ".codex"
     ".gemini"
+    ".hermes"
     ".opencode"
     ".qwen"
     ".local/share/claude"
@@ -333,33 +336,39 @@ let
   ];
 
   spotifyPlayerTmpfiles = lib.optionals (hasPackage [ "spotify-player" ]) (
-    lib.concatMap (
-      user:
-      let
-        group = userGroup user;
-      in
-      [
-        "d /home/${user}/.cache/spotify-player 0700 ${user} ${group} -"
-        "d ${cfg.persistPath}/home/${user}/.cache/spotify-player 0700 ${user} ${group} -"
-      ]
-    ) normalUserNames
+    lib.concatMap
+      (
+        user:
+        let
+          group = userGroup user;
+        in
+        [
+          "d /home/${user}/.cache/spotify-player 0700 ${user} ${group} -"
+          "d ${cfg.persistPath}/home/${user}/.cache/spotify-player 0700 ${user} ${group} -"
+        ]
+      )
+      normalUserNames
   );
 
-  generatedSshEtcEntries = lib.filterAttrs (
-    name: entry: lib.hasPrefix "ssh/" name && (entry ? source)
-  ) config.environment.etc;
+  generatedSshEtcEntries = lib.filterAttrs
+    (
+      name: entry: lib.hasPrefix "ssh/" name && (entry ? source)
+    )
+    config.environment.etc;
 
   generatedSshEtcTmpfiles =
     [
       "d ${cfg.persistPath}/etc/ssh/authorized_keys.d 0755 root root -"
     ]
-    ++ lib.mapAttrsToList (
-      name: entry:
-      if lib.hasPrefix "ssh/authorized_keys.d/" name then
-        "C+ ${cfg.persistPath}/etc/${name} 0644 root root - ${entry.source}"
-      else
-        "L+ ${cfg.persistPath}/etc/${name} - - - - ${entry.source}"
-    ) generatedSshEtcEntries;
+    ++ lib.mapAttrsToList
+      (
+        name: entry:
+          if lib.hasPrefix "ssh/authorized_keys.d/" name then
+            "C+ ${cfg.persistPath}/etc/${name} 0644 root root - ${entry.source}"
+          else
+            "L+ ${cfg.persistPath}/etc/${name} - - - - ${entry.source}"
+      )
+      generatedSshEtcEntries;
 
   sharedUserDirectories = [
     "github"
@@ -406,41 +415,47 @@ let
     files = sharedUserFiles;
   });
 
-  sharedUserTmpfiles = lib.concatMap (
-    user:
-    let
-      group = userGroup user;
-    in
-    [
-      "d /home/${user}/.cache 0755 ${user} ${group} -"
-      "d ${cfg.persistPath}/home/${user}/.cache 0755 ${user} ${group} -"
-      "d /home/${user}/.cache/nix-index 0755 ${user} ${group} -"
-      "d ${cfg.persistPath}/home/${user}/.cache/nix-index 0755 ${user} ${group} -"
-    ]
-    ++ lib.optionals hasVirtualMachines [
-      "d ${cfg.persistPath}/home/${user}/vms/disks 0755 ${user} ${group} -"
-      "h ${cfg.persistPath}/home/${user}/vms/disks - - - - +C"
-    ]
-    ++ lib.optionals hasLxc [
-      "d ${cfg.persistPath}/home/${user}/.local/share/lxc 0755 ${user} ${group} -"
-      "h ${cfg.persistPath}/home/${user}/.local/share/lxc - - - - +C"
-    ]
-  ) normalUserNames;
-
-  noCowUserTmpfiles = lib.concatMap (
-    user:
-    lib.concatMap (
-      dir:
+  sharedUserTmpfiles = lib.concatMap
+    (
+      user:
       let
-        path = "${cfg.persistPath}/home/${user}/${dir}";
         group = userGroup user;
       in
       [
-        "d ${path} 0700 ${user} ${group} -"
-        "h ${path} - - - - +C"
+        "d /home/${user}/.cache 0755 ${user} ${group} -"
+        "d ${cfg.persistPath}/home/${user}/.cache 0755 ${user} ${group} -"
+        "d /home/${user}/.cache/nix-index 0755 ${user} ${group} -"
+        "d ${cfg.persistPath}/home/${user}/.cache/nix-index 0755 ${user} ${group} -"
       ]
-    ) noCowUserDirs
-  ) normalUserNames;
+      ++ lib.optionals hasVirtualMachines [
+        "d ${cfg.persistPath}/home/${user}/vms/disks 0755 ${user} ${group} -"
+        "h ${cfg.persistPath}/home/${user}/vms/disks - - - - +C"
+      ]
+      ++ lib.optionals hasLxc [
+        "d ${cfg.persistPath}/home/${user}/.local/share/lxc 0755 ${user} ${group} -"
+        "h ${cfg.persistPath}/home/${user}/.local/share/lxc - - - - +C"
+      ]
+    )
+    normalUserNames;
+
+  noCowUserTmpfiles = lib.concatMap
+    (
+      user:
+      lib.concatMap
+        (
+          dir:
+          let
+            path = "${cfg.persistPath}/home/${user}/${dir}";
+            group = userGroup user;
+          in
+          [
+            "d ${path} 0700 ${user} ${group} -"
+            "h ${path} - - - - +C"
+          ]
+        )
+        noCowUserDirs
+    )
+    normalUserNames;
 in
 {
   options.local.impermanence = {

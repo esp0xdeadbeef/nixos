@@ -9,6 +9,7 @@
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config"
     profiles.nixos.llm-clients.agents
+    profiles.nixos.impermanence.default
   ];
 
   sops.defaultSopsFile = "${outPath}/secrets/s-agents.yaml";
@@ -106,6 +107,11 @@
     "d /persist/etc 0755 root root -"
     "d /persist/etc/ssh 0755 root root -"
   ];
+
+  local.impermanence = {
+    enable = true;
+    rotateBtrfsRoot.enable = false;
+  };
 
   home-manager.users.deadbeef = {
     programs.zsh.enable = true;
