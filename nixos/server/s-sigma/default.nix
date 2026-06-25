@@ -181,6 +181,10 @@
 
   local.shell.zshPrompt.enable = true;
 
+  environment.systemPackages = [
+    pkgs.ethtool
+  ];
+
   security.sudo.enable = true;
   security.sudo.extraRules = [
     {
