@@ -51,6 +51,7 @@
       podman = import ./nixos/virtualization/podman.nix;
     };
     llm-clients = {
+      cache = import ./nixos/llm-clients/cache.nix;
       agents = import ./nixos/llm-clients/agents.nix;
     };
     llm = {

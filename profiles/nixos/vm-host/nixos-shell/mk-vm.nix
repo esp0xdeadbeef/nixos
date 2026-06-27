@@ -38,6 +38,7 @@ let
   tmuxDir = "/run/nixos-shell";
   tmuxSocket = "${tmuxDir}/${name}.tmux";
   tmuxSession = "vm";
+  stopMarker = "${tmuxDir}/${name}.stopping";
 
   qcow2Path = "${workingDir}/${name}.qcow2";
 
@@ -69,6 +70,7 @@ let
     set -euo pipefail
 
     mkdir -p "${tmuxDir}" "${workingDir}" "${imgBase}" "${perVmPersistDir}" "${runImgBase}"
+    rm -f "${stopMarker}"
 
     if [ -n "''${NIXOS_VM_FLAKE:-}" ]; then
       FLAKE="path:''${NIXOS_VM_FLAKE}"
@@ -85,7 +87,7 @@ let
 
     if [ ! -e "${currentLink}" ]; then
       nix build ${nixBuildFlagsStr} "''${BUILD_ATTR}" --out-link "${candidateLink}"
-      ln -sfn "$(readlink -f "${candidateLink}")" "${currentLink}"
+      nix-store --add-root "${currentLink}" --indirect --realise "$(readlink -f "${candidateLink}")" >/dev/null
     fi
 
     ${lib.optionalString ephemeralRoot ''rm -f "${qcow2Path}" || true''}
@@ -101,6 +103,11 @@ let
     while tmux -S "${tmuxSocket}" has-session -t "${tmuxSession}" 2>/dev/null; do
       sleep 2
     done
+
+    if [ -e "${stopMarker}" ]; then
+      rm -f "${stopMarker}"
+      exit 0
+    fi
 
     exit 1
   '';
@@ -151,8 +158,10 @@ in
       while ps auxww | grep -E '[n]ixos.*build' >/dev/null; do
         sleep 1
       done
-      ln -sfn "$NEW_PATH" "${currentLink}"
-      systemctl restart "${vmServiceName}.service" || true
+      nix-store --add-root "${currentLink}" --indirect --realise "$NEW_PATH" >/dev/null
+      ${lib.optionalString autoStart ''
+        systemctl restart "${vmServiceName}.service" || true
+      ''}
     '';
   };
 
@@ -208,6 +217,8 @@ in
 
       ExecStop = pkgs.writeShellScript "stop-${vmServiceName}" ''
         set -euo pipefail
+        mkdir -p "${tmuxDir}"
+        : > "${stopMarker}"
         if [ -S "${qmpSocket}" ]; then
           printf '%s\n' \
             '{"execute":"qmp_capabilities"}' \

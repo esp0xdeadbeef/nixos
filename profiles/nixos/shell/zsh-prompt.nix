@@ -76,6 +76,12 @@ in
     programs.zsh = {
       enable = true;
 
+      shellInit = lib.mkBefore ''
+        if [[ -n "$HOME" && "$HOME" != "/" && ! -e "$HOME/.zshrc" ]]; then
+          touch -- "$HOME/.zshrc" 2>/dev/null || true
+        fi
+      '';
+
       ohMyZsh = {
         enable = true;
         preLoaded = lib.mkBefore ''
@@ -96,10 +102,6 @@ in
                 setopt hist_ignore_all_dups
                 setopt share_history
                 autoload -Uz colors && colors
-
-                if [[ -n "$HOME" && "$HOME" != "/" ]]; then
-                  touch -- "$HOME/.zshrc" 2>/dev/null || true
-                fi
 
                 export HISTSIZE=1000000000
                 export SAVEHIST=1000000000
