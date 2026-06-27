@@ -115,6 +115,7 @@ let
     {
       name = "s-test";
       args = {
+        autoStart = true;
         description = "s-test (nixos-shell)";
         repository = "path:${self.lib.vmSourceForHost "s-test"}";
       };
