@@ -1,26 +1,31 @@
-{
-  pkgs,
-  lib,
-  self,
+{ config ? null
+, pkgs
+, lib
+, self
+,
 }:
 
 name:
-{
-  description ? "NixOS VM (nixos-shell)",
-  workingDir ? "/persist/nix-shell-vms",
-  persistDir ? "/persist/vm-persists",
-  extraTmpfiles ? [ ],
-  repository ? "path:${self.lib.vmSourceForHost name}",
-  restartTime ? 5,
-  ephemeralRoot ? true,
-
-  buildDelaySec ? 600,
-  buildIntervalSec ? 600,
-  pinned ? false,
-  nixBuildFlags ? [ ],
-
-  stateDiskSize ? "100G",
-  autoStart ? true,
+{ description ? "NixOS VM (nixos-shell)"
+, workingDir ? "/persist/nix-shell-vms"
+, persistDir ? "/persist/vm-persists"
+, extraTmpfiles ? [ ]
+, repository ? "path:${self.lib.vmSourceForHost name}"
+, restartTime ? 5
+, ephemeralRoot ? true
+, buildDelaySec ? 600
+, buildIntervalSec ? 600
+, pinned ? false
+, nixBuildFlags ? [ ]
+, stateDiskSize ? "100G"
+, registerImage ? true
+, autoStart ? (
+    if config == null then
+      true
+    else
+      config.local.vmHost.nixosShell.autoStart or true
+  )
+,
 }:
 
 let
@@ -103,7 +108,9 @@ let
   stableLauncher = "/run/nixos-shell/${name}.sh";
 in
 {
-  system.build.vmImages.${name} = self.nixosConfigurations.${name}.config.system.build.nixos-shell;
+  system.build.vmImages = lib.mkIf registerImage {
+    ${name} = self.nixosConfigurations.${name}.config.system.build.nixos-shell;
+  };
 
   systemd.services.${imageServiceName} = {
     description = "VM image manager (nixos-shell) for ${name}";
