@@ -86,6 +86,10 @@ in
                 setopt share_history
                 autoload -Uz colors && colors
 
+                if [[ -n "$HOME" && "$HOME" != "/" ]]; then
+                  touch -- "$HOME/.zshrc" 2>/dev/null || true
+                fi
+
                 export HISTSIZE=1000000000
                 export SAVEHIST=1000000000
                 export EDITOR="''${EDITOR:-vim}"
