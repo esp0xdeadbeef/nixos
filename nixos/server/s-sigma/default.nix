@@ -36,7 +36,9 @@
     profiles.nixos.hardware.clock-sync
     profiles.nixos.laptop.xlayoutdisplay-hotplug
     profiles.nixos.nixpkgs.allow-unfree
+    profiles.nixos.llm-clients.cache
     profiles.nixos.shell.zsh-prompt
+    profiles.nixos.vm-host.nixos-shell
     "${outPath}/modules/nixos/local-users.nix"
     profiles.nixos.virtualization.libvirt
     profiles.nixos.virtualization.lxc
@@ -89,6 +91,7 @@
     extraSpecialArgs = {
       inherit inputs outputs profiles;
       inherit outPath;
+      hostName = name;
     };
     users = {
       deadbeef = import "${outPath}/home-manager/${name}/home.nix";
@@ -145,7 +148,7 @@
 
   # FIXME: Add the rest of your current configuration
 
-  networking.hostName = "s-sigma";
+  networking.hostName = name;
 
   # TODO: Configure your system-wide user settings (groups, etc), add more users as needed.
   users.users = {

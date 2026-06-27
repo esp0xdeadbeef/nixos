@@ -6,9 +6,13 @@
 , config
 , pkgs
 , profiles
+, hostName
 , outPath
 , ...
 }:
+let
+  sopsFile = "${outPath}/secrets/${hostName}-root.yaml";
+in
 {
   # You can import other home-manager modules here
   imports = [
@@ -52,8 +56,6 @@
     username = "deadbeef";
     homeDirectory = "/home/deadbeef";
   };
-  sops.defaultSopsFile = "${outPath}/secrets/s-sigma-root.yaml";
-  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   local.i3.modifier = "Mod1";
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
   local.i3.spotify.enable = false;
@@ -73,4 +75,7 @@
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "26.05";
 
+} // lib.optionalAttrs (builtins.pathExists sopsFile) {
+  sops.defaultSopsFile = sopsFile;
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 }

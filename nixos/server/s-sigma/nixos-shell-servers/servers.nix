@@ -1,6 +1,7 @@
 { lib
 , pkgs
 , self
+, config
 , ...
 }:
 # for testing, use:
@@ -8,74 +9,132 @@
 # or:
 # export HOST="<vm-hostname>" ; nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && grep build $(systemctl cat $HOST-image.service | grep Exec | cut -d '=' -f 2) | bash && systemctl restart -- $(ls /etc/systemd/system/s-*-image.service 2>/dev/null | xargs -n1 basename)
 let
-  mkVM = import ./mk-nixos-shell-vm.nix { inherit pkgs lib self; };
+  mkVM = import "${self.outPath}/profiles/nixos/vm-host/nixos-shell/mk-vm.nix" {
+    inherit config pkgs lib self;
+  };
+
+  vms = [
+    {
+      name = "s-infra";
+      args = {
+        description = "Infra VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-infra"}";
+      };
+    }
+    {
+      name = "s-nebula";
+      args = {
+        description = "Nebula VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-nebula"}";
+      };
+    }
+    {
+      name = "s-agents";
+      args = {
+        description = "Agent workbench VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-agents"}";
+      };
+    }
+    {
+      name = "s-router-legacy-edge";
+      args = {
+        description = "s-router-legacy-edge VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-legacy-edge"}";
+      };
+    }
+    {
+      name = "s-router-legacy-core";
+      args = {
+        description = "s-router-core VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-legacy-core"}";
+      };
+    }
+    # {
+    #   name = "s-router-core";
+    #   args = {
+    #     description = "s-router-core VM (nixos-shell)";
+    #     repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
+    #   };
+    # }
+    # {
+    #   name = "s-router-upstream-selector";
+    #   args = {
+    #     description = "s-router-upstream-selector VM (nixos-shell)";
+    #     repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
+    #   };
+    # }
+    # {
+    #   name = "s-router-policy";
+    #   args = {
+    #     description = "s-router-policy VM (nixos-shell)";
+    #     repository = "path:${self.lib.vmSourceForHost "s-router-policy"}";
+    #   };
+    # }
+    # {
+    #   name = "s-router-access";
+    #   args = {
+    #     description = "s-router-access VM (nixos-shell)";
+    #     repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
+    #   };
+    # }
+    {
+      name = "s-router-clab";
+      args = {
+        description = "s-router-clab VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
+      };
+    }
+    {
+      name = "s-router-nixos";
+      args = {
+        description = "s-router-nixos VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-nixos"}";
+      };
+    }
+    {
+      name = "s-router-test-clients";
+      args = {
+        description = "s-router-test-clients VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-test-clients"}";
+      };
+    }
+    {
+      name = "s-router-vpn-egress";
+      args = {
+        description = "VPN-egress VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-vpn-egress"}";
+      };
+    }
+    {
+      name = "s-gameserver";
+      args = {
+        description = "Gameserver VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";
+      };
+    }
+    {
+      name = "s-test";
+      args = {
+        description = "s-test (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-test"}";
+      };
+    }
+  ];
+
+  mkImage = vm: {
+    inherit (vm) name;
+    value = self.nixosConfigurations.${vm.name}.config.system.build.nixos-shell;
+  };
+
+  mkService = vm: mkVM vm.name (vm.args // { registerImage = false; });
 in
 {
-  config = lib.mkMerge [
-    (mkVM "s-infra" {
-      description = "Infra VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-infra"}";
-    })
-
-    (mkVM "s-nebula" {
-      description = "Nebula VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-nebula"}";
-    })
-    (mkVM "s-agents" {
-      description = "Agent workbench VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-agents"}";
-    })
-    (mkVM "s-router-legacy-edge" {
-      description = "s-router-legacy-edge VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-legacy-edge"}";
-    })
-    (mkVM "s-router-legacy-core" {
-      description = "s-router-core VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-legacy-core"}";
-    })
-    # (mkVM "s-router-core" {
-    #   description = "s-router-core VM (nixos-shell)";
-    #   repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
-    # })
-    #(mkVM "s-router-upstream-selector" {
-    #  description = "s-router-upstream-selector VM (nixos-shell)";
-    #  repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
-    #})
-
-    # (mkVM "s-router-policy" {
-    #   description = "s-router-policy VM (nixos-shell)";
-    #   repository = "path:${self.lib.vmSourceForHost "s-router-policy"}";
-    # })
-
-    # (mkVM "s-router-access" {
-    #   description = "s-router-access VM (nixos-shell)";
-    #   repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
-    # })
-    (mkVM "s-router-clab" {
-      description = "s-router-clab VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
-    })
-    (mkVM "s-router-nixos" {
-      description = "s-router-nixos VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-nixos"}";
-    })
-    (mkVM "s-router-test-clients" {
-      description = "s-router-test-clients VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-test-clients"}";
-    })
-    (mkVM "s-router-vpn-egress" {
-      description = "VPN-egress VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-router-vpn-egress"}";
-    })
-
-    (mkVM "s-gameserver" {
-      description = "Gameserver VM (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";
-    })
-
-    (mkVM "s-test" {
-      description = "s-test (nixos-shell)";
-      repository = "path:${self.lib.vmSourceForHost "s-test"}";
-    })
-  ];
+  config = lib.mkMerge (
+    [
+      {
+        system.build.vmImages = lib.listToAttrs (map mkImage vms);
+      }
+    ]
+    ++ map mkService vms
+  );
 }

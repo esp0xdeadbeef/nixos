@@ -1,8 +1,7 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
+{ config
+, pkgs
+, lib
+, ...
 }:
 
 {
@@ -61,15 +60,10 @@
       dhcpV4Config = {
         ClientIdentifier = "mac";
         SendRelease = false;
-        MaxAttempts = 0;
+        MaxAttempts = "infinity";
         UseRoutes = true;
         UseGateway = true;
       };
-
-      extraConfig = ''
-        [DHCPv4]
-        KeepConfiguration=yes
-      '';
     };
 
   };
