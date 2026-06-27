@@ -1,4 +1,5 @@
 { config
+, hostPath ? null
 , lib
 , pkgs
 , ...
@@ -7,9 +8,10 @@ let
   cfg = config.local.shell.zshPrompt;
   hostName = config.networking.hostName or "unknown";
   defaultUser = config.local.users.primary.resolvedName;
+  isServer = hostPath != null && lib.hasPrefix "nixos/server/" hostPath;
 
   role =
-    if hostName == "s-sigma" then
+    if isServer then
       "server"
     else if lib.hasPrefix "l-" hostName then
       "laptop"
@@ -23,7 +25,7 @@ let
       "host";
 
   color =
-    if hostName == "s-sigma" then
+    if isServer then
       "red"
     else if hostName == "l-envil" then
       "green"
