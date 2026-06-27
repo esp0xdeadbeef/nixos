@@ -37,7 +37,7 @@
     profiles.nixos.hardware.clock-sync
     profiles.nixos.laptop.xlayoutdisplay-hotplug
     profiles.nixos.nixpkgs.allow-unfree
-    profiles.nixos.llm-clients.cache
+    profiles.nixos.llm-clients.agents
     profiles.nixos.shell.zsh-prompt
     profiles.nixos.vm-host.nixos-shell
     "${outPath}/modules/nixos/local-users.nix"
