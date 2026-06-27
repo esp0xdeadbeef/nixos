@@ -1,0 +1,7 @@
+# /mnt/nas/private/vmstore/assignments/webserver.yaml
+vm: webserver
+host: hypervisor-01
+desired_state: running    # running | stopped
+assigned_at: 2026-01-01T10:00:00Z
+assigned_by: coordinator
+

@@ -1,0 +1,16 @@
+// /mnt/nas/private/vmstore/hosts/hypervisor-01/heartbeat.json
+{
+  "timestamp": "2026-01-01T12:17:00Z",
+  "state": "EXECUTE",
+  "uptime_seconds": 86400,
+  "vms": [
+    {"name": "webserver", "state": "EXECUTE"},
+    {"name": "database", "state": "EXECUTE"}
+  ],
+  "resources": {
+    "cpu_used_percent": 45,
+    "memory_used_gb": 32,
+    "storage_used_gb": 200
+  }
+}
+

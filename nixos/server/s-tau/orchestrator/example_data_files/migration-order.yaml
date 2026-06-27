@@ -1,0 +1,12 @@
+# /mnt/nas/private/vmstore/migrations/webserver.yaml
+vm: webserver
+from_host: hypervisor-01
+to_host: hypervisor-02
+status: pending           # pending | in_progress | complete | failed
+created_at: 2026-01-01T12:15:00Z
+reason: host_failure      # host_failure | rebalance | manual
+lock:
+  holder: coordinator
+  timestamp: 2026-01-01T12:15:00Z
+  ttl: 3600
+

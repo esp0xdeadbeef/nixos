@@ -1,0 +1,13 @@
+# /mnt/nas/private/vmstore/coordinator/config.yaml
+pollIntervalSeconds: 30
+hostTimeoutSeconds: 120
+heartbeatIntervalSeconds: 30
+placementStrategy: spread
+notifications:
+  apprise_url: "apprise://..."
+  events:
+    - host_offline
+    - host_online
+    - vm_failover
+    - migration_complete
+
