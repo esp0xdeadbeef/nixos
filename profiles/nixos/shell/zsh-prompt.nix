@@ -1,13 +1,24 @@
 { config
-, hostPath ? null
 , lib
+, name ? null
 , pkgs
+, self ? null
 , ...
 }:
 let
   cfg = config.local.shell.zshPrompt;
   hostName = config.networking.hostName or "unknown";
   defaultUser = config.local.users.primary.resolvedName;
+  hostMap =
+    if self == null then
+      { }
+    else
+      self.lib.hosts or { };
+  hostPath =
+    if name != null && builtins.hasAttr name hostMap then
+      hostMap.${name}
+    else
+      null;
   isServer = hostPath != null && lib.hasPrefix "nixos/server/" hostPath;
 
   role =
