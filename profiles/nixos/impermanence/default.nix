@@ -70,6 +70,28 @@ let
 
   hasPackage = packageNames: lib.any (name: lib.elem name installedPackageNames) packageNames;
 
+  selectedLlmAgentPackageNames =
+    lib.attrByPath
+      [
+        "local"
+        "llmClients"
+        "agents"
+        "packageNames"
+      ]
+      [ ]
+      config;
+
+  selectedLlmAgentPersistence =
+    lib.attrByPath
+      [
+        "local"
+        "llmClients"
+        "agents"
+        "persistence"
+      ]
+      { }
+      config;
+
   normalUserNames = lib.filter
     (
       name: name != "root" && (config.users.users.${name}.isNormalUser or false)
@@ -77,31 +99,6 @@ let
     (lib.attrNames config.users.users);
 
   userGroup = user: config.users.users.${user}.group or "users";
-
-  hasLlmAgent = hasPackage [
-    "claude-code"
-    "claw-code"
-    "codex"
-    "crush"
-    "forgecode"
-    "gitclaw"
-    "hermes-agent"
-    "hermes-desktop"
-    "hermes-hud"
-    "mimo-code"
-    "nanocoder"
-    "oh-my-codex"
-    "omp"
-    "openclaw"
-    "opencode"
-    "openfang"
-    "pi"
-    "picoclaw"
-    "qwen-code"
-    "reasonix"
-    "vessel-browser"
-    "zeroclaw"
-  ];
 
   hasDiscordClient = hasPackage [
     "discord"
@@ -252,37 +249,23 @@ let
       ".quickget"
     ];
 
-  llmAgentDirs = [
-    ".config/claude"
-    ".config/codex"
-    ".config/crush"
-    ".config/hermes"
-    ".config/mimo-code"
-    ".config/nanocoder"
-    ".config/opencode"
-    ".config/qwen"
-    ".config/qwen-code"
-    ".config/reasonix"
-    ".config/vessel-browser"
-    ".cache/claude"
-    ".cache/codex"
-    ".cache/hermes"
-    ".cache/opencode"
-    ".cache/qwen"
-    ".cache/qwen-code"
-    ".claude"
-    ".codex"
-    ".gemini"
-    ".hermes"
-    ".opencode"
-    ".qwen"
-    ".local/share/claude"
-    ".local/share/codex"
-    ".local/share/hermes"
-    ".local/share/opencode"
-    ".local/share/qwen"
-    ".local/share/qwen-code"
-  ];
+  llmAgentDirs = lib.unique (
+    lib.concatMap
+      (
+        name:
+          selectedLlmAgentPersistence.${name}.directories or [ ]
+      )
+      selectedLlmAgentPackageNames
+  );
+
+  llmAgentFiles = lib.unique (
+    lib.concatMap
+      (
+        name:
+          selectedLlmAgentPersistence.${name}.files or [ ]
+      )
+      selectedLlmAgentPackageNames
+  );
 
   discordClientDirs = [
     ".config/discord"
@@ -324,7 +307,7 @@ let
   ];
 
   noCowUserDirs = lib.unique (
-    (lib.optionals hasLlmAgent llmAgentDirs)
+    llmAgentDirs
     ++ (lib.optionals hasDiscordClient discordClientDirs)
     ++ containerStateDirs
     ++ desktopAppDirs
@@ -420,7 +403,7 @@ let
   ++ containerStateDirs
   ++ lib.optionals isWorkstationHost workstationUserDirs
   ++ desktopAppDirs
-  ++ lib.optionals hasLlmAgent llmAgentDirs
+  ++ llmAgentDirs
   ++ lib.optionals hasDiscordClient discordClientDirs
   ++ secureUserDirs
   ++ cfg.extraUserDirectories;
@@ -435,6 +418,7 @@ let
     ".ZAP/config.xml"
   ]
   ++ spotifyPlayerFiles
+  ++ llmAgentFiles
   ++ cfg.extraUserFiles;
 
   sharedUserPersistence = lib.genAttrs normalUserNames (_user: {

@@ -1,5 +1,4 @@
-{ inputs
-, lib
+{ lib
 , outPath
 , pkgs
 , profiles
@@ -46,6 +45,31 @@
 
   programs.fish.enable = true;
 
+  local.llmClients.agents.packageNames = [
+    "claude-code"
+    "claw-code"
+    "codex"
+    "crush"
+    "forgecode"
+    "gitclaw"
+    "hermes-agent"
+    "hermes-desktop"
+    "hermes-hud"
+    "mimo-code"
+    "nanocoder"
+    "oh-my-codex"
+    "omp"
+    "openclaw"
+    "opencode"
+    "openfang"
+    "pi"
+    "picoclaw"
+    "qwen-code"
+    "reasonix"
+    "vessel-browser"
+    "zeroclaw"
+  ];
+
   security.sudo.extraRules = [
     {
       groups = [ "wheel" ];
@@ -91,10 +115,7 @@
     unzip
     usbutils
     zip
-  ] ++ (with inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}; [
-    claude-code
-    qwen-code
-  ]);
+  ];
 
   environment.interactiveShellInit = ''
     if [ -r /run/secrets/gh-token ]; then
