@@ -144,7 +144,8 @@ in
     enable = true;
     left = "edid:37a85fea39fa278b";
     right = "edid:ccc5757174dd0f67";
-    targetResolution = "3200x1800";
+    targetResolution = "3840x2160";
+    internalScale = "1x1";
   };
 
   sops.secrets."deadbeef-passwd" = {
