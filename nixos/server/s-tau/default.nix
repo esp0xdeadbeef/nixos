@@ -29,8 +29,7 @@
 
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
-    # Bootstrap only: re-enable once secrets/s-tau-root.yaml exists.
-    # inputs.sops-nix.nixosModules.sops
+    inputs.sops-nix.nixosModules.sops
 
     profiles.nixos.core
     profiles.nixos.base.maintenance
@@ -53,13 +52,8 @@
     ./libvirt.nix
     ./nixos-shell-servers
     ./hardware
-    # Depends on SOPS-backed NAS secrets, so keep it disabled during bootstrap.
-    # ./connect-nas
+    ./connect-nas
   ];
-
-  # Bootstrap only. This is the yescrypt hash for the temporary password
-  # "nixos"; replace it with sops-nix after the real tau host key exists.
-  users.users.deadbeef.hashedPassword = "$y$j9T$Ml1U6HvkeXcm6IKcJcNtd/$8/IQEIMfWjTZ.B5tJF.oepeVrOjppKfkpRpybaaSZL2";
 
   boot.swraid = {
     # Disko creates the LUKS container on this mdraid array; the initrd must
@@ -75,13 +69,12 @@
   # until the active/standby router plan is explicit.
   local.vmHost.nixosShell.autoStart = false;
 
-  # Re-enable once secrets/s-tau-root.yaml exists and is encrypted to tau.
-  # sops.defaultSopsFile = "${outPath}/secrets/${name}-root.yaml";
-  # sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
-  #
-  # sops.secrets."deadbeef-passwd" = {
-  #   neededForUsers = true;
-  # };
+  sops.defaultSopsFile = "${outPath}/secrets/${name}-root.yaml";
+  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
+
+  sops.secrets."deadbeef-passwd" = {
+    neededForUsers = true;
+  };
 
   time.timeZone = "Europe/Amsterdam";
 
@@ -107,8 +100,7 @@
 
   home-manager = {
     sharedModules = [
-      # Bootstrap only: re-enable once secrets/s-tau-root.yaml exists.
-      # inputs.sops-nix.homeManagerModules.sops
+      inputs.sops-nix.homeManagerModules.sops
     ];
     extraSpecialArgs = {
       inherit inputs outputs profiles;
@@ -180,7 +172,7 @@
       # If you do, you can skip setting a root password by passing '--no-root-passwd' to nixos-install.
       # Be sure to change it (using passwd) after rebooting!
       # initialPassword = " ";
-      # hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
+      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
 
       isNormalUser = true;
       # TODO: Be sure to add any other groups you need (such as networkmanager, audio, docker, etc)
