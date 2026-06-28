@@ -26,13 +26,16 @@
 
     # Will test this box if relyable for router firmware hosting:
     inputs.lanzaboote.nixosModules.lanzaboote
+    profiles.nixos.boot.secure-boot-tools
 
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
     profiles.nixos.core
     profiles.nixos.base.maintenance
+    profiles.nixos.desktop.i3
+    profiles.nixos.editors.neovim
     profiles.nixos.hardware.clock-sync
     profiles.nixos.laptop.xlayoutdisplay-hotplug
     profiles.nixos.nixpkgs.allow-unfree
@@ -78,21 +81,6 @@
 
   time.timeZone = "Europe/Amsterdam";
 
-  services.xserver = {
-    enable = true;
-    windowManager.i3 = {
-      enable = true;
-      extraPackages = with pkgs; [
-        dmenu
-        i3lock
-        i3status
-      ];
-    };
-    xkb.layout = "us";
-  };
-  services.displayManager.defaultSession = "none+i3";
-  services.displayManager.gdm.enable = true;
-  security.pam.services.i3lock.enable = true;
   local.laptop.xlayoutdisplayHotplug.configLines = [
     "dpi=96"
   ];

@@ -4,7 +4,6 @@
 
   environment.systemPackages = with pkgs; [
     tcpdump
-    neovim
     nmap
     nftables
     dig

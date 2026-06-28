@@ -1,9 +1,8 @@
-{
-  inputs,
-  config,
-  pkgs,
-  lib,
-  ...
+{ inputs
+, config
+, pkgs
+, lib
+, ...
 }:
 
 {
@@ -40,6 +39,4 @@
   boot.initrd.systemd.enable = true;
   # boot.initrd.systemd.enableTpm2 = true;
 
-  # sec boot tool:
-  environment.systemPackages = with pkgs; [ sbctl ];
 }

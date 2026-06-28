@@ -35,7 +35,6 @@
   # System packages for Secure Boot debugging
   environment.systemPackages = with pkgs; [
     tpm2-tss
-    sbctl
   ];
 
   # Filesystem optimizations

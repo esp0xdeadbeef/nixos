@@ -66,9 +66,22 @@ let
       [ ]
       config;
 
+  homeManagerUsers = config.home-manager.users or { };
+
   installedPackageNames = map getPkgName (config.environment.systemPackages ++ homePackages);
 
   hasPackage = packageNames: lib.any (name: lib.elem name installedPackageNames) packageNames;
+
+  hasFish =
+    (config.programs.fish.enable or false)
+    || lib.any
+      (userConfig: userConfig.programs.fish.enable or false)
+      (lib.attrValues homeManagerUsers);
+
+  fishUserDirs = lib.optionals hasFish [
+    ".local/share/fish"
+    ".config/fish"
+  ];
 
   selectedLlmAgentPackageNames =
     lib.attrByPath
@@ -390,6 +403,7 @@ let
     ".config/sops"
     ".cache/nix-index"
   ]
+  ++ fishUserDirs
   ++ lib.optionals hasVirtualMachines [
     "vms"
     "vms/isos"
@@ -660,7 +674,6 @@ in
         "/var/lib/bluetooth"
         "/var/lib/chrony"
         "/var/lib/nixos"
-        "/var/lib/sbctl"
         "/var/lib/systemd/coredump"
         "/var/lib/systemd/timers"
         "/var/lib/systemd/timesync"
@@ -668,6 +681,9 @@ in
         "/etc/NetworkManager/system-connections"
         "/var/lib/libvirt"
         (colordDir cfg.colordMode)
+      ]
+      ++ lib.optionals (config.boot.lanzaboote.enable or false) [
+        "/var/lib/sbctl"
       ]
       ++ cfg.extraSystemDirectories;
 

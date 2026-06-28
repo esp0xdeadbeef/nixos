@@ -1,10 +1,16 @@
-{
-  lib,
-  options,
-  pkgs,
-  ...
+{ config
+, lib
+, options
+, pkgs
+, ...
 }:
 
+let
+  usesSharedImpermanence =
+    options ? local
+    && options.local ? impermanence
+    && config.local.impermanence.enable;
+in
 {
   programs.fish.enable = true;
   programs.zsh.enable = true;
@@ -329,7 +335,7 @@
     '';
   };
 
-  environment.persistence = lib.mkIf (options.environment ? persistence) {
+  environment.persistence = lib.mkIf ((options.environment ? persistence) && !usesSharedImpermanence) {
     "/persist" = {
       users.deadbeef.directories = [
         ".local/share/fish"

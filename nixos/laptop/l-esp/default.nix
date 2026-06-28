@@ -10,8 +10,9 @@
 {
   imports = [
     inputs.lanzaboote.nixosModules.lanzaboote
+    profiles.nixos.boot.secure-boot-tools
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
@@ -28,8 +29,6 @@
     ./hardware
     ./llms
     #./osee
-    ./signal
-    ./torrents
     ./nebula-node
     ./optional
     ./nixos-shell-servers

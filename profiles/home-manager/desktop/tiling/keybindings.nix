@@ -10,6 +10,13 @@ let
   packageNames = map lib.getName (config.home.packages or [ ]);
   hasPackage = names: lib.any (name: lib.elem name packageNames) names;
   hasTeams = hasPackage [ "teams-for-linux" ];
+  browserCommand =
+    if hasPackage [ "google-chrome" ] then
+      "${pkgs.google-chrome}/bin/google-chrome-stable"
+    else if hasPackage [ "chromium" ] then
+      "${pkgs.chromium}/bin/chromium"
+    else
+      "${pkgs.firefox}/bin/firefox";
   editScreenshot = pkgs.writeShellScriptBin "sway-edit-screenshot" ''
     set -eu
 
@@ -107,7 +114,7 @@ in
     bindsym $mod+m mode "exit: [l]ogout, [r]eboot, [s]hutdown"
     bindsym $mod+i exec ${thunar}/bin/thunar
     bindsym $mod+Escape exec ${pkgs.i3lock}/bin/i3lock -n -c 202020
-    bindsym $mod+c exec google-chrome-stable
+    bindsym $mod+c exec ${browserCommand}
     ${lib.optionalString i3SpotifyEnabled "bindsym $mod+F3 exec ${i3SpotifyCommand}"}
     bindsym Print exec "${pkgs.flameshot}/bin/flameshot gui"
     bindsym $mod+Print exec "${pkgs.ksnip}/bin/ksnip"

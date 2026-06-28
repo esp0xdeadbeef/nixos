@@ -1,6 +1,7 @@
 { inputs
 , lib
 , outPath
+, profiles
 , ...
 }:
 let
@@ -31,7 +32,7 @@ in
     inputs.disko.nixosModules.disko
 
     # Required because /persist is part of the machine contract.
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
 
     # Required if renderer/imported sops files define sops.* options.
     inputs.sops-nix.nixosModules.sops

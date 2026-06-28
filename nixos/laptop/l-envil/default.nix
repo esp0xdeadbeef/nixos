@@ -15,13 +15,14 @@ in
 {
   imports = [
     inputs.lanzaboote.nixosModules.lanzaboote
+    profiles.nixos.boot.secure-boot-tools
     inputs.disko.nixosModules.disko
     inputs.nixos-hardware.nixosModules.common-cpu-intel
     inputs.nixos-hardware.nixosModules.common-gpu-intel
     inputs.nixos-hardware.nixosModules.common-gpu-nvidia
     inputs.nixos-hardware.nixosModules.common-pc-laptop
     inputs.nixos-hardware.nixosModules.common-pc-laptop-ssd
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
@@ -33,7 +34,6 @@ in
     profiles.nixos.laptop.default
     profiles.nixos.workstation.android
     profiles.nixos.workstation.pentesting
-    profiles.nixos.llm.lmstudio
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm.open-webui
     profiles.nixos.containers.firefox-vnc

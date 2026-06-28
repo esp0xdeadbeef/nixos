@@ -16,9 +16,14 @@ in
     let
       stable = with pkgs; [
         black
+        brave
+        chromium
+        discord
         google-chrome
         htop
+        lmstudio
         obsidian
+        spotify
         tmuxp
       ];
       unstable = with unstablePkgs; [

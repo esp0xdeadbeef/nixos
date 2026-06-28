@@ -1,8 +1,7 @@
-{
-  outPath,
-  pkgs,
-  profiles,
-  ...
+{ outPath
+, pkgs
+, profiles
+, ...
 }:
 {
   imports = [
@@ -27,8 +26,6 @@
     ./packages/1-general/archive-tools.nix
     ./packages/1-general/tooling.nix
     ./packages/audio/packages.nix
-    ./packages/browsers-mail-media-social-media/not-on-aarch64/packages.nix
-    ./packages/browsers-mail-media-social-media/packages.nix
     ./packages/data-tranformation/packages.nix
     ./packages/editors/packages.nix
     ./packages/encryption-and-password-management/packages.nix
@@ -37,8 +34,6 @@
     ./packages/network-troubleshooting/packages.nix
     ./packages/nix-specific/packages.nix
     ./packages/password-managers/1password.nix
-    ./packages/pdf/packages.nix
-    ./packages/rdp/packages.nix
     ./packages/scripting-languages/packages.nix
     ./packages/services/packages.nix
     ./packages/terminals/packages.nix
@@ -46,8 +41,6 @@
     ./packages/terminals/terminal-optimisers/updatedb.nix
     ./packages/usb-tools/packages.nix
     ./packages/virtualization/packages.nix
-    ./packages/window-managers/X-org/i3-wm/packages.nix
-    ./packages/window-managers/X-org/packages.nix
     ./security
     ./secrets/import-secrets.nix
     ./system/autoupdate.nix

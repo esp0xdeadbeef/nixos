@@ -1,8 +1,7 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
+{ config
+, pkgs
+, lib
+, ...
 }:
 {
   #shamelessly joinked from https://github.com/mdlayher/homelab/blob/main/nixos/lib/system.nix
@@ -24,9 +23,6 @@
       sops
       # pgp
       gnupg
-
-      # hardware Secure Boot Manager
-      sbctl
 
       # utility to manipulate machine owner keys
       mokutil

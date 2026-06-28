@@ -1,7 +1,6 @@
 { config, pkgs, ... }:
 {
   environment.etc.hosts.enable = false;
-  programs.firefox.enable = true;
   security.polkit.enable = true;
   # #services.openssh.enable = true;
   # #services.openssh.settings.X11Forwarding = true;
@@ -47,7 +46,6 @@
 
     man
     man-pages
-    sbctl
     openssl
     tpm2-tools
     jq
@@ -67,32 +65,19 @@
     dig
     bindfs
     wget
-    obsidian
-    # spotify
     python3
     libusb1
-    # firefox
-    thunderbird
-    legcord
     kubectl
     docker
     kind
     python3.pkgs.evdev
     python3.pkgs.pygraphviz
     podman-compose
-    sbctl
     tcpdump
     wireshark
     tshark
     # ventoy-full
     htop
-
-    # browser
-    chromium
-
-    # discord
-    # google-chrome
-    remmina
   ];
 
 }

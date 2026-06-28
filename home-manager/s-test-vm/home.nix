@@ -1,12 +1,11 @@
 # This is your home-manager configuration file
 # Use this to configure your home environment (it replaces ~/.config/nixpkgs/home.nix)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, ...
 }:
 {
   # You can import other home-manager modules here
@@ -28,6 +27,7 @@
       outputs.overlays.additions
       outputs.overlays.modifications
       outputs.overlays.unstable-packages
+      outputs.overlays.legcord-unstable-overwrite
 
       # You can also add overlays exported from other flakes:
       # neovim-nightly-overlay.overlays.default

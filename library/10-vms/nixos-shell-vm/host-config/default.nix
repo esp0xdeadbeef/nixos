@@ -1,22 +1,21 @@
 # This is your system's configuration file.
 # Use this to configure your system environment (it replaces /etc/nixos/configuration.nix)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  name,
-  outPath,
-  profiles,
-  ...
+{ inputs
+, outputs
+, lib
+, config
+, pkgs
+, name
+, outPath
+, profiles
+, ...
 }:
 {
   # You can import other NixOS modules here
   imports = [
     # If you want to use modules your own flake exports (from modules/nixos):
     # outputs.nixosModules.example
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
     profiles.nixos.core

@@ -852,3 +852,45 @@ The desired repo should make these questions easy to answer:
 The next concrete cleanup should be reducing direct dependency on
 `library/01-general` by moving one remaining broad import path into focused
 profiles and validating one host at a time.
+
+## Profile Boundary Notes From 2026-06-29 Audit
+
+These are things noticed while moving GUI applications out of NixOS package
+sets and into Home Manager.
+
+- Secure Boot tooling should be a boot profile, not a core package. `sbctl`
+  should follow `boot.lanzaboote.enable`, while key enrollment remains an
+  explicit per-machine firmware action.
+- Rich Neovim/LSP setup should stay an editor profile, not a core dependency.
+  `core` is imported by nixos-shell VM host configs, so editor-heavy profiles
+  must be attached only to interactive workstation/server hosts that want them.
+  Keep plain `vim` in core because nano is disabled and every machine still
+  needs a fallback editor.
+  VM debug helpers should also avoid installing Neovim directly.
+- Xorg and i3 helper packages should stay in desktop/i3 profiles, not in core.
+  nixos-shell VM hosts import core and should not receive GUI session tools
+  unless they explicitly opt into a desktop profile.
+- Wireshark should stay system-side because capture permissions and groups are
+  NixOS concerns, but it should be isolated behind a small workstation or
+  pentest capture profile instead of being scattered through broad package
+  lists.
+- KDE Connect should stay system-side when it enables `programs.kdeconnect`,
+  but host-local duplicates should collapse into the Android workstation profile
+  or an explicit KDE Connect profile.
+- Desktop session plumbing should be separated from user apps: display manager,
+  X11/i3 enablement, PAM/i3lock, dconf, keyring, and related session packages
+  belong in NixOS desktop profiles; browsers, chat clients, PDF readers, RDP
+  clients, LLM GUIs, and torrent clients belong in Home Manager.
+- NAS/CIFS client glue appears as repeated host-local `connect-nas` modules.
+  Consider a storage/NAS client profile that owns `cifs-utils`, mount defaults,
+  and the shared mechanics while keeping secrets and endpoints host-local.
+- Repeated `security.pam.services.login.enableGnomeKeyring = true` should become
+  part of a desktop keyring profile instead of being set individually on
+  desktop-capable hosts.
+- Host-local VM/nixos-shell support should keep moving toward profiles with
+  clear intent: VM host plumbing, VM debug packages, VM network management, and
+  persistence disks should not be mixed into broad host roots unless the profile
+  name says exactly what capability is being enabled.
+- Legacy `library/01-general/desktop/packages.nix` still mixes virtualization,
+  desktop tools, CLI utilities, and privilege-bearing packages. Split or retire
+  it before reusing it on new hosts.

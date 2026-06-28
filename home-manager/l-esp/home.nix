@@ -51,6 +51,7 @@ in
       outputs.overlays.additions
       outputs.overlays.modifications
       outputs.overlays.unstable-packages
+      outputs.overlays.legcord-unstable-overwrite
 
       # You can also add overlays exported from other flakes:
       # neovim-nightly-overlay.overlays.default
@@ -81,10 +82,16 @@ in
   home.packages =
     let
       stable = with pkgs; [
+        brave
+        chromium
+        discord
         obsidian
         google-chrome
         flameshot
+        lmstudio
+        qbittorrent
         remmina
+        spotify
         distrobox
         xlayoutdisplay
       ];
@@ -92,6 +99,7 @@ in
       unstable = with unstablePkgs; [
         # firefox
         gh
+        signal-desktop
       ];
     in
     stable ++ unstable;

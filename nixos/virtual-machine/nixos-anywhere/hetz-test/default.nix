@@ -1,10 +1,10 @@
 # Minimal hetzner test VM — SSH only, no routers, no renderers, no parent deps.
 # Self-contained: all files copied here so sat.sh/s-router-hetz changes don't affect it.
-{
-  inputs,
-  lib,
-  outPath,
-  ...
+{ inputs
+, lib
+, outPath
+, profiles
+, ...
 }:
 let
   system = "x86_64-linux";
@@ -16,7 +16,7 @@ in
 
   imports = [
     inputs.disko.nixosModules.disko
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
     inputs.sops-nix.nixosModules.sops
 
     ./hardware.nix

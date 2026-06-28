@@ -32,7 +32,7 @@
     windowManager.i3 = {
       enable = true;
       extraPackages = with pkgs; [
-        #dmenu
+        dmenu
         i3status
         i3lock
         i3blocks

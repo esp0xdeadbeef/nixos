@@ -16,6 +16,8 @@ in
     profiles.nixos.base.default
     profiles.nixos.laptop.default
     profiles.nixos.boot.usb-removable
+    profiles.nixos.desktop.i3
+    profiles.nixos.editors.neovim
     profiles.nixos.hardware.clock-sync
 
     inputs.disko.nixosModules.disko
@@ -29,11 +31,8 @@ in
 
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x13s
 
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
     inputs.home-manager.nixosModules.home-manager
-
-    # inputs.nixos-x13s.nixosModules.default
-    "${outPath}/library/02-window-manager-i3/default.nix"
 
     "${outPath}/library/01-general/system/garbage-collection.nix"
     "${outPath}/library/01-general/system/autoupdate.nix"

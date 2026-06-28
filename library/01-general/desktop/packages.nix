@@ -5,7 +5,6 @@
 }:
 {
   environment.etc.hosts.enable = false;
-  programs.firefox.enable = true;
   # programs.neovim.enable = true;
   # programs.neovim.defaultEditor = true;
   services.supergfxd.enable = true;
@@ -50,7 +49,6 @@
       gh
       sshpass
       man-pages
-      sbctl
       openssl
       tpm2-tools
       jq
@@ -78,10 +76,8 @@
       dig
       bindfs
       wget
-      obsidian
       #qemu
       libvirt
-      spotify
       virt-manager
       virt-viewer
       spice
@@ -98,14 +94,11 @@
       docker
       kind
       #teams
-      brave
       python3.pkgs.evdev
       python3.pkgs.pygraphviz
       podman-compose
       #google-chrome
       #chromium
-      #signal-desktop
-      sbctl
       tcpdump
       wireshark
       tshark

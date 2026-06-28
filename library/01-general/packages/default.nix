@@ -4,8 +4,6 @@
     ./1-general/archive-tools.nix
     ./1-general/tooling.nix
     ./audio/packages.nix
-    ./browsers-mail-media-social-media/not-on-aarch64/packages.nix
-    ./browsers-mail-media-social-media/packages.nix
     ./data-tranformation/packages.nix
     ./editors/packages.nix
     ./encryption-and-password-management/packages.nix
@@ -14,8 +12,6 @@
     ./network-troubleshooting/packages.nix
     ./nix-specific/packages.nix
     ./password-managers/1password.nix
-    ./pdf/packages.nix
-    ./rdp/packages.nix
     ./scripting-languages/packages.nix
     ./services/packages.nix
     ./terminals/packages.nix
@@ -23,7 +19,5 @@
     ./terminals/terminal-optimisers/updatedb.nix
     ./usb-tools/packages.nix
     ./virtualization/packages.nix
-    ./window-managers/X-org/i3-wm/packages.nix
-    ./window-managers/X-org/packages.nix
   ];
 }

@@ -6,6 +6,7 @@
 , name
 , outPath
 , modulesPath
+, profiles
 , ...
 }:
 
@@ -17,7 +18,7 @@ in
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
 
-    inputs.impermanence.nixosModules.impermanence
+    profiles.nixos.impermanence.module
     inputs.home-manager.nixosModules.home-manager
     inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops

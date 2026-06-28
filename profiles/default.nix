@@ -9,6 +9,7 @@
     core = import ./nixos/core;
     boot = {
       clevis-tang-unlock = import ./nixos/boot/clevis-tang-unlock.nix;
+      secure-boot-tools = import ./nixos/boot/secure-boot-tools.nix;
       usb-removable = import ./nixos/boot/usb-removable.nix;
     };
     desktop = {
@@ -55,17 +56,17 @@
       agents = import ./nixos/llm-clients/agents.nix;
     };
     llm = {
-      lmstudio = import ./nixos/llm/lmstudio.nix;
       ollama-base = import ./nixos/llm/ollama-base.nix;
       open-webui = import ./nixos/llm/open-webui.nix;
     };
     impermanence = {
+      module = args@{ outputs, pkgs, ... }:
+        (outputs.overlays.impermanence-module pkgs pkgs).impermanenceNixosModule args;
       default = import ./nixos/impermanence;
     };
     laptop = {
       autorandr-default = import ./nixos/laptop/autorandr-default.nix;
       default = import ./nixos/laptop;
-      desktop-apps = import ./nixos/laptop/desktop-apps.nix;
       dock = import ./nixos/laptop/dock.nix;
       monitor-layouts = import ./nixos/laptop/monitor-layouts.nix;
       power = import ./nixos/laptop/power.nix;
