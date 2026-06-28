@@ -114,9 +114,18 @@ nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/s
 nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/KEK/KEK.pem -out /mnt/boot/KEK.cer'
 nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer'
 
-mkdir -p /persist/etc/secureboot/
-cp -r /mnt/persist/var/lib/sbctl/* /persist/etc/secureboot/
+mkdir -p /mnt/persist/etc/secureboot
+cp -r /mnt/persist/var/lib/sbctl/* /mnt/persist/etc/secureboot/
+
+test -f /mnt/persist/etc/secureboot/keys/db/db.pem
+test -f /mnt/persist/etc/secureboot/keys/db/db.key
 ```
+
+The installed system uses `boot.lanzaboote.pkiBundle = "/persist/etc/secureboot"`.
+If `/persist/etc/secureboot/keys/db/db.pem` is missing after first boot,
+`nixos-rebuild switch` cannot install a signed boot entry. The private keys
+cannot be recovered from `/boot/*.cer`; reset Secure Boot keys in BIOS/iDRAC and
+rerun this section if they are lost.
 
 ## SOPS host key
 
