@@ -12,6 +12,7 @@
   environment.systemPackages = with pkgs; [
     binutils
     btop
+    openssl
     sshpass
     tmuxp
     vim
