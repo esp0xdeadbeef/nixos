@@ -1,5 +1,6 @@
 { inputs
 , lib
+, options
 , pkgs
 , ...
 }: {
@@ -19,6 +20,28 @@
     pciutils
     smartmontools
     usbutils
+  ];
+
+  local.impermanence.extraSystemDirectories = lib.mkIf (options ? local && options.local ? impermanence) [
+    {
+      directory = "/var/cache/dell";
+      mode = "0750";
+    }
+    {
+      directory = "/var/lib/dell";
+      mode = "0750";
+    }
+  ];
+
+  systemd.tmpfiles.rules = [
+    "d /var/cache/dell 0750 root root -"
+    "d /var/cache/dell/dell_dup 0750 root root -"
+    "d /var/cache/dell/dell_dup/dsu 0750 root root -"
+    "d /var/cache/dell/dell_dup/suu 0750 root root -"
+    "d /var/cache/dell/dsu 0750 root root -"
+    "d /var/cache/dell/suu 0750 root root -"
+    "d /var/lib/dell 0750 root root -"
+    "d /var/lib/dell/dsu 0750 root root -"
   ];
 
   specialisation.upgrade-firmware.configuration = {
