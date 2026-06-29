@@ -29,6 +29,7 @@
 
 let
   dellPgpPubkeys = "https://linux.dell.com/repo/pgp_pubkeys";
+  dellBanner = "DELL FIRMWARE TOOLING IS PAINFUL";
 
   gpgmeCompat = gpgme.overrideAttrs (_old: {
     version = "1.24.3";
@@ -106,7 +107,7 @@ let
     '';
 
     meta = {
-      description = "Dell System Update payload";
+      description = "Dell System Update payload from a frustrating firmware vendor";
       homepage = "https://linux.dell.com/repo/hardware/dsu/";
       license = lib.licenses.unfree;
       platforms = [ "x86_64-linux" ];
@@ -144,6 +145,8 @@ buildFHSEnv {
   ];
 
   extraPreBwrapCmds = ''
+    printf '%s\n' '${dellBanner}' >&2
+
     mkdir -p /var/cache/dell/dell_dup/dsu /var/cache/dell/dsu /var/cache/dell/dsu/opt /var/lib/dell/dsu
     ${rsync}/bin/rsync -a --delete ${payload}/opt/ /var/cache/dell/dsu/opt/
     key_cache_dir=/var/cache/dell/dsu/pgp_pubkeys
@@ -244,7 +247,7 @@ buildFHSEnv {
   ];
 
   meta = {
-    description = "Dell System Update from Dell's official RPM, wrapped for NixOS";
+    description = "Dell System Update from Dell's official RPM; Dell firmware tooling is painful, wrapped for NixOS";
     homepage = "https://linux.dell.com/repo/hardware/dsu/";
     license = lib.licenses.unfree;
     mainProgram = "dsu";

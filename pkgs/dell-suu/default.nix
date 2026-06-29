@@ -63,6 +63,7 @@ let
   isoUrl = "https://dl.dell.com/FOLDER14030849M/1/SUU_980-x64-LIN-7.ISO";
   isoName = "SUU_980-x64-LIN-7.ISO";
   isoSha256 = "e97d46586b519e5f72cf77cde883474dbe4e5bb7abaae8bb023067411750f525";
+  dellBanner = "DELL FIRMWARE TOOLING IS PAINFUL";
 
   gpgmeCompat = gpgme.overrideAttrs (_old: {
     version = "1.24.3";
@@ -87,6 +88,8 @@ let
     ];
 
     text = ''
+      printf '%s\n' '${dellBanner}' >&2
+
       usage() {
         cat <<'USAGE'
       usage: dell-suu-fhs-run <mounted-suu-source> [--gui | --cli | --shell | --launcher PATH] [-- ARGS...]
@@ -289,6 +292,7 @@ let
 
     text = ''
       set -euo pipefail
+      printf '%s\n' '${dellBanner}' >&2
 
       usage() {
         cat <<'USAGE'
@@ -589,7 +593,7 @@ let
     '';
 
     meta = {
-      description = "Run Dell Server Update Utility from an official SUU ISO on NixOS";
+      description = "Run Dell Server Update Utility from an official SUU ISO on NixOS; Dell firmware tooling is painful";
       homepage = "https://www.dell.com/support/kbdoc/en-us/000123359/dell-emc-server-update-utility-suu-guide-and-download";
       license = lib.licenses.unfree;
       mainProgram = "dell-suu";
@@ -607,6 +611,7 @@ let
 
     text = ''
       set -euo pipefail
+      printf '%s\n' '${dellBanner}' >&2
 
       if [ "$(id -u)" -eq 0 ]; then
         exec ${suu}/bin/dell-suu --gui "$@"
@@ -638,7 +643,7 @@ let
     name = "dell-suu";
     desktopName = "Dell Server Update Utility";
     genericName = "Firmware updater";
-    comment = "Launch the Dell SUU firmware update GUI";
+    comment = "Launch the Dell SUU firmware update GUI; Dell firmware tooling is painful";
     exec = "dell-suu-gui";
     icon = "dell-suu";
     categories = [
