@@ -294,13 +294,20 @@ nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/
 Enroll Secure Boot keys while the firmware is still in setup mode:
 
 ```bash
-nix-shell -p sbctl --run 'sbctl enroll-keys -m'
+sudo sbctl enroll-keys \
+  --microsoft \
+  --ignore-immutable \
+  --yes-this-might-brick-my-machine
 nix-shell -p sbctl --run 'sbctl status'
 ```
 
-If setup mode is already disabled, reset Secure Boot keys from BIOS/iDRAC,
-rerun enrollment, and leave firmware Secure Boot disabled until the first
-signed UKI boot has been verified.
+If setup mode is already disabled and `sudo sbctl list-enrolled-keys` does not
+show `Platform Key`, `Key Exchange Key`, and `Database Key`, delete only the
+Secure Boot platform key from BIOS/iDRAC. Do not reset the full BIOS. On this
+iDRAC8 generation, Redfish exposes that as `SecureBoot.ResetKeys` with
+`DeletePK`. Reboot once, confirm `sudo sbctl status` reports setup mode
+enabled, rerun the enrollment command above, and leave firmware Secure Boot
+disabled until the first signed UKI boot has been verified.
 
 ## 10. First boot
 
@@ -397,6 +404,8 @@ Only enable firmware enforcement after:
 
 - Lanzaboote is enabled in the config.
 - `/persist/etc/secureboot/keys/db/db.key` exists on the installed host.
+- `sudo sbctl list-enrolled-keys` shows the sbctl `Platform Key`,
+  `Key Exchange Key`, and `Database Key`.
 - `bootctl status` shows a Lanzaboote UKI as the default boot entry.
 - The explicit `sbctl verify` command above reports all active EFI boot
   artifacts signed.
@@ -406,10 +415,15 @@ Use the iDRAC8 UI:
 1. Log in to iDRAC at `<idrac-host>`.
 2. Go to BIOS settings.
 3. Confirm boot mode is UEFI.
-4. Confirm Secure Boot policy is Standard or Custom with the enrolled keys.
+4. Set Secure Boot policy to Custom.
 5. Set Secure Boot to Enabled.
 6. Apply the change for the next reboot.
 7. Reboot the host from the OS or iDRAC.
+
+Do not use the Standard policy for this install. On this machine, Standard
+policy used only the firmware/vendor trust database and rejected the IDSDM
+`Linux Boot Manager` even though the files were signed. Custom policy plus the
+enrolled sbctl keys is the verified working state.
 
 Optional Redfish checks, without putting credentials in history:
 
@@ -426,9 +440,52 @@ curl -k -u "<idrac-user>:${IDRAC_PASSWORD}" \
 unset IDRAC_PASSWORD
 ```
 
-Some iDRAC8 firmware exposes Secure Boot changes through the SecureBoot
-resource, and some exposes them through BIOS pending settings. Prefer the UI
-unless the exact Redfish write path has been tested on this machine.
+If the firmware trust database is wrong, delete only the platform key, then
+enroll from the installed OS:
+
+```bash
+read -rsp "iDRAC password: " IDRAC_PASSWORD
+printf '\n'
+
+curl -k -u "<idrac-user>:${IDRAC_PASSWORD}" \
+  -H 'Content-Type: application/json' \
+  -X POST \
+  -d '{"ResetKeysType":"DeletePK"}' \
+  "https://$IDRAC_HOST/redfish/v1/Systems/System.Embedded.1/SecureBoot/Actions/SecureBoot.ResetKeys"
+
+unset IDRAC_PASSWORD
+
+systemctl reboot
+
+sudo sbctl status
+sudo sbctl enroll-keys \
+  --microsoft \
+  --ignore-immutable \
+  --yes-this-might-brick-my-machine
+sudo sbctl list-enrolled-keys
+```
+
+On iDRAC8, enabling Secure Boot was tested through BIOS pending settings plus a
+BIOS config job:
+
+```bash
+read -rsp "iDRAC password: " IDRAC_PASSWORD
+printf '\n'
+
+curl -k -u "<idrac-user>:${IDRAC_PASSWORD}" \
+  -H 'Content-Type: application/json' \
+  -X PATCH \
+  -d '{"Attributes":{"SecureBoot":"Enabled","SecureBootPolicy":"Custom"}}' \
+  "https://$IDRAC_HOST/redfish/v1/Systems/System.Embedded.1/Bios/Settings"
+
+ssh "<idrac-user>@$IDRAC_HOST" \
+  racadm jobqueue create BIOS.Setup.1-1 -r pwrcycle -s TIME_NOW
+
+unset IDRAC_PASSWORD
+```
+
+Some iDRAC8 firmware also exposes Secure Boot changes through the SecureBoot
+resource, but the BIOS pending settings path above is the one tested here.
 
 After reboot with firmware Secure Boot enabled:
 
@@ -456,10 +513,15 @@ If Secure Boot blocks boot:
 
 1. Use iDRAC to disable firmware Secure Boot.
 2. Boot the installed system or the installer ISO.
-3. Confirm `/persist/etc/secureboot` still contains the signing keys.
-4. Run `sudo nixos-rebuild switch --flake ".#s-tau"`.
-5. Run the explicit active-artifact `sbctl verify` command above.
-6. Re-enable firmware Secure Boot only after the verification gates pass.
+3. Check iDRAC lifecycle logs for `UEFI0073`. That means firmware policy
+   rejected the boot option before Linux started.
+4. Confirm `/persist/etc/secureboot` still contains the signing keys.
+5. Run `sudo sbctl list-enrolled-keys`. If it only shows vendor keys, use the
+   `DeletePK` and `sbctl enroll-keys` flow above.
+6. Run `sudo nixos-rebuild switch --flake ".#s-tau"`.
+7. Run the explicit active-artifact `sbctl verify` command above.
+8. Re-enable firmware Secure Boot only with policy `Custom` after the
+   verification gates pass.
 
 If Clevis/Tang unlock fails:
 
