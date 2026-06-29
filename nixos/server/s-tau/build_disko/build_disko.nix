@@ -2,9 +2,9 @@
   disko.devices = {
     disk = {
       boot = {
-        # The NixOS installer USB is /dev/sda on this box. Use by-id so Disko
-        # targets the internal Dell IDSDM boot device regardless of probe order.
-        device = "/dev/disk/by-id/usb-DELL_IDSDM_012345678901-0:0";
+        # Use non-serial by-path names so this public repo does not expose disk
+        # serials while still avoiding probe-order names like /dev/sda.
+        device = "/dev/disk/by-path/pci-0000:00:1a.0-usb-0:1.3:1.0-scsi-0:0:0:0";
         type = "disk";
         content = {
           type = "gpt";
@@ -23,7 +23,7 @@
       };
 
       root-a = {
-        device = "/dev/disk/by-id/nvme-Samsung_SSD_980_PRO_2TB_S69ENF0W826691E";
+        device = "/dev/disk/by-path/pci-0000:82:00.0-nvme-1";
         type = "disk";
         content = {
           type = "gpt";
@@ -40,7 +40,7 @@
       };
 
       root-b = {
-        device = "/dev/disk/by-id/nvme-Samsung_SSD_980_PRO_2TB_S69ENF0W826718V";
+        device = "/dev/disk/by-path/pci-0000:83:00.0-nvme-1";
         type = "disk";
         content = {
           type = "gpt";

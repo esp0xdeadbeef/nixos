@@ -122,6 +122,7 @@ in
   systemd.services.${imageServiceName} = {
     description = "VM image manager (nixos-shell) for ${name}";
     after = [ "nix-daemon.service" ];
+    restartIfChanged = false;
     path = [
       pkgs.nix
       pkgs.coreutils
@@ -132,10 +133,16 @@ in
       Type = "oneshot";
       User = "root";
     };
+    unitConfig.X-OnlyManualStart = true;
 
     script = ''
       set -euo pipefail
       mkdir -p "${imgBase}"
+
+      if ps -eo args= | grep -Eq '([n]ixos-rebuild|[s]witch-to-configuration).* switch'; then
+        echo "Skipping ${imageServiceName}.service during host switch; start it manually to rebuild the VM image."
+        exit 0
+      fi
 
       ${lib.optionalString pinned ''
         : > "${pinLock}"
@@ -155,9 +162,6 @@ in
       NEW_PATH="$(readlink -f "${candidateLink}")"
       OLD_PATH="$(readlink -f "${currentLink}" 2>/dev/null || true)"
       if [ "$NEW_PATH" = "$OLD_PATH" ]; then exit 0; fi
-      while ps auxww | grep -E '[n]ixos.*build' >/dev/null; do
-        sleep 1
-      done
       nix-store --add-root "${currentLink}" --indirect --realise "$NEW_PATH" >/dev/null
       ${lib.optionalString autoStart ''
         systemctl restart "${vmServiceName}.service" || true

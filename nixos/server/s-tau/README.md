@@ -1,91 +1,164 @@
-# s-tau manual install
+# s-tau one-time install runbook
 
-`s-tau` is the rack server below `s-sigma`. Install it with the same manual
-playbook style as `s-sigma`: boot a NixOS installer, rsync this repo, run Disko
-manually, generate hardware config, create secure boot material, generate the
-SOPS age key, generate the Clevis JWE, then run `nixos-install`.
+This document is the install and recovery runbook for `s-tau`. It should be
+safe to publish: use placeholders in this file, and keep credentials, private
+keys, service tags, management addresses, disk serials, and generated unlock
+secrets out of documentation and commits unless they are intentionally encrypted.
 
-Do not use `nixos-anywhere` for this box until this manual path is proven again.
+The host uses:
 
-Temporary bootstrap passwords:
+- Disko for install-time partitioning.
+- IDSDM as the EFI system partition mounted at `/boot`.
+- RAID0 across the two NVMe root members.
+- LUKS container name `crypted`.
+- Btrfs subvolumes `/`, `/nix`, `/persist`, and `/vmstore`.
+- Lanzaboote with `boot.lanzaboote.pkiBundle = "/persist/etc/secureboot"`.
+- Clevis/Tang unlock for the root LUKS device.
+- SOPS for the installed user's password and host secrets.
 
-- LUKS password: `nixos`
-- `deadbeef` password: `nixos`
+Do not use `nixos-anywhere` for this host until this manual path has been
+validated again.
 
-Replace both after the install is stable.
+## Public-repo rules
 
-## Known device map
+Never commit or paste:
 
-This is the device map observed from the NixOS installer on 2026-06-27:
+- Plaintext passwords or passphrases.
+- iDRAC credentials, Redfish session tokens, service tags, or serial numbers.
+- Secure Boot private keys from `/persist/etc/secureboot` or `/var/lib/sbctl`.
+- The root SOPS age private key.
+- Disk IDs that include serial numbers.
+- Command output that includes the above values.
+
+The examples below use placeholders such as `<installer-host>`, `<idrac-host>`,
+`<tang-host>`, and `<admin-user>`. Resolve them locally during installation.
+
+## Variables
+
+Set these on the workstation before copying commands:
+
+```bash
+export HOST=s-tau
+export REPO="$HOME/github/nixos"
+export INSTALLER_HOST="<installer-host>"
+export ADMIN_USER="<admin-user>"
+export TANG_URL="http://<tang-host>:<tang-port>"
+export IDRAC_HOST="<idrac-host>"
+```
+
+Set these inside the installer shell:
+
+```bash
+export HOST=s-tau
+export REPO=/home/nixos/github/nixos
+export DISKO="$REPO/nixos/server/s-tau/build_disko/build_disko.nix"
+export LUKS_KEY=/tmp/s-tau-luks.key
+export TANG_URL="http://<tang-host>:<tang-port>"
+```
+
+Use high-entropy temporary passphrases generated locally. Do not reuse or
+commit them.
+
+## 1. Boot installer
+
+1. Boot a NixOS installer ISO through local console or iDRAC virtual media.
+2. If the ISO is not visible, temporarily disable firmware Secure Boot.
+3. Start SSH on the installer and set a temporary installer password if needed.
+4. Confirm access from the workstation:
+
+```bash
+ssh nixos@"$INSTALLER_HOST" id
+```
+
+Keep installer passwords out of shell history where possible.
+
+## 2. Verify disks
+
+Before any destructive command, verify the disk map from the installer:
+
+```bash
+ssh nixos@"$INSTALLER_HOST" '
+  lsblk -e7 -o NAME,PATH,SIZE,TYPE,FSTYPE,LABEL,MODEL,MOUNTPOINTS
+  find /dev/disk/by-path -maxdepth 1 -type l -printf "%f -> %l\n" | sort
+'
+```
+
+Disko targets non-serial `/dev/disk/by-path` names in
+`nixos/server/s-tau/build_disko/build_disko.nix`:
+
+The Dell BIOS setting `BIOS.SlotBifurcation.Slot4Bif` must be `x8x8`; with
+`x4x4x4x4` only one NVMe root member was visible to Linux.
 
 ```text
-/dev/disk/by-id/usb-SanDisk_Cruzer_Blade_2006016481051AF20108-0:0  physical USB installer
-/dev/disk/by-id/usb-DELL_IDSDM_012345678901-0:0                   internal IDSDM boot device
-/dev/disk/by-id/nvme-Samsung_SSD_980_PRO_2TB_S69ENF0W826691E      NVMe root member A
-/dev/disk/by-id/nvme-Samsung_SSD_980_PRO_2TB_S69ENF0W826718V      NVMe root member B
-/dev/sr0                                                          iDRAC virtual CD ISO
+boot   -> /dev/disk/by-path/pci-0000:00:1a.0-usb-0:1.3:1.0-scsi-0:0:0:0
+root-a -> /dev/disk/by-path/pci-0000:82:00.0-nvme-1
+root-b -> /dev/disk/by-path/pci-0000:83:00.0-nvme-1
 ```
 
-Important: on this machine `/dev/sda` is the physical Cruzer Blade USB. Disko
-must never target bare `/dev/sda`.
-
-## Boot installer
-
-1. Boot the NixOS graphical ISO from iDRAC virtual media.
-2. Disable Secure Boot during setup if the ISO is not visible.
-3. Confirm SSH works:
+Confirm each path exists and points to the intended device:
 
 ```bash
-sshpass -p nixos ssh nixos@192.168.1.70 id
+for dev in \
+  /dev/disk/by-path/pci-0000:00:1a.0-usb-0:1.3:1.0-scsi-0:0:0:0 \
+  /dev/disk/by-path/pci-0000:82:00.0-nvme-1 \
+  /dev/disk/by-path/pci-0000:83:00.0-nvme-1
+do
+  readlink -f "$dev"
+done
 ```
 
-4. Confirm the disk map before any destructive command:
+Abort if any path is missing, points at installer media, or points at an
+unexpected disk.
 
-```bash
-sshpass -p nixos ssh nixos@192.168.1.70 \
-  'lsblk -e7 -o NAME,PATH,SIZE,TYPE,FSTYPE,LABEL,MODEL,SERIAL,MOUNTPOINTS; find /dev/disk/by-id -maxdepth 1 -type l -printf "%f -> %l\n" | sort'
-```
-
-## Copy repo to installer
+## 3. Copy repo
 
 From the workstation:
 
 ```bash
-rsync -va /home/deadbeef/github/nixos nixos@192.168.1.70:~/github/
+ssh nixos@"$INSTALLER_HOST" 'mkdir -p ~/github'
+rsync -az --delete "$REPO/" nixos@"$INSTALLER_HOST":~/github/nixos/
 ```
 
-## Partition, RAID0, LUKS, and mount
+## 4. Partition and mount
 
-Inside the installer:
+From the workstation, enter a root shell on the installer:
 
 ```bash
-ssh nixos@192.168.1.70
+ssh nixos@"$INSTALLER_HOST"
 sudo -i
+export HOST=s-tau
+export REPO=/home/nixos/github/nixos
+export DISKO="$REPO/nixos/server/s-tau/build_disko/build_disko.nix"
+export LUKS_KEY=/tmp/s-tau-luks.key
+cd "$REPO"
 
-PATH_TO_DISKO="/home/nixos/github/nixos/nixos/server/s-tau/build_disko/build_disko.nix"
-printf 'nixos' > /tmp/s-tau-luks.key
-chmod 600 /tmp/s-tau-luks.key
+read -rsp "temporary LUKS passphrase: " LUKS_PASSPHRASE
+printf '\n'
+printf '%s' "$LUKS_PASSPHRASE" > "$LUKS_KEY"
+chmod 600 "$LUKS_KEY"
 
 nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- \
   --yes-wipe-all-disks \
-  --mode destroy,format,mount "$PATH_TO_DISKO"
+  --mode destroy,format,mount "$DISKO"
 
-cryptsetup open --test-passphrase /dev/disk/by-id/md-name-any:root --key-file /tmp/s-tau-luks.key
+cryptsetup open --test-passphrase /dev/disk/by-id/md-name-any:root --key-file "$LUKS_KEY"
+unset LUKS_PASSPHRASE
 ```
 
 Expected layout after Disko:
 
-- `/boot` on the Dell IDSDM.
-- `/dev/md/root` as RAID0 over both Samsung NVMe partitions.
-- LUKS container name `crypted`.
-- Btrfs subvolumes `/root`, `/nix`, `/persist`, `/vmstore`.
+- `/boot` mounted from the IDSDM ESP.
+- `/dev/md/root` assembled from both NVMe root members.
+- LUKS container `crypted`.
+- Btrfs subvolumes mounted at `/mnt`, `/mnt/nix`, `/mnt/persist`, and
+  `/mnt/vmstore`.
 
-## Generate hardware configuration
+## 5. Generate hardware config
 
 Inside the installer:
 
 ```bash
-nixos-generate-config --root /mnt/
+nixos-generate-config --root /mnt
 mkdir -p /persist
 mount --bind /mnt/persist /persist
 ```
@@ -93,117 +166,312 @@ mount --bind /mnt/persist /persist
 From the workstation:
 
 ```bash
-rsync -va \
-  nixos@192.168.1.70:/mnt/etc/nixos/hardware-configuration.nix \
-  /home/deadbeef/github/nixos/nixos/server/s-tau/hardware/hardware-configuration.nix
+rsync -az \
+  nixos@"$INSTALLER_HOST":/mnt/etc/nixos/hardware-configuration.nix \
+  "$REPO/nixos/server/s-tau/hardware/hardware-configuration.nix"
 
-rsync -va /home/deadbeef/github/nixos nixos@192.168.1.70:~/github/
+rsync -az --delete "$REPO/" nixos@"$INSTALLER_HOST":~/github/nixos/
 ```
 
-## Secure Boot keys
+Review the generated hardware file before committing. UUIDs are expected; disk
+serials and service tags are not.
+
+## 6. Create Secure Boot keys
 
 Inside the installer as root:
 
 ```bash
 nix-shell -p sbctl --run 'sbctl create-keys'
 
-mkdir -p /mnt/persist/var/lib/sbctl
-cp -r /var/lib/sbctl/* /mnt/persist/var/lib/sbctl
+install -d -m 0700 /mnt/persist/var/lib/sbctl
+cp -a /var/lib/sbctl/. /mnt/persist/var/lib/sbctl/
 
-nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/PK/PK.pem -out /mnt/boot/PK.cer'
-nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/KEK/KEK.pem -out /mnt/boot/KEK.cer'
-nix-shell -p openssl --run 'openssl x509 -outform der -in /mnt/persist/var/lib/sbctl/keys/db/db.pem -out /mnt/boot/db.cer'
-
-mkdir -p /mnt/persist/etc/secureboot
-cp -r /mnt/persist/var/lib/sbctl/* /mnt/persist/etc/secureboot/
+install -d -m 0700 /mnt/persist/etc/secureboot
+cp -a /mnt/persist/var/lib/sbctl/. /mnt/persist/etc/secureboot/
 
 test -f /mnt/persist/etc/secureboot/keys/db/db.pem
 test -f /mnt/persist/etc/secureboot/keys/db/db.key
 ```
 
-The installed system uses `boot.lanzaboote.pkiBundle = "/persist/etc/secureboot"`.
-If `/persist/etc/secureboot/keys/db/db.pem` is missing after first boot,
-`nixos-rebuild switch` cannot install a signed boot entry. The private keys
-cannot be recovered from `/boot/*.cer`; reset Secure Boot keys in BIOS/iDRAC and
-rerun this section if they are lost.
+Optional, for manual firmware enrollment UI only:
 
-## SOPS host key
+```bash
+nix-shell -p openssl --run \
+  'openssl x509 -outform der -in /mnt/persist/etc/secureboot/keys/PK/PK.pem -out /mnt/boot/PK.cer'
+nix-shell -p openssl --run \
+  'openssl x509 -outform der -in /mnt/persist/etc/secureboot/keys/KEK/KEK.pem -out /mnt/boot/KEK.cer'
+nix-shell -p openssl --run \
+  'openssl x509 -outform der -in /mnt/persist/etc/secureboot/keys/db/db.pem -out /mnt/boot/db.cer'
+```
+
+The private keys under `/mnt/persist/etc/secureboot` are host-private. Losing
+them means future UKIs cannot be signed with the enrolled keys.
+
+## 7. Create SOPS host key
 
 Inside the installer as root:
 
 ```bash
-[ -d /mnt ] || echo "mount /mnt first"
-[ -f /mnt/persist/root/.ssh/id_ed25519 ] || (
-  mkdir -p /mnt/persist/root/.ssh
+install -d -m 0700 /mnt/persist/root/.ssh
+test -f /mnt/persist/root/.ssh/id_ed25519 || \
   ssh-keygen -t ed25519 -N "" -f /mnt/persist/root/.ssh/id_ed25519 -q
-)
 
-mkdir -p /mnt/persist/root/.config/sops/age
+install -d -m 0700 /mnt/persist/root/.config/sops/age
 nix-shell -p ssh-to-age --run \
-  'bash -c "ssh-to-age -private-key -i /mnt/persist/root/.ssh/id_ed25519 > /mnt/persist/root/.config/sops/age/keys.txt"'
+  'ssh-to-age -private-key -i /mnt/persist/root/.ssh/id_ed25519 > /mnt/persist/root/.config/sops/age/keys.txt'
 
-key=$(nix-shell -p age --run "age-keygen -y /mnt/persist/root/.config/sops/age/keys.txt")
-echo -e "public key:\n$key"
+chmod 600 /mnt/persist/root/.config/sops/age/keys.txt
+nix-shell -p age --run \
+  'age-keygen -y /mnt/persist/root/.config/sops/age/keys.txt'
 ```
 
-Add the public key to `secrets/.sops.yaml`, create or update
-`secrets/s-tau-root.yaml`, then re-enable the commented SOPS imports in
-`nixos/server/s-tau/default.nix`.
+Add only the printed public age key to `secrets/.sops.yaml` under the `s-tau`
+creation rule. Then create or update `secrets/s-tau-root.yaml` from the
+workstation with SOPS. Do not read decrypted secret values into logs or commits.
 
-Until that is done, tau intentionally uses the temporary `deadbeef` hash for
-password `nixos`.
+Push the encrypted secret update back to the installer:
 
-## Clevis/Tang auto-unlock
+```bash
+rsync -az --delete "$REPO/" nixos@"$INSTALLER_HOST":~/github/nixos/
+```
 
-Tang must stay on `192.168.1.75:7500`. `192.168.1.70` is tau's initrd client
-address, not the Tang server.
+## 8. Create Clevis/Tang unlock material
+
+Tang must be reachable from initrd networking before the LUKS prompt. Keep the
+Tang URL site-local; do not put the real address in public docs.
 
 Inside the installer as root:
 
 ```bash
-cd /home/nixos/github/nixos/nixos/server/s-tau/hardware/disks/
-./clevis-init-jwe.sh
+export HOST=s-tau
+export REPO=/home/nixos/github/nixos
+export TANG_URL="http://<tang-host>:<tang-port>"
+cd "$REPO/nixos/server/s-tau/hardware/disks"
+TANG_URL="$TANG_URL" ./clevis-init-jwe.sh
 ```
 
-When prompted for the current LUKS passphrase, enter:
+The script prompts for the current LUKS passphrase, creates a generated Clevis
+key, adds it to the LUKS keyslots, verifies it, and writes:
 
 ```text
-nixos
+/tmp/root-raid0.jwe
 ```
 
-The script writes `/tmp/root-raid0.jwe`.
+Copy the JWE into the repo path expected by the NixOS module:
+
+```bash
+install -m 0600 /tmp/root-raid0.jwe "$REPO/nixos/server/s-tau/hardware/disks/root-raid0.jwe"
+```
+
+Treat this JWE as unlock material. If the repo is public, either keep the file
+encrypted/out-of-tree in your publication workflow or explicitly accept the
+risk and rotate the LUKS keyslot/Tang binding after exposure.
 
 From the workstation:
 
 ```bash
-rsync -va \
-  nixos@192.168.1.70:/tmp/root-raid0.jwe \
-  /home/deadbeef/github/nixos/nixos/server/s-tau/hardware/disks/root-raid0.jwe
+rsync -az \
+  nixos@"$INSTALLER_HOST":~/github/nixos/nixos/server/s-tau/hardware/disks/root-raid0.jwe \
+  "$REPO/nixos/server/s-tau/hardware/disks/root-raid0.jwe"
 
-rsync -va /home/deadbeef/github/nixos nixos@192.168.1.70:~/github/
+rsync -az --delete "$REPO/" nixos@"$INSTALLER_HOST":~/github/nixos/
 ```
 
-## Install
+## 9. Install NixOS
 
 Inside the installer as root:
 
 ```bash
+export HOST=s-tau
+export REPO=/home/nixos/github/nixos
+cd "$REPO"
 nix --extra-experimental-features 'nix-command flakes' run github:NixOS/nixpkgs/nixos-26.05#nixos-install -- \
   --impure \
-  --flake path:/home/nixos/github/nixos#s-tau \
+  --flake "path:$REPO#$HOST" \
   --no-root-passwd
 ```
 
-Then enroll Secure Boot keys while still in setup mode:
+Enroll Secure Boot keys while the firmware is still in setup mode:
 
 ```bash
 nix-shell -p sbctl --run 'sbctl enroll-keys -m'
+nix-shell -p sbctl --run 'sbctl status'
 ```
 
-If `sbctl status` reports `Setup Mode: Disabled`, reset Secure Boot keys from
-BIOS/iDRAC first, then rerun the enroll command. The installed system can boot
-with Secure Boot disabled, but Secure Boot will not work until the generated
-keys are enrolled.
+If setup mode is already disabled, reset Secure Boot keys from BIOS/iDRAC,
+rerun enrollment, and leave firmware Secure Boot disabled until the first
+signed UKI boot has been verified.
 
-Reboot only after Disko, hardware config, secure boot keys, SOPS host key,
-Clevis JWE, and `nixos-install` are complete.
+## 10. First boot
+
+Reboot from the installer:
+
+```bash
+systemctl reboot
+```
+
+After the host comes up, verify from the workstation:
+
+```bash
+ssh "$ADMIN_USER@$HOST" '
+  hostname
+  systemctl is-system-running || true
+  readlink -f /run/current-system
+  readlink -f /run/booted-system
+  sudo sbctl status
+  sudo sbctl verify \
+    /boot/EFI/systemd/systemd-bootx64.efi \
+    /boot/EFI/BOOT/BOOTX64.EFI \
+    /boot/EFI/Linux/*.efi
+  sudo bootctl status | sed -n "1,180p"
+'
+```
+
+Expected:
+
+- Hostname is `s-tau`.
+- Current and booted systems are the same after reboot.
+- `bootctl status` shows the current stub as `lanzastub`.
+- The default boot entry is a Type 2 UKI under `/boot/EFI/Linux`.
+- The explicit `sbctl verify` command reports the active EFI boot artifacts as
+  signed.
+
+Do not sign, move, or delete `/boot/EFI/nixos/kernel-*.efi` or
+`/boot/EFI/nixos/initrd-*.efi`. Lanzaboote thin stubs under `/boot/EFI/Linux`
+load those payload files by content hash. A raw `sudo sbctl verify` scans the
+whole ESP and may report the payload files as unsigned; that is expected for
+this layout and is not a Secure Boot failure for the firmware-entered boot
+artifacts.
+
+```bash
+ssh "$ADMIN_USER@$HOST" '
+  sudo sbctl verify \
+    /boot/EFI/systemd/systemd-bootx64.efi \
+    /boot/EFI/BOOT/BOOTX64.EFI \
+    /boot/EFI/Linux/*.efi
+'
+```
+
+## 11. Rebuild and switch
+
+Preferred on-host rebuild:
+
+```bash
+ssh "$ADMIN_USER@$HOST"
+cd ~/github/nixos
+git pull --ff-only
+sudo nixos-rebuild switch --flake ".#$HOST" --show-trace
+```
+
+Remote rebuild from the workstation:
+
+```bash
+cd "$REPO"
+nixos-rebuild switch --flake ".#$HOST" \
+  --target-host "$HOST" \
+  --use-remote-sudo \
+  --show-trace
+```
+
+If the remote rebuild fails because the target does not trust local unsigned
+store paths, sync or clone the repo on `s-tau` and run the preferred on-host
+rebuild.
+
+Verify after every switch:
+
+```bash
+ssh "$ADMIN_USER@$HOST" '
+  systemctl is-system-running || true
+  readlink -f /run/current-system
+  sudo sbctl verify \
+    /boot/EFI/systemd/systemd-bootx64.efi \
+    /boot/EFI/BOOT/BOOTX64.EFI \
+    /boot/EFI/Linux/*.efi
+  sudo bootctl status | sed -n "1,180p"
+'
+```
+
+## 12. Enable firmware Secure Boot
+
+Only enable firmware enforcement after:
+
+- Lanzaboote is enabled in the config.
+- `/persist/etc/secureboot/keys/db/db.key` exists on the installed host.
+- `bootctl status` shows a Lanzaboote UKI as the default boot entry.
+- The explicit `sbctl verify` command above reports all active EFI boot
+  artifacts signed.
+
+Use the iDRAC8 UI:
+
+1. Log in to iDRAC at `<idrac-host>`.
+2. Go to BIOS settings.
+3. Confirm boot mode is UEFI.
+4. Confirm Secure Boot policy is Standard or Custom with the enrolled keys.
+5. Set Secure Boot to Enabled.
+6. Apply the change for the next reboot.
+7. Reboot the host from the OS or iDRAC.
+
+Optional Redfish checks, without putting credentials in history:
+
+```bash
+read -rsp "iDRAC password: " IDRAC_PASSWORD
+printf '\n'
+
+curl -k -u "<idrac-user>:${IDRAC_PASSWORD}" \
+  "https://$IDRAC_HOST/redfish/v1/Systems/System.Embedded.1/SecureBoot"
+
+curl -k -u "<idrac-user>:${IDRAC_PASSWORD}" \
+  "https://$IDRAC_HOST/redfish/v1/Systems/System.Embedded.1/Bios"
+
+unset IDRAC_PASSWORD
+```
+
+Some iDRAC8 firmware exposes Secure Boot changes through the SecureBoot
+resource, and some exposes them through BIOS pending settings. Prefer the UI
+unless the exact Redfish write path has been tested on this machine.
+
+After reboot with firmware Secure Boot enabled:
+
+```bash
+ssh "$ADMIN_USER@$HOST" '
+  sudo sbctl status
+  sudo sbctl verify \
+    /boot/EFI/systemd/systemd-bootx64.efi \
+    /boot/EFI/BOOT/BOOTX64.EFI \
+    /boot/EFI/Linux/*.efi
+  sudo bootctl status | sed -n "1,180p"
+  dmesg | grep -i "secure boot" || true
+'
+```
+
+Expected:
+
+- `sbctl status` reports Secure Boot enabled.
+- The explicit `sbctl verify` command reports signed active EFI boot artifacts.
+- `bootctl status` still reports `lanzastub`.
+
+## 13. Recovery notes
+
+If Secure Boot blocks boot:
+
+1. Use iDRAC to disable firmware Secure Boot.
+2. Boot the installed system or the installer ISO.
+3. Confirm `/persist/etc/secureboot` still contains the signing keys.
+4. Run `sudo nixos-rebuild switch --flake ".#s-tau"`.
+5. Run the explicit active-artifact `sbctl verify` command above.
+6. Re-enable firmware Secure Boot only after the verification gates pass.
+
+If Clevis/Tang unlock fails:
+
+1. Enter the manual LUKS passphrase on the console.
+2. Verify initrd networking and Tang reachability.
+3. Regenerate the JWE with `clevis-init-jwe.sh`.
+4. Rebuild so the initrd contains the updated JWE.
+5. Remove the obsolete LUKS keyslot after confirming the new one works.
+
+If disk paths change:
+
+1. Boot the installer.
+2. Re-run the disk verification commands.
+3. Update `build_disko/build_disko.nix` with non-serial stable paths.
+4. Do not commit command output containing disk serials.
