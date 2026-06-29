@@ -6,11 +6,15 @@ let
   system = "x86_64-linux";
   labSource = "active-lab";
   hostName = "s-router-test-clients";
+  labPath = "${inputs.network-labs}/${labSource}";
+  intentPath = "${labPath}/intent-${hostName}.nix";
+  inventoryPath = "${labPath}/inventory-${hostName}.nix";
+  clientsPath = "${labPath}/clients-${hostName}.nix";
 
   cpmLib = inputs.network-control-plane-model.libBySystem.${system};
   cpmBuilt = cpmLib.compileAndBuildFromPaths {
-    inputPath = "${inputs.network-labs}/${labSource}/intent.nix";
-    inventoryPath = "${inputs.network-labs}/${labSource}/inventory-nixos.nix";
+    inputPath = intentPath;
+    inherit inventoryPath;
   };
 in
 {
@@ -28,9 +32,9 @@ in
 
       cpm = cpmBuilt;
       controlPlane = cpmBuilt;
-      inventory = "${inputs.network-labs}/${labSource}/inventory-nixos.nix";
-      clients = "${inputs.network-labs}/${labSource}/clients.nix";
-      sops = "${inputs.network-labs}/${labSource}/sops-routing-${hostName}.nix";
+      inventory = inventoryPath;
+      clients = clientsPath;
+      sops = "${labPath}/sops-routing-${hostName}.nix";
     })
   ];
 }
