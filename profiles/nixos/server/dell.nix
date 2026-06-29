@@ -58,10 +58,29 @@
       efibootmgr
       ethtool
       file
+      fwupd
       gnupg
       kmod
       p7zip
       util-linux
+    ];
+
+    local.impermanence.extraSystemDirectories = lib.mkIf (options ? local && options.local ? impermanence) [
+      {
+        directory = "/var/cache/fwupd";
+        mode = "0755";
+      }
+      {
+        directory = "/var/lib/fwupd";
+        mode = "0755";
+      }
+    ];
+
+    services.fwupd.enable = true;
+
+    systemd.tmpfiles.rules = [
+      "d /var/cache/fwupd 0755 root root -"
+      "d /var/lib/fwupd 0755 root root -"
     ];
 
     systemd.services.dell-firmware-upgrade-modules = {
