@@ -73,6 +73,10 @@
   # until the active/standby router plan is explicit.
   local.vmHost.nixosShell.autoStart = false;
 
+  local.impermanence.extraUserDirectories = [
+    "Documents"
+  ];
+
   sops.defaultSopsFile = "${outPath}/secrets/${name}-root.yaml";
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 
