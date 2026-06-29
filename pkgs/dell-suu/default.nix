@@ -22,15 +22,19 @@
 , libuuid
 , libxkbcommon
 , lshw
+, makeDesktopItem
 , ncurses
 , nss
 , pciutils
+, polkit
 , rsync
 , smartmontools
+, symlinkJoin
 , usbutils
 , util-linux
 , which
 , writeShellApplication
+, writeTextFile
 , xauth
 , zlib
 , zstd
@@ -271,300 +275,402 @@ let
       "--bind /var/cache/dell/dell_dup/suu /usr/libexec/dell_dup"
     ];
   };
-in
-writeShellApplication {
-  name = "dell-suu";
 
-  runtimeInputs = [
-    coreutils
-    curl
-    findutils
-    rsync
-    util-linux
-  ];
+  suu = writeShellApplication {
+    name = "dell-suu";
 
-  text = ''
-    set -euo pipefail
+    runtimeInputs = [
+      coreutils
+      curl
+      findutils
+      rsync
+      util-linux
+    ];
 
-    usage() {
-      cat <<'USAGE'
-    usage: dell-suu [--iso PATH | --source PATH | --download] [--cache-source] [--cache-dir PATH] [--gui | --cli] [--shell] [--launcher PATH] [-- ARGS...]
+    text = ''
+      set -euo pipefail
 
-    Mounts an official Dell Server Update Utility Linux ISO and launches the
-    Dell-provided SUU updater inside an FHS runtime. Without --iso or --source it
-    first uses a cached source under /var/cache/dell/suu/source, then searches
-    for the newest SUU_*-x64-LIN-*.ISO in the current user's Downloads directory.
+      usage() {
+        cat <<'USAGE'
+      usage: dell-suu [--iso PATH | --source PATH | --download] [--cache-source] [--cache-dir PATH] [--gui | --cli] [--shell] [--launcher PATH] [-- ARGS...]
 
-    examples:
-      dell-suu --download
-      sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO
-      sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO -- --help
-      sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO --cache-source
-      sudo dell-suu --gui
-      sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO --gui
-      sudo dell-suu --source /mnt/suu
-      sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO --shell
-    USAGE
-    }
+      Mounts an official Dell Server Update Utility Linux ISO and launches the
+      Dell-provided SUU updater inside an FHS runtime. Without --iso or --source it
+      first uses a cached source under /var/cache/dell/suu/source, then searches
+      for the newest SUU_*-x64-LIN-*.ISO in the current user's Downloads directory.
 
-    iso=
-    source_dir=
-    launcher=
-    mode=cli
-    shell=0
-    download=0
-    cache_source=0
-    explicit_run=0
-    cache_root="''${DELL_FIRMWARE_CACHE_DIR:-/var/cache/dell}"
-    args=()
+      examples:
+        dell-suu --download
+        sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO
+        sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO -- --help
+        sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO --cache-source
+        sudo dell-suu --gui
+        sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO --gui
+        sudo dell-suu --source /mnt/suu
+        sudo dell-suu --iso ~/Downloads/SUU_980-x64-LIN-7.ISO --shell
+      USAGE
+      }
 
-    while [ "$#" -gt 0 ]; do
-      case "$1" in
-        --iso)
-          if [ "$#" -lt 2 ]; then
-            echo "dell-suu: --iso needs a path" >&2
-            exit 64
-          fi
-          iso=$2
-          shift 2
-          ;;
-        --source|--mount)
-          if [ "$#" -lt 2 ]; then
-            echo "dell-suu: --source needs a path" >&2
-            exit 64
-          fi
-          source_dir=$2
-          shift 2
-          ;;
-        --download)
-          download=1
-          shift
-          ;;
-        --cache-source)
-          cache_source=1
-          shift
-          ;;
-        --cache-dir)
-          if [ "$#" -lt 2 ]; then
-            echo "dell-suu: --cache-dir needs a path" >&2
-            exit 64
-          fi
-          cache_root=$2
-          shift 2
-          ;;
-        --launcher)
-          if [ "$#" -lt 2 ]; then
-            echo "dell-suu: --launcher needs a path" >&2
-            exit 64
-          fi
-          launcher=$2
-          explicit_run=1
-          shift 2
-          ;;
-        --cli)
-          mode=cli
-          explicit_run=1
-          shift
-          ;;
-        --gui)
-          mode=gui
-          explicit_run=1
-          shift
-          ;;
-        --shell)
-          shell=1
-          explicit_run=1
-          shift
-          ;;
-        --help|-h)
-          usage
-          exit 0
-          ;;
-        --)
-          shift
-          args+=("$@")
-          if [ "$#" -gt 0 ]; then
+      iso=
+      source_dir=
+      launcher=
+      mode=cli
+      shell=0
+      download=0
+      cache_source=0
+      explicit_run=0
+      cache_root="''${DELL_FIRMWARE_CACHE_DIR:-/var/cache/dell}"
+      args=()
+
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --iso)
+            if [ "$#" -lt 2 ]; then
+              echo "dell-suu: --iso needs a path" >&2
+              exit 64
+            fi
+            iso=$2
+            shift 2
+            ;;
+          --source|--mount)
+            if [ "$#" -lt 2 ]; then
+              echo "dell-suu: --source needs a path" >&2
+              exit 64
+            fi
+            source_dir=$2
+            shift 2
+            ;;
+          --download)
+            download=1
+            shift
+            ;;
+          --cache-source)
+            cache_source=1
+            shift
+            ;;
+          --cache-dir)
+            if [ "$#" -lt 2 ]; then
+              echo "dell-suu: --cache-dir needs a path" >&2
+              exit 64
+            fi
+            cache_root=$2
+            shift 2
+            ;;
+          --launcher)
+            if [ "$#" -lt 2 ]; then
+              echo "dell-suu: --launcher needs a path" >&2
+              exit 64
+            fi
+            launcher=$2
             explicit_run=1
-          fi
-          break
-          ;;
-        *)
-          args+=("$1")
-          explicit_run=1
-          shift
-          ;;
-      esac
-    done
-
-    download_iso() {
-      local target_dir target
-      target_dir="''${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
-      target="$target_dir/${isoName}"
-      mkdir -p "$target_dir"
-
-      curl \
-        --location \
-        --continue-at - \
-        --fail \
-        --show-error \
-        --progress-bar \
-        --user-agent 'Mozilla/5.0' \
-        --referer 'https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=2w9tp' \
-        --output "$target" \
-        '${isoUrl}'
-
-      actual=$(sha256sum "$target" | awk '{print $1}')
-      if [ "$actual" != '${isoSha256}' ]; then
-        echo "dell-suu: SHA-256 mismatch for $target" >&2
-        echo "expected: ${isoSha256}" >&2
-        echo "actual:   $actual" >&2
-        exit 65
-      fi
-
-      printf '%s\n' "$target"
-    }
-
-    find_latest_iso() {
-      shopt -s nullglob
-      local latest=
-      local dirs=()
-
-      if [ -n "''${SUDO_USER:-}" ] && [ "''${SUDO_USER:-}" != "root" ]; then
-        dirs+=("/home/$SUDO_USER/Downloads")
-      fi
-
-      dirs+=("$HOME/Downloads" "$PWD")
-
-      for dir in "''${dirs[@]}"; do
-        for candidate in "$dir"/SUU_*-x64-LIN-*.ISO "$dir"/SUU_*.ISO; do
-          if [ -z "$latest" ] || [ "$candidate" -nt "$latest" ]; then
-            latest=$candidate
-          fi
-        done
+            shift 2
+            ;;
+          --cli)
+            mode=cli
+            explicit_run=1
+            shift
+            ;;
+          --gui)
+            mode=gui
+            explicit_run=1
+            shift
+            ;;
+          --shell)
+            shell=1
+            explicit_run=1
+            shift
+            ;;
+          --help|-h)
+            usage
+            exit 0
+            ;;
+          --)
+            shift
+            args+=("$@")
+            if [ "$#" -gt 0 ]; then
+              explicit_run=1
+            fi
+            break
+            ;;
+          *)
+            args+=("$1")
+            explicit_run=1
+            shift
+            ;;
+        esac
       done
 
-      printf '%s\n' "$latest"
-    }
+      download_iso() {
+        local target_dir target
+        target_dir="''${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
+        target="$target_dir/${isoName}"
+        mkdir -p "$target_dir"
 
-    cached_source_dir() {
-      printf '%s\n' "$cache_root/suu/source"
-    }
+        curl \
+          --location \
+          --continue-at - \
+          --fail \
+          --show-error \
+          --progress-bar \
+          --user-agent 'Mozilla/5.0' \
+          --referer 'https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=2w9tp' \
+          --output "$target" \
+          '${isoUrl}'
 
-    is_suu_source() {
-      local dir=$1
-      [ -d "$dir" ] && [ -x "$dir/suulauncher" ] && [ -x "$dir/internalsuu" ]
-    }
+        actual=$(sha256sum "$target" | awk '{print $1}')
+        if [ "$actual" != '${isoSha256}' ]; then
+          echo "dell-suu: SHA-256 mismatch for $target" >&2
+          echo "expected: ${isoSha256}" >&2
+          echo "actual:   $actual" >&2
+          exit 65
+        fi
 
-    cache_suu_source() {
-      local src target
-      src=$1
-      target=$(cached_source_dir)
+        printf '%s\n' "$target"
+      }
 
-      if ! is_suu_source "$src"; then
-        echo "dell-suu: source does not look like a SUU source: $src" >&2
-        exit 66
+      find_latest_iso() {
+        shopt -s nullglob
+        local latest=
+        local dirs=()
+
+        if [ -n "''${SUDO_USER:-}" ] && [ "''${SUDO_USER:-}" != "root" ]; then
+          dirs+=("/home/$SUDO_USER/Downloads")
+        fi
+
+        dirs+=("$HOME/Downloads" "$PWD")
+
+        for dir in "''${dirs[@]}"; do
+          for candidate in "$dir"/SUU_*-x64-LIN-*.ISO "$dir"/SUU_*.ISO; do
+            if [ -z "$latest" ] || [ "$candidate" -nt "$latest" ]; then
+              latest=$candidate
+            fi
+          done
+        done
+
+        printf '%s\n' "$latest"
+      }
+
+      cached_source_dir() {
+        printf '%s\n' "$cache_root/suu/source"
+      }
+
+      is_suu_source() {
+        local dir=$1
+        [ -d "$dir" ] && [ -x "$dir/suulauncher" ] && [ -x "$dir/internalsuu" ]
+      }
+
+      cache_suu_source() {
+        local src target
+        src=$1
+        target=$(cached_source_dir)
+
+        if ! is_suu_source "$src"; then
+          echo "dell-suu: source does not look like a SUU source: $src" >&2
+          exit 66
+        fi
+
+        mkdir -p "$target"
+        rsync -a --delete "$src"/ "$target"/
+
+        if ! is_suu_source "$target"; then
+          echo "dell-suu: cached source is incomplete: $target" >&2
+          exit 66
+        fi
+
+        echo "dell-suu: cached SUU source in $target"
+      }
+
+      source_is_writable() {
+        local dir probe
+        dir=$1
+        probe="$dir/.dell-suu-write-test.$$"
+
+        if (: > "$probe") 2>/dev/null; then
+          rm -f "$probe"
+          return 0
+        fi
+
+        return 1
+      }
+
+      if [ "$download" -eq 1 ]; then
+        downloaded=$(download_iso)
+        if [ -z "$iso" ] && [ -z "$source_dir" ]; then
+          echo "dell-suu: downloaded $downloaded"
+          exit 0
+        fi
+        iso=$downloaded
       fi
 
-      mkdir -p "$target"
-      rsync -a --delete "$src"/ "$target"/
-
-      if ! is_suu_source "$target"; then
-        echo "dell-suu: cached source is incomplete: $target" >&2
-        exit 66
+      if [ -n "$iso" ] && [ -n "$source_dir" ]; then
+        echo "dell-suu: use either --iso or --source, not both" >&2
+        exit 64
       fi
 
-      echo "dell-suu: cached SUU source in $target"
-    }
-
-    if [ "$download" -eq 1 ]; then
-      downloaded=$(download_iso)
       if [ -z "$iso" ] && [ -z "$source_dir" ]; then
-        echo "dell-suu: downloaded $downloaded"
-        exit 0
-      fi
-      iso=$downloaded
-    fi
-
-    if [ -n "$iso" ] && [ -n "$source_dir" ]; then
-      echo "dell-suu: use either --iso or --source, not both" >&2
-      exit 64
-    fi
-
-    if [ -z "$iso" ] && [ -z "$source_dir" ]; then
-      cached_source=$(cached_source_dir)
-      if is_suu_source "$cached_source"; then
-        source_dir=$cached_source
-      else
-        iso=$(find_latest_iso)
-      fi
-    fi
-
-    cleanup_mount() {
-      if [ -n "''${mounted_dir:-}" ]; then
-        umount "$mounted_dir" || true
-        rmdir "$mounted_dir" || true
-      fi
-    }
-
-    if [ -n "$iso" ]; then
-      if [ "$(id -u)" -ne 0 ]; then
-        echo "dell-suu: mounting the SUU ISO needs root; run with sudo" >&2
-        exit 77
+        cached_source=$(cached_source_dir)
+        if is_suu_source "$cached_source"; then
+          source_dir=$cached_source
+        else
+          iso=$(find_latest_iso)
+        fi
       fi
 
-      if [ ! -f "$iso" ]; then
-        echo "dell-suu: ISO not found: $iso" >&2
-        echo "dell-suu: run 'dell-suu --download' first, or pass --iso PATH" >&2
+      cleanup_mount() {
+        if [ -n "''${mounted_dir:-}" ]; then
+          umount "$mounted_dir" || true
+          rmdir "$mounted_dir" || true
+        fi
+      }
+
+      if [ -n "$iso" ]; then
+        if [ "$(id -u)" -ne 0 ]; then
+          echo "dell-suu: mounting the SUU ISO needs root; run with sudo" >&2
+          exit 77
+        fi
+
+        if [ ! -f "$iso" ]; then
+          echo "dell-suu: ISO not found: $iso" >&2
+          echo "dell-suu: run 'dell-suu --download' first, or pass --iso PATH" >&2
+          exit 66
+        fi
+
+        mounted_dir=$(mktemp -d /tmp/dell-suu.XXXXXX)
+        trap cleanup_mount EXIT
+        mount -o loop,ro "$iso" "$mounted_dir"
+        source_dir=$mounted_dir
+      fi
+
+      if [ -z "$source_dir" ]; then
+        echo "dell-suu: no SUU ISO found; pass --iso PATH or --source PATH" >&2
         exit 66
       fi
 
-      mounted_dir=$(mktemp -d /tmp/dell-suu.XXXXXX)
-      trap cleanup_mount EXIT
-      mount -o loop,ro "$iso" "$mounted_dir"
-      source_dir=$mounted_dir
-    fi
-
-    if [ -z "$source_dir" ]; then
-      echo "dell-suu: no SUU ISO found; pass --iso PATH or --source PATH" >&2
-      exit 66
-    fi
-
-    if [ ! -d "$source_dir" ]; then
-      echo "dell-suu: source path is not a directory: $source_dir" >&2
-      exit 66
-    fi
-
-    if [ "$cache_source" -eq 1 ]; then
-      cache_suu_source "$source_dir"
-      source_dir=$(cached_source_dir)
-
-      if [ "$explicit_run" -eq 0 ]; then
-        exit 0
+      if [ ! -d "$source_dir" ]; then
+        echo "dell-suu: source path is not a directory: $source_dir" >&2
+        exit 66
       fi
-    fi
 
-    fhs_args=("$source_dir" "--$mode")
+      if [ "$cache_source" -eq 1 ]; then
+        cache_suu_source "$source_dir"
+        source_dir=$(cached_source_dir)
 
-    if [ "$shell" -eq 1 ]; then
-      fhs_args+=(--shell)
-    fi
+        if [ "$explicit_run" -eq 0 ]; then
+          exit 0
+        fi
+      fi
 
-    if [ -n "$launcher" ]; then
-      fhs_args+=(--launcher "$launcher")
-    fi
+      if [ "$mode" = gui ] && ! source_is_writable "$source_dir"; then
+        cached_source=$(cached_source_dir)
+        if is_suu_source "$cached_source"; then
+          source_dir=$cached_source
+        else
+          echo "dell-suu: GUI needs a writable SUU source; caching ISO source first" >&2
+          cache_suu_source "$source_dir"
+          source_dir=$cached_source
+        fi
+      fi
 
-    if [ "''${#args[@]}" -gt 0 ]; then
-      fhs_args+=(-- "''${args[@]}")
-    fi
+      fhs_args=("$source_dir" "--$mode")
 
-    exec ${fhs}/bin/dell-suu-fhs "''${fhs_args[@]}"
-  '';
+      if [ "$shell" -eq 1 ]; then
+        fhs_args+=(--shell)
+      fi
 
-  meta = {
-    description = "Run Dell Server Update Utility from an official SUU ISO on NixOS";
-    homepage = "https://www.dell.com/support/kbdoc/en-us/000123359/dell-emc-server-update-utility-suu-guide-and-download";
-    license = lib.licenses.unfree;
-    mainProgram = "dell-suu";
-    platforms = [ "x86_64-linux" ];
+      if [ -n "$launcher" ]; then
+        fhs_args+=(--launcher "$launcher")
+      fi
+
+      if [ "''${#args[@]}" -gt 0 ]; then
+        fhs_args+=(-- "''${args[@]}")
+      fi
+
+      exec ${fhs}/bin/dell-suu-fhs "''${fhs_args[@]}"
+    '';
+
+    meta = {
+      description = "Run Dell Server Update Utility from an official SUU ISO on NixOS";
+      homepage = "https://www.dell.com/support/kbdoc/en-us/000123359/dell-emc-server-update-utility-suu-guide-and-download";
+      license = lib.licenses.unfree;
+      mainProgram = "dell-suu";
+      platforms = [ "x86_64-linux" ];
+    };
   };
+
+  guiLauncher = writeShellApplication {
+    name = "dell-suu-gui";
+
+    runtimeInputs = [
+      coreutils
+      polkit
+    ];
+
+    text = ''
+      set -euo pipefail
+
+      if [ "$(id -u)" -eq 0 ]; then
+        exec ${suu}/bin/dell-suu --gui "$@"
+      fi
+
+      xauthority="''${XAUTHORITY:-}"
+      if [ -z "$xauthority" ] && [ -n "''${HOME:-}" ] && [ -e "$HOME/.Xauthority" ]; then
+        xauthority="$HOME/.Xauthority"
+      fi
+
+      env_args=()
+      if [ -n "''${DISPLAY:-}" ]; then
+        env_args+=("DISPLAY=$DISPLAY")
+      fi
+
+      if [ -n "$xauthority" ]; then
+        env_args+=("XAUTHORITY=$xauthority")
+      fi
+
+      if [ -n "''${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+        env_args+=("DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS")
+      fi
+
+      exec ${polkit}/bin/pkexec ${coreutils}/bin/env "''${env_args[@]}" ${suu}/bin/dell-suu --gui "$@"
+    '';
+  };
+
+  desktopItem = makeDesktopItem {
+    name = "dell-suu";
+    desktopName = "Dell Server Update Utility";
+    genericName = "Firmware updater";
+    comment = "Launch the Dell SUU firmware update GUI";
+    exec = "dell-suu-gui";
+    icon = "dell-suu";
+    categories = [
+      "System"
+      "Settings"
+    ];
+  };
+
+  desktopIcon = writeTextFile {
+    name = "dell-suu-icon";
+    destination = "/share/icons/hicolor/scalable/apps/dell-suu.svg";
+    text = ''
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="12" fill="#263238"/>
+        <rect x="13" y="14" width="38" height="11" rx="2" fill="#90caf9"/>
+        <rect x="13" y="28" width="38" height="11" rx="2" fill="#eceff1"/>
+        <rect x="13" y="42" width="38" height="8" rx="2" fill="#546e7a"/>
+        <circle cx="20" cy="19.5" r="2" fill="#102027"/>
+        <circle cx="20" cy="33.5" r="2" fill="#102027"/>
+        <path d="M40 36v8h-8v5h8v8h5v-8h8v-5h-8v-8z" fill="#69f0ae"/>
+      </svg>
+    '';
+  };
+in
+symlinkJoin {
+  name = "dell-suu";
+  paths = [
+    suu
+    guiLauncher
+    desktopItem
+    desktopIcon
+  ];
+
+  meta = suu.meta;
 }

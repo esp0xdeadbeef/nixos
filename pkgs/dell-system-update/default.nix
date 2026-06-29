@@ -28,6 +28,8 @@
 }:
 
 let
+  dellPgpPubkeys = "https://linux.dell.com/repo/pgp_pubkeys";
+
   gpgmeCompat = gpgme.overrideAttrs (_old: {
     version = "1.24.3";
 
@@ -40,75 +42,6 @@ let
     doCheck = false;
     passthru = { };
   });
-
-  dsuPublicKeys =
-    let
-      dellPgpPubkeys = "https://linux.dell.com/repo/pgp_pubkeys";
-    in
-    [
-      {
-        name = "0x756ba70b1019ced6.asc";
-        src = fetchurl {
-          url = "${dellPgpPubkeys}/0x756ba70b1019ced6.asc";
-          hash = "sha256-4mIATd9NEQAqpYXmWgclusHnj7wJiloykMYXcge7UTg=";
-        };
-      }
-      {
-        name = "0x1285491434D8786F.asc";
-        src = fetchurl {
-          url = "${dellPgpPubkeys}/0x1285491434D8786F.asc";
-          hash = "sha256-kvliK/MA8fyKTvEtjl7+9lEbCJxjwV5jXPx0KUmehtQ=";
-        };
-      }
-      {
-        name = "0xca77951d23b66a9d.asc";
-        src = fetchurl {
-          url = "${dellPgpPubkeys}/0xca77951d23b66a9d.asc";
-          hash = "sha256-FPBk4Qe/XMp4JeS1dpFT7vkAq9V2LqvTfJ+4e/+jmpw=";
-        };
-      }
-      {
-        name = "0x3CA66B4946770C59.asc";
-        src = fetchurl {
-          url = "${dellPgpPubkeys}/0x3CA66B4946770C59.asc";
-          hash = "sha256-dD13iAGsiIT51QPyHryQXq1x3dRF27pGyjRj76tyFKM=";
-        };
-      }
-      {
-        name = "0x076B95DB2FFC7F4A.asc";
-        src = fetchurl {
-          url = "${dellPgpPubkeys}/0x076B95DB2FFC7F4A.asc";
-          hash = "sha256-G0dtxvOAhaKjWTZDPMWn7L2zAmUpxIsfA7BtRXFUVqc=";
-        };
-      }
-      {
-        name = "0x274E9C32857A9594.asc";
-        src = fetchurl {
-          url = "${dellPgpPubkeys}/0x274E9C32857A9594.asc";
-          hash = "sha256-mUGS+9/BGauZ3MRTgkQvAXEegwpuhQ6gAVHm8jkF7Wo=";
-        };
-      }
-    ];
-
-  dsuPublicKeyDir = stdenv.mkDerivation {
-    pname = "dell-dsu-public-keys";
-    version = "2026-06-19";
-    dontUnpack = true;
-
-    installPhase =
-      ''
-        runHook preInstall
-        mkdir -p "$out"
-      ''
-      + lib.concatMapStringsSep "\n"
-        (key: ''
-          install -m 0644 ${key.src} "$out/${key.name}"
-        '')
-        dsuPublicKeys
-      + ''
-        runHook postInstall
-      '';
-  };
 
   payload = stdenv.mkDerivation rec {
     pname = "dell-system-update-payload";
@@ -213,7 +146,88 @@ buildFHSEnv {
   extraPreBwrapCmds = ''
     mkdir -p /var/cache/dell/dell_dup/dsu /var/cache/dell/dsu /var/cache/dell/dsu/opt /var/lib/dell/dsu
     ${rsync}/bin/rsync -a --delete ${payload}/opt/ /var/cache/dell/dsu/opt/
-    for key in ${dsuPublicKeyDir}/*.asc; do
+    key_cache_dir=/var/cache/dell/dsu/pgp_pubkeys
+    key_target_dir=/var/cache/dell/dell_dup/dsu
+    mkdir -p "$key_cache_dir" "$key_target_dir"
+
+    has_cached_key() {
+      [ -n "$(${findutils}/bin/find "$key_cache_dir" -maxdepth 1 -type f -name '*.asc' -print -quit)" ]
+    }
+
+    refresh_dell_dsu_keys() {
+      tmp_dir=$(${coreutils}/bin/mktemp -d /tmp/dell-dsu-keys.XXXXXX)
+      index_file="$tmp_dir/index.html"
+      fingerprints_file="$tmp_dir/fingerprints.txt"
+      key_names_file="$tmp_dir/key-names"
+      failed=0
+
+      if ! ${curl}/bin/curl -fsSL --retry 3 --retry-delay 2 -o "$index_file" "${dellPgpPubkeys}/"; then
+        echo "dsu: warning: failed to fetch Dell PGP key index from ${dellPgpPubkeys}/" >&2
+        ${coreutils}/bin/rm -rf "$tmp_dir"
+        return 1
+      fi
+
+      if ! ${curl}/bin/curl -fsSL --retry 3 --retry-delay 2 -o "$fingerprints_file" "${dellPgpPubkeys}/fingerprints.txt"; then
+        echo "dsu: warning: failed to fetch Dell PGP key fingerprints from ${dellPgpPubkeys}/fingerprints.txt" >&2
+        ${coreutils}/bin/rm -rf "$tmp_dir"
+        return 1
+      fi
+
+      ${gawk}/bin/awk '
+        FILENAME == ARGV[1] {
+          line = $0
+          while (match(line, /href="([^"]+\.asc)"/, match_parts)) {
+            name = match_parts[1]
+            lookup = tolower(name)
+            sub(/^0x/, "", lookup)
+            sub(/\.asc$/, "", lookup)
+            href[lookup] = name
+            line = substr(line, RSTART + RLENGTH)
+          }
+          next
+        }
+
+        FILENAME == ARGV[2] {
+          line = $0
+          gsub(/[[:space:]]/, "", line)
+          if (line ~ /Keyfingerprint=/) {
+            sub(/.*Keyfingerprint=/, "", line)
+            lookup = tolower(substr(line, length(line) - 15))
+            if (lookup in href) {
+              print href[lookup]
+            }
+          }
+        }
+      ' "$index_file" "$fingerprints_file" | ${coreutils}/bin/sort -u > "$key_names_file"
+
+      if [ ! -s "$key_names_file" ]; then
+        echo "dsu: warning: Dell PGP key mirror did not expose any DSU fingerprints" >&2
+        ${coreutils}/bin/rm -rf "$tmp_dir"
+        return 1
+      fi
+
+      while IFS= read -r key_name; do
+        [ -n "$key_name" ] || continue
+        if ${curl}/bin/curl -fsSL --retry 3 --retry-delay 2 -o "$tmp_dir/$key_name" "${dellPgpPubkeys}/$key_name"; then
+          ${coreutils}/bin/install -m 0644 "$tmp_dir/$key_name" "$key_cache_dir/$key_name"
+        else
+          echo "dsu: warning: failed to fetch Dell PGP key $key_name" >&2
+          failed=1
+        fi
+      done < "$key_names_file"
+
+      ${coreutils}/bin/rm -rf "$tmp_dir"
+      [ "$failed" -eq 0 ]
+    }
+
+    if [ "''${DELL_DSU_REFRESH_KEYS:-0}" = "1" ] || ! has_cached_key; then
+      if ! refresh_dell_dsu_keys && ! has_cached_key; then
+        echo "dsu: warning: no Dell PGP keys are cached; DSU may need network access or key import" >&2
+      fi
+    fi
+
+    for key in "$key_cache_dir"/*.asc; do
+      [ -e "$key" ] || continue
       target="/var/cache/dell/dell_dup/dsu/$(${coreutils}/bin/basename "$key")"
       ${coreutils}/bin/install -m 0644 "$key" "$target"
     done
