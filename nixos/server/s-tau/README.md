@@ -59,6 +59,83 @@ export TANG_URL="http://<tang-host>:<tang-port>"
 Use high-entropy temporary passphrases generated locally. Do not reuse or
 commit them.
 
+## Dell firmware and iDRAC automation
+
+The normal boot entry should stay boring. Dell firmware tooling is available in
+the `upgrade-firmware` specialisation so update-only dependencies, `fwupd`, Dell
+SUU/DSU, OpenManage Ansible, and permissive kernel parameters do not become the
+default runtime.
+
+If iDRAC credentials are stored with `sops-nix`, enable the Dell profile mapping
+only after the encrypted keys exist in `secrets/s-tau-root.yaml`:
+
+```nix
+local.server.dell.idrac.sops.enable = true;
+```
+
+Default secret names and paths:
+
+```text
+dell/idrac-host     -> /run/secrets/dell/idrac-host
+dell/idrac-user     -> /run/secrets/dell/idrac-user
+dell/idrac-password -> /run/secrets/dell/idrac-password
+```
+
+The `dell-idrac-*` wrappers read those files automatically. Explicit
+`IDRAC_HOST`, `IDRAC_USER`, `IDRAC_PASSWORD`, or `*_FILE` environment variables
+still override the defaults for one-off use. Do not enable the mapping before
+the encrypted secret keys exist, because activation must be able to decrypt
+every declared secret.
+
+After booting the `upgrade-firmware` specialisation, firmware checks can use the
+OpenManage wrappers:
+
+```bash
+sudo dell-idrac-firmware-report
+sudo dell-idrac-firmware-update --yes
+```
+
+The report path uses Dell's online repository by default and does not apply
+updates. The update path is intentionally gated behind `--yes`.
+
+For iDRAC HTTPS certificate import:
+
+```bash
+sudo IDRAC_CERT_PATH=/path/to/idrac.crt dell-idrac-import-https-cert
+```
+
+For reproducible install bootstrapping, serve a NixOS installer ISO from a
+plain LAN HTTP/NFS endpoint that iDRAC8 can read, then one-shot boot it through
+virtual media:
+
+```bash
+sudo NIXOS_ISO_URL="http://<lan-host>/nixos-installer.iso" dell-idrac-nixos-boot-iso
+```
+
+After the installer boots, SSH into the installer and continue with the Disko
+and `nixos-install` steps below. Avoid authenticated HTTPS shares for iDRAC8
+virtual media; this generation is picky about share protocols.
+
+The SUU GUI is still available from rofi/i3 in the firmware specialisation. It
+asks whether to refresh Dell's online catalog before opening. A refresh runs DSU
+first, backs up the previous `Catalog.xml` as `Catalog-YYYY-MM-DD_HH-MM-SS.xml`,
+writes a current online SUU source under `/var/cache/dell/suu/online-source`,
+clears stale SUU runtime files under `/var/cache/dell/dell_dup/suu`, and points
+the GUI compliance run at the refreshed repository instead of the old ISO
+catalog.
+
+OpenManage is the preferred non-GUI path for:
+
+- firmware compliance reports and scheduled updates;
+- iDRAC HTTPS certificate import;
+- virtual-media insertion and one-shot ISO boot.
+
+OpenManage is not the complete Secure Boot solution on this R730/iDRAC8
+generation. Use the installed OS `sbctl` flow and the iDRAC/BIOS Custom policy
+flow below for custom PK/KEK/db enrollment. Treat iDRAC Secure Boot automation
+on this generation as useful for key reset/policy changes, not as the source of
+truth for importing the sbctl key set.
+
 ## 1. Boot installer
 
 1. Boot a NixOS installer ISO through local console or iDRAC virtual media.

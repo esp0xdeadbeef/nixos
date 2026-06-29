@@ -213,11 +213,33 @@ stdenvNoCC.mkDerivation {
     #!@shell@
     set -eu
 
+    default_secret_file() {
+      case "$1" in
+        IDRAC_HOST)
+          printf '%s\n' /run/secrets/dell/idrac-host
+          ;;
+        IDRAC_USER)
+          printf '%s\n' /run/secrets/dell/idrac-user
+          ;;
+        IDRAC_PASSWORD)
+          printf '%s\n' /run/secrets/dell/idrac-password
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+    }
+
     load_secret_env() {
       var=$1
       file_var=''${var}_FILE
       eval "value=\''${$var-}"
       eval "file=\''${$file_var-}"
+      default_file=$(default_secret_file "$var" || true)
+
+      if [ -z "$file" ] && [ -n "$default_file" ] && [ -r "$default_file" ]; then
+        file=$default_file
+      fi
 
       if [ -z "$value" ] && [ -n "$file" ]; then
         if [ ! -r "$file" ]; then
@@ -229,7 +251,11 @@ stdenvNoCC.mkDerivation {
       fi
 
       if [ -z "$value" ]; then
-        echo "missing required environment variable: $var or $file_var" >&2
+        if [ -n "$default_file" ]; then
+          echo "missing required environment variable: $var or $file_var (default file: $default_file)" >&2
+        else
+          echo "missing required environment variable: $var or $file_var" >&2
+        fi
         exit 64
       fi
     }
@@ -252,11 +278,33 @@ stdenvNoCC.mkDerivation {
     fi
     shift
 
+    default_secret_file() {
+      case "$1" in
+        IDRAC_HOST)
+          printf '%s\n' /run/secrets/dell/idrac-host
+          ;;
+        IDRAC_USER)
+          printf '%s\n' /run/secrets/dell/idrac-user
+          ;;
+        IDRAC_PASSWORD)
+          printf '%s\n' /run/secrets/dell/idrac-password
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+    }
+
     load_secret_env() {
       var=$1
       file_var=''${var}_FILE
       eval "value=\''${$var-}"
       eval "file=\''${$file_var-}"
+      default_file=$(default_secret_file "$var" || true)
+
+      if [ -z "$file" ] && [ -n "$default_file" ] && [ -r "$default_file" ]; then
+        file=$default_file
+      fi
 
       if [ -z "$value" ] && [ -n "$file" ]; then
         if [ ! -r "$file" ]; then
@@ -268,7 +316,11 @@ stdenvNoCC.mkDerivation {
       fi
 
       if [ -z "$value" ]; then
-        echo "missing required environment variable: $var or $file_var" >&2
+        if [ -n "$default_file" ]; then
+          echo "missing required environment variable: $var or $file_var (default file: $default_file)" >&2
+        else
+          echo "missing required environment variable: $var or $file_var" >&2
+        fi
         exit 64
       fi
     }
@@ -284,11 +336,33 @@ stdenvNoCC.mkDerivation {
     #!@shell@
     set -eu
 
+    default_secret_file() {
+      case "$1" in
+        IDRAC_HOST)
+          printf '%s\n' /run/secrets/dell/idrac-host
+          ;;
+        IDRAC_USER)
+          printf '%s\n' /run/secrets/dell/idrac-user
+          ;;
+        IDRAC_PASSWORD)
+          printf '%s\n' /run/secrets/dell/idrac-password
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+    }
+
     load_secret_env() {
       var=$1
       file_var=''${var}_FILE
       eval "value=\''${$var-}"
       eval "file=\''${$file_var-}"
+      default_file=$(default_secret_file "$var" || true)
+
+      if [ -z "$file" ] && [ -n "$default_file" ] && [ -r "$default_file" ]; then
+        file=$default_file
+      fi
 
       if [ -z "$value" ] && [ -n "$file" ]; then
         if [ ! -r "$file" ]; then
@@ -300,7 +374,11 @@ stdenvNoCC.mkDerivation {
       fi
 
       if [ -z "$value" ]; then
-        echo "missing required environment variable: $var or $file_var" >&2
+        if [ -n "$default_file" ]; then
+          echo "missing required environment variable: $var or $file_var (default file: $default_file)" >&2
+        else
+          echo "missing required environment variable: $var or $file_var" >&2
+        fi
         exit 64
       fi
     }
@@ -316,11 +394,33 @@ stdenvNoCC.mkDerivation {
     #!@shell@
     set -eu
 
+    default_secret_file() {
+      case "$1" in
+        IDRAC_HOST)
+          printf '%s\n' /run/secrets/dell/idrac-host
+          ;;
+        IDRAC_USER)
+          printf '%s\n' /run/secrets/dell/idrac-user
+          ;;
+        IDRAC_PASSWORD)
+          printf '%s\n' /run/secrets/dell/idrac-password
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+    }
+
     load_secret_env() {
       var=$1
       file_var=''${var}_FILE
       eval "value=\''${$var-}"
       eval "file=\''${$file_var-}"
+      default_file=$(default_secret_file "$var" || true)
+
+      if [ -z "$file" ] && [ -n "$default_file" ] && [ -r "$default_file" ]; then
+        file=$default_file
+      fi
 
       if [ -z "$value" ] && [ -n "$file" ]; then
         if [ ! -r "$file" ]; then
@@ -332,7 +432,11 @@ stdenvNoCC.mkDerivation {
       fi
 
       if [ -z "$value" ]; then
-        echo "missing required environment variable: $var or $file_var" >&2
+        if [ -n "$default_file" ]; then
+          echo "missing required environment variable: $var or $file_var (default file: $default_file)" >&2
+        else
+          echo "missing required environment variable: $var or $file_var" >&2
+        fi
         exit 64
       fi
     }
