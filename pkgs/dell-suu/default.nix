@@ -26,7 +26,6 @@
 , ncurses
 , nss
 , pciutils
-, polkit
 , rsync
 , smartmontools
 , symlinkJoin
@@ -36,6 +35,7 @@
 , writeShellApplication
 , writeTextFile
 , xauth
+, zenity
 , zlib
 , zstd
 , libice
@@ -296,7 +296,7 @@ let
 
       usage() {
         cat <<'USAGE'
-      usage: dell-suu [--iso PATH | --source PATH | --download] [--cache-source] [--cache-dir PATH] [--gui | --cli] [--shell] [--launcher PATH] [-- ARGS...]
+      usage: dell-suu [--iso PATH | --source PATH | --download] [--cache-source] [--refresh-catalog] [--cache-dir PATH] [--gui | --cli] [--shell] [--launcher PATH] [-- ARGS...]
 
       Mounts an official Dell Server Update Utility Linux ISO and launches the
       Dell-provided SUU updater inside an FHS runtime. Without --iso or --source it
@@ -322,6 +322,7 @@ let
       shell=0
       download=0
       cache_source=0
+      refresh_catalog=0
       explicit_run=0
       cache_root="''${DELL_FIRMWARE_CACHE_DIR:-/var/cache/dell}"
       args=()
@@ -350,6 +351,14 @@ let
             ;;
           --cache-source)
             cache_source=1
+            shift
+            ;;
+          --refresh-catalog)
+            refresh_catalog=1
+            shift
+            ;;
+          --no-refresh-catalog)
+            refresh_catalog=0
             shift
             ;;
           --cache-dir)
@@ -497,6 +506,77 @@ let
         return 1
       }
 
+      find_dsu() {
+        local candidate
+
+        for candidate in "''${DELL_DSU_BIN:-}" /run/current-system/sw/bin/dsu dsu; do
+          [ -n "$candidate" ] || continue
+
+          if [ "$candidate" = dsu ]; then
+            if command -v dsu >/dev/null 2>&1; then
+              command -v dsu
+              return 0
+            fi
+          elif [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+          fi
+        done
+
+        return 1
+      }
+
+      refresh_online_catalog() {
+        local dsu_bin status dsu_cache catalog stamp
+
+        dsu_cache=/var/cache/dell/dell_dup/dsu
+        catalog="$dsu_cache/Catalog.xml"
+
+        if [ "$(id -u)" -ne 0 ]; then
+          echo "dell-suu: refreshing the Dell catalog needs root" >&2
+          return 77
+        fi
+
+        if ! dsu_bin=$(find_dsu); then
+          echo "dell-suu: dsu is unavailable; install dell-system-update to refresh the online catalog" >&2
+          return 69
+        fi
+
+        mkdir -p "$dsu_cache" /var/lib/dell/dsu
+
+        if [ -s "$catalog" ]; then
+          stamp=$(date +%Y-%m-%d_%H-%M-%S)
+          cp "$catalog" "$dsu_cache/Catalog-$stamp.xml"
+        fi
+
+        echo "dell-suu: refreshing Dell online DSU catalog and compliance report" >&2
+
+        set +e
+        "$dsu_bin" \
+          --compliance \
+          --non-interactive \
+          --output=/var/lib/dell/dsu/compliance.json \
+          --output-format=json \
+          --output-log-file=/var/lib/dell/dsu/compliance.log \
+          --log-level=4
+        status=$?
+        set -e
+
+        if [ "$status" -ne 0 ] && [ "$status" -ne 34 ]; then
+          echo "dell-suu: dsu catalog refresh failed with exit code $status" >&2
+          echo "dell-suu: continuing with the existing SUU ISO catalog" >&2
+          return "$status"
+        fi
+
+        if [ ! -s "$catalog" ]; then
+          echo "dell-suu: dsu did not produce $catalog" >&2
+          echo "dell-suu: continuing with the existing SUU ISO catalog" >&2
+          return 66
+        fi
+
+        echo "dell-suu: refreshed Dell online DSU catalog/report; SUU GUI keeps the SUU ISO catalog" >&2
+      }
+
       if [ "$download" -eq 1 ]; then
         downloaded=$(download_iso)
         if [ -z "$iso" ] && [ -z "$source_dir" ]; then
@@ -575,6 +655,10 @@ let
         fi
       fi
 
+      if [ "$mode" = gui ] && [ "$refresh_catalog" -eq 1 ]; then
+        refresh_online_catalog || true
+      fi
+
       fhs_args=("$source_dir" "--$mode")
 
       if [ "$shell" -eq 1 ]; then
@@ -606,36 +690,106 @@ let
 
     runtimeInputs = [
       coreutils
-      polkit
     ];
 
     text = ''
       set -euo pipefail
       printf '%s\n' '${dellBanner}' >&2
 
-      if [ "$(id -u)" -eq 0 ]; then
-        exec ${suu}/bin/dell-suu --gui "$@"
+      user_id=$(id -u)
+      runtime_dir="''${XDG_RUNTIME_DIR:-/run/user/$user_id}"
+      display="''${DISPLAY:-}"
+      xauthority="''${XAUTHORITY:-}"
+      dbus_session_bus_address="''${DBUS_SESSION_BUS_ADDRESS:-}"
+
+      if [ -z "$display" ] && [ -S /tmp/.X11-unix/X0 ]; then
+        display=:0
       fi
 
-      xauthority="''${XAUTHORITY:-}"
-      if [ -z "$xauthority" ] && [ -n "''${HOME:-}" ] && [ -e "$HOME/.Xauthority" ]; then
-        xauthority="$HOME/.Xauthority"
+      if [ -z "$xauthority" ]; then
+        for candidate in "$runtime_dir/gdm/Xauthority" "''${HOME:-}/.Xauthority"; do
+          if [ -e "$candidate" ]; then
+            xauthority="$candidate"
+            break
+          fi
+        done
+      fi
+
+      if [ -z "$dbus_session_bus_address" ] && [ -S "$runtime_dir/bus" ]; then
+        dbus_session_bus_address="unix:path=$runtime_dir/bus"
+      fi
+
+      if [ -n "$display" ]; then
+        export DISPLAY="$display"
+      fi
+
+      if [ -n "$xauthority" ]; then
+        export XAUTHORITY="$xauthority"
+      fi
+
+      if [ -d "$runtime_dir" ]; then
+        export XDG_RUNTIME_DIR="$runtime_dir"
+      fi
+
+      if [ -n "$dbus_session_bus_address" ]; then
+        export DBUS_SESSION_BUS_ADDRESS="$dbus_session_bus_address"
+      fi
+
+      refresh_catalog=0
+      case "''${DELL_SUU_REFRESH_CATALOG:-ask}" in
+        1|yes|true)
+          refresh_catalog=1
+          ;;
+        0|no|false)
+          refresh_catalog=0
+          ;;
+        *)
+          if [ -n "$display" ]; then
+            if ${zenity}/bin/zenity \
+              --question \
+              --title "Dell Server Update Utility" \
+              --text "Refresh Dell online DSU report before opening SUU?" \
+              --ok-label "Refresh" \
+              --cancel-label "Skip"; then
+              refresh_catalog=1
+            fi
+          fi
+          ;;
+      esac
+
+      suu_args=(${suu}/bin/dell-suu --gui)
+      if [ "$refresh_catalog" -eq 1 ]; then
+        suu_args+=(--refresh-catalog)
+      fi
+
+      if [ "$(id -u)" -eq 0 ]; then
+        exec "''${suu_args[@]}" "$@"
+      fi
+
+      pkexec=/run/wrappers/bin/pkexec
+      if [ ! -x "$pkexec" ]; then
+        echo "dell-suu-gui: /run/wrappers/bin/pkexec is unavailable; enable polkit or run as root" >&2
+        exit 69
       fi
 
       env_args=()
-      if [ -n "''${DISPLAY:-}" ]; then
-        env_args+=("DISPLAY=$DISPLAY")
+      if [ -n "$display" ]; then
+        env_args+=("DISPLAY=$display")
       fi
 
       if [ -n "$xauthority" ]; then
         env_args+=("XAUTHORITY=$xauthority")
       fi
 
-      if [ -n "''${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-        env_args+=("DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS")
+      if [ -d "$runtime_dir" ]; then
+        env_args+=("XDG_RUNTIME_DIR=$runtime_dir")
       fi
 
-      exec ${polkit}/bin/pkexec ${coreutils}/bin/env "''${env_args[@]}" ${suu}/bin/dell-suu --gui "$@"
+      if [ -n "$dbus_session_bus_address" ]; then
+        env_args+=("DBUS_SESSION_BUS_ADDRESS=$dbus_session_bus_address")
+      fi
+
+      exec "$pkexec" ${coreutils}/bin/env "''${env_args[@]}" "''${suu_args[@]}" "$@"
     '';
   };
 
