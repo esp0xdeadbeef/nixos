@@ -40,6 +40,7 @@
     profiles.nixos.laptop.xlayoutdisplay-hotplug
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.llm-clients.cache
+    profiles.nixos.server.dell
     profiles.nixos.shell.zsh-prompt
     profiles.nixos.vm-host.nixos-shell
     "${outPath}/modules/nixos/local-users.nix"

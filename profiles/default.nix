@@ -44,6 +44,9 @@
       private = import ./nixos/network/private.nix;
       workstation = import ./nixos/network/workstation.nix;
     };
+    server = {
+      dell = import ./nixos/server/dell.nix;
+    };
     virtualization = {
       docker = import ./nixos/virtualization/docker.nix;
       host = import ./nixos/virtualization/host.nix;
