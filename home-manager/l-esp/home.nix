@@ -79,6 +79,7 @@ in
   };
 
   local.i3.statusCommand = "${pkgs.i3status-rust}/bin/i3status-rs ~/.config/i3status-rust/config.toml";
+  local.i3.statusRust.battery.enable = true;
   home.packages =
     let
       stable = with pkgs; [

@@ -26,7 +26,7 @@ in
 
     battery.enable = lib.mkOption {
       type = lib.types.bool;
-      default = os.services.upower.enable or false;
+      default = false;
       description = "Whether to show the battery block.";
     };
   };
@@ -100,15 +100,20 @@ in
             "\U000F0928", # nf-md-wifi_strength_4
         ]
         ${lib.optionalString cfg.battery.enable ''
-          bat_charging = "\uf1e6 CHR" # fa-plug
+          bat_charging = "\U000f0084" # nf-md-battery_charging
           bat = [
-              "\uf244", # fa-battery-empty
-              "\uf243", # fa-battery-quarter
-              "\uf242", # fa-battery-half
-              "\uf241", # fa-battery-three-quarters
-              "\uf240", # fa-battery-full
+              "\U000f007a", # nf-md-battery_10
+              "\U000f007b", # nf-md-battery_20
+              "\U000f007c", # nf-md-battery_30
+              "\U000f007d", # nf-md-battery_40
+              "\U000f007e", # nf-md-battery_50
+              "\U000f007f", # nf-md-battery_60
+              "\U000f0080", # nf-md-battery_70
+              "\U000f0081", # nf-md-battery_80
+              "\U000f0082", # nf-md-battery_90
+              "\U000f0079", # nf-md-battery
           ]
-          bat_not_available = "\uf244 ? UNK" # fa-battery-empty
+          bat_not_available = "\U000f0091" # nf-md-battery_unknown
         ''}
 
         [[block]]
@@ -165,7 +170,11 @@ in
         ${lib.optionalString cfg.battery.enable ''
           [[block]]
           block = "battery"
-          format = "$icon $percentage {$time |}"
+          format = " $icon $percentage {$time_remaining.dur(hms:true, min_unit:m) |} "
+          charging_format = " $icon $percentage {$time_remaining.dur(hms:true, min_unit:m) |} "
+          full_format = " $icon $percentage "
+          not_charging_format = " $icon $percentage "
+          missing_format = ""
           device = "DisplayDevice"
           driver = "upower"
         ''}
