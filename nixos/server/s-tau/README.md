@@ -124,6 +124,13 @@ clears stale SUU runtime files under `/var/cache/dell/dell_dup/suu`, and points
 the GUI compliance run at the refreshed repository instead of the old ISO
 catalog.
 
+The rofi/i3 launcher runs the long refresh and GUI process inside a tmux
+session before attaching it in xterm. To watch it over SSH while it is running:
+
+```bash
+tmux -S /run/user/1000/dell-suu.tmux attach -t dell-suu
+```
+
 OpenManage is the preferred non-GUI path for:
 
 - firmware compliance reports and scheduled updates;

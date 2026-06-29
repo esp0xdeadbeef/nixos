@@ -30,12 +30,14 @@
 , rsync
 , smartmontools
 , symlinkJoin
+, tmux
 , usbutils
 , util-linux
 , which
 , writeShellApplication
 , writeTextFile
 , xauth
+, xterm
 , zenity
 , zlib
 , zstd
@@ -1025,6 +1027,11 @@ let
       display="''${DISPLAY:-}"
       xauthority="''${XAUTHORITY:-}"
       dbus_session_bus_address="''${DBUS_SESSION_BUS_ADDRESS:-}"
+      env_args=()
+      sudo_bin=/run/wrappers/bin/sudo
+      tmux_socket="''${DELL_SUU_TMUX_SOCKET:-}"
+      tmux_session="''${DELL_SUU_TMUX_SESSION:-dell-suu}"
+      tmux_command=
 
       if [ -z "$display" ] && [ -S /tmp/.X11-unix/X0 ]; then
         display=:0
@@ -1041,6 +1048,14 @@ let
 
       if [ -z "$dbus_session_bus_address" ] && [ -S "$runtime_dir/bus" ]; then
         dbus_session_bus_address="unix:path=$runtime_dir/bus"
+      fi
+
+      if [ -z "$tmux_socket" ]; then
+        if [ -d "$runtime_dir" ]; then
+          tmux_socket="$runtime_dir/dell-suu.tmux"
+        else
+          tmux_socket="/tmp/dell-suu-$user_id.tmux"
+        fi
       fi
 
       if [ -n "$display" ]; then
@@ -1086,17 +1101,6 @@ let
         suu_args+=(--refresh-catalog)
       fi
 
-      if [ "$(${coreutils}/bin/id -u)" -eq 0 ]; then
-        exec "''${suu_args[@]}" "$@"
-      fi
-
-      pkexec=/run/wrappers/bin/pkexec
-      if [ ! -x "$pkexec" ]; then
-        echo "dell-suu-gui: /run/wrappers/bin/pkexec is unavailable; enable polkit or run as root" >&2
-        exit 69
-      fi
-
-      env_args=()
       if [ -n "$display" ]; then
         env_args+=("DISPLAY=$display")
       fi
@@ -1113,7 +1117,49 @@ let
         env_args+=("DBUS_SESSION_BUS_ADDRESS=$dbus_session_bus_address")
       fi
 
-      exec "$pkexec" ${coreutils}/bin/env "''${env_args[@]}" "''${suu_args[@]}" "$@"
+      if [ "$(${coreutils}/bin/id -u)" -eq 0 ]; then
+        exec "''${suu_args[@]}" "$@"
+      fi
+
+      if [ ! -x "$sudo_bin" ]; then
+        echo "dell-suu-gui: $sudo_bin is unavailable; enable sudo or run as root" >&2
+        exit 69
+      fi
+
+      append_tmux_arg() {
+        local quoted
+        printf -v quoted '%q' "$1"
+        if [ -z "$tmux_command" ]; then
+          tmux_command=$quoted
+        else
+          tmux_command="$tmux_command $quoted"
+        fi
+      }
+
+      append_tmux_arg "$sudo_bin"
+      append_tmux_arg ${coreutils}/bin/env
+      for arg in "''${env_args[@]}" "''${suu_args[@]}" "$@"; do
+        append_tmux_arg "$arg"
+      done
+
+      if ${tmux}/bin/tmux -S "$tmux_socket" list-sessions >/dev/null 2>&1; then
+        if ! ${tmux}/bin/tmux -S "$tmux_socket" has-session -t "$tmux_session" 2>/dev/null; then
+          ${tmux}/bin/tmux -S "$tmux_socket" new-session -d -s "$tmux_session" "$tmux_command"
+        fi
+      else
+        ${coreutils}/bin/rm -f "$tmux_socket"
+        ${tmux}/bin/tmux -S "$tmux_socket" new-session -d -s "$tmux_session" "$tmux_command"
+      fi
+
+      echo "dell-suu-gui: attach with: tmux -S $tmux_socket attach -t $tmux_session" >&2
+
+      if [ -n "$display" ]; then
+        exec ${xterm}/bin/xterm \
+          -T "Dell Server Update Utility" \
+          -e ${tmux}/bin/tmux -S "$tmux_socket" attach-session -t "$tmux_session"
+      fi
+
+      exec ${tmux}/bin/tmux -S "$tmux_socket" attach-session -t "$tmux_session"
     '';
   };
 
