@@ -119,7 +119,7 @@ buildFHSEnv {
   executableName = "dsu";
   runScript = "/usr/bin/dsu";
 
-  targetPkgs = _pkgs: [
+  targetPkgs = pkgs: [
     payload
     coreutils
     curl
@@ -140,6 +140,7 @@ buildFHSEnv {
     rsync
     usbutils
     which
+    pkgs.xterm
     zlib
     zstd
   ];
@@ -147,11 +148,11 @@ buildFHSEnv {
   extraPreBwrapCmds = ''
     printf '%s\n' '${dellBanner}' >&2
 
-    mkdir -p /var/cache/dell/dell_dup/dsu /var/cache/dell/dsu /var/cache/dell/dsu/opt /var/lib/dell/dsu
+    ${coreutils}/bin/mkdir -p /var/cache/dell/dell_dup/dsu /var/cache/dell/dsu /var/cache/dell/dsu/opt /var/lib/dell/dsu
     ${rsync}/bin/rsync -a --delete ${payload}/opt/ /var/cache/dell/dsu/opt/
     key_cache_dir=/var/cache/dell/dsu/pgp_pubkeys
     key_target_dir=/var/cache/dell/dell_dup/dsu
-    mkdir -p "$key_cache_dir" "$key_target_dir"
+    ${coreutils}/bin/mkdir -p "$key_cache_dir" "$key_target_dir"
 
     has_cached_key() {
       [ -n "$(${findutils}/bin/find "$key_cache_dir" -maxdepth 1 -type f -name '*.asc' -print -quit)" ]

@@ -16,6 +16,7 @@
 , gpgme
 , gtk3
 , ipmitool
+, jq
 , lib
 , libGL
 , libdrm
@@ -104,6 +105,8 @@ let
         exit 64
       fi
 
+      export TERM=xterm
+
       source_dir=$1
       shift
       launcher=
@@ -156,19 +159,19 @@ let
       cleanup_stale_suulauncher_lock() {
         local lock_file lock_pid lock_user
 
-        lock_user=$(id -un 2>/dev/null || printf root)
+        lock_user=$(${coreutils}/bin/id -un 2>/dev/null || printf root)
         lock_file="''${HOME:-/root}/suulauncher-$lock_user"
 
         if [ ! -e "$lock_file" ]; then
           return 0
         fi
 
-        lock_pid=$(tr -cd '0-9' < "$lock_file" || true)
+        lock_pid=$(${coreutils}/bin/tr -cd '0-9' < "$lock_file" || true)
         if [ -n "$lock_pid" ] && [ -d "/proc/$lock_pid" ]; then
           return 0
         fi
 
-        rm -f "$lock_file"
+        ${coreutils}/bin/rm -f "$lock_file"
       }
 
       if [ "$shell" -eq 1 ]; then
@@ -196,7 +199,7 @@ let
         fi
       done
 
-      found=$(find . -maxdepth 3 -type f \( -name suu -o -name internalsuu -o -name suulauncher \) -perm -0100 -print -quit)
+      found=$(${findutils}/bin/find . -maxdepth 3 -type f \( -name suu -o -name internalsuu -o -name suulauncher \) -perm -0100 -print -quit)
       if [ -n "$found" ]; then
         exec "$found" "''${args[@]}"
       fi
@@ -212,7 +215,7 @@ let
     runScript = "${fhsRunner}/bin/dell-suu-fhs-run";
     includeClosures = true;
 
-    targetPkgs = _pkgs: [
+    targetPkgs = pkgs: [
       bashInteractive
       coreutils
       curl
@@ -242,6 +245,7 @@ let
       util-linux
       which
       xauth
+      pkgs.xterm
       zlib
       zstd
       libice
@@ -266,10 +270,11 @@ let
     ];
 
     extraPreBwrapCmds = ''
-      mkdir -p /var/cache/dell/dell_dup/suu
+      ${coreutils}/bin/mkdir -p /var/cache/dell/dell_dup/suu
     '';
 
     extraBuildCommands = ''
+      mkdir -p "$out/opt"
       mkdir -p "$out/usr/libexec/dell_dup"
       touch "$out/usr/libexec/dell_dup/.keep"
     '';
@@ -286,6 +291,9 @@ let
       coreutils
       curl
       findutils
+      gawk
+      jq
+      libxml2
       rsync
       util-linux
     ];
@@ -302,6 +310,9 @@ let
       Dell-provided SUU updater inside an FHS runtime. Without --iso or --source it
       first uses a cached source under /var/cache/dell/suu/source, then searches
       for the newest SUU_*-x64-LIN-*.ISO in the current user's Downloads directory.
+      With --refresh-catalog in GUI mode, DSU refreshes Dell's online catalog,
+      downloads host-relevant upgrade payloads into a local online SUU repository
+      cache, and SUU is launched only after that local repository is complete.
 
       examples:
         dell-suu --download
@@ -417,9 +428,9 @@ let
         local target_dir target
         target_dir="''${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
         target="$target_dir/${isoName}"
-        mkdir -p "$target_dir"
+        ${coreutils}/bin/mkdir -p "$target_dir"
 
-        curl \
+        ${curl}/bin/curl \
           --location \
           --continue-at - \
           --fail \
@@ -430,7 +441,7 @@ let
           --output "$target" \
           '${isoUrl}'
 
-        actual=$(sha256sum "$target" | awk '{print $1}')
+        actual=$(${coreutils}/bin/sha256sum "$target" | ${gawk}/bin/awk '{print $1}')
         if [ "$actual" != '${isoSha256}' ]; then
           echo "dell-suu: SHA-256 mismatch for $target" >&2
           echo "expected: ${isoSha256}" >&2
@@ -467,6 +478,10 @@ let
         printf '%s\n' "$cache_root/suu/source"
       }
 
+      cached_online_source_dir() {
+        printf '%s\n' "$cache_root/suu/online-source"
+      }
+
       is_suu_source() {
         local dir=$1
         [ -d "$dir" ] && [ -x "$dir/suulauncher" ] && [ -x "$dir/internalsuu" ]
@@ -482,8 +497,8 @@ let
           exit 66
         fi
 
-        mkdir -p "$target"
-        rsync -a --delete "$src"/ "$target"/
+        ${coreutils}/bin/mkdir -p "$target"
+        ${rsync}/bin/rsync -a --delete "$src"/ "$target"/
 
         if ! is_suu_source "$target"; then
           echo "dell-suu: cached source is incomplete: $target" >&2
@@ -499,7 +514,7 @@ let
         probe="$dir/.dell-suu-write-test.$$"
 
         if (: > "$probe") 2>/dev/null; then
-          rm -f "$probe"
+          ${coreutils}/bin/rm -f "$probe"
           return 0
         fi
 
@@ -532,7 +547,7 @@ let
         dsu_cache=/var/cache/dell/dell_dup/dsu
         catalog="$dsu_cache/Catalog.xml"
 
-        if [ "$(id -u)" -ne 0 ]; then
+        if [ "$(${coreutils}/bin/id -u)" -ne 0 ]; then
           echo "dell-suu: refreshing the Dell catalog needs root" >&2
           return 77
         fi
@@ -542,20 +557,21 @@ let
           return 69
         fi
 
-        mkdir -p "$dsu_cache" /var/lib/dell/dsu
+        ${coreutils}/bin/mkdir -p "$dsu_cache" /var/lib/dell/dsu
 
         if [ -s "$catalog" ]; then
-          stamp=$(date +%Y-%m-%d_%H-%M-%S)
-          cp "$catalog" "$dsu_cache/Catalog-$stamp.xml"
+          stamp=$(${coreutils}/bin/date +%Y-%m-%d_%H-%M-%S)
+          ${coreutils}/bin/cp "$catalog" "$dsu_cache/Catalog-$stamp.xml"
         fi
 
         echo "dell-suu: refreshing Dell online DSU catalog and compliance report" >&2
 
         set +e
-        "$dsu_bin" \
+        TERM=xterm "$dsu_bin" \
           --compliance \
+          --apply-upgrades \
           --non-interactive \
-          --output=/var/lib/dell/dsu/compliance.json \
+          --output=/var/lib/dell/dsu/compliance-upgrades.json \
           --output-format=json \
           --output-log-file=/var/lib/dell/dsu/compliance.log \
           --log-level=4
@@ -564,17 +580,314 @@ let
 
         if [ "$status" -ne 0 ] && [ "$status" -ne 34 ]; then
           echo "dell-suu: dsu catalog refresh failed with exit code $status" >&2
-          echo "dell-suu: continuing with the existing SUU ISO catalog" >&2
           return "$status"
         fi
 
         if [ ! -s "$catalog" ]; then
           echo "dell-suu: dsu did not produce $catalog" >&2
-          echo "dell-suu: continuing with the existing SUU ISO catalog" >&2
           return 66
         fi
 
-        echo "dell-suu: refreshed Dell online DSU catalog/report; SUU GUI keeps the SUU ISO catalog" >&2
+        echo "dell-suu: refreshed Dell online DSU catalog/upgrade report" >&2
+      }
+
+      catalog_attribute_for_path() {
+        local catalog rel_path attr
+        catalog=$1
+        rel_path=$2
+        attr=$3
+
+        ${libxml2}/bin/xmllint --nocatalogs --xpath "string((//*[@path='$rel_path']/@$attr)[1])" "$catalog" 2>/dev/null || true
+      }
+
+      verify_catalog_file() {
+        local catalog rel_path file expected_hash expected_hash_lower expected_algorithm expected_size actual actual_size
+        catalog=$1
+        rel_path=$2
+        file=$3
+
+        expected_size=$(catalog_attribute_for_path "$catalog" "$rel_path" size)
+        if [ -n "$expected_size" ]; then
+          actual_size=$(${coreutils}/bin/stat -c %s "$file")
+          if [ "$actual_size" != "$expected_size" ]; then
+            echo "dell-suu: size mismatch for $rel_path: expected $expected_size, got $actual_size" >&2
+            return 1
+          fi
+        fi
+
+        expected_algorithm=$(catalog_attribute_for_path "$catalog" "$rel_path" hashAlgorithm)
+        expected_hash=$(catalog_attribute_for_path "$catalog" "$rel_path" hash)
+
+        if [ -n "$expected_hash" ] && [ "$expected_algorithm" = SHA256 ]; then
+          expected_hash_lower=$(printf '%s' "$expected_hash" | ${coreutils}/bin/tr 'A-F' 'a-f')
+          actual=$(${coreutils}/bin/sha256sum "$file" | ${gawk}/bin/awk '{print tolower($1)}')
+          if [ "$actual" != "$expected_hash_lower" ]; then
+            echo "dell-suu: SHA-256 mismatch for $rel_path" >&2
+            echo "expected: $expected_hash_lower" >&2
+            echo "actual:   $actual" >&2
+            return 1
+          fi
+        fi
+
+        return 0
+      }
+
+      download_dell_file() {
+        local rel_path dest tmp url
+        rel_path=$1
+        dest=$2
+
+        url="''${DELL_DOWNLOAD_BASE_URL:-https://downloads.dell.com}/$rel_path"
+        ${coreutils}/bin/mkdir -p "$(${coreutils}/bin/dirname "$dest")"
+        tmp="$dest.part"
+
+        echo "dell-suu: downloading $rel_path" >&2
+        if ! ${curl}/bin/curl \
+          --location \
+          --continue-at - \
+          --fail \
+          --show-error \
+          --progress-bar \
+          --retry 3 \
+          --retry-delay 2 \
+          --user-agent 'Mozilla/5.0' \
+          --output "$tmp" \
+          "$url"; then
+          ${coreutils}/bin/rm -f "$tmp"
+          return 1
+        fi
+
+        ${coreutils}/bin/mv "$tmp" "$dest"
+      }
+
+      copy_dsu_catalog_for_suu() {
+        local dsu_cache repo stamp file name
+        dsu_cache=$1
+        repo=$2
+
+        ${coreutils}/bin/mkdir -p "$repo"
+        if [ -s "$repo/Catalog.xml" ]; then
+          stamp=$(${coreutils}/bin/date +%Y-%m-%d_%H-%M-%S)
+          ${coreutils}/bin/cp "$repo/Catalog.xml" "$repo/Catalog-$stamp.xml"
+        fi
+
+        ${coreutils}/bin/install -m 0644 "$dsu_cache/Catalog.xml" "$repo/Catalog.xml"
+
+        for file in "$dsu_cache"/Catalog*; do
+          [ -s "$file" ] || continue
+          name=$(${coreutils}/bin/basename "$file")
+          case "$name" in
+            Catalog-[0-9]*.xml)
+              continue
+              ;;
+          esac
+
+          ${coreutils}/bin/install -m 0644 "$file" "$repo/$name"
+
+          case "$name" in
+            Catalog.gz)
+              ${coreutils}/bin/install -m 0644 "$file" "$repo/Catalog.xml.gz"
+              ;;
+            Catalog.gz.sign)
+              ${coreutils}/bin/install -m 0644 "$file" "$repo/Catalog.xml.gz.sign"
+              ;;
+            Catalog.gz.sha512.sign)
+              ${coreutils}/bin/install -m 0644 "$file" "$repo/Catalog.xml.gz.sha512.sign"
+              ;;
+          esac
+        done
+      }
+
+      copy_dsu_keys_for_suu() {
+        local dsu_cache key
+        dsu_cache=$1
+
+        ${coreutils}/bin/mkdir -p /var/cache/dell/dell_dup/suu
+        for key in "$dsu_cache"/*.asc; do
+          [ -e "$key" ] || continue
+          ${coreutils}/bin/install -m 0644 "$key" "/var/cache/dell/dell_dup/suu/$(${coreutils}/bin/basename "$key")"
+        done
+      }
+
+      clear_suu_runtime_state() {
+        ${coreutils}/bin/rm -f \
+          /var/cache/dell/dell_dup/suu/Compliance.json \
+          /var/cache/dell/dell_dup/suu/Compliance.html \
+          /var/cache/dell/dell_dup/suu/ComplianceReport.json \
+          /var/cache/dell/dell_dup/suu/DSUINACTION.txt \
+          /var/cache/dell/dell_dup/suu/Log.txt \
+          /var/cache/dell/dell_dup/suu/ProgressLog.txt \
+          /var/cache/dell/dell_dup/suu/SUU_STATUS.json \
+          /var/cache/dell/dell_dup/suu/TempShareLog.txt \
+          /var/cache/dell/dell_dup/suu/hostProgressExit.json \
+          /var/cache/dell/dell_dup/suu/inter_progress.json \
+          /var/cache/dell/dell_dup/suu/inv.xml \
+          /var/cache/dell/dell_dup/suu/inventory_log.txt \
+          /var/cache/dell/dell_dup/suu/progress.json \
+          /var/cache/dell/dell_dup/suu/status.json \
+          /var/cache/dell/dell_dup/suu/suu_support.log \
+          /var/cache/dell/dell_dup/suu/suu_ui.log \
+          /var/cache/dell/dell_dup/suu/*_compliance.json \
+          /var/cache/dell/dell_dup/suu/*_inv.json \
+          /var/cache/dell/dell_dup/suu/*_output.json
+        ${findutils}/bin/find /var/cache/dell/dell_dup/suu -maxdepth 1 -type f -name 'z*.' -exec ${coreutils}/bin/rm -f '{}' +
+      }
+
+      prefer_upgrade_compliance_for_suu_gui() {
+        local source_dir
+        source_dir=$1
+
+        if [ ! -x "$source_dir/internalsuu" ]; then
+          return 0
+        fi
+
+        ${coreutils}/bin/mv "$source_dir/internalsuu" "$source_dir/internalsuu.real"
+
+        ${coreutils}/bin/cat > "$source_dir/internalsuu" <<'EOF'
+      #!${bashInteractive}/bin/bash
+      set -eu
+
+      export TERM=xterm
+
+      if [ -n "''${DELL_SUU_CATALOG_LOCATION:-}" ]; then
+        rewritten_args=()
+        for arg in "$@"; do
+          case "$arg" in
+            --catalog-location=*)
+              rewritten_args+=("--catalog-location=$DELL_SUU_CATALOG_LOCATION")
+              ;;
+            *)
+              rewritten_args+=("$arg")
+              ;;
+          esac
+        done
+        set -- "''${rewritten_args[@]}"
+      fi
+
+      mode=''${DELL_SUU_COMPLIANCE_MODE:-upgrades}
+
+      if [ "$mode" = upgrades ]; then
+        has_compliance=0
+        has_apply_mode=0
+
+        for arg in "$@"; do
+          case "$arg" in
+            --compliance)
+              has_compliance=1
+              ;;
+            --apply-upgrades|--apply-downgrades|--update)
+              has_apply_mode=1
+              ;;
+          esac
+        done
+
+        if [ "$has_compliance" -eq 1 ] && [ "$has_apply_mode" -eq 0 ]; then
+          exec "$(dirname "$0")/internalsuu.real" "$@" --apply-upgrades
+        fi
+      fi
+
+      exec "$(dirname "$0")/internalsuu.real" "$@"
+      EOF
+
+        ${coreutils}/bin/chmod 0755 "$source_dir/internalsuu"
+      }
+
+      materialize_payload_for_suu() {
+        local dsu_cache repo catalog rel_path dest cached sign_rel sign_dest sign_cached
+        dsu_cache=$1
+        repo=$2
+        catalog=$3
+        rel_path=$4
+
+        [ -n "$rel_path" ] || return 0
+
+        dest="$repo/$rel_path"
+        cached="$dsu_cache/$(${coreutils}/bin/basename "$rel_path")"
+
+        if [ -s "$dest" ] && verify_catalog_file "$catalog" "$rel_path" "$dest"; then
+          :
+        elif [ -s "$cached" ]; then
+          ${coreutils}/bin/mkdir -p "$(${coreutils}/bin/dirname "$dest")"
+          ${coreutils}/bin/install -m 0644 "$cached" "$dest"
+          if ! verify_catalog_file "$catalog" "$rel_path" "$dest"; then
+            ${coreutils}/bin/rm -f "$dest"
+            download_dell_file "$rel_path" "$dest"
+            verify_catalog_file "$catalog" "$rel_path" "$dest"
+          fi
+        else
+          download_dell_file "$rel_path" "$dest"
+          verify_catalog_file "$catalog" "$rel_path" "$dest"
+        fi
+
+        sign_rel="$rel_path.sign"
+        sign_dest="$dest.sign"
+        sign_cached="$cached.sign"
+
+        if [ -s "$sign_dest" ]; then
+          return 0
+        fi
+
+        if [ -s "$sign_cached" ]; then
+          ${coreutils}/bin/install -m 0644 "$sign_cached" "$sign_dest"
+        elif ! download_dell_file "$sign_rel" "$sign_dest"; then
+          echo "dell-suu: warning: failed to download signature for $rel_path" >&2
+        fi
+      }
+
+      prepare_online_suu_source() {
+        local base_source online_source repo dsu_cache catalog compliance payloads_file inventory_path rel_path
+        base_source=$1
+        online_source=$(cached_online_source_dir)
+        repo="$online_source/repository"
+        dsu_cache=/var/cache/dell/dell_dup/dsu
+        catalog="$dsu_cache/Catalog.xml"
+        compliance=/var/lib/dell/dsu/compliance-upgrades.json
+
+        if [ "$(${coreutils}/bin/id -u)" -ne 0 ]; then
+          echo "dell-suu: preparing the online SUU repository needs root" >&2
+          return 77
+        fi
+
+        if ! is_suu_source "$base_source"; then
+          echo "dell-suu: base source does not look like a SUU source: $base_source" >&2
+          return 66
+        fi
+
+        if [ ! -s "$catalog" ]; then
+          echo "dell-suu: DSU catalog is missing: $catalog" >&2
+          return 66
+        fi
+
+        ${coreutils}/bin/mkdir -p "$online_source" "$repo"
+        ${rsync}/bin/rsync -a --delete --exclude '/repository/***' "$base_source"/ "$online_source"/
+        prefer_upgrade_compliance_for_suu_gui "$online_source"
+
+        copy_dsu_catalog_for_suu "$dsu_cache" "$repo"
+        copy_dsu_keys_for_suu "$dsu_cache"
+        clear_suu_runtime_state
+
+        payloads_file=$(${coreutils}/bin/mktemp /tmp/dell-suu-payloads.XXXXXX)
+        trap '${coreutils}/bin/rm -f "$payloads_file"; cleanup_mount' EXIT
+
+        inventory_path=$(${libxml2}/bin/xmllint --nocatalogs --xpath "string((//InventoryComponent[@osCode='LIN64']/@path)[1])" "$catalog" 2>/dev/null || true)
+        if [ -n "$inventory_path" ]; then
+          printf '%s\n' "$inventory_path" >> "$payloads_file"
+        fi
+
+        if [ -s "$compliance" ]; then
+          ${jq}/bin/jq -r '.. | objects | .packageFilePath? // empty' "$compliance" >> "$payloads_file"
+        fi
+
+        ${coreutils}/bin/sort -u "$payloads_file" | while IFS= read -r rel_path; do
+          [ -n "$rel_path" ] || continue
+          materialize_payload_for_suu "$dsu_cache" "$repo" "$catalog" "$rel_path"
+        done
+
+        ${coreutils}/bin/rm -f "$payloads_file"
+        trap cleanup_mount EXIT
+
+        echo "dell-suu: prepared online SUU source in $online_source" >&2
+        printf '%s\n' "$online_source"
       }
 
       if [ "$download" -eq 1 ]; then
@@ -602,13 +915,13 @@ let
 
       cleanup_mount() {
         if [ -n "''${mounted_dir:-}" ]; then
-          umount "$mounted_dir" || true
-          rmdir "$mounted_dir" || true
+          ${util-linux}/bin/umount "$mounted_dir" || true
+          ${coreutils}/bin/rmdir "$mounted_dir" || true
         fi
       }
 
       if [ -n "$iso" ]; then
-        if [ "$(id -u)" -ne 0 ]; then
+        if [ "$(${coreutils}/bin/id -u)" -ne 0 ]; then
           echo "dell-suu: mounting the SUU ISO needs root; run with sudo" >&2
           exit 77
         fi
@@ -619,9 +932,9 @@ let
           exit 66
         fi
 
-        mounted_dir=$(mktemp -d /tmp/dell-suu.XXXXXX)
+        mounted_dir=$(${coreutils}/bin/mktemp -d /tmp/dell-suu.XXXXXX)
         trap cleanup_mount EXIT
-        mount -o loop,ro "$iso" "$mounted_dir"
+        ${util-linux}/bin/mount -o loop,ro "$iso" "$mounted_dir"
         source_dir=$mounted_dir
       fi
 
@@ -656,7 +969,18 @@ let
       fi
 
       if [ "$mode" = gui ] && [ "$refresh_catalog" -eq 1 ]; then
-        refresh_online_catalog || true
+        if ! refresh_online_catalog; then
+          echo "dell-suu: refusing to launch stale SUU source after refresh failure" >&2
+          exit 1
+        fi
+
+        if ! online_source=$(prepare_online_suu_source "$source_dir"); then
+          echo "dell-suu: refusing to launch stale SUU source after online repository preparation failure" >&2
+          exit 1
+        fi
+
+        source_dir=$online_source
+        export DELL_SUU_CATALOG_LOCATION="$online_source/repository"
       fi
 
       fhs_args=("$source_dir" "--$mode")
@@ -696,7 +1020,7 @@ let
       set -euo pipefail
       printf '%s\n' '${dellBanner}' >&2
 
-      user_id=$(id -u)
+      user_id=$(${coreutils}/bin/id -u)
       runtime_dir="''${XDG_RUNTIME_DIR:-/run/user/$user_id}"
       display="''${DISPLAY:-}"
       xauthority="''${XAUTHORITY:-}"
@@ -748,7 +1072,7 @@ let
             if ${zenity}/bin/zenity \
               --question \
               --title "Dell Server Update Utility" \
-              --text "Refresh Dell online DSU report before opening SUU?" \
+              --text "Refresh Dell online catalog and download matching packages before opening SUU?" \
               --ok-label "Refresh" \
               --cancel-label "Skip"; then
               refresh_catalog=1
@@ -762,7 +1086,7 @@ let
         suu_args+=(--refresh-catalog)
       fi
 
-      if [ "$(id -u)" -eq 0 ]; then
+      if [ "$(${coreutils}/bin/id -u)" -eq 0 ]; then
         exec "''${suu_args[@]}" "$@"
       fi
 

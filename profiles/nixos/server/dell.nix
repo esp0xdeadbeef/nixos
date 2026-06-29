@@ -55,6 +55,7 @@
 
     environment.systemPackages = with pkgs; [
       curl
+      dell-openmanage
       efibootmgr
       ethtool
       file
@@ -62,6 +63,7 @@
       gnupg
       kmod
       p7zip
+      python3
       util-linux
     ];
 
