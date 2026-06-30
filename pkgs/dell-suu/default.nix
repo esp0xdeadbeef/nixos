@@ -18,6 +18,7 @@
 , gpgme
 , gtk3
 , gzip
+, hwinfo
 , ipmitool
 , jq
 , lib
@@ -287,19 +288,19 @@ let
       ${coreutils}/bin/mkdir -p /var/cache/dell/dell_dup/suu
       ${coreutils}/bin/mkdir -p /var/cache/dell/suu/opt
       ${coreutils}/bin/touch /var/cache/dell/suu/usr-libexecsuu_temp_modelname_tempfile.txt
+      ${coreutils}/bin/chmod 0666 /var/cache/dell/suu/usr-libexecsuu_temp_modelname_tempfile.txt
     '';
 
     extraBuildCommands = ''
       mkdir -p "$out/opt"
       mkdir -p "$out/usr/libexec/dell_dup"
       touch "$out/usr/libexec/dell_dup/.keep"
-      touch "$out/usr/libexecsuu_temp_modelname_tempfile.txt"
+      ln -s /var/cache/dell/suu/usr-libexecsuu_temp_modelname_tempfile.txt "$out/usr/libexecsuu_temp_modelname_tempfile.txt"
     '';
 
     extraBwrapArgs = [
       "--bind /var/cache/dell/dell_dup/suu /usr/libexec/dell_dup"
       "--bind /var/cache/dell/suu/opt /opt"
-      "--bind /var/cache/dell/suu/usr-libexecsuu_temp_modelname_tempfile.txt /usr/libexecsuu_temp_modelname_tempfile.txt"
     ];
   };
 
@@ -312,7 +313,11 @@ let
       gnugrep
       gnutar
       gzip
+      hwinfo.bin
+      ipmitool
       libarchive
+      lshw
+      pciutils
       python3
       rpm
     ];
@@ -323,6 +328,10 @@ let
       export DELL_SUU_FHS="${fhs}/bin/dell-suu-fhs"
       export DELL_SUU_BSDTAR="${libarchive}/bin/bsdtar"
       export DELL_SUU_DMIDECODE="${dmidecode}/bin/dmidecode"
+      export DELL_SUU_HWINFO="${hwinfo.bin}/bin/hwinfo"
+      export DELL_SUU_IPMITOOL="${ipmitool}/bin/ipmitool"
+      export DELL_SUU_LSPCI="${pciutils}/bin/lspci"
+      export DELL_SUU_LSHW="${lshw}/bin/lshw"
 
       exec ${python3}/bin/python3 ${./dell-suu-support-refresh.py} "$@"
     '';
@@ -380,6 +389,7 @@ let
       cache_source=0
       online_cache=0
       refresh_catalog=0
+      use_support_compliance_cache=0
       explicit_run=0
       cache_root="''${DELL_FIRMWARE_CACHE_DIR:-/var/cache/dell}"
       args=()
@@ -898,6 +908,7 @@ let
 
       clear_suu_runtime_state() {
         ${coreutils}/bin/rm -f \
+          /var/lib/dell/suu/support-refresh.stamp \
           /var/cache/dell/dell_dup/suu/Compliance.json \
           /var/cache/dell/dell_dup/suu/Compliance.html \
           /var/cache/dell/dell_dup/suu/ComplianceReport.json \
@@ -1212,6 +1223,13 @@ let
           run_args+=("--apply-upgrades")
         fi
 
+        if [ "$has_compliance" -eq 1 ] \
+          && [ "$has_apply_mode" -eq 0 ] \
+          && [ "''${DELL_SUU_USE_MERGED_COMPLIANCE_CACHE:-0}" = 1 ]; then
+          merge_support_compliance "$@"
+          exit 0
+        fi
+
         if [ "$has_compliance" -eq 1 ]; then
           set +e
           "$(dirname "$0")/internalsuu.real" "''${run_args[@]}"
@@ -1448,6 +1466,33 @@ let
 
         source_dir=$online_source
         export DELL_SUU_CATALOG_LOCATION="$online_source/repository"
+        use_support_compliance_cache=1
+      fi
+
+      if [ "$mode" = gui ] \
+        && [ "$use_support_compliance_cache" -eq 1 ] \
+        && [ "''${DELL_SUU_GUI_PREFLIGHT_COMPLIANCE:-1}" != 0 ]; then
+        preflight_catalog="''${DELL_SUU_CATALOG_LOCATION:-$source_dir/repository}"
+        if [ -s /var/lib/dell/suu/support-upgrades.json ]; then
+          echo "dell-suu: preflighting SUU GUI compliance cache" >&2
+          set +e
+          DELL_SUU_USE_MERGED_COMPLIANCE_CACHE=0 \
+            DELL_SUU_CATALOG_LOCATION="$preflight_catalog" \
+            ${fhs}/bin/dell-suu-fhs "$source_dir" --cli -- \
+              --compliance \
+              --catalog-location "$preflight_catalog" \
+              --output /usr/libexec/dell_dup/Compliance.json
+          preflight_status=$?
+          set -e
+          case "$preflight_status" in
+            0|34)
+              ;;
+            *)
+              echo "dell-suu: warning: SUU GUI compliance preflight exited with $preflight_status" >&2
+              ;;
+          esac
+          export DELL_SUU_USE_MERGED_COMPLIANCE_CACHE=1
+        fi
       fi
 
       fhs_args=("$source_dir" "--$mode")

@@ -1,7 +1,9 @@
 import argparse
 import concurrent.futures
+import csv
 import gzip
 import hashlib
+import html
 import json
 import os
 import re
@@ -18,8 +20,14 @@ from pathlib import Path
 FHS = os.environ.get("DELL_SUU_FHS", "dell-suu-fhs")
 BSDTAR = os.environ.get("DELL_SUU_BSDTAR", "bsdtar")
 DMIDECODE = os.environ.get("DELL_SUU_DMIDECODE", "dmidecode")
+HWINFO = os.environ.get("DELL_SUU_HWINFO", "hwinfo")
+IPMITOOL = os.environ.get("DELL_SUU_IPMITOOL", "ipmitool")
+LSPCI = os.environ.get("DELL_SUU_LSPCI", "lspci")
+LSHW = os.environ.get("DELL_SUU_LSHW", "lshw")
 
 DEFAULT_REPO_BASE = "https://linux.dell.com/repo/hardware/"
+DEFAULT_PLATFORM_CSV_BASE = "https://poweredgec.dell.com"
+DEFAULT_PLATFORM_GENERATION_SCAN = tuple(range(17, 9, -1))
 USER_AGENT = "Mozilla/5.0"
 SUPPORT_REPORT = Path("/var/lib/dell/suu/support-upgrades.json")
 SUPPORT_STAMP = Path("/var/lib/dell/suu/support-refresh.stamp")
@@ -29,6 +37,10 @@ FILE_LOCKS_LOCK = threading.Lock()
 HASH_CHUNK_SIZE = 4 * 1024 * 1024
 
 XML_NS = {"m": "http://linux.duke.edu/metadata/common"}
+POWEREDGE_MODEL_RE = re.compile(
+    r"(?:PowerEdge\s+)?([A-Z]{1,3}\d{3,4}[A-Z]*|XE\d{3,4}|MX\d{4}[A-Z]*)",
+    flags=re.I,
+)
 
 
 def env_flag(name, default=False):
@@ -160,12 +172,25 @@ def normalise_text(value):
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
+def natural_key(value):
+    parts = re.split(r"(\d+)", value or "")
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part.lower()) for part in parts
+    )
+
+
 def version_tuple(value):
     parts = []
     for part in re.split(r"[^0-9]+", value or ""):
         if part:
             parts.append(int(part))
     return tuple(parts)
+
+
+def version_desc_key(value, width=8):
+    parts = version_tuple(value)
+    padded = (parts + (0,) * width)[:width]
+    return tuple(-part for part in padded)
 
 
 def newer_version(candidate, installed):
@@ -262,6 +287,284 @@ def parse_dmidecode():
     return data
 
 
+def inventory_relevant_display(value):
+    return bool(
+        re.search(
+            r"\b(3d|backplane|bmc|controller|cntlr|display|ethernet|gfx|graphics|gpu|idrac|infiniband|lifecycle|network|nic|non-volatile|nvme|perc|power supply|raid|sas|storage|vga)\b",
+            value or "",
+            re.I,
+        )
+    )
+
+
+def merge_inventory_component(inventory, component_index, component):
+    if not (
+        component.get("display")
+        or component.get("component_id")
+        or pci_tuple_has_data(component.get("pci") or ("", "", "", ""))
+    ):
+        return
+
+    key = (
+        component.get("component_id", ""),
+        component.get("display", ""),
+        component.get("pci") or ("", "", "", ""),
+    )
+    existing = component_index.get(key)
+    if existing is None:
+        component_index[key] = component
+        inventory["components"].append(component)
+        return
+
+    for field in ("version", "component_type", "source"):
+        if not existing.get(field) and component.get(field):
+            existing[field] = component[field]
+
+
+def parse_ipmitool_fru_components():
+    try:
+        proc = run([IPMITOOL, "fru"], timeout=60)
+    except Exception:
+        return []
+    if proc.returncode != 0:
+        return []
+
+    components = []
+    current = {}
+    description = ""
+
+    def flush():
+        if not current and not description:
+            return
+        display = (
+            current.get("Board Product")
+            or current.get("Product Name")
+            or current.get("Product Part Number")
+            or ""
+        ).strip()
+        combined = " ".join([description, display])
+        if display and inventory_relevant_display(combined):
+            components.append(
+                {
+                    "component_id": "",
+                    "display": display,
+                    "version": "",
+                    "component_type": "FRMW",
+                    "pci": ("", "", "", ""),
+                    "source": "ipmitool-fru",
+                }
+            )
+
+    for raw in proc.stdout.splitlines():
+        line = raw.strip()
+        if not line:
+            flush()
+            current = {}
+            description = ""
+            continue
+        if ":" not in line:
+            continue
+        key, value = [part.strip() for part in line.split(":", 1)]
+        if key == "FRU Device Description":
+            flush()
+            current = {}
+            description = value
+            continue
+        current[key] = value
+
+    flush()
+    return components
+
+
+def lshw_nodes(node):
+    if isinstance(node, list):
+        for item in node:
+            yield from lshw_nodes(item)
+        return
+    if not isinstance(node, dict):
+        return
+    yield node
+    for child in node.get("children", []) or []:
+        yield from lshw_nodes(child)
+
+
+def parse_lshw_components():
+    try:
+        proc = run(
+            [
+                LSHW,
+                "-quiet",
+                "-json",
+                "-class",
+                "storage",
+                "-class",
+                "network",
+                "-class",
+                "display",
+            ],
+            timeout=90,
+        )
+    except Exception:
+        return []
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return []
+
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return []
+
+    components = []
+    for node in lshw_nodes(data):
+        node_class = node.get("class", "")
+        if node_class not in {"storage", "network", "display"}:
+            continue
+
+        config = node.get("configuration") or {}
+        display = " ".join(
+            str(part)
+            for part in (
+                node.get("product", ""),
+                node.get("vendor", ""),
+                node.get("description", ""),
+                config.get("driver", ""),
+                config.get("firmware", ""),
+            )
+            if part
+        ).strip()
+        if not display or not inventory_relevant_display(display):
+            continue
+
+        components.append(
+            {
+                "component_id": "",
+                "display": display,
+                "version": config.get("firmware", "") or node.get("version", ""),
+                "component_type": "FRMW",
+                "pci": ("", "", "", ""),
+                "source": "lshw",
+            }
+        )
+    return components
+
+
+def parse_hwinfo_components():
+    try:
+        proc = run(
+            [HWINFO, "--storage", "--network", "--gfxcard", "--short"], timeout=90
+        )
+    except Exception:
+        return []
+    if proc.returncode != 0:
+        return []
+
+    components = []
+    for raw in proc.stdout.splitlines():
+        line = raw.strip()
+        line_lower = line.lower()
+        if not line or line.endswith(":") or not inventory_relevant_display(line):
+            continue
+        if (
+            " network interface" in line_lower
+            or "loopback network interface" in line_lower
+        ):
+            continue
+        components.append(
+            {
+                "component_id": "",
+                "display": line,
+                "version": "",
+                "component_type": "FRMW",
+                "pci": ("", "", "", ""),
+                "source": "hwinfo",
+            }
+        )
+    return components
+
+
+def parse_lspci_record(lines):
+    record = {}
+    for line in lines:
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        record[key.strip()] = value.strip().strip('"')
+    return record
+
+
+def pci_id_from_lspci_value(value):
+    match = re.search(r"\[([0-9a-fA-F]{4})\]\s*$", value or "")
+    return normalize_pci_id(match.group(1)) if match else ""
+
+
+def parse_lspci_components():
+    try:
+        proc = run([LSPCI, "-Dnnmm"], timeout=60)
+    except Exception:
+        return []
+    if proc.returncode != 0:
+        return []
+
+    components = []
+    current = []
+    relevant_classes = (
+        "3d controller",
+        "display controller",
+        "ethernet controller",
+        "fibre channel",
+        "infiniband controller",
+        "network controller",
+        "non-volatile memory controller",
+        "raid bus controller",
+        "sata controller",
+        "scsi storage controller",
+        "serial attached scsi controller",
+        "vga compatible controller",
+    )
+
+    def flush():
+        if not current:
+            return
+        record = parse_lspci_record(current)
+        class_name = record.get("Class", "")
+        if not any(term in class_name.lower() for term in relevant_classes):
+            return
+
+        vendor = record.get("Vendor", "")
+        device = record.get("Device", "")
+        sub_vendor = record.get("SVendor", "")
+        sub_device = record.get("SDevice", "")
+        display = " ".join(part for part in (class_name, vendor, device) if part)
+        if not display:
+            return
+
+        components.append(
+            {
+                "component_id": "",
+                "display": display,
+                "version": "",
+                "component_type": "FRMW",
+                "pci": (
+                    pci_id_from_lspci_value(vendor),
+                    pci_id_from_lspci_value(device),
+                    pci_id_from_lspci_value(sub_vendor),
+                    pci_id_from_lspci_value(sub_device),
+                ),
+                "source": "lspci",
+            }
+        )
+
+    for raw in proc.stdout.splitlines():
+        if raw.strip():
+            current.append(raw)
+            continue
+        flush()
+        current = []
+
+    flush()
+    return components
+
+
 def parse_inventory():
     paths = [
         Path("/var/cache/dell/dell_dup/suu/inv.xml"),
@@ -304,29 +607,17 @@ def parse_inventory():
                     app.get("componentType", "") if app is not None else ""
                 ),
                 "pci": pci_tuple(device.attrib),
+                "source": str(path),
             }
-            if not (
-                component["display"]
-                or component["component_id"]
-                or pci_tuple_has_data(component["pci"])
-            ):
-                continue
+            merge_inventory_component(inventory, component_index, component)
 
-            key = (
-                component["component_id"],
-                component["display"],
-                component["pci"],
-            )
-            existing = component_index.get(key)
-            if existing is None:
-                component_index[key] = component
-                inventory["components"].append(component)
-                continue
-
-            if not existing.get("version") and component.get("version"):
-                existing["version"] = component["version"]
-            if not existing.get("component_type") and component.get("component_type"):
-                existing["component_type"] = component["component_type"]
+    for component in (
+        parse_ipmitool_fru_components()
+        + parse_lshw_components()
+        + parse_hwinfo_components()
+        + parse_lspci_components()
+    ):
+        merge_inventory_component(inventory, component_index, component)
 
     return inventory
 
@@ -339,16 +630,46 @@ def model_tokens(dmidecode_data):
     ]
     tokens = set()
     for raw in raw_values:
-        for value in re.findall(
-            r"(?:PowerEdge\s+)?([A-Z]{1,3}\d{3,4}[A-Z]*|XE\d{3,4}|MX\d{4}[A-Z]*)",
-            raw,
-            flags=re.I,
-        ):
+        for value in model_tokens_from_text(raw):
             tokens.add(value.upper())
         model_match = re.search(r"ModelName=([^;]+)", raw)
         if model_match:
             tokens.update(model_tokens({"product": model_match.group(1), "sku": ""}))
     return sorted(tokens, key=len, reverse=True)
+
+
+def model_tokens_from_text(value):
+    return [match.upper() for match in POWEREDGE_MODEL_RE.findall(value or "")]
+
+
+def poweredge_generation_from_token(token):
+    token = (token or "").upper()
+    match = re.match(r"^[A-Z]+(\d+)", token)
+    if not match:
+        return None
+
+    digits = match.group(1)
+    if token.startswith("C") and len(digits) >= 2:
+        first_two = int(digits[:2])
+        if 62 <= first_two <= 63:
+            return 12 if first_two == 62 else 13
+        if first_two >= 64:
+            return first_two - 50
+
+    if len(digits) < 2:
+        return None
+
+    generation_digit = int(digits[1])
+    return generation_digit + 10
+
+
+def poweredge_generations(tokens):
+    generations = []
+    for token in tokens:
+        generation = poweredge_generation_from_token(token)
+        if generation and generation not in generations:
+            generations.append(generation)
+    return generations
 
 
 def component_terms(inventory):
@@ -358,43 +679,100 @@ def component_terms(inventory):
         "application",
         "a00",
         "a37",
+        "autonegotiation",
+        "avocent",
         "bios",
         "bit",
+        "blade",
         "broadcom",
+        "bus",
+        "cap",
+        "cntlr",
         "collector",
         "controller",
+        "cruzer",
         "cruzerblade",
         "dell",
         "diagnostics",
+        "device",
+        "disk",
+        "drive",
         "driver",
         "drivers",
+        "dual",
+        "emulated",
         "eno1",
         "eno2",
         "eno3",
         "eno4",
         "ethernet",
+        "expander",
+        "ffv16",
+        "fibre",
         "firmware",
+        "floppy",
+        "function",
+        "gigabit",
+        "host",
         "gigabit",
         "inc",
+        "interface",
+        "internal",
         "intel",
         "integrated",
         "lifecycle",
+        "list",
+        "loopback",
+        "mass",
         "mini",
         "module",
-        "nvidia",
+        "msi",
+        "msix",
+        "network",
         "pack",
+        "pciexpress",
         "perc",
+        "physical",
         "power",
         "poweredge",
-        "qlogic",
+        "raid",
         "remote",
         "rev",
+        "rom",
+        "sandisk",
+        "sas",
+        "scsi",
         "server",
         "service",
+        "storage",
         "supply",
         "system",
         "uefi",
+        "usb",
         "version",
+        "vpd",
+    }
+    allowed_identifiers = {
+        "backplane",
+        "bnx2x",
+        "connectx",
+        "cpld",
+        "geforce",
+        "idrac",
+        "idsdm",
+        "ixgbe",
+        "megaraid",
+        "quadro",
+        "rtx",
+        "tesla",
+    }
+    allowed_vendor_terms = {
+        "amd",
+        "emulex",
+        "marvell",
+        "mellanox",
+        "nvidia",
+        "qlogic",
     }
     terms = set()
     inventory_text = normalise_text(
@@ -402,9 +780,42 @@ def component_terms(inventory):
     )
     for component in inventory["components"]:
         text = component.get("display", "")
+        component_text = normalise_text(text)
+        component_allows_vendor = any(
+            term in component_text
+            for term in (
+                "3d controller",
+                "display controller",
+                "ethernet",
+                "fibre channel",
+                "graphics",
+                "gpu",
+                "infiniband",
+                "network controller",
+                "non volatile",
+                "nvme",
+                "raid",
+                "sata",
+                "scsi",
+                "storage",
+                "vga",
+            )
+        )
         for word in re.findall(r"[A-Za-z][A-Za-z0-9]{2,}", text):
             lower = word.lower()
-            if lower not in ignored:
+            if lower in allowed_vendor_terms and component_allows_vendor:
+                terms.add(lower)
+                continue
+            if lower in ignored:
+                continue
+            is_model_like = bool(re.search(r"[a-z].*\d|\d.*[a-z]", lower))
+            is_interface_name = bool(
+                re.match(r"^(eno|enp|tap|vlan|vmbr|lxcbr|lo)\d*", lower)
+            )
+            is_hex_noise = bool(re.match(r"^x?[0-9a-f]{6,}$", lower))
+            if lower in allowed_identifiers or (
+                is_model_like and not is_interface_name and not is_hex_noise
+            ):
                 terms.add(lower)
     for preferred in ("idrac", "cpld", "idsdm"):
         if re.search(rf"\b{re.escape(preferred)}\b", inventory_text):
@@ -467,6 +878,205 @@ def metadata_for_release(repo_base, cache_dir, release):
         print(f"dell-suu: fetching Dell yum metadata {release}", file=sys.stderr)
         download_file(url, path)
     return gzip.decompress(path.read_bytes())
+
+
+def platform_csv_url(generation):
+    base = os.environ.get(
+        "DELL_SUU_SUPPORT_PLATFORM_CSV_BASE", DEFAULT_PLATFORM_CSV_BASE
+    ).rstrip("/")
+    return f"{base}/latest_poweredge-{generation}g.csv"
+
+
+def platform_csv_urls(tokens):
+    configured = os.environ.get("DELL_SUU_SUPPORT_PLATFORM_CSV_URLS")
+    if configured:
+        return [url.strip() for url in configured.split(",") if url.strip()]
+
+    generation_scan = []
+    generation_scan.extend(poweredge_generations(tokens))
+    generation_scan.extend(DEFAULT_PLATFORM_GENERATION_SCAN)
+
+    urls = []
+    seen = set()
+    for generation in generation_scan:
+        if generation in seen:
+            continue
+        seen.add(generation)
+        urls.append(platform_csv_url(generation))
+    return urls
+
+
+def cache_path_for_url(cache_dir, url):
+    digest = hashlib.sha256(url.encode()).hexdigest()[:16]
+    name = re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(url).name or "platform.csv")
+    return cache_dir / "platform-csv" / f"{digest}-{name}"
+
+
+def cached_fetch_text(cache_dir, url, max_age):
+    path = cache_path_for_url(cache_dir, url)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if (
+        path.exists()
+        and path.stat().st_size > 0
+        and not env_flag("DELL_SUU_FORCE_REFRESH")
+        and (max_age <= 0 or time.time() - path.stat().st_mtime <= max_age)
+    ):
+        return path.read_text(errors="replace")
+
+    data = fetch_bytes(url, timeout=60)
+    path.write_bytes(data)
+    return data.decode("utf-8", errors="replace")
+
+
+def normalise_platform_filename(value):
+    name = Path(value or "").name.strip()
+    lowered = name.lower()
+    for suffix in (".sign", ".rpm"):
+        if lowered.endswith(suffix):
+            name = name[: -len(suffix)]
+            lowered = name.lower()
+    return name
+
+
+def platform_filename_candidates(value):
+    name = normalise_platform_filename(value)
+    if not name:
+        return set()
+
+    candidates = {name}
+    if not name.lower().endswith((".bin", ".exe", ".efi")):
+        candidates.update({f"{name}.BIN", f"{name}.EXE", f"{name}.efi"})
+    return {normalise_platform_filename(candidate) for candidate in candidates}
+
+
+def load_platform_filter(cache_dir, tokens):
+    token_set = {token.upper() for token in tokens if token}
+    result = {
+        "enabled": False,
+        "filenames": set(),
+        "models": set(),
+        "records": [],
+        "source": "",
+    }
+    if not token_set or env_flag("DELL_SUU_SUPPORT_IGNORE_PLATFORM_CSV"):
+        return result
+
+    max_age = env_int("DELL_SUU_SUPPORT_PLATFORM_CSV_MAX_AGE_SECONDS", 21600)
+    for url in platform_csv_urls(token_set):
+        try:
+            text = cached_fetch_text(cache_dir, url, max_age)
+        except Exception as exc:
+            print(
+                f"dell-suu: warning: failed to fetch Dell platform CSV {url}: {exc}",
+                file=sys.stderr,
+            )
+            continue
+
+        filenames = set()
+        models = set()
+        records_by_name = {}
+        sign_urls_by_name = {}
+        for row in csv.reader(text.splitlines()):
+            if len(row) < 13:
+                continue
+            row_tokens = {token.upper() for token in model_tokens_from_text(row[0])}
+            if not (row_tokens & token_set):
+                continue
+            filename = normalise_platform_filename(row[12])
+            if not filename:
+                continue
+            filenames.add(filename)
+            models.update(row_tokens & token_set)
+
+            if row[12].strip().lower().endswith(".sign") and len(row) > 13:
+                sign_urls_by_name[filename] = row[13].strip()
+                continue
+
+            record = platform_csv_record_from_row(row, url)
+            if record:
+                records_by_name.setdefault(record["name"], record)
+
+        if filenames:
+            for record in records_by_name.values():
+                sign_url = sign_urls_by_name.get(record["name"])
+                if sign_url:
+                    record["sign_url"] = sign_url
+            result.update(
+                {
+                    "enabled": True,
+                    "filenames": filenames,
+                    "models": models,
+                    "records": list(records_by_name.values()),
+                    "source": url,
+                }
+            )
+            return result
+
+    return result
+
+
+def platform_filter_allows_name(platform_filter, value):
+    if not platform_filter.get("enabled"):
+        return True
+    filenames = platform_filter.get("filenames") or set()
+    return any(
+        candidate in filenames for candidate in platform_filename_candidates(value)
+    )
+
+
+def platform_filter_allows_record(platform_filter, record):
+    if not platform_filter.get("enabled"):
+        return True
+    values = {
+        record.get("name", ""),
+        record.get("location", ""),
+        Path(record.get("location", "")).name,
+    }
+    return any(platform_filter_allows_name(platform_filter, value) for value in values)
+
+
+def platform_source_release(source):
+    match = re.search(r"latest_poweredge-([0-9]+g)", source or "", flags=re.I)
+    return f"poweredgec-{match.group(1).lower()}" if match else "poweredgec"
+
+
+def platform_csv_record_from_row(row, source):
+    if len(row) < 14:
+        return None
+
+    package_format = row[5].strip().lower()
+    filename = Path(row[12]).name.strip()
+    filename_lower = filename.lower()
+    url = row[13].strip()
+    if (
+        package_format != "linux dup"
+        or not filename_lower.endswith(".bin")
+        or filename_lower.endswith(".bin.sign")
+        or not url
+    ):
+        return None
+
+    record = {
+        "name": filename,
+        "summary": row[8].strip() if len(row) > 8 else filename,
+        "description": " ".join(
+            part.strip() for part in row[14:16] if part and part.strip()
+        ),
+        "location": url,
+        "url": url,
+        "checksum": "",
+        "checksum_type": "",
+        "version": row[10].strip() if len(row) > 10 else "",
+        "criticality": row[9].strip() if len(row) > 9 and row[9].strip() else "",
+        "category": row[3].strip() if len(row) > 3 else "",
+        "release_date": row[7].strip() if len(row) > 7 else "",
+        "release": platform_source_release(source),
+        "source": "platform-csv",
+        "platform_source": source,
+    }
+    if not record_is_update_payload(record):
+        return None
+    return record
 
 
 def package_records(metadata):
@@ -556,8 +1166,8 @@ def candidate_priority(record):
         (0, ("idrac", "lifecycle")),
         (1, ("bios",)),
         (2, ("cpld", "idsdm")),
-        (3, ("perc", "h730", "sas raid", "sas non raid")),
-        (4, ("network", "ethernet", "intel", "x520", "broadcom")),
+        (3, ("perc", "sas raid", "sas non raid")),
+        (4, ("network", "ethernet", "intel", "broadcom")),
         (5, ("power supply", "backplane", "drive firmware", "nvme", "ssd")),
         (6, ("firmware",)),
     )
@@ -600,6 +1210,192 @@ def package_match_kind(record, tokens, terms, term_major_versions, download_all)
     return ""
 
 
+def record_release_name(record):
+    return Path(record.get("location") or record.get("name") or "").name
+
+
+def record_version_key(record):
+    return record.get("version") or record.get("name") or record.get("location") or ""
+
+
+def term_is_specific_chain_key(term):
+    if not term:
+        return False
+    term = term.lower()
+    if term in {"idrac", "cpld", "idsdm", "backplane"}:
+        return True
+    if re.search(r"[a-z].*\d|\d.*[a-z]", term):
+        return True
+    return False
+
+
+def record_chain_keys(record, tokens, terms, term_major_versions, download_all):
+    if download_all:
+        return set()
+
+    keys = set()
+    haystack = record_haystack(record)
+    priority = candidate_priority(record)
+
+    if record_is_platform_payload(record):
+        for token in tokens:
+            token_lower = token.lower()
+            if re.search(rf"\b{re.escape(token_lower)}\b", haystack):
+                keys.add(("model", priority, token_lower))
+
+    record_major = version_tuple(record.get("version", ""))[:1]
+    for term in terms:
+        term = term.lower()
+        if not term_is_specific_chain_key(term):
+            continue
+        if not re.search(rf"\b{re.escape(term)}\b", haystack):
+            continue
+
+        allowed_majors = term_major_versions.get(term)
+        if allowed_majors and (not record_major or record_major not in allowed_majors):
+            continue
+
+        keys.add(("component", priority, term))
+    return keys
+
+
+def record_family_key(record):
+    priority = candidate_priority(record)
+    if priority <= 2 and record_is_platform_payload(record):
+        return ("platform", priority)
+    return None
+
+
+def package_target_keys(package_info, matched_components, record):
+    keys = set()
+    component_type = package_info.get("component_type") or ""
+    component_id = package_info.get("component_id") or ""
+    if component_id:
+        keys.add(("component-id", component_type, str(component_id)))
+
+    for component_id in package_info.get("supported_component_ids") or set():
+        if component_id:
+            keys.add(("supported-component-id", component_type, str(component_id)))
+
+    for pci in package_info.get("supported_pci_ids") or set():
+        if pci_tuple_has_data(pci):
+            keys.add(("pci", tuple(pci)))
+
+    for component in matched_components or []:
+        component_id = component.get("component_id") or ""
+        if component_id:
+            keys.add(("inventory-component-id", str(component_id)))
+        component_pci = component.get("pci") or ("", "", "", "")
+        if pci_tuple_has_data(component_pci):
+            keys.add(("inventory-pci", tuple(component_pci)))
+
+    if not keys and package_info.get("supported_system_ids"):
+        keys.add(
+            (
+                "system",
+                component_type or candidate_priority(record),
+                tuple(sorted(package_info["supported_system_ids"])),
+            )
+        )
+
+    if not keys:
+        key_name = package_info.get("name") or package_info.get("device_display") or ""
+        if key_name:
+            keys.add(("name", component_type, normalise_text(key_name)))
+
+    return keys
+
+
+def candidate_sort_key(candidate, release_rank):
+    release, record = candidate
+    return (
+        candidate_priority(record),
+        version_desc_key(record_version_key(record)),
+        release_rank.get(release, 999999),
+        natural_key(record_release_name(record)),
+    )
+
+
+def compliance_html_state(component):
+    message = component.get("complianceMessage") or ""
+    if message:
+        return message
+    current = component.get("version") or component.get("currentVersion") or ""
+    baseline = component.get("baseLineVersion") or ""
+    if newer_version(baseline, current):
+        return "Upgrade"
+    if newer_version(current, baseline):
+        return "Downgrade"
+    return "Equal"
+
+
+def write_compliance_html(path, report):
+    root = report.get("SystemUpdateCompliance", [{}])[0]
+    system = root.get("System", {})
+    baseline = root.get("BaseLineInformation", {})
+    components = root.get("UpdateableComponent", [])
+    dmidecode_data = parse_dmidecode()
+    host_name = os.uname().nodename if hasattr(os, "uname") else "LocalHost"
+
+    def esc(value):
+        return html.escape(str(value or ""), quote=True)
+
+    rows = []
+    for component in components:
+        rows.append(
+            "<tr>"
+            f'<td class="data-area-canvas">{esc(component.get("packageFilePath"))}</td>'
+            f'<td class="data-area-canvas">{esc(component.get("name"))}</td>'
+            f'<td class="data-area-canvas">{esc(component.get("criticality"))}</td>'
+            f'<td class="data-area-canvas">{esc(component.get("componentType"))}</td>'
+            f'<td class="data-area-canvas">{esc(component.get("version") or component.get("currentVersion"))}</td>'
+            f'<td class="data-area-canvas">{esc(component.get("baseLineVersion"))}</td>'
+            '<td class="data-area-canvas">No Dependency</td>'
+            '<td class="data-area-canvas">No Dependency</td>'
+            f'<td class="data-area-canvas">{esc(compliance_html_state(component))}</td>'
+            "</tr>"
+        )
+
+    content = """<head><META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style>
+body {{background-color: #ADBEE7}}
+TD.data-area-header {{font-weight:bold}}
+TD.data-area-canvas {{background-color:#ADBEE7}}
+TH.data-area-header {{font-weight:bold}}
+TABLE.data-area {{background-color:#ADBEE7}}
+</style>
+<center>
+<h1>Dell Server Update Utility : Compliance Report </h1>
+</center>
+</head><body>
+<br>
+<table width="100%" border="0" cellpadding="2" cellspacing="2" class="data-area">
+<tr><td nowrap align="left" class="data-area-header">Model : {model}</td></tr>
+<tr><td nowrap align="left" class="data-area-header">Host Name : {host}</td></tr>
+<tr><td nowrap align="left" class="data-area-header">SUU Version : {version}</td></tr>
+</table>
+<br>
+<table width="100%" border="1" cellpadding="0" cellspacing="1" class="data-area">
+<th class="data-area-header">Package Name</th><th class="data-area-header">Component</th><th class="data-area-header">Criticality</th><th class="data-area-header">Type</th><th class="data-area-header">Current Version</th><th class="data-area-header">Latest Version</th><th class="data-area-header">Pre-Requisites</th><th class="data-area-header">Co-Requisites</th><th class="data-area-header">State</th>
+{rows}
+</table>
+<br>
+<br>
+</body>
+""".format(
+        model=esc(
+            system.get("model")
+            or dmidecode_data.get("product")
+            or os.environ.get("DELL_SUU_SUPPORT_MODEL", "")
+        ),
+        host=esc(system.get("hostName") or host_name),
+        version=esc(baseline.get("version") or ""),
+        rows="\n".join(rows),
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+
+
 def download_rpm(repo_base, cache_dir, release, record):
     rpm = cache_dir / "rpms" / release / Path(record["location"]).name
     with file_lock(rpm):
@@ -620,6 +1416,36 @@ def download_rpm(repo_base, cache_dir, release, record):
         return rpm
 
 
+def download_platform_bin(cache_dir, release, record):
+    filename = Path(record["name"] or record["location"]).name
+    bin_path = cache_dir / "platform-bins" / release / filename
+    url = record.get("url") or record.get("location")
+    if not url:
+        raise RuntimeError(f"platform CSV record has no download URL: {filename}")
+
+    with file_lock(bin_path):
+        if not bin_path.exists() or bin_path.stat().st_size == 0:
+            print(
+                f"dell-suu: downloading Dell platform package {filename}",
+                file=sys.stderr,
+            )
+            download_file(url, bin_path)
+        bin_path.chmod(0o755)
+
+        sign_url = record.get("sign_url")
+        sign_path = Path(str(bin_path) + ".sign")
+        if sign_url and (not sign_path.exists() or sign_path.stat().st_size == 0):
+            try:
+                download_file(sign_url, sign_path)
+            except Exception as exc:
+                print(
+                    f"dell-suu: warning: failed to download signature for {filename}: {exc}",
+                    file=sys.stderr,
+                )
+
+    return bin_path
+
+
 def extract_rpm(cache_dir, release, rpm):
     extract_dir = cache_dir / "extracted" / release / rpm.stem
     marker = extract_dir / ".complete"
@@ -635,7 +1461,10 @@ def extract_rpm(cache_dir, release, rpm):
 
 
 def find_bins(extract_dir):
-    return sorted(path for path in extract_dir.rglob("*.BIN") if path.is_file())
+    return sorted(
+        (path for path in extract_dir.rglob("*.BIN") if path.is_file()),
+        key=lambda path: natural_key(path.name),
+    )
 
 
 def package_xml_cache_path(cache_dir, bin_path):
@@ -868,6 +1697,104 @@ def component_type_display(component_type):
     }.get(component_type, component_type or "FIRMWARE")
 
 
+def support_component_text(component):
+    return normalise_text(
+        " ".join(
+            str(component.get(name, ""))
+            for name in (
+                "name",
+                "categoryType",
+                "componentType",
+                "componentTypeDisplay",
+                "packageFilePath",
+            )
+        )
+    )
+
+
+def inventory_component_text(component):
+    return normalise_text(
+        " ".join(
+            str(component.get(name, ""))
+            for name in ("display", "component_id", "component_type")
+        )
+    )
+
+
+def text_component_matches(support_text, inventory_text):
+    if not support_text or not inventory_text:
+        return False
+
+    alias_groups = (
+        ("idrac", "integrated dell remote access controller", "lifecycle controller"),
+        ("bios",),
+        ("backplane",),
+    )
+    for aliases in alias_groups:
+        support_has_alias = any(alias in support_text for alias in aliases)
+        inventory_has_alias = any(alias in inventory_text for alias in aliases)
+        if support_has_alias and inventory_has_alias:
+            return True
+
+    support_terms = {
+        term
+        for term in support_text.split()
+        if len(term) >= 4
+        and term
+        not in {
+            "dell",
+            "firmware",
+            "controller",
+            "integrated",
+            "adapter",
+            "update",
+            "package",
+            "mini",
+            "network",
+            "ethernet",
+            "intel",
+            "broadcom",
+        }
+    }
+    inventory_terms = set(inventory_text.split())
+    shared_terms = support_terms & inventory_terms
+    if len(shared_terms) >= 2:
+        return True
+
+    return any(re.search(r"[a-z].*\d|\d.*[a-z]", term) for term in shared_terms)
+
+
+def support_component_is_current_in_inventory(component, inventory):
+    baseline = component.get("baseLineVersion", "")
+    if not version_tuple(baseline):
+        return False
+
+    component_id = str(component.get("componentID") or "")
+    support_text = support_component_text(component)
+    for inventory_component in inventory.get("components", []):
+        inventory_version = inventory_component.get("version", "")
+        if not version_tuple(inventory_version):
+            continue
+
+        inventory_component_id = str(inventory_component.get("component_id") or "")
+        id_matches = (
+            component_id
+            and component_id != "0"
+            and inventory_component_id
+            and component_id == inventory_component_id
+        )
+        text_matches = text_component_matches(
+            support_text, inventory_component_text(inventory_component)
+        )
+        if not (id_matches or text_matches):
+            continue
+
+        if version_tuple(inventory_version) >= version_tuple(baseline):
+            return True
+
+    return False
+
+
 def install_bin(repo_dir, release, bin_path):
     rel_path = Path("support-yum") / release / bin_path.name
     dest = repo_dir / rel_path
@@ -910,8 +1837,8 @@ def refresh(args):
     repo_dir = Path(args.repo)
     source_dir = args.source
     releases = list_releases(repo_base)
-    max_releases = env_int("DELL_SUU_SUPPORT_MAX_RELEASES", 80)
-    max_candidates = env_int("DELL_SUU_SUPPORT_MAX_CANDIDATES", 200)
+    max_releases = env_int("DELL_SUU_SUPPORT_MAX_RELEASES", 0)
+    max_candidates = env_int("DELL_SUU_SUPPORT_MAX_CANDIDATES", 0)
     metadata_workers = max(1, env_int("DELL_SUU_SUPPORT_METADATA_WORKERS", 6))
     download_workers = max(1, env_int("DELL_SUU_SUPPORT_DOWNLOAD_WORKERS", 6))
     download_all = env_flag("DELL_SUU_SUPPORT_DOWNLOAD_ALL", False)
@@ -922,6 +1849,7 @@ def refresh(args):
     tokens = model_tokens(dmidecode_data)
     terms = component_terms(inventory)
     term_major_versions = inventory_major_versions(inventory)
+    platform_filter = load_platform_filter(cache_dir, tokens)
 
     print(
         "dell-suu: Dell support discovery "
@@ -931,13 +1859,42 @@ def refresh(args):
         f"tokens={','.join(tokens) or 'none'}",
         file=sys.stderr,
     )
+    if platform_filter.get("enabled"):
+        print(
+            "dell-suu: using Dell platform latest CSV "
+            f"{platform_filter['source']} for "
+            f"{','.join(sorted(platform_filter['models'])) or ','.join(tokens)} "
+            f"({len(platform_filter['filenames'])} published files)",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            "dell-suu: no Dell platform latest CSV match found; falling back to metadata/package checks",
+            file=sys.stderr,
+        )
 
     seen_names = set()
+    seen_filenames = set()
     model_candidates = []
     component_candidates = []
-    selected_releases = releases[:max_releases]
+    platform_candidates = []
+    selected_releases = releases[:max_releases] if max_releases > 0 else releases
     metadata_by_release = {}
     metadata_workers = min(metadata_workers, max(1, len(selected_releases)))
+
+    for record in platform_filter.get("records") or []:
+        record = dict(record)
+        record["match_kind"] = "all"
+        record["chain_keys"] = tuple()
+        platform_candidates.append((record.get("release") or "poweredgec", record))
+        seen_names.add(record["name"])
+        seen_filenames.update(platform_filename_candidates(record["name"]))
+
+    if platform_candidates:
+        print(
+            f"dell-suu: queued {len(platform_candidates)} Dell platform latest Linux DUP candidates",
+            file=sys.stderr,
+        )
 
     print(
         f"dell-suu: fetching/scanning metadata for {len(selected_releases)} releases with {metadata_workers} workers",
@@ -977,27 +1934,37 @@ def refresh(args):
         for record in package_records(metadata):
             if record["name"] in seen_names:
                 continue
+            record_filenames = set()
+            for value in (record.get("name", ""), record.get("location", "")):
+                record_filenames.update(platform_filename_candidates(value))
+            if record_filenames & seen_filenames:
+                continue
             kind = package_match_kind(
                 record, tokens, terms, term_major_versions, download_all
             )
             if not kind:
                 continue
+            if not platform_filter_allows_record(platform_filter, record):
+                continue
             seen_names.add(record["name"])
             record = dict(record)
             record["match_kind"] = kind
+            record["chain_keys"] = tuple(
+                sorted(
+                    record_chain_keys(
+                        record, tokens, terms, term_major_versions, download_all
+                    )
+                )
+            )
+            seen_filenames.update(record_filenames)
             if kind in {"model", "all"}:
                 model_candidates.append((release, record))
             else:
                 component_candidates.append((release, record))
 
     release_rank = {release: index for index, release in enumerate(selected_releases)}
-    candidates = model_candidates + component_candidates
-    candidates.sort(
-        key=lambda candidate: (
-            candidate_priority(candidate[1]),
-            release_rank.get(candidate[0], len(selected_releases)),
-        )
-    )
+    candidates = platform_candidates + model_candidates + component_candidates
+    candidates.sort(key=lambda candidate: candidate_sort_key(candidate, release_rank))
     if max_candidates > 0:
         candidates = candidates[:max_candidates]
 
@@ -1011,10 +1978,22 @@ def refresh(args):
 
     def materialize_candidate(candidate):
         release, record = candidate
-        rpm = download_rpm(repo_base, cache_dir, release, record)
-        extract_dir = extract_rpm(cache_dir, release, rpm)
+        if record.get("source") == "platform-csv":
+            bin_paths = [download_platform_bin(cache_dir, release, record)]
+        else:
+            rpm = download_rpm(repo_base, cache_dir, release, record)
+            extract_dir = extract_rpm(cache_dir, release, rpm)
+            bin_paths = find_bins(extract_dir)
+
         bin_infos = []
-        for bin_path in find_bins(extract_dir):
+        for bin_path in bin_paths:
+            if not platform_filter_allows_name(platform_filter, bin_path.name):
+                print(
+                    f"dell-suu: skipping {bin_path.name}: not listed for this Dell platform in latest CSV",
+                    file=sys.stderr,
+                )
+                continue
+
             package_info = {}
             try:
                 package_info = parse_package_xml_path(
@@ -1048,126 +2027,198 @@ def refresh(args):
         return release, record, bin_infos
 
     best_components = {}
+    closed_chain_keys = set()
+    closed_family_keys = set()
+    closed_target_keys = set()
     materialized = 0
+    skipped_closed = 0
     download_workers = min(download_workers, max(1, len(candidates)))
 
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=download_workers
-    ) as executor:
-        future_to_candidate = {
-            executor.submit(materialize_candidate, candidate): candidate
-            for candidate in candidates
-        }
-
-        for future in concurrent.futures.as_completed(future_to_candidate):
-            release, record = future_to_candidate[future]
-            try:
-                release, record, bin_infos = future.result()
-            except Exception as exc:
-                print(
-                    f"dell-suu: warning: failed to materialize {record['name']}: {exc}",
-                    file=sys.stderr,
-                )
-                continue
-
-            materialized += 1
+    def close_candidate(record, target_keys, reason):
+        chain_keys = set(record.get("chain_keys") or ())
+        if chain_keys:
+            closed_chain_keys.update(chain_keys)
+        family_key = record_family_key(record)
+        if family_key and (chain_keys or target_keys):
+            closed_family_keys.add(family_key)
+        if target_keys:
+            closed_target_keys.update(target_keys)
+        if chain_keys or target_keys or family_key:
             print(
-                f"dell-suu: materialized {materialized}/{len(candidates)}: {record['name']}",
+                "dell-suu: closing older update chain "
+                f"for {record['name']} ({reason})",
                 file=sys.stderr,
             )
 
-            for bin_path, package_info in bin_infos:
+    next_candidate = 0
+    while next_candidate < len(candidates):
+        batch = []
+        while next_candidate < len(candidates) and len(batch) < download_workers:
+            candidate = candidates[next_candidate]
+            next_candidate += 1
+            record = candidate[1]
+            if set(record.get("chain_keys") or ()) & closed_chain_keys:
+                skipped_closed += 1
+                continue
+            if record_family_key(record) in closed_family_keys:
+                skipped_closed += 1
+                continue
+            batch.append(candidate)
+
+        if not batch:
+            continue
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(download_workers, len(batch))
+        ) as executor:
+            future_to_candidate = {
+                executor.submit(materialize_candidate, candidate): candidate
+                for candidate in batch
+            }
+
+            for future in concurrent.futures.as_completed(future_to_candidate):
+                release, record = future_to_candidate[future]
                 try:
-                    applicable, check = check_dup(source_dir, bin_path)
+                    release, record, bin_infos = future.result()
                 except Exception as exc:
                     print(
-                        f"dell-suu: warning: failed to check {bin_path.name}: {exc}",
+                        f"dell-suu: warning: failed to materialize {record['name']}: {exc}",
                         file=sys.stderr,
                     )
                     continue
-                if not applicable:
-                    continue
 
-                if not package_info:
-                    package_info = parse_package_xml(bin_path)
-                    if not package_info:
-                        print(
-                            f"dell-suu: warning: no package.xml found after checking {bin_path.name}; using DUP output only",
-                            file=sys.stderr,
-                        )
-
-                matched_components = matching_inventory_components(
-                    package_info, inventory
-                )
-                matched_component = matched_components[0] if matched_components else {}
-                component_id = (
-                    package_info.get("component_id")
-                    or matched_component.get("component_id")
-                    or ""
-                )
-                component_type = package_info.get("component_type") or "FRMW"
-                package_version = (
-                    package_info.get("version")
-                    or check.get("package_version")
-                    or record.get("version")
-                )
-                installed_version = (
-                    check.get("installed_version")
-                    or matched_component.get("version")
-                    or ""
-                )
-                display = (
-                    component_display_by_id(inventory, component_id)
-                    or matched_component.get("display")
-                    or check.get("display")
-                    or package_info.get("device_display")
-                    or package_info.get("name")
-                    or record["summary"]
-                    or record["name"]
-                )
-                package_id = (
-                    package_info.get("package_id")
-                    or package_info.get("release_id")
-                    or record["name"].split("_", 2)[1]
-                )
-                rel_path = install_bin(repo_dir, release, bin_path)
-
-                component = {
-                    "packageID": package_id,
-                    "packageFilePath": rel_path,
-                    "name": display,
-                    "index": 0,
-                    "complianceStatus": False,
-                    "componentType": component_type,
-                    "componentTypeDisplay": component_type_display(component_type),
-                    "categoryType": package_info.get("device_display") or display,
-                    "criticality": package_info.get("criticality") or "Recommended",
-                    "componentID": (
-                        int(component_id) if str(component_id).isdigit() else 0
-                    ),
-                    "complianceMessage": "Upgrade",
-                    "version": installed_version,
-                    "baseLineVersion": package_version,
-                    "rebootRequired": bool(package_info.get("reboot_required")),
-                }
-                key = (
-                    component.get("componentType") or "",
-                    str(
-                        component.get("componentID")
-                        or component.get("packageID")
-                        or component.get("packageFilePath")
-                    ),
-                )
-                previous = best_components.get(key)
-                if previous and version_tuple(
-                    previous.get("baseLineVersion")
-                ) >= version_tuple(component.get("baseLineVersion")):
-                    continue
-                best_components[key] = component
+                materialized += 1
                 print(
-                    f"dell-suu: support package applicable: {display} {installed_version} -> {package_version}",
+                    f"dell-suu: materialized {materialized}/{len(candidates)}: {record['name']}",
                     file=sys.stderr,
                 )
+
+                for bin_path, package_info in bin_infos:
+                    matched_components = matching_inventory_components(
+                        package_info, inventory
+                    )
+                    target_keys = package_target_keys(
+                        package_info, matched_components, record
+                    )
+                    if target_keys and target_keys & closed_target_keys:
+                        close_candidate(record, target_keys, "target already handled")
+                        continue
+
+                    try:
+                        applicable, check = check_dup(source_dir, bin_path)
+                    except Exception as exc:
+                        print(
+                            f"dell-suu: warning: failed to check {bin_path.name}: {exc}",
+                            file=sys.stderr,
+                        )
+                        continue
+
+                    if not package_info:
+                        package_info = parse_package_xml(bin_path)
+                        if not package_info:
+                            print(
+                                f"dell-suu: warning: no package.xml found after checking {bin_path.name}; using DUP output only",
+                                file=sys.stderr,
+                            )
+                        matched_components = matching_inventory_components(
+                            package_info, inventory
+                        )
+                        target_keys = package_target_keys(
+                            package_info, matched_components, record
+                        )
+
+                    matched_component = (
+                        matched_components[0] if matched_components else {}
+                    )
+                    component_id = (
+                        package_info.get("component_id")
+                        or matched_component.get("component_id")
+                        or ""
+                    )
+                    component_type = package_info.get("component_type") or "FRMW"
+                    package_version = (
+                        package_info.get("version")
+                        or check.get("package_version")
+                        or record.get("version")
+                    )
+                    installed_version = (
+                        check.get("installed_version")
+                        or matched_component.get("version")
+                        or ""
+                    )
+
+                    if not applicable:
+                        if (
+                            package_version
+                            and installed_version
+                            and version_tuple(package_version)
+                            and version_tuple(installed_version)
+                            and version_tuple(package_version)
+                            <= version_tuple(installed_version)
+                        ):
+                            close_candidate(record, target_keys, "current or older")
+                        continue
+
+                    display = (
+                        component_display_by_id(inventory, component_id)
+                        or matched_component.get("display")
+                        or check.get("display")
+                        or package_info.get("device_display")
+                        or package_info.get("name")
+                        or record["summary"]
+                        or record["name"]
+                    )
+                    package_id = (
+                        package_info.get("package_id")
+                        or package_info.get("release_id")
+                        or record["name"].split("_", 2)[1]
+                    )
+                    rel_path = install_bin(repo_dir, release, bin_path)
+
+                    component = {
+                        "packageID": package_id,
+                        "packageFilePath": rel_path,
+                        "name": display,
+                        "index": 0,
+                        "complianceStatus": False,
+                        "componentType": component_type,
+                        "componentTypeDisplay": component_type_display(component_type),
+                        "categoryType": package_info.get("device_display") or display,
+                        "criticality": package_info.get("criticality") or "Recommended",
+                        "componentID": (
+                            int(component_id) if str(component_id).isdigit() else 0
+                        ),
+                        "complianceMessage": "Upgrade",
+                        "version": installed_version,
+                        "baseLineVersion": package_version,
+                        "rebootRequired": bool(package_info.get("reboot_required")),
+                    }
+                    key = (
+                        component.get("componentType") or "",
+                        str(
+                            component.get("componentID")
+                            or component.get("packageID")
+                            or component.get("packageFilePath")
+                        ),
+                    )
+                    previous = best_components.get(key)
+                    if previous and version_tuple(
+                        previous.get("baseLineVersion")
+                    ) >= version_tuple(component.get("baseLineVersion")):
+                        close_candidate(record, target_keys, "older than best match")
+                        continue
+                    best_components[key] = component
+                    close_candidate(record, target_keys, "applicable")
+                    print(
+                        f"dell-suu: support package applicable: {display} {installed_version} -> {package_version}",
+                        file=sys.stderr,
+                    )
+
+    if skipped_closed:
+        print(
+            f"dell-suu: skipped {skipped_closed} older support candidates after newer chain matches",
+            file=sys.stderr,
+        )
 
     components = list(best_components.values())
 
@@ -1237,14 +2288,15 @@ def load_json(path):
 
 def merge(args):
     compliance_path = Path(args.compliance)
+    html_path = None
     if compliance_path.suffix.lower() in {".html", ".htm"}:
+        html_path = compliance_path
         compliance_path = Path("/usr/libexec/dell_dup/Compliance.json")
     support = load_json(SUPPORT_REPORT)
     support_components = support.get("SystemUpdateCompliance", [{}])[0].get(
         "UpdateableComponent", []
     )
-    if not support_components:
-        return 0
+    inventory = parse_inventory()
 
     base = load_json(compliance_path)
     if not base.get("SystemUpdateCompliance"):
@@ -1254,6 +2306,18 @@ def merge(args):
 
     target = base["SystemUpdateCompliance"][0]
     target.setdefault("UpdateableComponent", [])
+    original_components = target["UpdateableComponent"]
+    removed_support_components = [
+        component
+        for component in original_components
+        if str(component.get("packageFilePath", "")).startswith("support-yum/")
+    ]
+    target["UpdateableComponent"] = [
+        component
+        for component in original_components
+        if not str(component.get("packageFilePath", "")).startswith("support-yum/")
+    ]
+    removed_support = len(removed_support_components)
     existing = {
         (
             component.get("packageFilePath", ""),
@@ -1264,7 +2328,12 @@ def merge(args):
     }
 
     added = 0
+    skipped_current = 0
     for component in support_components:
+        if support_component_is_current_in_inventory(component, inventory):
+            skipped_current += 1
+            continue
+
         key = (
             component.get("packageFilePath", ""),
             str(component.get("componentID", "")),
@@ -1284,13 +2353,35 @@ def merge(args):
         target["InvokerInfo"]["statusMessage"] = "Compliance Success"
         target.setdefault("BaseLineInformation", {})
         target["BaseLineInformation"]["complianceStatus"] = False
+    elif removed_support:
+        for index, component in enumerate(target["UpdateableComponent"], start=1):
+            component["index"] = index
+        target.setdefault("InvokerInfo", {})
+        target["InvokerInfo"]["exitStatus"] = 0 if target["UpdateableComponent"] else 34
+        target["InvokerInfo"]["statusMessage"] = (
+            "Compliance Success"
+            if target["UpdateableComponent"]
+            else "No Applicable Update(s) Available"
+        )
+        target.setdefault("BaseLineInformation", {})
+        target["BaseLineInformation"]["complianceStatus"] = not bool(
+            target["UpdateableComponent"]
+        )
 
     compliance_path.parent.mkdir(parents=True, exist_ok=True)
     compliance_path.write_text(json.dumps(base, separators=(",", ":")) + "\n")
     runtime_compliance = Path("/usr/libexec/dell_dup/Compliance.json")
     if runtime_compliance.parent.exists() and runtime_compliance != compliance_path:
         runtime_compliance.write_text(json.dumps(base, separators=(",", ":")) + "\n")
-    print(f"dell-suu: support updates merged: {added}", file=sys.stderr)
+    if html_path is not None:
+        write_compliance_html(html_path, base)
+        runtime_html = Path("/usr/libexec/dell_dup/Compliance.html")
+        if runtime_html.parent.exists() and runtime_html != html_path:
+            write_compliance_html(runtime_html, base)
+    print(
+        f"dell-suu: support updates merged: {added}, skipped current: {skipped_current}, removed stale: {removed_support}",
+        file=sys.stderr,
+    )
     return 0
 
 

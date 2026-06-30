@@ -41,6 +41,7 @@ in
   config = {
     environment.systemPackages = with pkgs; [
       dmidecode
+      hwinfo.bin
       ipmitool
       libsmbios
       lshw
