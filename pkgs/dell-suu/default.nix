@@ -13,11 +13,15 @@
 , gawk
 , gcc
 , glib
+, gnugrep
+, gnutar
 , gpgme
 , gtk3
+, gzip
 , ipmitool
 , jq
 , lib
+, libarchive
 , libGL
 , libdrm
 , libuuid
@@ -27,7 +31,9 @@
 , ncurses
 , nss
 , pciutils
+, python3
 , rsync
+, rpm
 , smartmontools
 , symlinkJoin
 , tmux
@@ -108,6 +114,8 @@ let
       fi
 
       export TERM=xterm
+      export COLUMNS="''${COLUMNS:-120}"
+      export LINES="''${LINES:-40}"
 
       source_dir=$1
       shift
@@ -231,8 +239,11 @@ let
       gawk
       gcc.cc.lib
       glib
+      gnugrep
+      gnutar
       gpgmeCompat
       gtk3
+      gzip
       ipmitool
       libGL
       libdrm
@@ -242,6 +253,7 @@ let
       ncurses
       nss
       pciutils
+      rpm
       smartmontools
       usbutils
       util-linux
@@ -273,17 +285,47 @@ let
 
     extraPreBwrapCmds = ''
       ${coreutils}/bin/mkdir -p /var/cache/dell/dell_dup/suu
+      ${coreutils}/bin/mkdir -p /var/cache/dell/suu/opt
+      ${coreutils}/bin/touch /var/cache/dell/suu/usr-libexecsuu_temp_modelname_tempfile.txt
     '';
 
     extraBuildCommands = ''
       mkdir -p "$out/opt"
       mkdir -p "$out/usr/libexec/dell_dup"
       touch "$out/usr/libexec/dell_dup/.keep"
+      touch "$out/usr/libexecsuu_temp_modelname_tempfile.txt"
     '';
 
     extraBwrapArgs = [
       "--bind /var/cache/dell/dell_dup/suu /usr/libexec/dell_dup"
+      "--bind /var/cache/dell/suu/opt /opt"
+      "--bind /var/cache/dell/suu/usr-libexecsuu_temp_modelname_tempfile.txt /usr/libexecsuu_temp_modelname_tempfile.txt"
     ];
+  };
+
+  supportRefresh = writeShellApplication {
+    name = "dell-suu-support-refresh";
+
+    runtimeInputs = [
+      coreutils
+      findutils
+      gnugrep
+      gnutar
+      gzip
+      libarchive
+      python3
+      rpm
+    ];
+
+    text = ''
+      set -euo pipefail
+
+      export DELL_SUU_FHS="${fhs}/bin/dell-suu-fhs"
+      export DELL_SUU_BSDTAR="${libarchive}/bin/bsdtar"
+      export DELL_SUU_DMIDECODE="${dmidecode}/bin/dmidecode"
+
+      exec ${python3}/bin/python3 ${./dell-suu-support-refresh.py} "$@"
+    '';
   };
 
   suu = writeShellApplication {
@@ -294,6 +336,7 @@ let
       curl
       findutils
       gawk
+      gzip
       jq
       libxml2
       rsync
@@ -543,54 +586,169 @@ let
         return 1
       }
 
+      preserve_catalog_cache_entry() {
+        local dsu_cache stamp name current archive
+        dsu_cache=$1
+        stamp=$2
+        name=$3
+        current="$dsu_cache/$name"
+        archive="$dsu_cache/archive/$stamp-$name"
+
+        if [ -L "$current" ]; then
+          ${coreutils}/bin/rm -f "$current"
+          return 0
+        fi
+
+        if [ -e "$current" ]; then
+          ${coreutils}/bin/mkdir -p "$dsu_cache/archive"
+          if [ -e "$archive" ]; then
+            archive="$dsu_cache/archive/$stamp-$$-$name"
+          fi
+          ${coreutils}/bin/mv "$current" "$archive"
+        fi
+      }
+
       refresh_online_catalog() {
-        local dsu_bin status dsu_cache catalog stamp
+        local dsu_cache catalog stamp base_url key rel_path staging final current target name
 
         dsu_cache=/var/cache/dell/dell_dup/dsu
         catalog="$dsu_cache/Catalog.xml"
+        base_url="''${DELL_CATALOG_BASE_URL:-https://downloads.dell.com/catalog}"
 
         if [ "$(${coreutils}/bin/id -u)" -ne 0 ]; then
           echo "dell-suu: refreshing the Dell catalog needs root" >&2
           return 77
         fi
 
-        if ! dsu_bin=$(find_dsu); then
-          echo "dell-suu: dsu is unavailable; install dell-system-update to refresh the online catalog" >&2
-          return 69
-        fi
+        stamp="$(${coreutils}/bin/date +%Y-%m-%d_%H-%M-%S)-$$"
+        staging="$dsu_cache/catalogs/$stamp.tmp"
+        final="$dsu_cache/catalogs/$stamp"
+        current="$dsu_cache/current"
 
-        ${coreutils}/bin/mkdir -p "$dsu_cache" /var/lib/dell/dsu
+        ${coreutils}/bin/mkdir -p "$staging" /var/lib/dell/dsu
 
-        if [ -s "$catalog" ]; then
-          stamp=$(${coreutils}/bin/date +%Y-%m-%d_%H-%M-%S)
-          ${coreutils}/bin/cp "$catalog" "$dsu_cache/Catalog-$stamp.xml"
-        fi
+        echo "dell-suu: refreshing Dell online catalog metadata into $staging" >&2
 
-        echo "dell-suu: refreshing Dell online DSU catalog and compliance report" >&2
+        for rel_path in \
+          CatalogIndex.gz \
+          CatalogIndex.gz.sha512.sign \
+          Catalog.gz \
+          Catalog.gz.sign \
+          Catalog.gz.sha512.sign; do
+          target="$staging/$rel_path"
+          echo "dell-suu: downloading $rel_path" >&2
+          ${curl}/bin/curl \
+            --location \
+            --fail \
+            --show-error \
+            --progress-bar \
+            --retry 3 \
+            --retry-delay 2 \
+            --user-agent 'Mozilla/5.0' \
+            --output "$target.part" \
+            "$base_url/$rel_path"
+          ${coreutils}/bin/mv "$target.part" "$target"
+        done
 
-        set +e
-        TERM=xterm "$dsu_bin" \
-          --compliance \
-          --apply-upgrades \
-          --non-interactive \
-          --output=/var/lib/dell/dsu/compliance-upgrades.json \
-          --output-format=json \
-          --output-log-file=/var/lib/dell/dsu/compliance.log \
-          --log-level=4
-        status=$?
-        set -e
+        ${gzip}/bin/gzip -dc "$staging/CatalogIndex.gz" > "$staging/CatalogIndex.xml"
+        ${gzip}/bin/gzip -dc "$staging/Catalog.gz" > "$staging/Catalog.xml"
 
-        if [ "$status" -ne 0 ] && [ "$status" -ne 34 ]; then
-          echo "dell-suu: dsu catalog refresh failed with exit code $status" >&2
-          return "$status"
-        fi
-
-        if [ ! -s "$catalog" ]; then
-          echo "dell-suu: dsu did not produce $catalog" >&2
+        if [ ! -s "$staging/Catalog.xml" ]; then
+          echo "dell-suu: catalog refresh did not produce $staging/Catalog.xml" >&2
+          ${coreutils}/bin/rm -rf "$staging"
           return 66
         fi
 
-        echo "dell-suu: refreshed Dell online DSU catalog/upgrade report" >&2
+        ${coreutils}/bin/mv "$staging" "$final"
+        ${coreutils}/bin/ln -sfnT "$final" "$current"
+
+        for name in \
+          CatalogIndex.gz \
+          CatalogIndex.gz.sha512.sign \
+          CatalogIndex.xml \
+          Catalog.gz \
+          Catalog.gz.sign \
+          Catalog.gz.sha512.sign \
+          Catalog.xml; do
+          preserve_catalog_cache_entry "$dsu_cache" "$stamp" "$name"
+          ${coreutils}/bin/ln -sfnT "current/$name" "$dsu_cache/$name"
+        done
+
+        for key in \
+          0x756ba70b1019ced6.asc \
+          0x1285491434D8786F.asc \
+          0xca77951d23b66a9d.asc \
+          0x3CA66B4946770C59.asc \
+          0x274E9C32857A9594.asc \
+          0x076B95DB2FFC7F4A.asc; do
+          if [ ! -s "$dsu_cache/$key" ]; then
+            ${curl}/bin/curl \
+              --location \
+              --fail \
+              --show-error \
+              --progress-bar \
+              --retry 3 \
+              --retry-delay 2 \
+              --user-agent 'Mozilla/5.0' \
+              --output "$dsu_cache/$key.part" \
+              "https://linux.dell.com/repo/pgp_pubkeys/$key"
+            ${coreutils}/bin/mv "$dsu_cache/$key.part" "$dsu_cache/$key"
+          fi
+        done
+
+        if [ ! -s "$catalog" ]; then
+          echo "dell-suu: catalog refresh did not produce $catalog" >&2
+          return 66
+        fi
+
+        echo "dell-suu: refreshed Dell online catalog metadata in $final" >&2
+      }
+
+      cached_online_source_if_fresh() {
+        local online_source repo source_catalog support_report max_age now source_mtime support_mtime oldest_mtime age
+
+        online_source=$(cached_online_source_dir)
+        repo="$online_source/repository"
+        source_catalog="$repo/Catalog.xml"
+        support_report=/var/lib/dell/suu/support-upgrades.json
+
+        case "''${DELL_SUU_FORCE_REFRESH:-0}" in
+          1|yes|true)
+            return 1
+            ;;
+        esac
+
+        max_age="''${DELL_SUU_REFRESH_MAX_AGE_SECONDS:-21600}"
+        if [[ ! "$max_age" =~ ^[0-9]+$ ]]; then
+          echo "dell-suu: invalid DELL_SUU_REFRESH_MAX_AGE_SECONDS=$max_age" >&2
+          return 1
+        fi
+
+        if [ "$max_age" -eq 0 ]; then
+          return 1
+        fi
+
+        is_suu_source "$online_source" || return 1
+        [ -s "$source_catalog" ] || return 1
+        [ -s "$support_report" ] || return 1
+
+        source_mtime=$(${coreutils}/bin/stat -c %Y "$source_catalog")
+        support_mtime=$(${coreutils}/bin/stat -c %Y "$support_report")
+        oldest_mtime=$source_mtime
+        if [ "$support_mtime" -lt "$oldest_mtime" ]; then
+          oldest_mtime=$support_mtime
+        fi
+
+        now=$(${coreutils}/bin/date +%s)
+        age=$((now - oldest_mtime))
+
+        if [ "$age" -gt "$max_age" ]; then
+          return 1
+        fi
+
+        echo "dell-suu: using cached Dell online catalog/compliance from $online_source ($age seconds old)" >&2
+        echo "dell-suu: set DELL_SUU_FORCE_REFRESH=1 to force a fresh Dell online refresh" >&2
+        printf '%s\n' "$online_source"
       }
 
       catalog_attribute_for_path() {
@@ -635,9 +793,10 @@ let
       }
 
       download_dell_file() {
-        local rel_path dest tmp url
+        local rel_path dest catalog tmp url
         rel_path=$1
         dest=$2
+        catalog=''${3:-}
 
         url="''${DELL_DOWNLOAD_BASE_URL:-https://downloads.dell.com}/$rel_path"
         ${coreutils}/bin/mkdir -p "$(${coreutils}/bin/dirname "$dest")"
@@ -655,6 +814,11 @@ let
           --user-agent 'Mozilla/5.0' \
           --output "$tmp" \
           "$url"; then
+          ${coreutils}/bin/rm -f "$tmp"
+          return 1
+        fi
+
+        if [ -n "$catalog" ] && ! verify_catalog_file "$catalog" "$rel_path" "$tmp"; then
           ${coreutils}/bin/rm -f "$tmp"
           return 1
         fi
@@ -743,13 +907,44 @@ let
           return 0
         fi
 
-        ${coreutils}/bin/mv "$source_dir/internalsuu" "$source_dir/internalsuu.real"
+        if [ ! -x "$source_dir/internalsuu.real" ]; then
+          ${coreutils}/bin/mv "$source_dir/internalsuu" "$source_dir/internalsuu.real"
+        fi
 
         ${coreutils}/bin/cat > "$source_dir/internalsuu" <<'EOF'
       #!${bashInteractive}/bin/bash
       set -eu
 
       export TERM=xterm
+
+      merge_support_compliance() {
+        local output_file previous arg
+        output_file=
+        previous=
+
+        for arg in "$@"; do
+          if [ "$previous" = output ]; then
+            output_file=$arg
+            previous=
+            continue
+          fi
+
+          case "$arg" in
+            --output=*)
+              output_file=''${arg#--output=}
+              ;;
+            --output)
+              previous=output
+              ;;
+          esac
+        done
+
+        if [ -z "$output_file" ]; then
+          output_file=/usr/libexec/dell_dup/Compliance.json
+        fi
+
+        ${supportRefresh}/bin/dell-suu-support-refresh --merge --compliance "$output_file" || true
+      }
 
       if [ -n "''${DELL_SUU_CATALOG_LOCATION:-}" ]; then
         rewritten_args=()
@@ -771,6 +966,7 @@ let
       if [ "$mode" = upgrades ]; then
         has_compliance=0
         has_apply_mode=0
+        run_args=("$@")
 
         for arg in "$@"; do
           case "$arg" in
@@ -784,7 +980,16 @@ let
         done
 
         if [ "$has_compliance" -eq 1 ] && [ "$has_apply_mode" -eq 0 ]; then
-          exec "$(dirname "$0")/internalsuu.real" "$@" --apply-upgrades
+          run_args+=("--apply-upgrades")
+        fi
+
+        if [ "$has_compliance" -eq 1 ]; then
+          set +e
+          "$(dirname "$0")/internalsuu.real" "''${run_args[@]}"
+          status=$?
+          set -e
+          merge_support_compliance "''${run_args[@]}"
+          exit "$status"
         fi
       fi
 
@@ -813,11 +1018,11 @@ let
           ${coreutils}/bin/install -m 0644 "$cached" "$dest"
           if ! verify_catalog_file "$catalog" "$rel_path" "$dest"; then
             ${coreutils}/bin/rm -f "$dest"
-            download_dell_file "$rel_path" "$dest"
+            download_dell_file "$rel_path" "$dest" "$catalog"
             verify_catalog_file "$catalog" "$rel_path" "$dest"
           fi
         else
-          download_dell_file "$rel_path" "$dest"
+          download_dell_file "$rel_path" "$dest" "$catalog"
           verify_catalog_file "$catalog" "$rel_path" "$dest"
         fi
 
@@ -832,18 +1037,36 @@ let
         if [ -s "$sign_cached" ]; then
           ${coreutils}/bin/install -m 0644 "$sign_cached" "$sign_dest"
         elif ! download_dell_file "$sign_rel" "$sign_dest"; then
-          echo "dell-suu: warning: failed to download signature for $rel_path" >&2
+        echo "dell-suu: warning: failed to download signature for $rel_path" >&2
+        fi
+      }
+
+      refresh_support_yum_for_suu() {
+        local online_source repo
+        online_source=$1
+        repo="$online_source/repository"
+
+        if [ "$(${coreutils}/bin/id -u)" -ne 0 ]; then
+          echo "dell-suu: skipping Dell yum support refresh because it needs root" >&2
+          return 0
+        fi
+
+        if ! ${supportRefresh}/bin/dell-suu-support-refresh \
+          --refresh \
+          --source "$online_source" \
+          --repo "$repo" \
+          --cache-root "$cache_root"; then
+          echo "dell-suu: warning: Dell yum support package refresh failed; continuing with Dell catalog only" >&2
         fi
       }
 
       prepare_online_suu_source() {
-        local base_source online_source repo dsu_cache catalog compliance payloads_file inventory_path rel_path
+        local base_source online_source repo dsu_cache catalog payloads_file inventory_path rel_path
         base_source=$1
         online_source=$(cached_online_source_dir)
         repo="$online_source/repository"
         dsu_cache=/var/cache/dell/dell_dup/dsu
         catalog="$dsu_cache/Catalog.xml"
-        compliance=/var/lib/dell/dsu/compliance-upgrades.json
 
         if [ "$(${coreutils}/bin/id -u)" -ne 0 ]; then
           echo "dell-suu: preparing the online SUU repository needs root" >&2
@@ -876,10 +1099,6 @@ let
           printf '%s\n' "$inventory_path" >> "$payloads_file"
         fi
 
-        if [ -s "$compliance" ]; then
-          ${jq}/bin/jq -r '.. | objects | .packageFilePath? // empty' "$compliance" >> "$payloads_file"
-        fi
-
         ${coreutils}/bin/sort -u "$payloads_file" | while IFS= read -r rel_path; do
           [ -n "$rel_path" ] || continue
           materialize_payload_for_suu "$dsu_cache" "$repo" "$catalog" "$rel_path"
@@ -887,6 +1106,8 @@ let
 
         ${coreutils}/bin/rm -f "$payloads_file"
         trap cleanup_mount EXIT
+
+        refresh_support_yum_for_suu "$online_source"
 
         echo "dell-suu: prepared online SUU source in $online_source" >&2
         printf '%s\n' "$online_source"
@@ -971,14 +1192,23 @@ let
       fi
 
       if [ "$mode" = gui ] && [ "$refresh_catalog" -eq 1 ]; then
-        if ! refresh_online_catalog; then
-          echo "dell-suu: refusing to launch stale SUU source after refresh failure" >&2
-          exit 1
+        prepared_online_source=0
+        if ! online_source=$(cached_online_source_if_fresh); then
+          if ! refresh_online_catalog; then
+            echo "dell-suu: refusing to launch stale SUU source after refresh failure" >&2
+            exit 1
+          fi
+
+          if ! online_source=$(prepare_online_suu_source "$source_dir"); then
+            echo "dell-suu: refusing to launch stale SUU source after online repository preparation failure" >&2
+            exit 1
+          fi
+          prepared_online_source=1
         fi
 
-        if ! online_source=$(prepare_online_suu_source "$source_dir"); then
-          echo "dell-suu: refusing to launch stale SUU source after online repository preparation failure" >&2
-          exit 1
+        prefer_upgrade_compliance_for_suu_gui "$online_source"
+        if [ "$prepared_online_source" -eq 0 ]; then
+          refresh_support_yum_for_suu "$online_source"
         fi
 
         source_dir=$online_source
@@ -1058,6 +1288,10 @@ let
         fi
       fi
 
+      tmux_log="''${DELL_SUU_GUI_LOG:-/tmp/dell-suu-gui-tmux.log}"
+      ${coreutils}/bin/mkdir -p "$(${coreutils}/bin/dirname "$tmux_log")"
+      : > "$tmux_log"
+
       if [ -n "$display" ]; then
         export DISPLAY="$display"
       fi
@@ -1117,6 +1351,10 @@ let
         env_args+=("DBUS_SESSION_BUS_ADDRESS=$dbus_session_bus_address")
       fi
 
+      for name in "''${!DELL_SUU_@}"; do
+        env_args+=("$name=''${!name}")
+      done
+
       if [ "$(${coreutils}/bin/id -u)" -eq 0 ]; then
         exec "''${suu_args[@]}" "$@"
       fi
@@ -1151,7 +1389,11 @@ let
         ${tmux}/bin/tmux -S "$tmux_socket" new-session -d -s "$tmux_session" "$tmux_command"
       fi
 
+      printf -v quoted_tmux_log '%q' "$tmux_log"
+      ${tmux}/bin/tmux -S "$tmux_socket" pipe-pane -o -t "$tmux_session" "${coreutils}/bin/cat >> $quoted_tmux_log"
+
       echo "dell-suu-gui: attach with: tmux -S $tmux_socket attach -t $tmux_session" >&2
+      echo "dell-suu-gui: log: $tmux_log" >&2
 
       if [ -n "$display" ]; then
         exec ${xterm}/bin/xterm \

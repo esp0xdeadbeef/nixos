@@ -90,6 +90,7 @@ in
       "d /var/cache/dell/suu 0750 root root -"
       "d /var/lib/dell 0750 root root -"
       "d /var/lib/dell/dsu 0750 root root -"
+      "d /var/lib/dell/suu 0750 root root -"
     ];
 
     specialisation.upgrade-firmware.configuration = {
