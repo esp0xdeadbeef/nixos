@@ -3,10 +3,7 @@
   config,
   pkgs,
   ...
-}:
-
-{
-
+}: {
   nixpkgs.hostPlatform = "x86_64-linux";
 
   # cores, disk and mem:
@@ -18,8 +15,8 @@
   # Network settings:
   virtualisation.qemu.networkingOptions = [
     "-nic none"
-    "-nic bridge,br=vmbr4,model=virtio-net-pci"
-    "-nic bridge,br=vmbr1,model=virtio-net-pci"
+    "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
+    "-nic bridge,br=vmbr1,mac=52:54:00:12:34:57,model=virtio-net-pci"
   ];
 
   nixos-shell.mounts = {

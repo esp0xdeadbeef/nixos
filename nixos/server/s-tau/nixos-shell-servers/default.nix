@@ -1,7 +1,13 @@
-{ pkgs, self, ... }:
 {
+  pkgs,
+  self,
+  ...
+}: {
   imports = [
-    ./eno1-router-vms.nix
     ./servers.nix
   ];
+
+  local.vmHost.nixosShell.eno1RouterVms = {
+    enable = true;
+  };
 }
