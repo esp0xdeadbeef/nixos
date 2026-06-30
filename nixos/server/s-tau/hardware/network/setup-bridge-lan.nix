@@ -21,6 +21,7 @@
     netdevConfig = {
       Name = "vlan2";
       Kind = "vlan";
+      MACAddress = "14:18:77:44:5d:7c";
     };
     vlanConfig.Id = 2;
   };
@@ -30,9 +31,6 @@
     matchConfig.Name = "eno3";
     networkConfig = {
       Bridge = "vmbr4";
-      # Keep a host management address on VLAN 2 while eno3 remains the LAN
-      # bridge port for VM traffic.
-      VLAN = [ "vlan2" ];
     };
   };
 
@@ -54,7 +52,12 @@
   ###### BRIDGE: NO IP, NO DHCP ######
   systemd.network.networks."10-vmbr4" = {
     matchConfig.Name = "vmbr4";
-    networkConfig = { };
+    networkConfig = {
+      # Keep a host management address on VLAN 2 on the bridge master. Putting
+      # this on eno3 steals VLAN 2 replies before the bridge can forward them
+      # back to nixos-shell VM tap devices.
+      VLAN = [ "vlan2" ];
+    };
   };
 
   ###### LIBVIRT ######
