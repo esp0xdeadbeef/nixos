@@ -349,7 +349,7 @@ let
 
       usage() {
         cat <<'USAGE'
-      usage: dell-suu [--iso PATH | --source PATH | --download] [--cache-source] [--refresh-catalog] [--cache-dir PATH] [--gui | --cli] [--shell] [--launcher PATH] [-- ARGS...]
+      usage: dell-suu [--iso PATH | --source PATH | --download] [--cache-source] [--online-cache] [--refresh-catalog] [--cache-dir PATH] [--gui | --cli] [--shell] [--launcher PATH] [-- ARGS...]
 
       Mounts an official Dell Server Update Utility Linux ISO and launches the
       Dell-provided SUU updater inside an FHS runtime. Without --iso or --source it
@@ -378,6 +378,7 @@ let
       shell=0
       download=0
       cache_source=0
+      online_cache=0
       refresh_catalog=0
       explicit_run=0
       cache_root="''${DELL_FIRMWARE_CACHE_DIR:-/var/cache/dell}"
@@ -407,6 +408,10 @@ let
             ;;
           --cache-source)
             cache_source=1
+            shift
+            ;;
+          --online-cache|--use-online-cache)
+            online_cache=1
             shift
             ;;
           --refresh-catalog)
@@ -751,6 +756,22 @@ let
         printf '%s\n' "$online_source"
       }
 
+      cached_online_source_if_present() {
+        local online_source repo source_catalog support_report
+
+        online_source=$(cached_online_source_dir)
+        repo="$online_source/repository"
+        source_catalog="$repo/Catalog.xml"
+        support_report=/var/lib/dell/suu/support-upgrades.json
+
+        is_suu_source "$online_source" || return 1
+        [ -s "$source_catalog" ] || return 1
+        [ -s "$support_report" ] || return 1
+
+        echo "dell-suu: using cached Dell online catalog/compliance from $online_source" >&2
+        printf '%s\n' "$online_source"
+      }
+
       catalog_attribute_for_path() {
         local catalog rel_path attr
         catalog=$1
@@ -946,6 +967,191 @@ let
         ${supportRefresh}/bin/dell-suu-support-refresh --merge --compliance "$output_file" || true
       }
 
+      support_catalog_dir_from_args() {
+        local previous arg value
+        previous=
+        value=
+
+        for arg in "$@"; do
+          if [ "$previous" = catalog ]; then
+            value=$arg
+            previous=
+            continue
+          fi
+
+          case "$arg" in
+            --catalog-location=*)
+              value=''${arg#--catalog-location=}
+              ;;
+            --catalog-location)
+              previous=catalog
+              ;;
+          esac
+        done
+
+        if [ -n "''${DELL_SUU_CATALOG_LOCATION:-}" ]; then
+          value=$DELL_SUU_CATALOG_LOCATION
+        fi
+
+        case "$value" in
+          */Catalog.xml)
+            dirname "$value"
+            ;;
+          "")
+            printf '%s\n' "$(pwd)/repository"
+            ;;
+          *)
+            printf '%s\n' "$value"
+            ;;
+        esac
+      }
+
+      support_update_list_from_args() {
+        local previous arg
+        previous=
+
+        for arg in "$@"; do
+          if [ "$previous" = update ]; then
+            printf '%s\n' "$arg"
+            return 0
+          fi
+
+          case "$arg" in
+            --update-list=*)
+              printf '%s\n' "''${arg#--update-list=}"
+              return 0
+              ;;
+            --update-list)
+              previous=update
+              ;;
+          esac
+        done
+
+        return 1
+      }
+
+      write_support_status() {
+        local status_message exit_status status_file
+        status_message=$1
+        exit_status=''${2:-}
+        status_file=/usr/libexec/dell_dup/SUU_STATUS.json
+
+        if [ -n "$exit_status" ]; then
+          ${jq}/bin/jq -cn \
+            --arg message "$status_message" \
+            --argjson exitStatus "$exit_status" \
+            '{SystemUpdateStatus:[{System:{id:"0600",idType:"BIOS",hostAddress:"LocalHost"},InvokerInfo:{name:"dell-suu-support-apply",version:"1",command:"support DUP apply",exitStatus:$exitStatus,statusMessage:$message}}]}' \
+            > "$status_file"
+          ${coreutils}/bin/rm -f /usr/libexec/dell_dup/inter_progress.json
+        else
+          ${jq}/bin/jq -cn \
+            --arg message "$status_message" \
+            '{SystemUpdateStatus:[{System:{id:"0600",idType:"BIOS",hostAddress:"LocalHost"},InvokerInfo:{name:"dell-suu-support-apply",version:"1",command:"support DUP apply",statusMessage:$message}}]}' \
+            > /usr/libexec/dell_dup/inter_progress.json
+        fi
+      }
+
+      apply_support_updates() {
+        local update_list support_report catalog_dir item basename rel_path full_path status failures selected support_count remaining_count dup_args_raw
+        local -a selected_support_paths remaining_items dup_args pass_args
+        declare -A support_path_by_name
+
+        update_list=$(support_update_list_from_args "$@") || return 1
+        support_report=/var/lib/dell/suu/support-upgrades.json
+        [ -s "$support_report" ] || return 1
+
+        while IFS=$'\t' read -r basename rel_path; do
+          [ -n "$basename" ] || continue
+          support_path_by_name["$basename"]=$rel_path
+        done < <(${jq}/bin/jq -r '
+          .SystemUpdateCompliance[0].UpdateableComponent[]?
+          | [(.packageFilePath | split("/")[-1]), .packageFilePath]
+          | @tsv
+        ' "$support_report")
+
+        IFS=, read -r -a selected <<< "$update_list"
+        selected_support_paths=()
+        remaining_items=()
+
+        for item in "''${selected[@]}"; do
+          item="''${item#"''${item%%[![:space:]]*}"}"
+          item="''${item%"''${item##*[![:space:]]}"}"
+          [ -n "$item" ] || continue
+          basename=''${item##*/}
+
+          if [ -n "''${support_path_by_name[$basename]:-}" ]; then
+            selected_support_paths+=("''${support_path_by_name[$basename]}")
+          else
+            remaining_items+=("$item")
+          fi
+        done
+
+        support_count=''${#selected_support_paths[@]}
+        remaining_count=''${#remaining_items[@]}
+        if [ "$support_count" -eq 0 ]; then
+          return 1
+        fi
+
+        catalog_dir=$(support_catalog_dir_from_args "$@")
+        dup_args_raw="''${DELL_SUU_SUPPORT_DUP_ARGS:--q}"
+        read -r -a dup_args <<< "$dup_args_raw"
+
+        echo "dell-suu: applying $support_count Dell support DUP update(s)" >&2
+        write_support_status "Applying Dell support update(s)"
+
+        failures=0
+        for rel_path in "''${selected_support_paths[@]}"; do
+          full_path="$catalog_dir/$rel_path"
+          if [ ! -x "$full_path" ]; then
+            echo "dell-suu: missing executable support DUP: $full_path" >&2
+            failures=$((failures + 1))
+            continue
+          fi
+
+          echo "dell-suu: running $(basename "$full_path") ''${dup_args[*]}" >&2
+          write_support_status "Applying $(basename "$full_path")"
+          set +e
+          "$full_path" "''${dup_args[@]}"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "dell-suu: support DUP failed with exit $status: $rel_path" >&2
+            failures=$((failures + 1))
+          fi
+        done
+
+        if [ "$remaining_count" -gt 0 ]; then
+          pass_args=()
+          for arg in "$@"; do
+            case "$arg" in
+              --update-list=*)
+                pass_args+=("--update-list=$(IFS=,; printf '%s' "''${remaining_items[*]}")")
+                ;;
+              *)
+                pass_args+=("$arg")
+                ;;
+            esac
+          done
+
+          set +e
+          "$(dirname "$0")/internalsuu.real" "''${pass_args[@]}"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            failures=$((failures + 1))
+          fi
+        fi
+
+        if [ "$failures" -eq 0 ]; then
+          write_support_status "Dell support update(s) completed" 0
+          echo "dell-suu: Dell support DUP update(s) completed" >&2
+          exit 0
+        fi
+
+        write_support_status "Dell support update(s) failed" 1
+        exit 1
+      }
+
       if [ -n "''${DELL_SUU_CATALOG_LOCATION:-}" ]; then
         rewritten_args=()
         for arg in "$@"; do
@@ -964,6 +1170,8 @@ let
       mode=''${DELL_SUU_COMPLIANCE_MODE:-upgrades}
 
       if [ "$mode" = upgrades ]; then
+        apply_support_updates "$@" || true
+
         has_compliance=0
         has_apply_mode=0
         run_args=("$@")
@@ -1191,9 +1399,15 @@ let
         fi
       fi
 
-      if [ "$mode" = gui ] && [ "$refresh_catalog" -eq 1 ]; then
+      if [ "$mode" = gui ] && { [ "$refresh_catalog" -eq 1 ] || [ "$online_cache" -eq 1 ]; }; then
         prepared_online_source=0
-        if ! online_source=$(cached_online_source_if_fresh); then
+        if [ "$online_cache" -eq 1 ] && [ "$refresh_catalog" -eq 0 ]; then
+          if ! online_source=$(cached_online_source_if_present); then
+            echo "dell-suu: cached online SUU source is missing; refusing to launch old ISO source" >&2
+            echo "dell-suu: refresh through the GUI prompt or run with --refresh-catalog" >&2
+            exit 1
+          fi
+        else
           if ! refresh_online_catalog; then
             echo "dell-suu: refusing to launch stale SUU source after refresh failure" >&2
             exit 1
@@ -1207,7 +1421,7 @@ let
         fi
 
         prefer_upgrade_compliance_for_suu_gui "$online_source"
-        if [ "$prepared_online_source" -eq 0 ]; then
+        if [ "$prepared_online_source" -eq 0 ] && [ "$refresh_catalog" -eq 1 ]; then
           refresh_support_yum_for_suu "$online_source"
         fi
 
@@ -1308,6 +1522,38 @@ let
         export DBUS_SESSION_BUS_ADDRESS="$dbus_session_bus_address"
       fi
 
+      cache_is_fresh=0
+      cache_exists=0
+      use_online_cache=0
+      cache_max_age="''${DELL_SUU_REFRESH_MAX_AGE_SECONDS:-21600}"
+      if [[ "$cache_max_age" =~ ^[0-9]+$ ]] && [ "$cache_max_age" -gt 0 ]; then
+        online_source=/var/cache/dell/suu/online-source
+        source_catalog="$online_source/repository/Catalog.xml"
+        support_report=/var/lib/dell/suu/support-upgrades.json
+        cache_as_root=()
+        if [ "$user_id" -ne 0 ]; then
+          cache_as_root=("$sudo_bin" -n)
+        fi
+
+        if "''${cache_as_root[@]}" ${coreutils}/bin/test -x "$online_source/suulauncher" 2>/dev/null \
+          && "''${cache_as_root[@]}" ${coreutils}/bin/test -x "$online_source/internalsuu" 2>/dev/null \
+          && "''${cache_as_root[@]}" ${coreutils}/bin/test -s "$source_catalog" 2>/dev/null \
+          && "''${cache_as_root[@]}" ${coreutils}/bin/test -s "$support_report" 2>/dev/null; then
+          cache_exists=1
+          source_mtime=$("''${cache_as_root[@]}" ${coreutils}/bin/stat -c %Y "$source_catalog")
+          support_mtime=$("''${cache_as_root[@]}" ${coreutils}/bin/stat -c %Y "$support_report")
+          oldest_mtime=$source_mtime
+          if [ "$support_mtime" -lt "$oldest_mtime" ]; then
+            oldest_mtime=$support_mtime
+          fi
+
+          now=$(${coreutils}/bin/date +%s)
+          if [ "$((now - oldest_mtime))" -le "$cache_max_age" ]; then
+            cache_is_fresh=1
+          fi
+        fi
+      fi
+
       refresh_catalog=0
       case "''${DELL_SUU_REFRESH_CATALOG:-ask}" in
         1|yes|true)
@@ -1316,16 +1562,78 @@ let
         0|no|false)
           refresh_catalog=0
           ;;
+        cache|cached|online|online-cache|use-cache)
+          use_online_cache=1
+          refresh_catalog=0
+          ;;
         *)
-          if [ -n "$display" ]; then
-            if ${zenity}/bin/zenity \
-              --question \
-              --title "Dell Server Update Utility" \
-              --text "Refresh Dell online catalog and download matching packages before opening SUU?" \
-              --ok-label "Refresh" \
-              --cancel-label "Skip"; then
-              refresh_catalog=1
+          if [ "$cache_is_fresh" -eq 1 ]; then
+            if [ -n "$display" ]; then
+              choice=$(${zenity}/bin/zenity \
+                --list \
+                --title "Dell Server Update Utility" \
+                --text "The refreshed Dell cache is less than 6 hours old. Choose what SUU should open." \
+                --width 760 \
+                --height 260 \
+                --column "Mode" \
+                --column "Details" \
+                "Use refreshed Dell cache" "Open the cached Dell online catalog and downloaded matching packages." \
+                "Use ISO-only inventory" "Open the bundled SUU ISO repository without Dell online support updates.") || exit 0
+              case "$choice" in
+                "Use refreshed Dell cache")
+                  use_online_cache=1
+                  ;;
+                "Use ISO-only inventory")
+                  refresh_catalog=0
+                  ;;
+                *)
+                  exit 0
+                  ;;
+              esac
+            else
+              use_online_cache=1
+              refresh_catalog=0
             fi
+          elif [ -n "$display" ]; then
+            if [ "$cache_exists" -eq 1 ]; then
+              choice=$(${zenity}/bin/zenity \
+                --list \
+                --title "Dell Server Update Utility" \
+                --text "The refreshed Dell cache is older than 6 hours. Choose what SUU should open." \
+                --width 820 \
+                --height 300 \
+                --column "Mode" \
+                --column "Details" \
+                "Refresh Dell cache first" "Fetch Dell's current online catalog and matching packages, then open SUU." \
+                "Use refreshed Dell cache" "Open the existing cached Dell online catalog without downloading again." \
+                "Use ISO-only inventory" "Open the bundled SUU ISO repository without Dell online support updates.") || exit 0
+            else
+              choice=$(${zenity}/bin/zenity \
+                --list \
+                --title "Dell Server Update Utility" \
+                --text "No refreshed Dell cache is available. Choose what SUU should open." \
+                --width 820 \
+                --height 260 \
+                --column "Mode" \
+                --column "Details" \
+                "Refresh Dell cache first" "Fetch Dell's current online catalog and matching packages, then open SUU." \
+                "Use ISO-only inventory" "Open the bundled SUU ISO repository without Dell online support updates.") || exit 0
+            fi
+
+            case "$choice" in
+              "Refresh Dell cache first")
+                refresh_catalog=1
+                ;;
+              "Use refreshed Dell cache")
+                use_online_cache=1
+                ;;
+              "Use ISO-only inventory")
+                refresh_catalog=0
+                ;;
+              *)
+                exit 0
+                ;;
+            esac
           fi
           ;;
       esac
@@ -1333,6 +1641,8 @@ let
       suu_args=(${suu}/bin/dell-suu --gui)
       if [ "$refresh_catalog" -eq 1 ]; then
         suu_args+=(--refresh-catalog)
+      elif [ "$use_online_cache" -eq 1 ]; then
+        suu_args+=(--online-cache)
       fi
 
       if [ -n "$display" ]; then
