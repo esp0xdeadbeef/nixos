@@ -131,6 +131,36 @@ session before attaching it in xterm. To watch it over SSH while it is running:
 tmux -S /run/user/1000/dell-suu.tmux attach -t dell-suu
 ```
 
+Live result from the 2026-06-30 `s-tau` run, with identifiers redacted:
+
+```text
+iDRAC-with-Lifecycle-Controller_Firmware_VWF72_LN64_2.86.86.86_A00.BIN
+  2.83.83.83 -> 2.86.86.86
+  Exit code = 0 (Success)
+  Redfish returned HTTP 200 after the iDRAC restarted.
+
+BIOS_KM6P8_LN64_2.19.0.BIN
+  2.16.0 -> 2.19.0
+  Exit code = 2 (Reboot required)
+  Update ready to be applied at reboot.
+
+SAS-RAID_Firmware_700GG_LN_25.5.9.0001_A17_01.BIN
+  PERC H730 Mini Controller 0 was already on 25.5.9.0001.
+  DUP check reported previous version 25.5.9.0001 and new version 25.5.9.0001.
+  Exit code = 3 (same-version no-op during check)
+  No RAID update was applicable.
+
+Network_Firmware_WTTP6_LN_22.0.9_A00.BIN
+  Intel X520 19.5.12 -> 22.0.9
+  Exit code = 1 (Failure)
+  The package validated but the firmware module update failed.
+```
+
+The SUU GUI can show merged Dell yum support packages, but those entries are a
+bridge over Dell's normal SUU catalog flow. If a package is not handled by the
+native `internalsuu` path, the wrapper executes the DUP and the GUI may keep the
+pre-apply compliance table visible until a fresh compliance run.
+
 OpenManage is the preferred non-GUI path for:
 
 - firmware compliance reports and scheduled updates;

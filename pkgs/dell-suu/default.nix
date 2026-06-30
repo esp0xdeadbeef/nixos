@@ -1052,7 +1052,7 @@ let
       }
 
       apply_support_updates() {
-        local update_list support_report catalog_dir item basename rel_path full_path status failures selected support_count remaining_count dup_args_raw
+        local update_list support_report catalog_dir item basename rel_path full_path status failures reboot_required selected support_count remaining_count dup_args_raw
         local -a selected_support_paths remaining_items dup_args pass_args
         declare -A support_path_by_name
 
@@ -1100,6 +1100,7 @@ let
         write_support_status "Applying Dell support update(s)"
 
         failures=0
+        reboot_required=0
         for rel_path in "''${selected_support_paths[@]}"; do
           full_path="$catalog_dir/$rel_path"
           if [ ! -x "$full_path" ]; then
@@ -1114,10 +1115,18 @@ let
           "$full_path" "''${dup_args[@]}"
           status=$?
           set -e
-          if [ "$status" -ne 0 ]; then
-            echo "dell-suu: support DUP failed with exit $status: $rel_path" >&2
-            failures=$((failures + 1))
-          fi
+          case "$status" in
+            0)
+              ;;
+            2)
+              echo "dell-suu: support DUP completed and requires reboot: $rel_path" >&2
+              reboot_required=1
+              ;;
+            *)
+              echo "dell-suu: support DUP failed with exit $status: $rel_path" >&2
+              failures=$((failures + 1))
+              ;;
+          esac
         done
 
         if [ "$remaining_count" -gt 0 ]; then
@@ -1137,18 +1146,30 @@ let
           "$(dirname "$0")/internalsuu.real" "''${pass_args[@]}"
           status=$?
           set -e
-          if [ "$status" -ne 0 ]; then
-            failures=$((failures + 1))
-          fi
+          case "$status" in
+            0)
+              ;;
+            2)
+              reboot_required=1
+              ;;
+            *)
+              failures=$((failures + 1))
+              ;;
+          esac
         fi
 
         if [ "$failures" -eq 0 ]; then
-          write_support_status "Dell support update(s) completed" 0
-          echo "dell-suu: Dell support DUP update(s) completed" >&2
+          if [ "$reboot_required" -eq 1 ]; then
+            write_support_status "Dell support update(s) completed; reboot required" 0
+            echo "dell-suu: Dell support DUP update(s) completed; reboot required" >&2
+          else
+            write_support_status "Dell support update(s) completed" 0
+            echo "dell-suu: Dell support DUP update(s) completed" >&2
+          fi
           exit 0
         fi
 
-        write_support_status "Dell support update(s) failed" 1
+        write_support_status "Dell support update(s) completed with failures" 1
         exit 1
       }
 
