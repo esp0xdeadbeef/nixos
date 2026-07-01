@@ -1,6 +1,8 @@
 import argparse
 import concurrent.futures
+import copy
 import csv
+import fcntl
 import gzip
 import hashlib
 import html
@@ -31,7 +33,11 @@ DEFAULT_PLATFORM_GENERATION_SCAN = tuple(range(17, 9, -1))
 USER_AGENT = "Mozilla/5.0"
 SUPPORT_REPORT = Path("/var/lib/dell/suu/support-upgrades.json")
 SUPPORT_STAMP = Path("/var/lib/dell/suu/support-refresh.stamp")
+SUPPORT_MANIFEST = Path("/var/lib/dell/suu/support-refresh-manifest.json")
+NATIVE_COMPLIANCE_CACHE = Path("/var/lib/dell/suu/native-compliance.json")
+SUPPORT_REPORT_SCHEMA_VERSION = 2
 DUP_LOCK = threading.Lock()
+DUP_LOCK_PATH = Path(os.environ.get("DELL_SUU_DUP_LOCK", "/run/lock/dell-suu-dup.lock"))
 FILE_LOCKS = {}
 FILE_LOCKS_LOCK = threading.Lock()
 HASH_CHUNK_SIZE = 4 * 1024 * 1024
@@ -59,6 +65,43 @@ def env_int(name, default):
     except ValueError:
         print(f"dell-suu: ignoring invalid {name}={value!r}", file=sys.stderr)
         return default
+
+
+def support_cache_settings():
+    return {
+        "nativeCatalogOnly": env_flag("DELL_SUU_SUPPORT_NATIVE_CATALOG_ONLY", False),
+        "includeNonApplicable": env_flag(
+            "DELL_SUU_SUPPORT_INCLUDE_NON_APPLICABLE", False
+        ),
+        "trustPlatformCsv": env_flag("DELL_SUU_SUPPORT_TRUST_PLATFORM_CSV", True),
+        "checkPlatformDups": env_flag("DELL_SUU_SUPPORT_CHECK_PLATFORM_DUPS", True),
+    }
+
+
+def hardware_fingerprint(dmidecode_data=None, inventory=None):
+    dmidecode_data = dmidecode_data or parse_dmidecode()
+    inventory = inventory or parse_inventory()
+    relevant = {
+        "product": one_line_text(dmidecode_data.get("product")),
+        "sku": one_line_text(dmidecode_data.get("sku")),
+        "biosVersion": one_line_text(dmidecode_data.get("bios_version")),
+        "baseboard": one_line_text(dmidecode_data.get("baseboard")),
+        "systemID": one_line_text(inventory.get("system_id")),
+        "components": sorted(
+            {
+                (
+                    one_line_text(component.get("component_id")),
+                    one_line_text(component.get("display")),
+                    one_line_text(component.get("version")),
+                    one_line_text(component.get("component_type")),
+                    tuple(component.get("pci") or ("", "", "", "")),
+                )
+                for component in inventory.get("components", [])
+            }
+        ),
+    }
+    encoded = json.dumps(relevant, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
 
 
 def fetch_bytes(url, timeout=45):
@@ -168,8 +211,20 @@ def sha512_file(path):
     return digest.hexdigest()
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def normalise_text(value):
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def one_line_text(value):
+    return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
 def natural_key(value):
@@ -252,9 +307,17 @@ def run(cmd, timeout=300, check=False):
     return proc
 
 
-def run_dup(cmd, timeout=300, check=False):
-    with DUP_LOCK:
+def run_dup(cmd, timeout=300, check=False, locked=True):
+    if not locked:
         return run(cmd, timeout=timeout, check=check)
+    with DUP_LOCK:
+        DUP_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with DUP_LOCK_PATH.open("a+") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                return run(cmd, timeout=timeout, check=check)
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def parse_dmidecode():
@@ -1079,6 +1142,101 @@ def platform_csv_record_from_row(row, source):
     return record
 
 
+def suu_iso_record_from_row(row, source, tokens):
+    if len(row) < 14:
+        return None
+
+    filename = Path(row[12]).name.strip()
+    filename_lower = filename.lower()
+    url = row[13].strip()
+    title = row[8].strip() if len(row) > 8 else ""
+    title_lower = title.lower()
+    details = " ".join(part.strip() for part in row[14:16] if part and part.strip())
+    details_lower = details.lower()
+
+    if not url or not filename_lower.endswith(".iso"):
+        return None
+    if "windows" in title_lower or "win64" in filename_lower:
+        return None
+    if not (
+        "server update utility" in title_lower
+        or filename_lower.startswith(("suu-lin64", "suu_"))
+    ):
+        return None
+    if not (
+        "lin64" in filename_lower
+        or "x64-lin" in filename_lower
+        or "linux 64" in title_lower
+        or "64 bit linux" in title_lower
+        or "64 bit linux" in details_lower
+    ):
+        return None
+
+    token_set = {token.upper() for token in tokens if token}
+    row_tokens = set(model_tokens_from_text(row[0] if row else ""))
+    model_match = bool(token_set and row_tokens and row_tokens & token_set)
+
+    return {
+        "name": filename,
+        "url": url,
+        "date": row[7].strip() if len(row) > 7 else "",
+        "version": row[10].strip() if len(row) > 10 else "",
+        "revision": row[11].strip() if len(row) > 11 else "",
+        "summary": title,
+        "source": source,
+        "model": row[0].strip() if row else "",
+        "modelMatch": model_match,
+    }
+
+
+def suu_iso_sort_key(record):
+    return (
+        1 if record.get("modelMatch") else 0,
+        record.get("date") or "",
+        version_tuple(record.get("version") or ""),
+        natural_key(record.get("name") or ""),
+    )
+
+
+def resolve_suu_iso(args):
+    dmidecode_data = parse_dmidecode()
+    tokens = set(model_tokens(dmidecode_data))
+    tokens.update(model_tokens({"product": args.model or "", "sku": ""}))
+
+    cache_dir = Path(args.cache_root) / "suu" / "support-yum"
+    max_age = env_int("DELL_SUU_SUPPORT_PLATFORM_CSV_MAX_AGE_SECONDS", 21600)
+    records = []
+
+    for url in platform_csv_urls(tokens):
+        try:
+            text = cached_fetch_text(cache_dir, url, max_age)
+        except Exception as exc:
+            print(
+                f"dell-suu: warning: failed to fetch Dell platform CSV {url}: {exc}",
+                file=sys.stderr,
+            )
+            continue
+
+        for row in csv.reader(text.splitlines()):
+            record = suu_iso_record_from_row(row, url, tokens)
+            if record:
+                records.append(record)
+
+        if records and any(record.get("modelMatch") for record in records):
+            break
+
+    if not records:
+        print(
+            "dell-suu: no Linux 64-bit SUU ISO found in Dell platform CSVs",
+            file=sys.stderr,
+        )
+        return 66
+
+    selected = sorted(records, key=suu_iso_sort_key, reverse=True)[0]
+    print(json.dumps(selected, separators=(",", ":")))
+    return 0
+
+
 def package_records(metadata):
     root = ET.fromstring(metadata)
     for package in root.findall("m:package", XML_NS):
@@ -1329,6 +1487,22 @@ def compliance_html_state(component):
     return "Equal"
 
 
+def compliance_message_for_versions(package_version, installed_version, applicable):
+    if applicable:
+        return "Upgrade"
+    if (
+        package_version
+        and installed_version
+        and version_tuple(package_version)
+        and version_tuple(installed_version)
+    ):
+        if version_tuple(package_version) == version_tuple(installed_version):
+            return "Equal"
+        if version_tuple(package_version) < version_tuple(installed_version):
+            return "Downgrade"
+    return "Matched"
+
+
 def write_compliance_html(path, report):
     root = report.get("SystemUpdateCompliance", [{}])[0]
     system = root.get("System", {})
@@ -1396,6 +1570,106 @@ TABLE.data-area {{background-color:#ADBEE7}}
     path.write_text(content)
 
 
+def write_suu_status(path):
+    status = {
+        "SystemUpdateStatus": [
+            {
+                "System": {
+                    "id": "0600",
+                    "idType": "BIOS",
+                    "hostAddress": "LocalHost",
+                },
+                "InvokerInfo": {
+                    "name": "DSU",
+                    "version": "1.9.3.0",
+                    "command": "--compliance , --output",
+                    "exitStatus": 0,
+                    "statusMessage": "Command has run successfully",
+                },
+            }
+        ]
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(status, separators=(",", ":")) + "\n")
+
+
+def native_compliance_base_is_useful(report):
+    root = (report.get("SystemUpdateCompliance") or [{}])[0]
+    baseline = root.get("BaseLineInformation") or {}
+    return bool(
+        baseline.get("identifier")
+        or baseline.get("catalogName")
+        or baseline.get("version")
+        or root.get("System", {}).get("id")
+    )
+
+
+def strip_support_components(report):
+    report = copy.deepcopy(report)
+    root = report.setdefault("SystemUpdateCompliance", [{}])[0]
+    components = root.setdefault("UpdateableComponent", [])
+    root["UpdateableComponent"] = [
+        component
+        for component in components
+        if not str(component.get("packageFilePath", "")).startswith("support-yum/")
+    ]
+    root.setdefault("BaseLineInformation", {})
+    root["BaseLineInformation"]["complianceStatus"] = not bool(
+        root["UpdateableComponent"]
+    )
+    return report
+
+
+def save_native_compliance_base(report):
+    if not native_compliance_base_is_useful(report):
+        return
+    native = strip_support_components(report)
+    NATIVE_COMPLIANCE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    NATIVE_COMPLIANCE_CACHE.write_text(json.dumps(native, separators=(",", ":")) + "\n")
+
+
+def compliance_component_for_gui(component):
+    component = dict(component)
+    for field in (
+        "packageID",
+        "packageFilePath",
+        "name",
+        "componentType",
+        "componentTypeDisplay",
+        "categoryType",
+        "criticality",
+        "complianceMessage",
+        "version",
+        "baseLineVersion",
+    ):
+        component[field] = one_line_text(component.get(field))
+
+    if not component["name"]:
+        component["name"] = (
+            component["packageID"] or Path(component["packageFilePath"]).name
+        )
+    if not component["categoryType"]:
+        component["categoryType"] = component["name"]
+    if not component["componentTypeDisplay"]:
+        component["componentTypeDisplay"] = component_type_display(
+            component.get("componentType")
+        )
+    if not component["criticality"]:
+        component["criticality"] = "Recommended"
+    if not component["complianceMessage"]:
+        component["complianceMessage"] = "Upgrade"
+
+    try:
+        component["componentID"] = int(component.get("componentID") or 0)
+    except (TypeError, ValueError):
+        component["componentID"] = 0
+
+    component["index"] = int(component.get("index") or 0)
+    component["complianceStatus"] = bool(component.get("complianceStatus"))
+    component["rebootRequired"] = bool(component.get("rebootRequired"))
+    return component
+
+
 def download_rpm(repo_base, cache_dir, release, record):
     rpm = cache_dir / "rpms" / release / Path(record["location"]).name
     with file_lock(rpm):
@@ -1430,6 +1704,11 @@ def download_platform_bin(cache_dir, release, record):
                 file=sys.stderr,
             )
             download_file(url, bin_path)
+        else:
+            print(
+                f"dell-suu: using cached Dell platform package {filename}",
+                file=sys.stderr,
+            )
         bin_path.chmod(0o755)
 
         sign_url = record.get("sign_url")
@@ -1498,6 +1777,7 @@ def extract_package_xml(cache_dir, source_dir, bin_path):
                 str(tmp_dir),
             ],
             timeout=240,
+            locked=False,
         )
         if proc.returncode != 0:
             raise RuntimeError(proc.stdout)
@@ -1517,9 +1797,11 @@ def extract_package_xml(cache_dir, source_dir, bin_path):
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def check_dup(source_dir, bin_path):
+def check_dup(source_dir, bin_path, locked=True):
     proc = run_dup(
-        [FHS, source_dir, "--launcher", str(bin_path), "--", "-q", "-c"], timeout=360
+        [FHS, source_dir, "--launcher", str(bin_path), "--", "-q", "-c"],
+        timeout=360,
+        locked=locked,
     )
     output = proc.stdout
     lower = output.lower()
@@ -1531,14 +1813,29 @@ def check_dup(source_dir, bin_path):
         stripped = line.strip()
         if not stripped:
             continue
-        if stripped.lower().startswith("package version:"):
+        lower_stripped = stripped.lower()
+        if lower_stripped.startswith("package version:"):
             package_version = stripped.split(":", 1)[1].strip()
-        elif stripped.lower().startswith("installed version:"):
+        elif lower_stripped.startswith("new version:") and not package_version:
+            package_version = stripped.split(":", 1)[1].strip()
+        elif lower_stripped.startswith("installed version:"):
             installed_version = stripped.split(":", 1)[1].strip()
+        elif lower_stripped.startswith("previous version:") and not installed_version:
+            installed_version = stripped.split(":", 1)[1].strip()
+        elif lower_stripped.startswith("software application name:"):
+            display = stripped.split(":", 1)[1].strip()
         elif (
             not display
             and not stripped.startswith("DELL ")
-            and "warning:" not in stripped.lower()
+            and "warning:" not in lower_stripped
+            and lower_stripped
+            not in {
+                ".",
+                "collecting inventory...",
+                "running validation...",
+            }
+            and not lower_stripped.startswith("collecting inventory")
+            and not lower_stripped.startswith("running validation")
         ):
             display = stripped
 
@@ -1582,6 +1879,7 @@ def parse_package_xml_path(path):
         "component_id": "",
         "criticality": "Recommended",
         "name": "",
+        "package_xml_path": str(path),
         "supported_component_ids": set(),
         "supported_pci_ids": set(),
         "supported_system_ids": set(),
@@ -1814,6 +2112,236 @@ def install_bin(repo_dir, release, bin_path):
     return str(rel_path)
 
 
+def support_report_paths(report_path):
+    report = load_json(report_path)
+    paths = set()
+    for component in report.get("SystemUpdateCompliance", [{}])[0].get(
+        "UpdateableComponent", []
+    ):
+        rel_path = str(component.get("packageFilePath") or "")
+        if rel_path.startswith("support-yum/") and rel_path.endswith(".BIN"):
+            paths.add(rel_path)
+    return paths
+
+
+def support_report_has_current_versions(report_path):
+    report = load_json(report_path)
+    for component in report.get("SystemUpdateCompliance", [{}])[0].get(
+        "UpdateableComponent", []
+    ):
+        rel_path = str(component.get("packageFilePath") or "")
+        if not rel_path.startswith("support-yum/"):
+            continue
+        version = one_line_text(component.get("version"))
+        if not version or version.lower() == "unknown":
+            return False
+    return True
+
+
+def support_report_payloads_exist(repo_dir, report_path):
+    for rel_path in support_report_paths(report_path):
+        path = repo_dir / rel_path
+        if not path.exists() or path.stat().st_size == 0:
+            return False
+    return True
+
+
+def support_cache_manifest_valid(repo_dir, report_path, manifest_path):
+    if not manifest_path.exists() or manifest_path.stat().st_size == 0:
+        return False
+    if not report_path.exists() or report_path.stat().st_size == 0:
+        return False
+
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except json.JSONDecodeError:
+        return False
+
+    settings = support_cache_settings()
+    if manifest.get("schema") != SUPPORT_REPORT_SCHEMA_VERSION:
+        return False
+    if manifest.get("repo") != str(repo_dir):
+        return False
+    if manifest.get("settings") != settings:
+        return False
+    expected_fingerprint = (
+        hardware_fingerprint(parse_dmidecode(), {"system_id": "", "components": []})
+        if settings["nativeCatalogOnly"]
+        else hardware_fingerprint()
+    )
+    if manifest.get("hardwareFingerprint") != expected_fingerprint:
+        return False
+    if not support_report_payloads_exist(repo_dir, report_path):
+        return False
+    if not settings["includeNonApplicable"]:
+        if not support_report_has_current_versions(report_path):
+            return False
+
+    report_paths = support_report_paths(report_path)
+    if manifest.get("supportPackageCount") != len(report_paths):
+        return False
+    return True
+
+
+def catalog_support_paths(catalog_path):
+    if not catalog_path.exists() or catalog_path.stat().st_size == 0:
+        return set()
+
+    try:
+        root = ET.parse(catalog_path).getroot()
+    except ET.ParseError:
+        return set()
+
+    paths = set()
+    for element in root:
+        if element.tag.rsplit("}", 1)[-1] != "SoftwareComponent":
+            continue
+        rel_path = element.get("path", "")
+        if rel_path.startswith("support-yum/"):
+            paths.add(rel_path)
+    return paths
+
+
+def find_package_xml_for_bin(cache_dir, bin_name):
+    candidates = sorted(
+        (cache_dir / "manifests").glob(f"{bin_name}-*/package.xml"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
+def catalog_entry_from_package_xml(xml_path, rel_path, bin_path):
+    try:
+        root = ET.parse(xml_path).getroot()
+    except ET.ParseError as exc:
+        print(
+            f"dell-suu: warning: failed to parse catalog metadata {xml_path}: {exc}",
+            file=sys.stderr,
+        )
+        return None
+
+    if root.tag.rsplit("}", 1)[-1] != "SoftwareComponent":
+        return None
+
+    entry = copy.deepcopy(root)
+    entry.set("path", rel_path)
+    entry.set("size", str(bin_path.stat().st_size))
+    if not entry.get("packageType"):
+        entry.set("packageType", "LLXP")
+    if not entry.get("hash") or entry.get("hashAlgorithm") != "SHA256":
+        entry.set("hash", sha256_file(bin_path))
+        entry.set("hashAlgorithm", "SHA256")
+    return entry
+
+
+def inject_support_catalog_entries(catalog_path, entries):
+    if not entries:
+        return 0
+    if not catalog_path.exists() or catalog_path.stat().st_size == 0:
+        print(
+            f"dell-suu: warning: cannot inject support packages; missing {catalog_path}",
+            file=sys.stderr,
+        )
+        return 0
+
+    tree = ET.parse(catalog_path)
+    root = tree.getroot()
+    existing_paths = set()
+    removed = 0
+
+    for element in list(root):
+        if element.tag.rsplit("}", 1)[-1] != "SoftwareComponent":
+            continue
+        rel_path = element.get("path", "")
+        if rel_path.startswith("support-yum/"):
+            root.remove(element)
+            removed += 1
+            continue
+        existing_paths.add(rel_path)
+
+    added = 0
+    for entry in entries:
+        rel_path = entry.get("path", "")
+        if not rel_path or rel_path in existing_paths:
+            continue
+        root.append(entry)
+        existing_paths.add(rel_path)
+        added += 1
+
+    if added or removed:
+        tmp = catalog_path.with_name(f"{catalog_path.name}.tmp.{os.getpid()}")
+        tree.write(tmp, encoding="utf-16", xml_declaration=True)
+        tmp.replace(catalog_path)
+        print(
+            f"dell-suu: injected {added} Dell support package(s) into {catalog_path.name}"
+            + (f" and removed {removed} stale injected package(s)" if removed else ""),
+            file=sys.stderr,
+        )
+
+    return added
+
+
+def ensure_support_catalog_from_report(repo_dir, cache_dir, report_path):
+    report_paths = support_report_paths(report_path)
+    if not report_paths:
+        return True
+
+    catalog_path = repo_dir / "Catalog.xml"
+    if report_paths <= catalog_support_paths(catalog_path):
+        return True
+
+    entries = []
+    for rel_path in sorted(report_paths, key=natural_key):
+        bin_path = repo_dir / rel_path
+        if not bin_path.exists() or bin_path.stat().st_size == 0:
+            print(
+                f"dell-suu: warning: cached support report references missing package {rel_path}",
+                file=sys.stderr,
+            )
+            continue
+
+        xml_path = find_package_xml_for_bin(cache_dir, bin_path.name)
+        if not xml_path:
+            print(
+                f"dell-suu: warning: no package.xml cache for {bin_path.name}",
+                file=sys.stderr,
+            )
+            continue
+
+        entry = catalog_entry_from_package_xml(xml_path, rel_path, bin_path)
+        if entry is not None:
+            entries.append(entry)
+
+    if not entries:
+        return False
+
+    inject_support_catalog_entries(catalog_path, entries)
+    return report_paths <= catalog_support_paths(catalog_path)
+
+
+def write_support_cache_manifest(
+    repo_dir, components, candidates, catalog_entry_count, dmidecode_data, inventory
+):
+    SUPPORT_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    SUPPORT_MANIFEST.write_text(
+        json.dumps(
+            {
+                "schema": SUPPORT_REPORT_SCHEMA_VERSION,
+                "repo": str(repo_dir),
+                "settings": support_cache_settings(),
+                "hardwareFingerprint": hardware_fingerprint(dmidecode_data, inventory),
+                "supportPackageCount": len(components),
+                "candidateCount": len(candidates),
+                "catalogEntryCount": catalog_entry_count,
+                "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+
 def refresh(args):
     max_age = env_int(
         "DELL_SUU_SUPPORT_REFRESH_MAX_AGE_SECONDS",
@@ -1826,8 +2354,20 @@ def refresh(args):
         and SUPPORT_STAMP.exists()
         and time.time() - SUPPORT_STAMP.stat().st_mtime <= max_age
     ):
-        print("dell-suu: using cached Dell yum support package report", file=sys.stderr)
-        return 0
+        repo_dir = Path(args.repo)
+        cache_dir = Path(args.cache_root) / "suu" / "support-yum"
+        if support_cache_manifest_valid(
+            repo_dir, SUPPORT_REPORT, SUPPORT_MANIFEST
+        ) and ensure_support_catalog_from_report(repo_dir, cache_dir, SUPPORT_REPORT):
+            print(
+                "dell-suu: using cached Dell platform support package report",
+                file=sys.stderr,
+            )
+            return 0
+        print(
+            "dell-suu: cached Dell support report is stale or incomplete for the GUI; refreshing",
+            file=sys.stderr,
+        )
 
     repo_base = (
         os.environ.get("DELL_SUU_SUPPORT_REPO_BASE", DEFAULT_REPO_BASE).rstrip("/")
@@ -1836,16 +2376,28 @@ def refresh(args):
     cache_dir = Path(args.cache_root) / "suu" / "support-yum"
     repo_dir = Path(args.repo)
     source_dir = args.source
-    releases = list_releases(repo_base)
+
+    SUPPORT_STAMP.unlink(missing_ok=True)
+    SUPPORT_MANIFEST.unlink(missing_ok=True)
+
     max_releases = env_int("DELL_SUU_SUPPORT_MAX_RELEASES", 0)
     max_candidates = env_int("DELL_SUU_SUPPORT_MAX_CANDIDATES", 0)
     metadata_workers = max(1, env_int("DELL_SUU_SUPPORT_METADATA_WORKERS", 6))
     download_workers = max(1, env_int("DELL_SUU_SUPPORT_DOWNLOAD_WORKERS", 6))
+    check_workers = max(1, env_int("DELL_SUU_SUPPORT_CHECK_WORKERS", 1))
     download_all = env_flag("DELL_SUU_SUPPORT_DOWNLOAD_ALL", False)
     require_metadata_match = env_flag("DELL_SUU_SUPPORT_REQUIRE_METADATA_MATCH", True)
+    include_non_applicable = env_flag("DELL_SUU_SUPPORT_INCLUDE_NON_APPLICABLE", False)
+    trust_platform_csv = env_flag("DELL_SUU_SUPPORT_TRUST_PLATFORM_CSV", True)
+    check_platform_dups = env_flag("DELL_SUU_SUPPORT_CHECK_PLATFORM_DUPS", True)
 
     dmidecode_data = parse_dmidecode()
-    inventory = parse_inventory()
+    native_catalog_only = env_flag("DELL_SUU_SUPPORT_NATIVE_CATALOG_ONLY", False)
+    inventory = (
+        {"system_id": "", "components": []}
+        if native_catalog_only
+        else parse_inventory()
+    )
     tokens = model_tokens(dmidecode_data)
     terms = component_terms(inventory)
     term_major_versions = inventory_major_versions(inventory)
@@ -1854,11 +2406,16 @@ def refresh(args):
     print(
         "dell-suu: Dell support discovery "
         f"model={dmidecode_data.get('product') or 'unknown'} "
-        f"systemID={inventory.get('system_id') or 'unknown'} "
-        f"inventoryComponents={len(inventory['components'])} "
+        f"systemID={inventory.get('system_id') or 'native-suu'} "
+        f"inventoryComponents={len(inventory['components']) if not native_catalog_only else 'native-suu'} "
         f"tokens={','.join(tokens) or 'none'}",
         file=sys.stderr,
     )
+    if native_catalog_only:
+        print(
+            "dell-suu: native catalog mode is enabled; host inventory/compliance is left to Dell SUU",
+            file=sys.stderr,
+        )
     if platform_filter.get("enabled"):
         print(
             "dell-suu: using Dell platform latest CSV "
@@ -1878,9 +2435,7 @@ def refresh(args):
     model_candidates = []
     component_candidates = []
     platform_candidates = []
-    selected_releases = releases[:max_releases] if max_releases > 0 else releases
     metadata_by_release = {}
-    metadata_workers = min(metadata_workers, max(1, len(selected_releases)))
 
     for record in platform_filter.get("records") or []:
         record = dict(record)
@@ -1896,35 +2451,48 @@ def refresh(args):
             file=sys.stderr,
         )
 
-    print(
-        f"dell-suu: fetching/scanning metadata for {len(selected_releases)} releases with {metadata_workers} workers",
-        file=sys.stderr,
+    scan_yum_metadata = env_flag(
+        "DELL_SUU_SUPPORT_SCAN_YUM_METADATA", not bool(platform_candidates)
     )
+    if scan_yum_metadata:
+        releases = list_releases(repo_base)
+        selected_releases = releases[:max_releases] if max_releases > 0 else releases
+        metadata_workers = min(metadata_workers, max(1, len(selected_releases)))
+        print(
+            f"dell-suu: fetching/scanning metadata for {len(selected_releases)} releases with {metadata_workers} workers",
+            file=sys.stderr,
+        )
 
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=metadata_workers
-    ) as executor:
-        future_to_release = {
-            executor.submit(
-                metadata_for_release, repo_base, cache_dir, release
-            ): release
-            for release in selected_releases
-        }
-        for future in concurrent.futures.as_completed(future_to_release):
-            release = future_to_release[future]
-            try:
-                metadata_by_release[release] = future.result()
-            except (
-                urllib.error.URLError,
-                TimeoutError,
-                RuntimeError,
-                ET.ParseError,
-                OSError,
-            ) as exc:
-                print(
-                    f"dell-suu: warning: failed to read {release} metadata: {exc}",
-                    file=sys.stderr,
-                )
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=metadata_workers
+        ) as executor:
+            future_to_release = {
+                executor.submit(
+                    metadata_for_release, repo_base, cache_dir, release
+                ): release
+                for release in selected_releases
+            }
+            for future in concurrent.futures.as_completed(future_to_release):
+                release = future_to_release[future]
+                try:
+                    metadata_by_release[release] = future.result()
+                except (
+                    urllib.error.URLError,
+                    TimeoutError,
+                    RuntimeError,
+                    ET.ParseError,
+                    OSError,
+                ) as exc:
+                    print(
+                        f"dell-suu: warning: failed to read {release} metadata: {exc}",
+                        file=sys.stderr,
+                    )
+    else:
+        selected_releases = []
+        print(
+            "dell-suu: skipping Dell yum metadata scan because platform latest CSV matched this model",
+            file=sys.stderr,
+        )
 
     for release in selected_releases:
         metadata = metadata_by_release.get(release)
@@ -1970,9 +2538,9 @@ def refresh(args):
 
     print(
         "dell-suu: checking "
-        f"{len(candidates)} Dell yum support candidates "
+        f"{len(candidates)} Dell support candidates "
         f"(download_all={'yes' if download_all else 'no'}, max_candidates={max_candidates or 'unlimited'}, "
-        f"download_workers={download_workers})",
+        f"download_workers={download_workers}, check_workers={check_workers})",
         file=sys.stderr,
     )
 
@@ -2005,17 +2573,35 @@ def refresh(args):
                     file=sys.stderr,
                 )
 
-            if package_info and not package_supports_inventory(package_info, inventory):
+            trusted_platform_record = (
+                trust_platform_csv and record.get("source") == "platform-csv"
+            )
+            if (
+                package_info
+                and not package_supports_inventory(package_info, inventory)
+                and not trusted_platform_record
+            ):
                 print(
                     f"dell-suu: skipping {bin_path.name}: package metadata does not match this system inventory",
                     file=sys.stderr,
                 )
                 continue
+            if (
+                package_info
+                and trusted_platform_record
+                and not package_supports_inventory(package_info, inventory)
+            ):
+                print(
+                    "dell-suu: accepting "
+                    f"{bin_path.name}: Dell platform CSV lists it for this model",
+                    file=sys.stderr,
+                )
 
             if (
                 not package_info
                 and require_metadata_match
                 and record.get("match_kind") == "all"
+                and not trusted_platform_record
             ):
                 print(
                     f"dell-suu: skipping {bin_path.name}: no package metadata for all-package discovery",
@@ -2033,8 +2619,42 @@ def refresh(args):
     materialized = 0
     skipped_closed = 0
     download_workers = min(download_workers, max(1, len(candidates)))
+    check_workers = min(check_workers, max(1, len(candidates)))
+    batch_size = max(download_workers, check_workers)
+
+    def exact_target_keys(target_keys):
+        exact_types = {
+            "inventory-component-id",
+            "inventory-pci",
+        }
+        exact = set()
+        for key in target_keys or set():
+            if not key or key[0] not in exact_types:
+                continue
+            if key[0].endswith("component-id") and str(key[-1]) in {"", "0"}:
+                continue
+            exact.add(key)
+        return exact
+
+    def should_serial_retry_missing_version(record, package_info, matched_components):
+        if not env_flag("DELL_SUU_SUPPORT_SERIAL_RETRY_MISSING", True):
+            return False
+        if matched_components:
+            return True
+        haystack = normalise_text(
+            " ".join(
+                [
+                    record.get("name", ""),
+                    record.get("summary", ""),
+                    package_info.get("name", ""),
+                    package_info.get("device_display", ""),
+                ]
+            )
+        )
+        return bool(re.search(r"\b(bios|idrac|lifecycle)\b", haystack))
 
     def close_candidate(record, target_keys, reason):
+        target_keys = exact_target_keys(target_keys)
         chain_keys = set(record.get("chain_keys") or ())
         if chain_keys:
             closed_chain_keys.update(chain_keys)
@@ -2050,10 +2670,200 @@ def refresh(args):
                 file=sys.stderr,
             )
 
+    def checked_component_from_result(result):
+        record = result["record"]
+        bin_path = result["bin_path"]
+        package_info = result["package_info"]
+        matched_components = result["matched_components"]
+        target_keys = result["target_keys"]
+        trusted_platform_record = result["trusted_platform_record"]
+        applicable = result.get("applicable")
+        check = result.get("check") or {}
+        error = result.get("error")
+
+        if target_keys and target_keys & closed_target_keys:
+            close_candidate(record, target_keys, "target already handled")
+            return
+
+        if error is not None:
+            if trusted_platform_record and not check_platform_dups:
+                print(
+                    "dell-suu: skipping "
+                    f"{bin_path.name}: platform CSV lists it for this model, "
+                    "but DUP validation is disabled and no current version can be proven",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"dell-suu: warning: failed to check {bin_path.name}: {error}",
+                    file=sys.stderr,
+                )
+            return
+
+        if not package_info:
+            package_info = parse_package_xml(bin_path)
+            if not package_info:
+                print(
+                    f"dell-suu: warning: no package.xml found after checking {bin_path.name}; using DUP output only",
+                    file=sys.stderr,
+                )
+            matched_components = matching_inventory_components(package_info, inventory)
+            target_keys = package_target_keys(package_info, matched_components, record)
+
+        matched_component = matched_components[0] if matched_components else {}
+        component_id = (
+            package_info.get("component_id")
+            or matched_component.get("component_id")
+            or ""
+        )
+        component_type = package_info.get("component_type") or "FRMW"
+        package_version = (
+            package_info.get("version")
+            or check.get("package_version")
+            or record.get("version")
+        )
+        installed_version = (
+            check.get("installed_version") or matched_component.get("version") or ""
+        )
+
+        if not installed_version and not include_non_applicable:
+            if should_serial_retry_missing_version(
+                record, package_info, matched_components
+            ):
+                try:
+                    retry_applicable, retry_check = check_dup(
+                        source_dir, bin_path, locked=True
+                    )
+                    retry_installed_version = (
+                        retry_check.get("installed_version")
+                        or matched_component.get("version")
+                        or ""
+                    )
+                    if retry_installed_version:
+                        print(
+                            "dell-suu: serial retry recovered installed version "
+                            f"for {bin_path.name}",
+                            file=sys.stderr,
+                        )
+                        applicable = retry_applicable
+                        check = retry_check
+                        installed_version = retry_installed_version
+                        package_version = (
+                            package_info.get("version")
+                            or check.get("package_version")
+                            or record.get("version")
+                        )
+                except Exception as exc:
+                    print(
+                        f"dell-suu: warning: serial retry failed for {bin_path.name}: {exc}",
+                        file=sys.stderr,
+                    )
+
+        if not installed_version and not include_non_applicable:
+            print(
+                "dell-suu: skipping "
+                f"{bin_path.name}: Dell DUP check did not report an installed version",
+                file=sys.stderr,
+            )
+            close_candidate(record, target_keys, "missing installed version")
+            return
+
+        if not applicable and not include_non_applicable:
+            if (
+                package_version
+                and installed_version
+                and version_tuple(package_version)
+                and version_tuple(installed_version)
+                and version_tuple(package_version) <= version_tuple(installed_version)
+            ):
+                close_candidate(record, target_keys, "current or older")
+            return
+
+        display = one_line_text(
+            component_display_by_id(inventory, component_id)
+            or matched_component.get("display")
+            or check.get("display")
+            or package_info.get("device_display")
+            or package_info.get("name")
+            or record["summary"]
+            or record["name"]
+        )
+        record_name_parts = record["name"].split("_", 2)
+        package_id = (
+            package_info.get("package_id")
+            or package_info.get("release_id")
+            or (
+                record_name_parts[1]
+                if len(record_name_parts) > 1
+                else Path(record["name"]).stem
+            )
+        )
+        rel_path = install_bin(repo_dir, result["release"], bin_path)
+        compliance_message = compliance_message_for_versions(
+            package_version, installed_version, applicable
+        )
+
+        component = {
+            "packageID": package_id,
+            "packageFilePath": rel_path,
+            "name": display,
+            "index": 0,
+            "complianceStatus": not applicable,
+            "componentType": component_type,
+            "componentTypeDisplay": component_type_display(component_type),
+            "categoryType": one_line_text(
+                package_info.get("device_display") or display
+            ),
+            "criticality": one_line_text(
+                package_info.get("criticality") or "Recommended"
+            ),
+            "componentID": int(component_id) if str(component_id).isdigit() else 0,
+            "complianceMessage": compliance_message,
+            "version": one_line_text(installed_version),
+            "baseLineVersion": one_line_text(package_version),
+            "rebootRequired": bool(package_info.get("reboot_required")),
+            "_catalogBinPath": str(repo_dir / rel_path),
+            "_catalogPackageXmlPath": package_info.get("package_xml_path", ""),
+        }
+        key = (
+            component.get("componentType") or "",
+            str(
+                component.get("componentID")
+                or component.get("packageID")
+                or component.get("packageFilePath")
+            ),
+        )
+        previous = best_components.get(key)
+        if previous and version_tuple(previous.get("baseLineVersion")) >= version_tuple(
+            component.get("baseLineVersion")
+        ):
+            close_candidate(record, target_keys, "older than best match")
+            return
+        best_components[key] = component
+        close_candidate(record, target_keys, "applicable" if applicable else "matched")
+        print(
+            "dell-suu: support package "
+            f"{'applicable' if applicable else 'matched'}: "
+            f"{display} {installed_version} -> {package_version}",
+            file=sys.stderr,
+        )
+
+    def check_item(item):
+        try:
+            applicable, check = check_dup(source_dir, item["bin_path"], locked=True)
+            item["applicable"] = applicable
+            item["check"] = check
+            item["error"] = None
+        except Exception as exc:
+            item["applicable"] = None
+            item["check"] = None
+            item["error"] = exc
+        return item
+
     next_candidate = 0
     while next_candidate < len(candidates):
         batch = []
-        while next_candidate < len(candidates) and len(batch) < download_workers:
+        while next_candidate < len(candidates) and len(batch) < batch_size:
             candidate = candidates[next_candidate]
             next_candidate += 1
             record = candidate[1]
@@ -2068,6 +2878,7 @@ def refresh(args):
         if not batch:
             continue
 
+        check_items = []
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=min(download_workers, len(batch))
         ) as executor:
@@ -2104,115 +2915,36 @@ def refresh(args):
                         close_candidate(record, target_keys, "target already handled")
                         continue
 
-                    try:
-                        applicable, check = check_dup(source_dir, bin_path)
-                    except Exception as exc:
-                        print(
-                            f"dell-suu: warning: failed to check {bin_path.name}: {exc}",
-                            file=sys.stderr,
-                        )
-                        continue
-
-                    if not package_info:
-                        package_info = parse_package_xml(bin_path)
-                        if not package_info:
-                            print(
-                                f"dell-suu: warning: no package.xml found after checking {bin_path.name}; using DUP output only",
-                                file=sys.stderr,
-                            )
-                        matched_components = matching_inventory_components(
-                            package_info, inventory
-                        )
-                        target_keys = package_target_keys(
-                            package_info, matched_components, record
-                        )
-
-                    matched_component = (
-                        matched_components[0] if matched_components else {}
+                    trusted_platform_record = (
+                        trust_platform_csv and record.get("source") == "platform-csv"
                     )
-                    component_id = (
-                        package_info.get("component_id")
-                        or matched_component.get("component_id")
-                        or ""
-                    )
-                    component_type = package_info.get("component_type") or "FRMW"
-                    package_version = (
-                        package_info.get("version")
-                        or check.get("package_version")
-                        or record.get("version")
-                    )
-                    installed_version = (
-                        check.get("installed_version")
-                        or matched_component.get("version")
-                        or ""
+                    check_items.append(
+                        {
+                            "release": release,
+                            "record": record,
+                            "bin_path": bin_path,
+                            "package_info": package_info,
+                            "matched_components": matched_components,
+                            "target_keys": target_keys,
+                            "trusted_platform_record": trusted_platform_record,
+                        }
                     )
 
-                    if not applicable:
-                        if (
-                            package_version
-                            and installed_version
-                            and version_tuple(package_version)
-                            and version_tuple(installed_version)
-                            and version_tuple(package_version)
-                            <= version_tuple(installed_version)
-                        ):
-                            close_candidate(record, target_keys, "current or older")
-                        continue
+        if not check_items:
+            continue
 
-                    display = (
-                        component_display_by_id(inventory, component_id)
-                        or matched_component.get("display")
-                        or check.get("display")
-                        or package_info.get("device_display")
-                        or package_info.get("name")
-                        or record["summary"]
-                        or record["name"]
-                    )
-                    package_id = (
-                        package_info.get("package_id")
-                        or package_info.get("release_id")
-                        or record["name"].split("_", 2)[1]
-                    )
-                    rel_path = install_bin(repo_dir, release, bin_path)
-
-                    component = {
-                        "packageID": package_id,
-                        "packageFilePath": rel_path,
-                        "name": display,
-                        "index": 0,
-                        "complianceStatus": False,
-                        "componentType": component_type,
-                        "componentTypeDisplay": component_type_display(component_type),
-                        "categoryType": package_info.get("device_display") or display,
-                        "criticality": package_info.get("criticality") or "Recommended",
-                        "componentID": (
-                            int(component_id) if str(component_id).isdigit() else 0
-                        ),
-                        "complianceMessage": "Upgrade",
-                        "version": installed_version,
-                        "baseLineVersion": package_version,
-                        "rebootRequired": bool(package_info.get("reboot_required")),
-                    }
-                    key = (
-                        component.get("componentType") or "",
-                        str(
-                            component.get("componentID")
-                            or component.get("packageID")
-                            or component.get("packageFilePath")
-                        ),
-                    )
-                    previous = best_components.get(key)
-                    if previous and version_tuple(
-                        previous.get("baseLineVersion")
-                    ) >= version_tuple(component.get("baseLineVersion")):
-                        close_candidate(record, target_keys, "older than best match")
-                        continue
-                    best_components[key] = component
-                    close_candidate(record, target_keys, "applicable")
-                    print(
-                        f"dell-suu: support package applicable: {display} {installed_version} -> {package_version}",
-                        file=sys.stderr,
-                    )
+        print(
+            f"dell-suu: checking {len(check_items)} DUP candidate(s) with {min(check_workers, len(check_items))} worker(s); Dell DUP validation is serialized",
+            file=sys.stderr,
+        )
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(check_workers, len(check_items))
+        ) as executor:
+            future_to_item = {
+                executor.submit(check_item, item): item for item in check_items
+            }
+            for future in concurrent.futures.as_completed(future_to_item):
+                checked_component_from_result(future.result())
 
     if skipped_closed:
         print(
@@ -2221,6 +2953,42 @@ def refresh(args):
         )
 
     components = list(best_components.values())
+    catalog_entries = []
+    for component in components:
+        catalog_bin_path = component.pop("_catalogBinPath", "")
+        catalog_xml_path = component.pop("_catalogPackageXmlPath", "")
+        if not catalog_bin_path or not catalog_xml_path:
+            continue
+        entry = catalog_entry_from_package_xml(
+            Path(catalog_xml_path),
+            component["packageFilePath"],
+            Path(catalog_bin_path),
+        )
+        if entry is not None:
+            catalog_entries.append(entry)
+
+    catalog_entry_count = inject_support_catalog_entries(
+        repo_dir / "Catalog.xml", catalog_entries
+    )
+    support_paths = {
+        component["packageFilePath"]
+        for component in components
+        if str(component.get("packageFilePath", "")).startswith("support-yum/")
+    }
+    catalog_paths = catalog_support_paths(repo_dir / "Catalog.xml")
+    missing_catalog_paths = sorted(support_paths - catalog_paths, key=natural_key)
+    if missing_catalog_paths:
+        print(
+            "dell-suu: warning: support cache is not fully present in Catalog.xml; GUI compliance will use checked DUP report",
+            file=sys.stderr,
+        )
+        for rel_path in missing_catalog_paths[:20]:
+            print(f"dell-suu: missing catalog entry: {rel_path}", file=sys.stderr)
+        if len(missing_catalog_paths) > 20:
+            print(
+                f"dell-suu: ... and {len(missing_catalog_paths) - 20} more missing catalog entries",
+                file=sys.stderr,
+            )
 
     for index, component in enumerate(components, start=1):
         component["index"] = index
@@ -2236,7 +3004,7 @@ def refresh(args):
                 "InvokerInfo": {
                     "name": "dell-suu-support-refresh",
                     "version": "1",
-                    "command": "Dell yum repository support discovery",
+                    "command": "Dell platform support discovery",
                     "exitStatus": 0 if components else 34,
                     "statusMessage": (
                         "Compliance Success"
@@ -2245,8 +3013,8 @@ def refresh(args):
                     ),
                 },
                 "BaseLineInformation": {
-                    "identifier": "dell-yum-support",
-                    "catalogName": "Dell yum repository support packages",
+                    "identifier": "dell-platform-support",
+                    "catalogName": "Dell platform support packages",
                     "version": time.strftime("%Y.%m.%d"),
                     "baseLocationAccessProtocols": ["HTTPS"],
                     "baseLocation": repo_base,
@@ -2260,6 +3028,14 @@ def refresh(args):
 
     SUPPORT_REPORT.parent.mkdir(parents=True, exist_ok=True)
     SUPPORT_REPORT.write_text(json.dumps(report, indent=2) + "\n")
+    write_support_cache_manifest(
+        repo_dir,
+        components,
+        candidates,
+        catalog_entry_count,
+        dmidecode_data,
+        inventory,
+    )
     SUPPORT_STAMP.write_text(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + "\n")
     return 0
 
@@ -2292,6 +3068,8 @@ def merge(args):
     if compliance_path.suffix.lower() in {".html", ".htm"}:
         html_path = compliance_path
         compliance_path = Path("/usr/libexec/dell_dup/Compliance.json")
+    else:
+        html_path = compliance_path.with_suffix(".html")
     support = load_json(SUPPORT_REPORT)
     support_components = support.get("SystemUpdateCompliance", [{}])[0].get(
         "UpdateableComponent", []
@@ -2299,6 +3077,13 @@ def merge(args):
     inventory = parse_inventory()
 
     base = load_json(compliance_path)
+    if native_compliance_base_is_useful(base):
+        save_native_compliance_base(base)
+    elif NATIVE_COMPLIANCE_CACHE.exists():
+        cached_base = load_json(NATIVE_COMPLIANCE_CACHE)
+        if native_compliance_base_is_useful(cached_base):
+            base = cached_base
+
     if not base.get("SystemUpdateCompliance"):
         base["SystemUpdateCompliance"] = load_json(Path("/nonexistent"))[
             "SystemUpdateCompliance"
@@ -2330,6 +3115,7 @@ def merge(args):
     added = 0
     skipped_current = 0
     for component in support_components:
+        component = compliance_component_for_gui(component)
         if support_component_is_current_in_inventory(component, inventory):
             skipped_current += 1
             continue
@@ -2370,9 +3156,15 @@ def merge(args):
 
     compliance_path.parent.mkdir(parents=True, exist_ok=True)
     compliance_path.write_text(json.dumps(base, separators=(",", ":")) + "\n")
+    report_path = compliance_path.parent / "ComplianceReport.json"
+    report_path.write_text(json.dumps(base, separators=(",", ":")) + "\n")
+    write_suu_status(compliance_path.parent / "SUU_STATUS.json")
     runtime_compliance = Path("/usr/libexec/dell_dup/Compliance.json")
     if runtime_compliance.parent.exists() and runtime_compliance != compliance_path:
         runtime_compliance.write_text(json.dumps(base, separators=(",", ":")) + "\n")
+        runtime_report = runtime_compliance.parent / "ComplianceReport.json"
+        runtime_report.write_text(json.dumps(base, separators=(",", ":")) + "\n")
+        write_suu_status(runtime_compliance.parent / "SUU_STATUS.json")
     if html_path is not None:
         write_compliance_html(html_path, base)
         runtime_html = Path("/usr/libexec/dell_dup/Compliance.html")
@@ -2389,19 +3181,23 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--merge", action="store_true")
+    parser.add_argument("--resolve-suu-iso", action="store_true")
     parser.add_argument("--source", default="/var/cache/dell/suu/online-source")
     parser.add_argument(
         "--repo", default="/var/cache/dell/suu/online-source/repository"
     )
     parser.add_argument("--cache-root", default="/var/cache/dell")
     parser.add_argument("--compliance", default="/usr/libexec/dell_dup/Compliance.json")
+    parser.add_argument("--model", default="")
     args = parser.parse_args()
 
     if args.refresh:
         return refresh(args)
     if args.merge:
         return merge(args)
-    parser.error("use --refresh or --merge")
+    if args.resolve_suu_iso:
+        return resolve_suu_iso(args)
+    parser.error("use --refresh, --merge, or --resolve-suu-iso")
 
 
 if __name__ == "__main__":
