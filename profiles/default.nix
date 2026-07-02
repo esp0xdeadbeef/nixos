@@ -63,8 +63,26 @@
       open-webui = import ./nixos/llm/open-webui.nix;
     };
     impermanence = {
-      module = args@{ outputs, pkgs, ... }:
-        (outputs.overlays.impermanence-module pkgs pkgs).impermanenceNixosModule args;
+      module = args@{ config, lib, outputs, pkgs, ... }:
+        let
+          persistPath = "/persist";
+          persistConfigs = config.environment.persistence or { };
+          usesPersist =
+            builtins.hasAttr persistPath persistConfigs
+            && (persistConfigs.${persistPath}.enable or true);
+        in
+        {
+          imports = [
+            ((outputs.overlays.impermanence-module pkgs pkgs).impermanenceNixosModule args)
+          ];
+
+          config = lib.mkIf usesPersist {
+            environment.systemPackages = with pkgs; [
+              age
+              ssh-to-age
+            ];
+          };
+        };
       default = import ./nixos/impermanence;
     };
     laptop = {
