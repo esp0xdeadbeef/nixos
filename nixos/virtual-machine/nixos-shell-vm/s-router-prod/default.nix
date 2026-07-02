@@ -28,6 +28,7 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./vlan2-kea-reservations-override.nix
+    ./legacy-parity-contract.nix
 
     (import ./renderers.nix {
       inherit
@@ -46,15 +47,4 @@ in
   ];
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
-
-  assertions = [
-    {
-      assertion = config.virtualisation.qemu.networkingOptions == qemuNetworkingOptions;
-      message = ''
-        s-router-prod must keep the legacy VM NIC contract:
-          eth0 -> vmbr4, MAC 52:54:00:12:34:56
-          eth1 -> vmbr1, MAC 52:54:00:12:34:57
-      '';
-    }
-  ];
 }
