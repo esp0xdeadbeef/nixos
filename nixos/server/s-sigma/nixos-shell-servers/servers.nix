@@ -36,6 +36,14 @@ let
       };
     }
     {
+      name = "s-router-prod";
+      args = {
+        autoStart = false;
+        description = "Production router canary VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
+      };
+    }
+    {
       name = "s-router-legacy-edge";
       args = {
         description = "s-router-legacy-edge VM (nixos-shell)";
