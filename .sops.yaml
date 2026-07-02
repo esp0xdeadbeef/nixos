@@ -205,6 +205,14 @@ creation_rules:
           - *l-esp-deadbeef
           - *s-router-core
           - *s-router-legacy-core
+  - path_regex: '^(secrets/)*s-router-prod.*\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-core
+          - *s-router-legacy-core
 
   - path_regex: '^secrets/isc_export_lan\.csv\.age$'
     input_type: binary
