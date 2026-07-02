@@ -3,40 +3,52 @@
 , pkgs
 , ...
 }:
+let
+  cryptswapBackingDevice = "/dev/disk/by-partlabel/disk-nvme0n1-swap";
+  cryptswapBackingUnit = "dev-disk-by\\x2dpartlabel-disk\\x2dnvme0n1\\x2dswap.device";
+  cryptswapKeyFile = "/persist/etc/diskunlock/cryptswap.key";
+  cryptswapMapper = "cryptswap";
+  cryptswapSwapUnit = "dev-mapper-cryptswap.swap";
+in
 {
-  boot.initrd.systemd.services.cryptswap-keyfile = {
-    description = "Stage cryptswap keyfile from persisted root";
-    requiredBy = [ "systemd-cryptsetup@cryptswap.service" ];
-    after = [ "systemd-cryptsetup@root.service" ];
-    before = [
-      "systemd-cryptsetup@cryptswap.service"
-    ];
-    unitConfig.DefaultDependencies = false;
-    serviceConfig.Type = "oneshot";
-    script = ''
-      mkdir -p /cryptswap-persist /run
-      mount -o subvol=/persist,ro /dev/mapper/root /cryptswap-persist
-      install -m 0400 /cryptswap-persist/etc/diskunlock/cryptswap.key /run/cryptswap.key
-      umount /cryptswap-persist
-    '';
-  };
 
   boot.initrd.luks.devices = lib.mkForce {
     root = {
       device = "/dev/disk/by-partlabel/disk-nvme0n1-luks";
       allowDiscards = true;
     };
-    cryptswap = {
-      device = "/dev/disk/by-partlabel/disk-nvme0n1-swap";
-      allowDiscards = true;
-      keyFile = "/run/cryptswap.key";
-      crypttabExtraOpts = [
-        "nofail"
-        "tries=1"
-        "timeout=5s"
-        "x-systemd.device-timeout=5s"
-      ];
+  };
+
+  systemd.services.cryptswap-unlock = {
+    description = "Unlock encrypted swap from persisted root keyfile";
+    requiredBy = [ cryptswapSwapUnit ];
+    requires = [ cryptswapBackingUnit ];
+    after = [
+      cryptswapBackingUnit
+      "persist.mount"
+    ];
+    before = [ cryptswapSwapUnit ];
+    unitConfig = {
+      DefaultDependencies = false;
+      RequiresMountsFor = [ cryptswapKeyFile ];
     };
+    path = [
+      pkgs.cryptsetup
+    ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      if cryptsetup status ${cryptswapMapper} >/dev/null 2>&1; then
+        exit 0
+      fi
+
+      cryptsetup open --allow-discards \
+        ${cryptswapBackingDevice} \
+        ${cryptswapMapper} \
+        --key-file ${cryptswapKeyFile}
+    '';
   };
 
   networking.useDHCP = lib.mkDefault true;
