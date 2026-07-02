@@ -37,6 +37,7 @@ keys:
   - &legacy-shared-router age1xm8ftcjlqsns5a4m74593hur7ltuxh2wqcrsl6ja2vqee664dclsq4yrkv
   - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
   - &hetz-test age1757z4z4t392kxuzfeajuaukh93na90e2p08t06k9ggpw6wa75dsshhqpzw
+  - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
 
 creation_rules:
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
@@ -188,6 +189,7 @@ creation_rules:
           - *l-esp-deadbeef
           - *s-router-edge
           - *s-router-legacy-edge
+          - *s-router-prod
 
   - path_regex: '^(secrets/)*s-router-legacy-edge.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
@@ -197,6 +199,13 @@ creation_rules:
           - *l-esp-deadbeef
           - *s-router-edge
           - *s-router-legacy-edge
+  - path_regex: '^(secrets/)*s-router-prod.*\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-prod
   - path_regex: '^(secrets/)*s-router-legacy-core.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
