@@ -79,7 +79,6 @@
     flameshot
     remmina
     spotify-player
-    thunderbird
     home-manager
   ];
 
