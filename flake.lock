@@ -1331,11 +1331,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1782920252,
-        "narHash": "sha256-XPLvQYnmEy1NnoahCG679BCZSvsOV/FeDIwqGVW5Ox0=",
+        "lastModified": 1783042714,
+        "narHash": "sha256-/ATibmw1raoYt64HnyPraPnyC8DCp3sA3gjbCPvIY2A=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-access-endpoint-nixos",
-        "rev": "6234a11baac4d6a60a45504e5cf022fd87b99ebb",
+        "rev": "b450a7e2845e9a9b58dca418a6b1287e2e415bb9",
         "type": "github"
       },
       "original": {
