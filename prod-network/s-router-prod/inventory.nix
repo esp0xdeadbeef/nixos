@@ -79,6 +79,15 @@ let
     };
   };
 
+  recursiveDns = address: {
+    forwarders = [
+      "1.1.1.1"
+      "9.9.9.9"
+    ];
+    outgoingInterfaces = [ address ];
+    roles.recursion.outgoingInterfaces = [ address ];
+  };
+
   dhcp4Advertisement =
     { tenant
     , interface
@@ -283,6 +292,10 @@ let
     // {
       statePolicy = persistentDhcpState;
 
+      services = {
+        dns = recursiveDns "192.168.1.1";
+      };
+
       advertisements = {
         dhcp4 = {
           tenant-vlan2 = dhcp4Advertisement {
@@ -321,6 +334,10 @@ let
     // {
       statePolicy = persistentDhcpState;
 
+      services = {
+        dns = recursiveDns "192.168.2.1";
+      };
+
       advertisements = {
         dhcp4 = {
           tenant-vlan7 = dhcp4Advertisement {
@@ -342,7 +359,17 @@ in
 {
   schemaVersion = 1;
 
-  endpoints = { };
+  endpoints = {
+    vlan2-dns = {
+      ipv4 = [ "192.168.1.1" ];
+      ipv6 = [ "fd42:1::1" ];
+    };
+
+    vlan7-dns = {
+      ipv4 = [ "192.168.2.1" ];
+      ipv6 = [ "fd42:dead:beef:7::1" ];
+    };
+  };
 
   deployment = {
     hosts = {

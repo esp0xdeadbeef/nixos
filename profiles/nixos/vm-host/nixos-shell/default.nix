@@ -1,14 +1,15 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}: let
+{ config
+, lib
+, pkgs
+, ...
+}:
+let
   cfg = config.local.vmHost.nixosShell;
   eno1RouterVms = cfg.eno1RouterVms;
   routerVmUnits = eno1RouterVms.units;
   escapedRouterVmUnits = lib.concatMapStringsSep " " lib.escapeShellArg routerVmUnits;
-in {
+in
+{
   options.local.vmHost.nixosShell.autoStart = lib.mkOption {
     type = lib.types.bool;
     default = true;
@@ -27,8 +28,7 @@ in {
     units = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
-        "s-router-legacy-edge-vm.service"
-        "s-router-legacy-core-vm.service"
+        "s-router-prod-vm.service"
       ];
       description = "systemd units controlled by the interface carrier watcher.";
     };
@@ -48,10 +48,10 @@ in {
     ];
 
     systemd.services.nixos-shell-eno1-router-vms = lib.mkIf eno1RouterVms.enable {
-      description = "Start or stop legacy router nixos-shell VMs from ${eno1RouterVms.interface} carrier";
-      wantedBy = ["multi-user.target"];
-      after = ["sys-subsystem-net-devices-${eno1RouterVms.interface}.device"];
-      wants = ["sys-subsystem-net-devices-${eno1RouterVms.interface}.device"];
+      description = "Start or stop router nixos-shell VMs from ${eno1RouterVms.interface} carrier";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "sys-subsystem-net-devices-${eno1RouterVms.interface}.device" ];
+      wants = [ "sys-subsystem-net-devices-${eno1RouterVms.interface}.device" ];
 
       path = [
         pkgs.coreutils

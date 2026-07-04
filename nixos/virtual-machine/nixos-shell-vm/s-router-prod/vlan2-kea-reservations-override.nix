@@ -6,6 +6,7 @@
 
 let
   runtimeReservationsFile = "/run/secrets/s-router-prod-vlan2-reservations.json";
+  runtimeUnboundLocalFile = "/run/unbound/s-router-prod-vlan2-local.conf";
 
   # Hostnames are private by default. Keep only names that are acceptable in the
   # rendered runtime Kea file; all other reservation hostnames are dropped.
@@ -51,21 +52,29 @@ in
             --argjson publicHostnames ${lib.escapeShellArg publicHostnamesJson} \
             --slurpfile reservations "$secret" \
             '
-              def masked_reservations:
+              def reservation_objects:
                 $reservations[0]
-                | map(
+                | ..
+                | objects
+                | select(."hw-address" != null and ."ip-address" != null);
+
+              def masked_reservations:
+                [
+                  reservation_objects
+                  |
                     {
                       "hw-address": ."hw-address",
                       "ip-address": ."ip-address"
                     }
                     + (
-                      if (.hostname != null and ($publicHostnames | index(.hostname)) != null) then
+                      .hostname as $hostname
+                      | if ($hostname != null and ($publicHostnames | index($hostname)) != null) then
                         { hostname: .hostname }
                       else
                         {}
                       end
                     )
-                  )
+                ]
                 | map(select(."hw-address" != null and ."ip-address" != null))
                 | sort_by(."hw-address")
                 | group_by(."hw-address")
@@ -92,9 +101,79 @@ in
 
           ${pkgs.coreutils}/bin/mv "$tmp" "$cfg"
         '';
+
+        generateUnboundLocalData = pkgs.writeShellScript "gen-s-router-prod-vlan2-unbound-local-data" ''
+          set -euo pipefail
+
+          secret=${lib.escapeShellArg runtimeReservationsFile}
+          out=${lib.escapeShellArg runtimeUnboundLocalFile}
+
+          if [ ! -r "$secret" ]; then
+            echo "[dns] ERROR: runtime reservation secret $secret missing" >&2
+            exit 1
+          fi
+
+          mkdir -p "$(${pkgs.coreutils}/bin/dirname "$out")"
+          tmp="$(${pkgs.coreutils}/bin/mktemp "$out.XXXXXX")"
+
+          ${pkgs.jq}/bin/jq -r '
+            def reservation_objects:
+              ..
+              | objects
+              | select(.hostname != null and ."ip-address" != null);
+
+            def safe_hostname:
+              type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._-]*$");
+
+            def safe_ipv4:
+              type == "string" and test("^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$");
+
+            [
+              reservation_objects
+              | select(.hostname | safe_hostname)
+              | select(."ip-address" | safe_ipv4)
+              | {
+                  hostname: (.hostname | sub("[.]$"; "")),
+                  address: ."ip-address"
+                }
+            ]
+            | unique_by(.hostname, .address)
+            | sort_by(.hostname, .address)
+            | .[]
+            | . as $record
+            | "local-data: \"" + $record.hostname + ".lan. A " + $record.address + "\"",
+              "local-data-ptr: \"" + $record.address + " " + $record.hostname + ".lan.\""
+          ' "$secret" > "$tmp"
+
+          ${pkgs.coreutils}/bin/mv "$tmp" "$out"
+        '';
       in
       {
         systemd.services.gen-kea-vlan2.serviceConfig.ExecStartPost = applyReservations;
+
+        services.unbound.settings.server = {
+          local-zone = lib.mkBefore [
+            "lan. static"
+            "1.168.192.in-addr.arpa. static"
+          ];
+          include = lib.mkAfter [ runtimeUnboundLocalFile ];
+        };
+
+        systemd.services.gen-s-router-prod-vlan2-unbound-local-data = {
+          wantedBy = [ "multi-user.target" ];
+          before = [ "unbound.service" ];
+          requiredBy = [ "unbound.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = generateUnboundLocalData;
+            RemainAfterExit = true;
+          };
+        };
+
+        systemd.services.unbound = {
+          after = [ "gen-s-router-prod-vlan2-unbound-local-data.service" ];
+          requires = [ "gen-s-router-prod-vlan2-unbound-local-data.service" ];
+        };
       };
   };
 }

@@ -38,6 +38,7 @@ let
     {
       name = "s-router-legacy-edge";
       args = {
+        autoStart = false;
         description = "s-router-legacy-edge VM (nixos-shell)";
         repository = "path:${self.lib.vmSourceForHost "s-router-legacy-edge"}";
       };
@@ -45,6 +46,7 @@ let
     {
       name = "s-router-legacy-core";
       args = {
+        autoStart = false;
         description = "s-router-core VM (nixos-shell)";
         repository = "path:${self.lib.vmSourceForHost "s-router-legacy-core"}";
       };

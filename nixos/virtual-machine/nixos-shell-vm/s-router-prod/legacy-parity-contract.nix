@@ -37,6 +37,60 @@ let
   hasExpectedContainers =
     builtins.all (name: builtins.elem name containerNames) expectedContainers
     && !(builtins.hasAttr "external-isp" (config.containers or { }));
+
+  expectedDnsForwarders = [
+    "1.1.1.1"
+    "9.9.9.9"
+  ];
+
+  unboundForwardersFor =
+    containerName:
+    let
+      settings = config.containers.${containerName}.config.services.unbound.settings or { };
+      forwardZones = settings."forward-zone" or [ ];
+    in
+    lib.unique (lib.flatten (map (zone: zone."forward-addr" or [ ]) forwardZones));
+
+  unboundServerFor =
+    containerName:
+      config.containers.${containerName}.config.services.unbound.settings.server or { };
+
+  hasVlan2RuntimeLocalDns =
+    let
+      server = unboundServerFor "access-vlan2";
+    in
+    builtins.elem "lan. static" (server.local-zone or [ ])
+    && builtins.elem "1.168.192.in-addr.arpa. static" (server.local-zone or [ ])
+    && builtins.elem "/run/unbound/s-router-prod-vlan2-local.conf" (server.include or [ ])
+    && builtins.hasAttr "gen-s-router-prod-vlan2-unbound-local-data"
+      config.containers.access-vlan2.config.systemd.services;
+
+  dnsNftScriptFor =
+    containerName:
+      config.containers.${containerName}.config.systemd.services.nft-allow-dns-service.script or "";
+
+  dnsEgressFragments = {
+    access-vlan2 = [
+      "ip saddr 192.168.1.1 ip daddr 1.1.1.1 udp dport 53"
+      "ip saddr 192.168.1.1 ip daddr 9.9.9.9 udp dport 53"
+      "ip saddr 192.168.1.1 ip daddr 1.1.1.1 tcp dport 53"
+      "ip saddr 192.168.1.1 ip daddr 9.9.9.9 tcp dport 53"
+    ];
+
+    access-vlan7 = [
+      "ip saddr 192.168.2.1 ip daddr 1.1.1.1 udp dport 53"
+      "ip saddr 192.168.2.1 ip daddr 9.9.9.9 udp dport 53"
+      "ip saddr 192.168.2.1 ip daddr 1.1.1.1 tcp dport 53"
+      "ip saddr 192.168.2.1 ip daddr 9.9.9.9 tcp dport 53"
+    ];
+  };
+
+  hasDnsEgressRules =
+    containerName:
+    let
+      script = dnsNftScriptFor containerName;
+    in
+    builtins.all (fragment: lib.hasInfix fragment script) dnsEgressFragments.${containerName};
 in
 {
   assertions = [
@@ -127,6 +181,30 @@ in
         == "${outPath}/prod-network/s-router-prod/inventory.nix";
       message = ''
         s-router-prod must consume the production intent.nix and inventory.nix directly.
+      '';
+    }
+    {
+      assertion =
+        unboundForwardersFor "access-vlan2" == expectedDnsForwarders
+        && unboundForwardersFor "access-vlan7" == expectedDnsForwarders;
+      message = ''
+        s-router-prod must render explicit prod-like recursive DNS forwarders for
+        both client VLAN access containers.
+      '';
+    }
+    {
+      assertion = hasDnsEgressRules "access-vlan2" && hasDnsEgressRules "access-vlan7";
+      message = ''
+        s-router-prod must render DNS service egress from the local gateway source
+        addresses, matching the FS-540-HDS-010-SDS-010-SMS-045 intent pattern.
+      '';
+    }
+    {
+      assertion = hasVlan2RuntimeLocalDns;
+      message = ''
+        s-router-prod must publish VLAN 2 runtime reservation hostnames through
+        an Unbound lan. local-zone without leaking the private hostname source
+        into inventory, flake eval output, or the Nix store.
       '';
     }
   ];

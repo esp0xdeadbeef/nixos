@@ -110,13 +110,97 @@ in
         }
       ];
 
-      endpoints = [ ];
+      endpoints = [
+        {
+          kind = "host";
+          name = "vlan2-dns";
+          tenant = "vlan2";
+          ipv4 = [ "192.168.1.1" ];
+          ipv6 = [ "fd42:1::1" ];
+        }
+        {
+          kind = "host";
+          name = "vlan7-dns";
+          tenant = "vlan7";
+          ipv4 = [ "192.168.2.1" ];
+          ipv6 = [ "fd42:dead:beef:7::1" ];
+        }
+      ];
     };
 
     communicationContract = {
       inherit trafficTypes;
-      services = [ ];
+      services = [
+        {
+          name = "vlan2-dns";
+          providers = [ "vlan2-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "vlan7-dns";
+          providers = [ "vlan7-dns" ];
+          trafficType = "dns";
+        }
+      ];
       relations = [
+        {
+          id = "allow-vlan2-to-vlan2-dns";
+          priority = 80;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
+        {
+          id = "allow-vlan7-to-vlan7-dns";
+          priority = 81;
+          from = {
+            kind = "tenant";
+            name = "vlan7";
+          };
+          to = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
+        {
+          id = "allow-vlan2-dns-to-wan";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
+        {
+          id = "allow-vlan7-dns-to-wan";
+          priority = 91;
+          from = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
         (allowTenantToWan "vlan2" 100)
         (allowTenantToWan "vlan7" 110)
       ];
@@ -125,6 +209,8 @@ in
         tenant-vlan2 = "vlan2";
         tenant-vlan7 = "vlan7";
         external-wan = "wan";
+        service-vlan2-dns = "vlan2-dns";
+        service-vlan7-dns = "vlan7-dns";
       };
     };
 
