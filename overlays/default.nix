@@ -58,8 +58,33 @@
               # Referencing outPath makes the derivation depend on the whole flake
               # source and can force rebuilds when unrelated repository files change.
               ../patches/xlayoutdisplay-max-resolution.patch
+              ../patches/xlayoutdisplay-display-selectors.patch
             ];
         });
+
+      xlayoutdisplay-selectors = final.writeShellApplication {
+        name = "xlayoutdisplay-selectors";
+        runtimeInputs = [
+          final.gawk
+          final.xlayoutdisplay
+        ];
+        text = ''
+          xlayoutdisplay --info | awk '
+            /^[^[:space:]].* (active|connected)/ {
+              output = $1
+              selectors = ""
+              for (i = 1; i <= NF; i++) {
+                if ($i ~ /^[[:alnum:]]+:[[:alnum:]][[:alnum:]:]*$/ || $i ~ /^edid:[[:xdigit:]]+$/) {
+                  selectors = selectors " " $i
+                }
+              }
+              if (selectors != "") {
+                print output selectors
+              }
+            }
+          '
+        '';
+      };
 
       libvirt =
         builtins.trace

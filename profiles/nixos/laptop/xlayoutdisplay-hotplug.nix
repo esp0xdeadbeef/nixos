@@ -245,6 +245,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    environment.systemPackages = [
+      pkgs.xlayoutdisplay-selectors
+    ];
+
     assertions = [
       {
         assertion = cfg.configLines == [ ] || primaryUser != null && primaryHome != null;

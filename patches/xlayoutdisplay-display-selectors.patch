@@ -1,0 +1,184 @@
+diff -ruN xlayoutdisplay-old/src/DisplayRules.cpp xlayoutdisplay-new/src/DisplayRules.cpp
+--- xlayoutdisplay-old/src/DisplayRules.cpp	2026-06-25 02:58:42.437440311 +0200
++++ xlayoutdisplay-new/src/DisplayRules.cpp	2026-07-04 18:00:00.000000000 +0200
+@@ -57,6 +57,14 @@
+         return output->edid && strcasecmp(wanted.c_str(), output->edid->hash().c_str()) == 0;
+     }
+ 
++    if (output->edid && strcasecmp(selector.c_str(), output->edid->modelSelector().c_str()) == 0) {
++        return true;
++    }
++
++    if (output->edid && strcasecmp(selector.c_str(), output->edid->uniqueSelector().c_str()) == 0) {
++        return true;
++    }
++
+     return false;
+ }
+ 
+diff -ruN xlayoutdisplay-old/src/Edid.cpp xlayoutdisplay-new/src/Edid.cpp
+--- xlayoutdisplay-old/src/Edid.cpp	2026-06-25 00:56:43.199788900 +0200
++++ xlayoutdisplay-new/src/Edid.cpp	2026-07-04 18:00:00.000000000 +0200
+@@ -16,10 +16,12 @@
+ #include "Edid.h"
+ 
+ #include <cstring>
++#include <cctype>
+ #include <cstdint>
+ #include <iomanip>
+ #include <sstream>
+ #include <cmath>
++#include <map>
+ #include <system_error>
+ 
+ using namespace std;
+@@ -56,3 +58,97 @@
++static string normalizeSelectorPart(const string &value) {
++    string normalized;
++
++    for (const auto &ch : value) {
++        if (isalnum(static_cast<unsigned char>(ch))) {
++            normalized.push_back(static_cast<char>(tolower(static_cast<unsigned char>(ch))));
++        }
++    }
++
++    return normalized;
++}
++
++static string fnv64Hex(const string &value) {
++    uint64_t hash = 14695981039346656037ULL;
++
++    for (const auto &ch : value) {
++        hash ^= static_cast<unsigned char>(ch);
++        hash *= 1099511628211ULL;
++    }
++
++    stringstream ss;
++    ss << hex << setw(16) << setfill('0') << hash;
++    return ss.str();
++}
++
++static string manufacturerCodeToName(const string &code) {
++    static const map<string, string> names = {
++        {"SAM", "samsung"},
++        {"DEL", "dell"},
++        {"GSM", "lg"},
++        {"ACR", "acer"},
++        {"APP", "apple"},
++        {"BNQ", "benq"},
++        {"HWP", "hp"},
++        {"LEN", "lenovo"},
++        {"PHL", "philips"},
++        {"SNY", "sony"},
++    };
++
++    const auto name = names.find(code);
++    if (name != names.end()) {
++        return name->second;
++    }
++
++    return normalizeSelectorPart(code);
++}
++
++string Edid::manufacturerCode() const {
++    const uint16_t raw = (static_cast<uint16_t>(edid[8]) << 8) | edid[9];
++    string code;
++    code.push_back(static_cast<char>('A' + ((raw >> 10) & 0x1f) - 1));
++    code.push_back(static_cast<char>('A' + ((raw >> 5) & 0x1f) - 1));
++    code.push_back(static_cast<char>('A' + (raw & 0x1f) - 1));
++    return code;
++}
++
++string Edid::descriptorText(const unsigned char tag) const {
++    for (size_t descriptor = 54; descriptor + 18 <= EDID_MIN_LENGTH; descriptor += 18) {
++        if (edid[descriptor] == 0x00 && edid[descriptor + 1] == 0x00 && edid[descriptor + 2] == 0x00 &&
++            edid[descriptor + 3] == tag) {
++            string value;
++            for (size_t offset = descriptor + 5; offset < descriptor + 18; offset++) {
++                const unsigned char ch = edid[offset];
++                if (ch == 0x00 || ch == 0x0a) {
++                    break;
++                }
++                value.push_back(static_cast<char>(ch));
++            }
++            return value;
++        }
++    }
++
++    return "";
++}
++
++string Edid::displayName() const {
++    return descriptorText(0xfc);
++}
++
++string Edid::serialNumber() const {
++    return descriptorText(0xff);
++}
++
++string Edid::modelSelector() const {
++    const string vendor = manufacturerCodeToName(manufacturerCode());
++    const string model = normalizeSelectorPart(displayName());
++    return model.empty() ? vendor : vendor + ":" + model;
++}
++
++string Edid::uniqueSelector() const {
++    const string serial = normalizeSelectorPart(serialNumber());
++    return serial.empty() ? modelSelector() : modelSelector() + ":" + fnv64Hex(serial);
++}
++
+ unsigned int Edid::maxCmHoriz() const {
+     return edid[EDID_BYTE_MAX_CM_HORIZ];
+ }
+diff -ruN xlayoutdisplay-old/src/Edid.h xlayoutdisplay-new/src/Edid.h
+--- xlayoutdisplay-old/src/Edid.h	2026-06-25 00:56:43.199788900 +0200
++++ xlayoutdisplay-new/src/Edid.h	2026-07-04 18:00:00.000000000 +0200
+@@ -35,6 +35,18 @@
+ 
+     virtual std::string hash() const;
+ 
++    virtual std::string manufacturerCode() const;
++
++    virtual std::string descriptorText(unsigned char tag) const;
++
++    virtual std::string displayName() const;
++
++    virtual std::string serialNumber() const;
++
++    virtual std::string modelSelector() const;
++
++    virtual std::string uniqueSelector() const;
++
+     virtual unsigned int maxCmHoriz() const;
+ 
+     virtual unsigned int maxCmVert() const;
+diff -ruN xlayoutdisplay-old/src/calculations.cpp xlayoutdisplay-new/src/calculations.cpp
+--- xlayoutdisplay-old/src/calculations.cpp	2026-06-25 02:58:47.419423311 +0200
++++ xlayoutdisplay-new/src/calculations.cpp	2026-07-04 18:00:00.000000000 +0200
+@@ -171,6 +171,10 @@
+         if (output->edid) {
+             ss << ' ' << output->edid->maxCmHoriz() << "cm/" << output->edid->maxCmVert() << "cm";
+             ss << " edid:" << output->edid->hash();
++            ss << ' ' << output->edid->modelSelector();
++            if (output->edid->uniqueSelector() != output->edid->modelSelector()) {
++                ss << ' ' << output->edid->uniqueSelector();
++            }
+         }
+         if (output->currentMode && output->currentPos) {
+             ss << ' ' << output->currentMode->width << 'x' << output->currentMode->height;
+diff -ruN xlayoutdisplay-old/test/test-calculations.cpp xlayoutdisplay-new/test/test-calculations.cpp
+--- xlayoutdisplay-old/test/test-calculations.cpp	2026-06-25 02:58:47.419423311 +0200
++++ xlayoutdisplay-new/test/test-calculations.cpp	2026-07-04 18:00:00.000000000 +0200
+@@ -440,11 +440,11 @@
+ 
+     const string expected = ""
+-            "dis disconnected 15cm/16cm edid:ccb847a6457d37a3\n"
++            "dis disconnected 15cm/16cm edid:ccb847a6457d37a3 nay\n"
+             "con connected\n"
+             "   2x3 4Hz\n"
+             "  !6x7 8Hz\n"
+-            "act active 17cm/18cm edid:ccb847a6457d37a3 6x7+13+14 8Hz\n"
++            "act active 17cm/18cm edid:ccb847a6457d37a3 nay 6x7+13+14 8Hz\n"
+             " +!10x11 12Hz\n"
+             "*  6x7 8Hz\n"
+             "   2x3 4Hz\n"
