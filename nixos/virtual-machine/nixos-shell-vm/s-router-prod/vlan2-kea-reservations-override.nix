@@ -149,7 +149,7 @@ in
         '';
       in
       {
-        systemd.services.gen-kea-vlan2.serviceConfig.ExecStartPost = applyReservations;
+        systemd.services.gen-kea-vlan2.serviceConfig.ExecStartPost = [ applyReservations ];
 
         services.unbound.settings.server = {
           local-zone = lib.mkBefore [

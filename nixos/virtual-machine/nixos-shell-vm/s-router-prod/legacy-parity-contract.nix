@@ -91,6 +91,39 @@ let
       script = dnsNftScriptFor containerName;
     in
     builtins.all (fragment: lib.hasInfix fragment script) dnsEgressFragments.${containerName};
+
+  keaServiceFor =
+    containerName: vlanName:
+      config.containers.${containerName}.config.systemd.services."kea-dhcp4-${vlanName}" or { };
+
+  keaGenServiceFor =
+    containerName: vlanName:
+      config.containers.${containerName}.config.systemd.services."gen-kea-${vlanName}" or { };
+
+  execStartPostList =
+    value:
+    if builtins.isList value then
+      value
+    else if value == null then
+      [ ]
+    else
+      [ value ];
+
+  hasLegacyKeaLeasePaths =
+    let
+      hasContainer =
+        containerName: vlanName:
+        let
+          keaService = keaServiceFor containerName vlanName;
+          genService = keaGenServiceFor containerName vlanName;
+          postHooks = execStartPostList (genService.serviceConfig.ExecStartPost or null);
+        in
+        (keaService.serviceConfig.StateDirectory or null) == "kea"
+        && builtins.any
+          (hook: lib.hasInfix "rewrite-kea-${vlanName}-lease-path" (toString hook))
+          postHooks;
+    in
+    hasContainer "access-vlan2" "vlan2" && hasContainer "access-vlan7" "vlan7";
 in
 {
   assertions = [
@@ -205,6 +238,17 @@ in
         s-router-prod must publish VLAN 2 runtime reservation hostnames through
         an Unbound lan. local-zone without leaking the private hostname source
         into inventory, flake eval output, or the Nix store.
+      '';
+    }
+    {
+      assertion = hasLegacyKeaLeasePaths;
+      message = ''
+        s-router-prod Kea lease databases must stay legacy-compatible at
+        /var/lib/kea/<vlan>.leases with StateDirectory=kea.
+
+        Kea's memfile path security only allows lease database files directly
+        under /var/lib/kea; nested rendered paths under /var/lib/kea/dhcp4/...
+        make kea-dhcp4 fail before serving DHCP.
       '';
     }
   ];
