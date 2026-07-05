@@ -13,6 +13,15 @@ let
   swaySpotifyEnabled = config.local.sway.spotify.enable;
   swaySpotifyCommand = config.local.sway.spotify.command;
   displayStartupCommand = config.local.i3.display.startupCommand;
+  onePasswordGuiEnabled =
+    (os.programs._1password-gui.enable or false)
+    || hasPackage [
+      "1password"
+      "1password-gui"
+    ];
+  onePasswordGuiPackage = os.programs._1password-gui.package or pkgs._1password-gui;
+  onePasswordCommand = "${onePasswordGuiPackage}/bin/1password --silent";
+  onePasswordSwayCommand = "${pkgs.coreutils}/bin/env NIXOS_OZONE_WL=1 ${onePasswordCommand}";
   packageNames =
     let
       systemPackages = os.environment.systemPackages or [ ];
@@ -31,6 +40,9 @@ let
   '';
   teamsAutostart = execAlways: ''
     ${execAlways} ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -x teams-for-linux >/dev/null || exec ${pkgs.teams-for-linux}/bin/teams-for-linux'
+  '';
+  onePasswordAutostart = execAlways: command: ''
+    ${execAlways} ${pkgs.runtimeShell} -c '${pkgs.procps}/bin/pgrep -u "$USER" -x 1password >/dev/null || ${pkgs.procps}/bin/pgrep -u "$USER" -x 1Password >/dev/null || exec ${command}'
   '';
 in
 {
@@ -60,6 +72,7 @@ in
     exec --no-startup-id ${pkgs.dunst}/bin/dunst
     exec --no-startup-id ${pkgs.numlockx}/bin/numlockx off
     ${autotilingAutostart "exec_always --no-startup-id"}
+    ${lib.optionalString onePasswordGuiEnabled (onePasswordAutostart "exec_always --no-startup-id" onePasswordCommand)}
     ${lib.optionalString i3SpotifyEnabled (spotifyAutostart "exec_always --no-startup-id" i3SpotifyCommand)}
     ${lib.optionalString hasTeams (teamsAutostart "exec_always --no-startup-id")}
   '';
@@ -71,6 +84,7 @@ in
     ${lib.optionalString networkManagerEnabled "exec ${pkgs.networkmanagerapplet}/bin/nm-applet --indicator"}
     ${polkitAutostart "exec_always"}
     ${autotilingAutostart "exec_always"}
+    ${lib.optionalString onePasswordGuiEnabled (onePasswordAutostart "exec_always" onePasswordSwayCommand)}
     ${lib.optionalString swaySpotifyEnabled (spotifyAutostart "exec_always" swaySpotifyCommand)}
     ${lib.optionalString hasTeams (teamsAutostart "exec_always")}
   '';

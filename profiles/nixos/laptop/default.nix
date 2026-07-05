@@ -1,4 +1,7 @@
-{ profiles, ... }:
+{ outPath
+, profiles
+, ...
+}:
 {
   imports = [
     profiles.nixos.laptop.autorandr-default
@@ -7,6 +10,7 @@
     profiles.nixos.laptop.power
     profiles.nixos.laptop.xlayoutdisplay-hotplug
     profiles.nixos.llm-clients.agents
+    "${outPath}/library/01-general/packages/password-managers/1password.nix"
   ];
 
   local.shell.zshPrompt = {
