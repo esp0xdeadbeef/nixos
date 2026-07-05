@@ -255,10 +255,18 @@
           network = config.systemd.network;
           netdevs = builtins.attrValues (network.netdevs or { });
           networks = builtins.attrValues (network.networks or { });
+          networkEntries =
+            map
+              (name: {
+                inherit name;
+                value = network.networks.${name};
+              })
+              (builtins.attrNames (network.networks or { }));
 
           count = pred: values: lib.length (lib.filter pred values);
           has = value: values: builtins.elem value values;
           atLeastOne = pred: values: count pred values > 0;
+          firstNetwork = pred: entries: lib.findFirst (entry: pred entry.value) null entries;
 
           isDisabled = value: value == false || value == "no" || value == "false";
           isIpv4Dhcp = value: value == true || value == "yes" || value == "ipv4";
@@ -286,9 +294,9 @@
             && (net.networkConfig.Bridge or null) == bridge
             && isDisabled (net.networkConfig.DHCP or "no");
 
-          bridgeNetwork = net:
-            (net.matchConfig.Name or null) == bridge
-            && isIpv4Dhcp (net.networkConfig.DHCP or null);
+          effectiveBridgeNetwork = firstNetwork (net: (net.matchConfig.Name or null) == bridge) networkEntries;
+          effectiveBridgeNetworkHasIpv4Dhcp =
+            effectiveBridgeNetwork != null && isIpv4Dhcp (effectiveBridgeNetwork.value.networkConfig.DHCP or null);
         in
         {
           errors =
@@ -304,8 +312,8 @@
             ++ lib.optionals (!atLeastOne vlanNetwork networks) [
               "${hostName}: runtime must define at least one eth0.2 network enslaved into vlan2 with DHCP disabled"
             ]
-            ++ lib.optionals (!atLeastOne bridgeNetwork networks) [
-              "${hostName}: runtime must define at least one vlan2 network with IPv4 DHCP and optional IPv6 SLAAC/RA client"
+            ++ lib.optionals (!effectiveBridgeNetworkHasIpv4Dhcp) [
+              "${hostName}: runtime first matching vlan2 network must use IPv4 DHCP with optional IPv6 SLAAC/RA client"
             ];
         };
 
