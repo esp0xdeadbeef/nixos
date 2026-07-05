@@ -2,11 +2,10 @@
 
 parent: vlanId: opts:
 
-{
-  config,
-  lib,
-  pkgs,
-  ...
+{ config
+, lib
+, pkgs
+, ...
 }:
 
 let
@@ -21,8 +20,11 @@ let
   # Whether the host should DHCP on the bridge (Proxmox-style)
   hostDHCP = opts.hostDHCP or true;
 
-  # Convenience: systemd-networkd expects strings like "no"/"ipv4"
-  ll = "no";
+  # Whether the host should accept IPv6 RA/SLAAC on the bridge.
+  hostSLAAC = opts.hostSLAAC or true;
+
+  # Convenience: systemd-networkd expects strings like "no"/"ipv4"/"ipv6"
+  noLinkLocal = "no";
 in
 {
   networking.useNetworkd = true;
@@ -64,7 +66,7 @@ in
         matchConfig.Name = parent;
         networkConfig = {
           DHCP = "no";
-          LinkLocalAddressing = ll;
+          LinkLocalAddressing = noLinkLocal;
           VLAN = [ vlanIf ];
         };
       };
@@ -74,7 +76,7 @@ in
         matchConfig.Name = vlanIf;
         networkConfig = {
           DHCP = "no";
-          LinkLocalAddressing = ll;
+          LinkLocalAddressing = noLinkLocal;
 
           # enslave VLAN link into bridge
           Bridge = bridge;
@@ -86,10 +88,8 @@ in
         matchConfig.Name = bridge;
         networkConfig = {
           DHCP = if hostDHCP then "ipv4" else "no";
-          LinkLocalAddressing = ll;
-
-          # keep v6 from doing weird RA surprises unless you want it
-          IPv6AcceptRA = "no";
+          LinkLocalAddressing = if hostSLAAC then "ipv6" else noLinkLocal;
+          IPv6AcceptRA = if hostSLAAC then "yes" else "no";
         };
       };
     };

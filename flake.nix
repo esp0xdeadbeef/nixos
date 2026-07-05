@@ -288,8 +288,7 @@
 
           bridgeNetwork = net:
             (net.matchConfig.Name or null) == bridge
-            && isIpv4Dhcp (net.networkConfig.DHCP or null)
-            && isDisabled (net.networkConfig.IPv6AcceptRA or "no");
+            && isIpv4Dhcp (net.networkConfig.DHCP or null);
         in
         {
           errors =
@@ -306,7 +305,7 @@
               "${hostName}: runtime must define at least one eth0.2 network enslaved into vlan2 with DHCP disabled"
             ]
             ++ lib.optionals (!atLeastOne bridgeNetwork networks) [
-              "${hostName}: runtime must define at least one vlan2 network with IPv4 DHCP and IPv6 RA disabled"
+              "${hostName}: runtime must define at least one vlan2 network with IPv4 DHCP and optional IPv6 SLAAC/RA client"
             ];
         };
 
