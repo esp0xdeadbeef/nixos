@@ -1,7 +1,5 @@
 { inputs
-, outputs
 , lib
-, config
 , pkgs
 , profiles
 , outPath
@@ -19,8 +17,16 @@ in
     profiles.nixos.desktop.i3
     profiles.nixos.editors.neovim
     profiles.nixos.hardware.clock-sync
+    profiles.nixos.home-manager.deadbeef
+    profiles.nixos.nix.flake-inputs
+    profiles.nixos.nixpkgs.local-overlays
+    profiles.nixos.sops.persist-root-age-key-file
+    profiles.nixos.sops.persist-root-ssh
+    profiles.nixos.ssh.password-login
+    profiles.nixos.users.deadbeef-sops
 
     inputs.disko.nixosModules.disko
+    inputs.sops-nix.nixosModules.sops
 
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
@@ -32,77 +38,24 @@ in
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x13s
 
     profiles.nixos.impermanence.module
-    inputs.home-manager.nixosModules.home-manager
 
-    "${outPath}/library/01-general/system/garbage-collection.nix"
-    "${outPath}/library/01-general/system/autoupdate.nix"
     "${outPath}/library/01-general/desktop/fonts.nix"
 
     #"${outPath}/library/01-general/desktop/shell-env.nix"
-
-    inputs.sops-nix.nixosModules.sops
   ];
+
   sops.defaultSopsFile = "${outPath}/secrets/${hostName}-default.yaml";
-  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
-  sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
-  sops.secrets."deadbeef-passwd" = {
-    neededForUsers = true; # make it available before the user is created
-  };
+
   time.timeZone = "Europe/Amsterdam";
-
-  home-manager = {
-    sharedModules = [
-      inputs.sops-nix.homeManagerModules.sops
-    ];
-    extraSpecialArgs = {
-      inherit inputs outputs profiles outPath;
-    };
-
-    users = {
-      deadbeef = import "${outPath}/home-manager/${hostName}/home.nix";
-    };
-  };
 
   nixpkgs = {
     overlays = [
-      outputs.overlays.additions
-      outputs.overlays.modifications
-      outputs.overlays.unstable-packages
-
       # Widevine patch.
       inputs.nixos-aarch64-widevine.overlays.default
     ];
 
-    config = {
-      allowUnfree = true;
-    };
-
     hostPlatform = "aarch64-linux";
   };
-
-  nix =
-    let
-      flakeInputs = lib.filterAttrs (_: lib.isType "flake") inputs;
-    in
-    {
-      settings = {
-        experimental-features = "nix-command flakes";
-
-        # Opinionated: disable global registry.
-        flake-registry = "";
-
-        # Workaround for:
-        # https://github.com/NixOS/nix/issues/9574
-        nix-path = config.nix.nixPath;
-      };
-
-      # Opinionated: disable channels.
-      channel.enable = false;
-
-      # Opinionated: make flake registry and nix path match flake inputs.
-      registry = lib.mapAttrs (_: flake: { inherit flake; }) flakeInputs;
-      nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
-    };
 
   networking.hostName = hostName;
   networking.networkmanager.enable = true;
@@ -176,33 +129,18 @@ in
 
   users.mutableUsers = false;
 
-  users.users = {
-    deadbeef = {
-      #initialPassword = " ";
-      hashedPasswordFile = config.sops.secrets.deadbeef-passwd.path;
-      isNormalUser = true;
+  users.users.deadbeef = {
+    openssh.authorizedKeys.keys = [
+      (keyFor "l-portal")
+      (keyFor "l-esp")
+      (keyFor "l-esp-alt")
+      (keyFor "l-esp-root")
+      (keyFor "l-esp-rsa")
+    ];
 
-      openssh.authorizedKeys.keys = [
-        (keyFor "l-portal")
-        (keyFor "l-esp")
-        (keyFor "l-esp-alt")
-        (keyFor "l-esp-root")
-        (keyFor "l-esp-rsa")
-      ];
-
-      extraGroups = [
-        "wheel"
-      ];
-    };
-  };
-
-  services.openssh = {
-    enable = true;
-
-    settings = {
-      PermitRootLogin = "no";
-      PasswordAuthentication = true;
-    };
+    extraGroups = [
+      "wheel"
+    ];
   };
 
   system.stateVersion = "24.11";

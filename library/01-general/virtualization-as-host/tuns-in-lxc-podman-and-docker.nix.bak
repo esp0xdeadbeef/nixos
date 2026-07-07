@@ -1,9 +1,0 @@
-{ config, lib, pkgs, ... }:
-
-{
-  #sadly it didn't work in podman, disabled it right now...
-  boot.kernelModules = [ "tun" ];
-  services.udev.extraRules = ''
-    KERNEL=="tun", MODE="0666", OPTIONS+="static_node=net/tun"
-  '';
-}

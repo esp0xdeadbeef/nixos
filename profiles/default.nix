@@ -29,16 +29,24 @@
     };
     nixpkgs = {
       allow-unfree = import ./nixos/nixpkgs/allow-unfree.nix;
+      local-overlays = import ./nixos/nixpkgs/local-overlays.nix;
+    };
+    nix = {
+      flake-inputs = import ./nixos/nix/flake-inputs.nix;
     };
     shell = {
       fish = import ./nixos/shell/fish.nix;
       zsh-prompt = import ./nixos/shell/zsh-prompt.nix;
+    };
+    home-manager = {
+      deadbeef = import ./nixos/home-manager/deadbeef.nix;
     };
     hardware = {
       clock-sync = import ./nixos/hardware/clock-sync.nix;
     };
     ssh = {
       deadbeef-authorized-keys = import ./nixos/ssh/deadbeef-authorized-keys.nix;
+      password-login = import ./nixos/ssh/password-login.nix;
     };
     network = {
       private = import ./nixos/network/private.nix;
@@ -46,6 +54,14 @@
     };
     server = {
       dell = import ./nixos/server/dell.nix;
+      dell-vm-host = import ./nixos/server/dell-vm-host.nix;
+    };
+    sops = {
+      persist-root-age-key-file = import ./nixos/sops/persist-root-age-key-file.nix;
+      persist-root-ssh = import ./nixos/sops/persist-root-ssh.nix;
+    };
+    users = {
+      deadbeef-sops = import ./nixos/users/deadbeef-sops.nix;
     };
     virtualization = {
       docker = import ./nixos/virtualization/docker.nix;
@@ -89,12 +105,16 @@
       autorandr-default = import ./nixos/laptop/autorandr-default.nix;
       default = import ./nixos/laptop;
       dock = import ./nixos/laptop/dock.nix;
+      intel-workstation = import ./nixos/laptop/intel-workstation.nix;
       monitor-layouts = import ./nixos/laptop/monitor-layouts.nix;
       power = import ./nixos/laptop/power.nix;
       xlayoutdisplay-hotplug = import ./nixos/laptop/xlayoutdisplay-hotplug.nix;
     };
     vm-host = {
       nixos-shell = import ./nixos/vm-host/nixos-shell;
+    };
+    nixos-shell-host = {
+      common = import ./nixos/nixos-shell-host/common.nix;
     };
     workstation = {
       android = import ./nixos/workstation/android.nix;

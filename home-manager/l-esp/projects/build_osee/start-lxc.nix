@@ -1,8 +1,7 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
+{ config
+, pkgs
+, lib
+, ...
 }:
 
 let
@@ -10,7 +9,7 @@ let
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
-    # Defined in nixos/nixos/l-esp/osee/bind-to-lxc.nix
+    # Defined in nixos/laptop/l-esp/optional/build_osee/lxc-osee/bind-to-lxc.nix
     # bindfs mount (no password prompt if you’ve added this to sudoers)
     # sudo ${pkgs.bindfs}/bin/bindfs \
     #   --uid-offset=100000 --gid-offset=100900 \

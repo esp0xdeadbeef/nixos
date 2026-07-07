@@ -1,10 +1,9 @@
 { inputs
-, outputs
 , lib
 , config
-, pkgs
 , name
 , outPath
+, profiles
 , ...
 }:
 
@@ -14,6 +13,10 @@ in
 {
   imports = [
     inputs.nixos-shell.nixosModules.nixos-shell
+    profiles.nixos.nix.flake-inputs
+    profiles.nixos.nixpkgs.allow-unfree
+    profiles.nixos.nixpkgs.local-overlays
+
     "${outPath}/library/10-vms/default.nix"
     "${outPath}/library/01-general/desktop/shell-env.nix"
     "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
@@ -36,30 +39,6 @@ in
   };
 
   security.sudo.wheelNeedsPassword = false;
-
-  nixpkgs = {
-    overlays = [
-      outputs.overlays.additions
-      outputs.overlays.modifications
-      outputs.overlays.unstable-packages
-    ];
-    config.allowUnfree = true;
-  };
-
-  nix =
-    let
-      flakeInputs = lib.filterAttrs (_: lib.isType "flake") inputs;
-    in
-    {
-      settings = {
-        experimental-features = "nix-command flakes";
-        flake-registry = "";
-        nix-path = config.nix.nixPath;
-      };
-      channel.enable = false;
-      registry = lib.mapAttrs (_: flake: { inherit flake; }) flakeInputs;
-      nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
-    };
 
   virtualisation = {
     cores = 2;

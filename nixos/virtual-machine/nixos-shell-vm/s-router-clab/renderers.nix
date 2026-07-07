@@ -42,12 +42,39 @@ let
   };
 
   render-clab =
-    inputs.network-renderer-containerlab-linux-backend.libBySystem.${system}.renderer.hostModule (
-      rendererInput
-      // {
-        inherit lib selectorFile;
-      }
-    );
+    { lib, pkgs, ... }:
+    {
+      _module.args.clabDeploymentHost = rendererInput.hostName;
+      _module.args.clabCpmJsonPath =
+        builtins.toFile
+          "cpm-${rendererInput.hostName}.json"
+          (builtins.toJSON rendererInput.cpm);
+      _module.args.clabRendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath;
+      _module.args.containerlabLinuxRendererSelf = inputs.network-renderer-containerlab-linux-backend.outPath;
+      _module.args.containerlabLinuxGenerateClabConfig =
+        inputs.network-renderer-containerlab-linux-backend.packages.${pkgs.stdenv.hostPlatform.system}.generate-clab-config;
+      _module.args.containerlabLinuxRendererInput =
+        builtins.removeAttrs rendererInput [
+          "cpm"
+          "controlPlane"
+          "cpmJsonPath"
+          "deploymentHost"
+          "rendererInventoryJsonPath"
+        ];
+
+      assertions = [
+        {
+          assertion = rendererInput ? hostName;
+          message = "containerlab linux renderer input must include hostName";
+        }
+      ];
+
+      networking.hostName = lib.mkDefault rendererInput.hostName;
+
+      imports = [
+        "${inputs.network-renderer-containerlab-linux-backend}/host-module.nix"
+      ];
+    };
 
   render-nebula =
     inputs.network-renderer-nebula.libBySystem.${system}.renderer.hostModule

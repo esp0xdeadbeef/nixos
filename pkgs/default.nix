@@ -1,6 +1,6 @@
 { pkgs
 , lib ? pkgs.lib
-, system ? pkgs.system
+, system ? pkgs.stdenv.hostPlatform.system
 }:
 
 let
