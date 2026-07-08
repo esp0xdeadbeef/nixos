@@ -1,1 +1,3 @@
 nixos/l-esp/hardware/temp.nix
+nixos/virtual-machine/nixos-anywhere/s-mx01/mail-private.nix
+nixos/virtual-machine/nixos-anywhere/s-mx01/private/

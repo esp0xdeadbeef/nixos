@@ -20,6 +20,11 @@
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
     };
 
+    nixos-mailserver = {
+      url = "gitlab:simple-nixos-mailserver/nixos-mailserver/nixos-26.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     network-renderer-nebula = {
       url = "github:esp0xdeadbeef/network-renderer-nebula";
     };
