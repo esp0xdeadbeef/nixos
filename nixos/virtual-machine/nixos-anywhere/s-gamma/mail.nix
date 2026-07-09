@@ -630,7 +630,6 @@ let
     smtpd_sasl_path = "/run/dovecot2/auth";
     smtpd_sasl_security_options = "noanonymous";
     smtpd_client_restrictions = "permit_sasl_authenticated,reject";
-    smtpd_sender_login_maps = "hash:${postfixRuntimeDir}/vaccounts hash:${sharedSenderLoginMap}";
     smtpd_sender_restrictions = "reject_sender_login_mismatch";
     smtpd_recipient_restrictions = "reject_non_fqdn_recipient,reject_unknown_recipient_domain,permit_sasl_authenticated,reject";
     milter_macro_daemon_name = "ORIGINATING";
