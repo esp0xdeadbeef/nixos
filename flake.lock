@@ -2544,11 +2544,11 @@
     "webpage": {
       "flake": false,
       "locked": {
-        "lastModified": 1783601200,
-        "narHash": "sha256-8JlrFgBLf2fTXDbaRfUUFdP31anz4hb8re6lcmIEyzQ=",
+        "lastModified": 1783605775,
+        "narHash": "sha256-UWOzsKujRwKG5Xv39Ebq3yS1wYhrTYwFj7n+51Q8Pjk=",
         "ref": "refs/heads/main",
-        "rev": "66b0ef459c037eadf05c0f2d17b2c4b09b53cb87",
-        "revCount": 3,
+        "rev": "325e8d3907592709dd4c8776973dc114f1c63364",
+        "revCount": 4,
         "type": "git",
         "url": "ssh://git@github.com/esp0xdeadbeef/Webpage.git"
       },
