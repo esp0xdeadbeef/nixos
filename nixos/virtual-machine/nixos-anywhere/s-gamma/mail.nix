@@ -343,7 +343,6 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.dovecot
-      pkgs.findutils
       pkgs.gawk
       pkgs.gnugrep
       pkgs.postfix
@@ -353,8 +352,10 @@ let
 
       env_file=${lib.escapeShellArg mailEnvPath}
       shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
+      shared_namespace_prefix=users
       vmail_root=/var/vmail
       shared_sender_logins_raw="$shared_sender_logins.raw"
+      trap 'rm -f "$shared_sender_logins_raw"' EXIT
 
       words() {
         printf '%s\n' "''${1:-}" | tr ',\t\r\n' ' '
@@ -388,39 +389,49 @@ let
         exit 0
       fi
 
-      list_users() {
-        for account_id in $(words "''${MAIL_ACCOUNTS:-}"); do
-          [ -n "$account_id" ] || continue
-          ref_to_address "$account_id"
-        done | sort -u
+      owner_localpart() {
+        owner="$1"
+        owner_local="''${owner%@*}"
+        owner_domain="''${owner#*@}"
+
+        if [ -z "$owner_local" ] || [ -z "$owner_domain" ] || [ "$owner_domain" = "$owner" ]; then
+          return 1
+        fi
+
+        printf '%s\n' "$owner_local"
       }
 
-      is_long_acl_right() {
-        case "$1" in
-          lookup|read|write|write-seen|write-deleted|insert|post|expunge|create|delete|admin)
-            return 0
+      shared_mailbox_name() {
+        owner="$1"
+        mailbox="$2"
+        owner_local="$(owner_localpart "$owner")"
+
+        case "$mailbox" in
+          ""|INBOX)
+            printf '%s/%s\n' "$shared_namespace_prefix" "$owner_local"
+            ;;
+          INBOX/*)
+            printf '%s/%s/%s\n' "$shared_namespace_prefix" "$owner_local" "''${mailbox#INBOX/}"
             ;;
           *)
-            return 1
+            printf '%s/%s/%s\n' "$shared_namespace_prefix" "$owner_local" "$mailbox"
             ;;
         esac
       }
 
-      right_list_has() {
+      right_list_has_post() {
         rights="$1"
-        short="$2"
-        long="$3"
 
         for right in $(words "$rights"); do
           case "$right" in
-            "$short"|"$long")
+            p|post)
               return 0
               ;;
           esac
 
-          if ! is_long_acl_right "$right" \
+          if ! printf '%s\n' "$right" | grep -Eq '^(lookup|read|write|write-seen|write-deleted|insert|post|expunge|create|delete|admin)$' \
             && printf '%s\n' "$right" | grep -Eq '^[lrwstipekxacd]+$' \
-            && printf '%s\n' "$right" | grep -q "$short"; then
+            && printf '%s\n' "$right" | grep -q p; then
             return 0
           fi
         done
@@ -428,52 +439,63 @@ let
         return 1
       }
 
-      recalculate_acl_sharing_map() {
-        while IFS= read -r owner; do
-          [ -n "$owner" ] || continue
-          doveadm acl recalc -u "$owner" >/dev/null
-        done < <(list_users)
-      }
-
-      mailbox_from_acl_path() {
-        acl_file="$1"
-        mailbox_dir="$(dirname "$acl_file")"
-
-        rel="''${mailbox_dir#"$vmail_root"/}"
-        domain="''${rel%%/*}"
-        rel="''${rel#*/}"
-        owner_local="''${rel%%/*}"
-        rel="''${rel#*/}"
-
-        if [ -z "$domain" ] || [ -z "$owner_local" ] || [ "$rel" = "$owner_local" ]; then
-          return 1
-        fi
-
-        owner="$owner_local@$domain"
-
-        case "$rel" in
-          mail)
-            printf 'shared/%s\n' "$owner"
-            ;;
-          mail/.*)
-            suffix="''${rel#mail/.}"
-            suffix="''${suffix//./\/}"
-            printf 'shared/%s/%s\n' "$owner" "$suffix"
-            ;;
-          *)
-            return 1
-            ;;
-        esac
-      }
-
       add_sender_login() {
         owner="$1"
         user="$2"
         rights="$3"
 
-        if right_list_has "$rights" p post; then
+        if right_list_has_post "$rights"; then
           printf '%s %s\n' "$owner" "$user" >> "$shared_sender_logins_raw"
         fi
+      }
+
+      subscriptions_file_for_user() {
+        user="$1"
+        user_local="$(owner_localpart "$user")"
+        user_domain="''${user#*@}"
+
+        printf '%s/%s/%s/mail/subscriptions\n' "$vmail_root" "$user_domain" "$user_local"
+      }
+
+      remove_managed_subscriptions() {
+        subscriptions_file="$1"
+
+        [ -f "$subscriptions_file" ] || return 0
+
+        tmp="$(mktemp "''${subscriptions_file}.tmp.XXXXXX")"
+        awk -v current="$shared_namespace_prefix" '
+          {
+            keep = 1
+            prefixes[1] = "shared"
+            prefixes[2] = current
+
+            for (i = 1; i <= 2; i++) {
+              prefix = prefixes[i]
+              if ($0 == prefix || index($0, prefix "/") == 1 || index($0, prefix "\t") == 1) {
+                keep = 0
+                break
+              }
+            }
+
+            if (keep) {
+              print
+            }
+          }
+        ' "$subscriptions_file" > "$tmp"
+        chown --reference="$subscriptions_file" "$tmp"
+        chmod --reference="$subscriptions_file" "$tmp"
+        mv "$tmp" "$subscriptions_file"
+      }
+
+      clear_managed_subscriptions() {
+        for account_id in $(words "''${MAIL_ACCOUNTS:-}"); do
+          [ -n "$account_id" ] || continue
+          user="$(ref_to_address "$account_id")"
+
+          subscriptions_file="$(subscriptions_file_for_user "$user" || true)"
+          [ -n "$subscriptions_file" ] || continue
+          remove_managed_subscriptions "$subscriptions_file"
+        done
       }
 
       sync_declared_shared_mailboxes() {
@@ -509,6 +531,8 @@ let
             rights_args+=("$right")
           done
 
+          visible_mailbox="$(shared_mailbox_name "$owner" "$mailbox")"
+
           for user_ref in $(words "$user_refs"); do
             [ -n "$user_ref" ] || continue
             user="$(ref_to_address "$user_ref")"
@@ -519,7 +543,14 @@ let
             fi
 
             doveadm acl add -u "$owner" "$mailbox" "user=$user" "''${rights_args[@]}" >/dev/null
+            doveadm acl recalc -u "$owner" >/dev/null
             add_sender_login "$owner" "$user" "$rights"
+
+            if subscribe_user "$user" "$visible_mailbox"; then
+              subscribed=$((subscribed + 1))
+            else
+              failed=$((failed + 1))
+            fi
           done
         done
       }
@@ -532,7 +563,7 @@ let
           return 0
         fi
 
-        if ! doveadm mailbox status -u "$user" uidvalidity "$mailbox" >/dev/null 2>&1; then
+        if ! doveadm acl debug -u "$user" "$mailbox" >/dev/null 2>&1; then
           echo "shared-mail-subscriptions: mailbox is not visible for ACL user" >&2
           return 1
         fi
@@ -544,49 +575,8 @@ let
       failed=0
       : > "$shared_sender_logins_raw"
 
+      clear_managed_subscriptions
       sync_declared_shared_mailboxes
-      recalculate_acl_sharing_map
-
-      while IFS= read -r acl_file; do
-        mailbox="$(mailbox_from_acl_path "$acl_file" || true)"
-        [ -n "$mailbox" ] || continue
-        owner="''${mailbox#shared/}"
-        owner="''${owner%%/*}"
-
-        while read -r identifier rights; do
-          [ -n "''${identifier:-}" ] || continue
-          case "$identifier" in
-            \#*) continue ;;
-          esac
-
-          if ! right_list_has "''${rights:-}" l lookup; then
-            continue
-          fi
-
-          case "$identifier" in
-            user=*)
-              user="''${identifier#user=}"
-              add_sender_login "$owner" "$user" "$rights"
-              if subscribe_user "$user" "$mailbox"; then
-                subscribed=$((subscribed + 1))
-              else
-                failed=$((failed + 1))
-              fi
-              ;;
-            authenticated|anyone)
-              while IFS= read -r user; do
-                [ -n "$user" ] || continue
-                add_sender_login "$owner" "$user" "$rights"
-                if subscribe_user "$user" "$mailbox"; then
-                  subscribed=$((subscribed + 1))
-                else
-                  failed=$((failed + 1))
-                fi
-              done < <(list_users)
-              ;;
-          esac
-        done < "$acl_file"
-      done < <(find "$vmail_root" -type f -name dovecot-acl)
 
       awk '
         {
@@ -1023,11 +1013,11 @@ in
       "namespace shared" = {
         type = "shared";
         separator = "/";
-        prefix = "shared/$user/";
-        list = "children";
+        prefix = "users/$username/";
+        list = "yes";
         subscriptions = false;
         mail_driver = "maildir";
-        mail_path = "%{owner_home}/mail";
+        mail_path = "/var/vmail/%{owner_user | domain}/%{owner_user | username}/mail";
         mail_index_private_path = "~/mail/shared/%{owner_user}";
       };
 
