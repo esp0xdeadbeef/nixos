@@ -19,7 +19,9 @@ in
 
     # You can also split up your configuration and import pieces of it here:
     profiles.home-manager.desktop.legcord
+    profiles.home-manager.desktop.thunderbird
     profiles.home-manager.desktop-i3
+    profiles.home-manager.mail.aerc
     # profiles.home-manager.desktop-sway
     ./desktop.nix
     ./rclone-wrapper/rclone.nix

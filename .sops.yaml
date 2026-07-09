@@ -10,7 +10,7 @@ keys:
   - &s-sigma-nixos-proxmox-replacement age172vz7pyznaj5sattexdjg43aekx5qv9sjs49axshrlty6ndrdeyskajktk
   - &s-sigma age1lkqlezc852g3svecanwg7ctl2y9ur0qs9pquwjas5dhkhcl9yq5qvr33q2
   - &s-tau age1wkzp7dzxr0fk92zrm2c8eqyhu8hvqzxqlmepsm72yxnhw5x9wseqfn26cp
-  - &s-mx01 age13v5pme6vzmlclc25zqrmv3gx6qg4lcp5378tp7xrf0vecnlvdcns8semur
+  - &s-gamma age13v5pme6vzmlclc25zqrmv3gx6qg4lcp5378tp7xrf0vecnlvdcns8semur
   - &s-test-vm-impermanence-root age1zwgk9rqgwgpnzqz0fu5sdkc57sk9gkzk0kx7qw7l3zgacrnvh54srdp94w
   - &s-router-vpn-impermanence-root age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
   - &s-router-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
@@ -41,6 +41,27 @@ keys:
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
 
 creation_rules:
+  - path_regex: '^(secrets/)*mail-client\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-envil-root
+          - *l-envil-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *l-portal-root
+          - *s-gamma
+
+  - path_regex: '^(secrets/)*s-gamma-runtime\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-envil-root
+          - *l-envil-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-gamma
+
   - path_regex: '^(secrets/)*general-.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
@@ -120,13 +141,13 @@ creation_rules:
           - *l-esp-deadbeef
           - *s-tau
 
-  - path_regex: '^(secrets/)*s-mx01\.(env|ya?ml)$'
+  - path_regex: '^(secrets/)*s-gamma\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
-          - *s-mx01
+          - *s-gamma
 
   - path_regex: '^(secrets/)*s-router-vpn-impermanence-.*\.(env|ya?ml)$'
     encrypted_regex: ".*"

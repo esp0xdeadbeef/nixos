@@ -89,6 +89,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    webpage = {
+      url = "git+ssh://git@github.com/esp0xdeadbeef/Webpage.git";
+      flake = false;
+    };
+
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
     };

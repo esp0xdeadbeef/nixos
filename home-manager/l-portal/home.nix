@@ -20,6 +20,7 @@
     # ./steam/packages.nix
     profiles.home-manager.desktop.legcord
     profiles.home-manager.desktop-i3
+    profiles.home-manager.mail.aerc
   ];
   nixpkgs = {
     # You can add overlays here

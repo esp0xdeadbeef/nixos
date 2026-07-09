@@ -125,10 +125,14 @@
   };
 
   home-manager = {
+    mail = {
+      aerc = import ./home-manager/mail/aerc.nix;
+    };
     desktop = {
       window-manager = import ./home-manager/desktop/window-manager.nix;
       i3 = import ./home-manager/desktop-i3/base.nix;
       legcord = import ./home-manager/desktop/legcord.nix;
+      thunderbird = import ./home-manager/desktop/thunderbird.nix;
     };
     desktop-i3 = import ./home-manager/desktop-i3;
     desktop-sway = import ./home-manager/desktop-sway;

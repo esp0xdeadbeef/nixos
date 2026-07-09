@@ -83,6 +83,12 @@ let
     ".config/fish"
   ];
 
+  aercUserDirs = lib.optionals (hasPackage [ "aerc" ]) [
+    ".config/aerc"
+    ".local/share/aerc"
+    ".local/state/aerc"
+  ];
+
   selectedLlmAgentPackageNames =
     lib.attrByPath
       [
@@ -258,6 +264,9 @@ let
       [
         ".mozilla"
       ]
+    ++ lib.optionals (hasPackage [ "thunderbird" ]) [
+      ".thunderbird"
+    ]
     ++ lib.optionals (hasPackage [ "quickemu" ]) [
       ".quickget"
     ];
@@ -403,6 +412,7 @@ let
     ".config/sops"
     ".cache/nix-index"
   ]
+  ++ aercUserDirs
   ++ fishUserDirs
   ++ lib.optionals hasVirtualMachines [
     "vms"

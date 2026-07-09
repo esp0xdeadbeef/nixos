@@ -2460,7 +2460,8 @@
         "nixpkgs": "nixpkgs_15",
         "nixpkgs-stable": "nixpkgs-stable",
         "nixpkgs-unstable": "nixpkgs-unstable",
-        "sops-nix": "sops-nix"
+        "sops-nix": "sops-nix",
+        "webpage": "webpage"
       }
     },
     "rust-overlay": {
@@ -2538,6 +2539,22 @@
         "owner": "numtide",
         "repo": "treefmt-nix",
         "type": "github"
+      }
+    },
+    "webpage": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1783601200,
+        "narHash": "sha256-8JlrFgBLf2fTXDbaRfUUFdP31anz4hb8re6lcmIEyzQ=",
+        "ref": "refs/heads/main",
+        "rev": "66b0ef459c037eadf05c0f2d17b2c4b09b53cb87",
+        "revCount": 3,
+        "type": "git",
+        "url": "ssh://git@github.com/esp0xdeadbeef/Webpage.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/esp0xdeadbeef/Webpage.git"
       }
     }
   },

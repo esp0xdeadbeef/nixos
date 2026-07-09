@@ -12,6 +12,8 @@
   ];
 
   home-manager = {
+    backupFileExtension = "hm-backup";
+
     sharedModules = [
       inputs.sops-nix.homeManagerModules.sops
     ];

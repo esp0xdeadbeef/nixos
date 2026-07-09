@@ -7,6 +7,7 @@
   boot.initrd.availableKernelModules = [
     "ahci"
     "xhci_pci"
+    "virtio_blk"
     "virtio_pci"
     "virtio_scsi"
     "sd_mod"

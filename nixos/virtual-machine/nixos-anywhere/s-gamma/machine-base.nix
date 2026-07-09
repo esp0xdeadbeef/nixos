@@ -78,7 +78,7 @@ in
   ];
 
   sops.age.sshKeyPaths = [
-    "/persist/root/.ssh/id_ed25519"
+    "/persist/etc/ssh/ssh_host_ed25519_key"
   ];
 
   services.openssh = {
@@ -107,6 +107,7 @@ in
     (keyFor "codex-jail")
     (keyFor "l-portal")
     (keyFor "l-esp")
+    (keyFor "l-esp-rsa")
   ];
 
   networking.firewall.allowedTCPPorts = [ 22 ];

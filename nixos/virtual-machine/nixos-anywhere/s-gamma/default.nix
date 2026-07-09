@@ -6,8 +6,8 @@
 }:
 let
   system = "x86_64-linux";
-  hostName = "s-mx01";
-  installDisk = "/dev/sda";
+  hostName = "s-gamma";
+  installDisk = "/dev/vda";
 in
 {
   networking.hostName = lib.mkForce hostName;
@@ -16,7 +16,6 @@ in
     inputs.disko.nixosModules.disko
     profiles.nixos.impermanence.module
     inputs.sops-nix.nixosModules.sops
-    inputs.nixos-mailserver.nixosModules.default
 
     ./hardware.nix
     ./mail.nix
