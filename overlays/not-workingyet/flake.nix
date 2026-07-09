@@ -22,16 +22,17 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      azurePS,
-      aadinternals,
-      o365spray,
-      mfasweep,
+    { self
+    , nixpkgs
+    , azurePS
+    , aadinternals
+    , o365spray
+    , mfasweep
+    ,
     }:
     let
-      pkgs = import nixpkgs { inherit inputs; };
+      system = "x86_64-linux";
+      pkgs = import nixpkgs { inherit system; };
 
       # Azure PowerShell modules: pakketten direct uit de tarball uitpakken
       azModules = pkgs.stdenv.mkDerivation {
@@ -79,6 +80,8 @@
       o365sprayPkg = pkgs.python3Packages.buildPythonApplication {
         name = "o365spray";
         src = o365spray;
+        pyproject = true;
+        build-system = [ pkgs.python3Packages.setuptools ];
         propagatedBuildInputs = with pkgs.python3Packages; [
           beautifulsoup4
           colorama
@@ -90,7 +93,7 @@
     {
       devShell.${system} = pkgs.mkShell {
         buildInputs = [
-          pkgs.python39 # Python > 3.7
+          pkgs.python3 # Python > 3.7
           pkgs.powershell # PowerShell 7
           pkgs.azure-cli # Azure CLI
           azModules # Azure PowerShell modules
@@ -110,7 +113,7 @@
       packages.${system}.azureToolset = pkgs.buildEnv {
         name = "azure-toolset";
         paths = [
-          pkgs.python39
+          pkgs.python3
           pkgs.powershell
           pkgs.azure-cli
           azModules

@@ -26,7 +26,7 @@
 
           # Qt runtime libs (WebEngine + X11 extras)
           pkgs.qt5.qtbase
-          pkgs.qt5.qtwebengine
+          pkgs.qt6.qtwebengine
           pkgs.qt5.qtx11extras
 
           # pbtk mentions Java runtime for extractors; jadx also needs Java
