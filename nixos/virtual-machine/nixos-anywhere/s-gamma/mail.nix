@@ -1,5 +1,4 @@
 { config
-, inputs
 , lib
 , pkgs
 , ...
@@ -11,7 +10,8 @@ let
   runtimeRoot = "/run/s-gamma";
   postfixRuntimeDir = "${runtimeRoot}/mail/postfix";
   dovecotRuntimeDir = "${runtimeRoot}/mail/dovecot";
-  webpageSource = inputs.webpage;
+  sharedSenderLoginMap = "${postfixRuntimeDir}/shared-vaccounts";
+  webpageSource = import ./webpage-source.nix;
   webpageRuntimeDir = "/persist/srv/kvk/app";
   webpageHost = "127.0.0.1";
   webpagePort = 8080;
@@ -24,6 +24,7 @@ let
   dnsNamedConfPath = config.sops.secrets."dns/named_conf".path;
   dnsZonePath = config.sops.secrets."dns/zone_001".path;
   nginxHttpConfPath = config.sops.secrets."web/nginx/http_conf".path;
+  webContactEnvPath = config.sops.secrets."web/contact/env".path;
   nginxPreviewUsernamePath = config.sops.secrets."web/preview/username".path;
   nginxPreviewPasswordPath = config.sops.secrets."web/preview/password".path;
   nginxRuntimeDir = "${runtimeRoot}/nginx";
@@ -177,7 +178,6 @@ let
       pkgs.dovecot
       pkgs.gawk
       pkgs.gnugrep
-      pkgs.gnused
       pkgs.postfix
     ];
     text = ''
@@ -217,22 +217,6 @@ let
         printf '%s\n' "$1" | tr ',\t\r\n' ' '
       }
 
-      ref_to_address() {
-        ref="$1"
-        address="$(printenv "MAIL_''${ref}_ADDRESS" || true)"
-        if [ -n "$address" ]; then
-          printf '%s\n' "$address"
-        else
-          printf '%s\n' "$ref"
-        fi
-      }
-
-      shared_var() {
-        shared_id="$1"
-        field="$2"
-        printenv "MAIL_SHARED_''${shared_id}_''${field}" || true
-      }
-
       require_env MAIL_FQDN
       require_env MAIL_DOMAIN
       require_env MAIL_DOMAINS
@@ -245,12 +229,14 @@ let
       valias="$postfix_dir/valias"
       vaccounts_raw="$postfix_dir/vaccounts.raw"
       vaccounts="$postfix_dir/vaccounts"
+      shared_vaccounts=${lib.escapeShellArg sharedSenderLoginMap}
       passwd_file="$dovecot_dir/passwd"
 
       : > "$vdomains"
       : > "$valias"
       : > "$vaccounts_raw"
       : > "$vaccounts"
+      : > "$shared_vaccounts"
       : > "$passwd_file"
 
       for domain in $(words "$MAIL_DOMAINS"); do
@@ -283,23 +269,6 @@ let
           [ -n "$alias" ] || continue
           printf '%s %s\n' "$alias" "$address" >> "$valias"
           printf '%s %s\n' "$alias" "$address" >> "$vaccounts_raw"
-        done
-      done
-
-      for shared_id in $(words "''${MAIL_SHARED_MAILBOXES:-}"); do
-        [ -n "$shared_id" ] || continue
-
-        owner_ref="$(shared_var "$shared_id" OWNER)"
-        user_refs="$(shared_var "$shared_id" USERS)"
-        [ -n "$owner_ref" ] || continue
-        [ -n "$user_refs" ] || continue
-
-        owner="$(ref_to_address "$owner_ref")"
-        printf '%s %s\n' "$owner" "$owner" >> "$vaccounts_raw"
-
-        for user_ref in $(words "$user_refs"); do
-          [ -n "$user_ref" ] || continue
-          printf '%s %s\n' "$owner" "$(ref_to_address "$user_ref")" >> "$vaccounts_raw"
         done
       done
 
@@ -337,16 +306,17 @@ let
       ' "$vaccounts_raw" > "$vaccounts"
 
       rm -f "$vaccounts_raw"
-      chown root:postfix "$vdomains" "$valias" "$vaccounts"
-      chmod 0640 "$vdomains" "$valias" "$vaccounts"
+      chown root:postfix "$vdomains" "$valias" "$vaccounts" "$shared_vaccounts"
+      chmod 0640 "$vdomains" "$valias" "$vaccounts" "$shared_vaccounts"
       chown root:dovecot2 "$passwd_file"
       chmod 0440 "$passwd_file"
 
       postmap "$vdomains"
       postmap "$valias"
       postmap "$vaccounts"
-      chown root:postfix "$vdomains.db" "$valias.db" "$vaccounts.db"
-      chmod 0640 "$vdomains.db" "$valias.db" "$vaccounts.db"
+      postmap "$shared_vaccounts"
+      chown root:postfix "$vdomains.db" "$valias.db" "$vaccounts.db" "$shared_vaccounts.db"
+      chmod 0640 "$vdomains.db" "$valias.db" "$vaccounts.db" "$shared_vaccounts.db"
 
       main_cf=/var/lib/postfix/conf/main.cf
       if [ -L "$main_cf" ]; then
@@ -361,7 +331,7 @@ let
         "virtual_mailbox_domains = hash:$vdomains" \
         "virtual_mailbox_maps = hash:$valias" \
         "virtual_alias_maps = hash:$valias" \
-        "smtpd_sender_login_maps = hash:$vaccounts" \
+        "smtpd_sender_login_maps = hash:$vaccounts hash:$shared_vaccounts" \
         "smtpd_tls_chain_files = $tls_key $tls_fullchain"
 
       postfix -c /var/lib/postfix/conf check
@@ -374,14 +344,17 @@ let
       pkgs.coreutils
       pkgs.dovecot
       pkgs.findutils
+      pkgs.gawk
       pkgs.gnugrep
-      pkgs.gnused
+      pkgs.postfix
     ];
     text = ''
       set -euo pipefail
 
       env_file=${lib.escapeShellArg mailEnvPath}
+      shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
       vmail_root=/var/vmail
+      shared_sender_logins_raw="$shared_sender_logins.raw"
 
       words() {
         printf '%s\n' "''${1:-}" | tr ',\t\r\n' ' '
@@ -419,6 +392,46 @@ let
         doveadm user '*' 2>/dev/null || true
       }
 
+      is_long_acl_right() {
+        case "$1" in
+          lookup|read|write|write-seen|write-deleted|insert|post|expunge|create|delete|admin)
+            return 0
+            ;;
+          *)
+            return 1
+            ;;
+        esac
+      }
+
+      right_list_has() {
+        rights="$1"
+        short="$2"
+        long="$3"
+
+        for right in $(words "$rights"); do
+          case "$right" in
+            "$short"|"$long")
+              return 0
+              ;;
+          esac
+
+          if ! is_long_acl_right "$right" \
+            && printf '%s\n' "$right" | grep -Eq '^[lrwstipekxacd]+$' \
+            && printf '%s\n' "$right" | grep -q "$short"; then
+            return 0
+          fi
+        done
+
+        return 1
+      }
+
+      recalculate_acl_sharing_map() {
+        while IFS= read -r owner; do
+          [ -n "$owner" ] || continue
+          doveadm acl recalc -u "$owner" >/dev/null
+        done < <(list_users)
+      }
+
       mailbox_from_acl_path() {
         acl_file="$1"
         mailbox_dir="$(dirname "$acl_file")"
@@ -426,25 +439,38 @@ let
         rel="''${mailbox_dir#"$vmail_root"/}"
         domain="''${rel%%/*}"
         rel="''${rel#*/}"
-        owner="''${rel%%/*}"
+        owner_local="''${rel%%/*}"
         rel="''${rel#*/}"
 
-        if [ -z "$domain" ] || [ -z "$owner" ] || [ "$rel" = "$owner" ]; then
+        if [ -z "$domain" ] || [ -z "$owner_local" ] || [ "$rel" = "$owner_local" ]; then
           return 1
         fi
 
+        owner="$owner_local@$domain"
+
         case "$rel" in
           mail)
-            printf 'shared.%s\n' "$owner"
+            printf 'shared/%s\n' "$owner"
             ;;
           mail/.*)
             suffix="''${rel#mail/.}"
-            printf 'shared.%s.%s\n' "$owner" "$suffix"
+            suffix="''${suffix//./\/}"
+            printf 'shared/%s/%s\n' "$owner" "$suffix"
             ;;
           *)
             return 1
             ;;
         esac
+      }
+
+      add_sender_login() {
+        owner="$1"
+        user="$2"
+        rights="$3"
+
+        if right_list_has "$rights" p post; then
+          printf '%s %s\n' "$owner" "$user" >> "$shared_sender_logins_raw"
+        fi
       }
 
       sync_declared_shared_mailboxes() {
@@ -490,6 +516,7 @@ let
             fi
 
             doveadm acl add -u "$owner" "$mailbox" "user=$user" "''${rights_args[@]}" >/dev/null
+            add_sender_login "$owner" "$user" "$rights"
           done
         done
       }
@@ -512,27 +539,31 @@ let
 
       subscribed=0
       failed=0
+      : > "$shared_sender_logins_raw"
 
       sync_declared_shared_mailboxes
+      recalculate_acl_sharing_map
 
       while IFS= read -r acl_file; do
         mailbox="$(mailbox_from_acl_path "$acl_file" || true)"
         [ -n "$mailbox" ] || continue
+        owner="''${mailbox#shared/}"
+        owner="''${owner%%/*}"
 
-        while read -r identifier rights _rest; do
+        while read -r identifier rights; do
           [ -n "''${identifier:-}" ] || continue
           case "$identifier" in
             \#*) continue ;;
           esac
 
-          case "''${rights:-}" in
-            *l*) ;;
-            *) continue ;;
-          esac
+          if ! right_list_has "''${rights:-}" l lookup; then
+            continue
+          fi
 
           case "$identifier" in
             user=*)
               user="''${identifier#user=}"
+              add_sender_login "$owner" "$user" "$rights"
               if subscribe_user "$user" "$mailbox"; then
                 subscribed=$((subscribed + 1))
               else
@@ -542,6 +573,7 @@ let
             authenticated|anyone)
               while IFS= read -r user; do
                 [ -n "$user" ] || continue
+                add_sender_login "$owner" "$user" "$rights"
                 if subscribe_user "$user" "$mailbox"; then
                   subscribed=$((subscribed + 1))
                 else
@@ -552,6 +584,42 @@ let
           esac
         done < "$acl_file"
       done < <(find "$vmail_root" -type f -name dovecot-acl)
+
+      awk '
+        {
+          sender = $1
+          login = $2
+
+          if (sender == "" || login == "") {
+            next
+          }
+
+          if (!(sender in seen_sender)) {
+            seen_sender[sender] = 1
+            sender_order[++sender_count] = sender
+          }
+
+          key = sender SUBSEP login
+          if (!(key in seen_login)) {
+            seen_login[key] = 1
+            login_list[sender] = login_list[sender] (login_list[sender] == "" ? "" : ",") login
+          }
+        }
+
+        END {
+          for (i = 1; i <= sender_count; i++) {
+            sender = sender_order[i]
+            print sender, login_list[sender]
+          }
+        }
+      ' "$shared_sender_logins_raw" > "$shared_sender_logins"
+
+      rm -f "$shared_sender_logins_raw"
+      chown root:postfix "$shared_sender_logins"
+      chmod 0640 "$shared_sender_logins"
+      postmap "$shared_sender_logins"
+      chown root:postfix "$shared_sender_logins.db"
+      chmod 0640 "$shared_sender_logins.db"
 
       if [ "$failed" -ne 0 ]; then
         echo "shared-mail-subscriptions: failed to sync $failed subscription(s)" >&2
@@ -569,7 +637,7 @@ let
     smtpd_sasl_path = "/run/dovecot2/auth";
     smtpd_sasl_security_options = "noanonymous";
     smtpd_client_restrictions = "permit_sasl_authenticated,reject";
-    smtpd_sender_login_maps = "hash:${postfixRuntimeDir}/vaccounts";
+    smtpd_sender_login_maps = "hash:${postfixRuntimeDir}/vaccounts hash:${sharedSenderLoginMap}";
     smtpd_sender_restrictions = "reject_sender_login_mismatch";
     smtpd_recipient_restrictions = "reject_non_fqdn_recipient,reject_unknown_recipient_domain,permit_sasl_authenticated,reject";
     milter_macro_daemon_name = "ORIGINATING";
@@ -633,17 +701,20 @@ in
       restartUnits = [ "bind.service" ];
     };
 
-    "github/webpage_pat" = {
-      sopsFile = runtimeSopsFile;
-      mode = "0400";
-    };
-
     "web/nginx/http_conf" = {
       sopsFile = runtimeSopsFile;
       owner = "nginx";
       group = "nginx";
       mode = "0440";
       restartUnits = [ "nginx.service" ];
+    };
+
+    "web/contact/env" = {
+      sopsFile = runtimeSopsFile;
+      owner = "nginx";
+      group = "nginx";
+      mode = "0440";
+      restartUnits = [ "s-gamma-webpage.service" ];
     };
 
     "web/preview/username" = {
@@ -781,17 +852,20 @@ in
       PORT = toString webpagePort;
       WEB_ROOT = "webpagina";
       CORS_ALLOW_ORIGIN = "*";
-      MAIL_DRY_RUN = "1";
     };
     path = [ pkgs.python3 ];
     serviceConfig = {
       User = "nginx";
       Group = "nginx";
       WorkingDirectory = webpageRuntimeDir;
+      EnvironmentFile = webContactEnvPath;
       ExecStart = "${pkgs.python3}/bin/python3 ./run-server.py";
       Restart = "always";
       RestartSec = "5s";
     };
+    preStart = waitForReadableFiles "web contact" [
+      webContactEnvPath
+    ];
   };
 
   systemd.services.postfix = {
@@ -811,7 +885,7 @@ in
   };
 
   systemd.services.s-gamma-mail-shared-subscriptions = {
-    description = "Subscribe users to Dovecot shared mailboxes from ACL state";
+    description = "Sync Dovecot shared mailbox ACL projections";
     after = [
       "dovecot.service"
       "s-gamma-mail-runtime-config.service"
@@ -828,12 +902,12 @@ in
   };
 
   systemd.timers.s-gamma-mail-shared-subscriptions = {
-    description = "Refresh Dovecot shared mailbox subscriptions";
+    description = "Refresh Dovecot shared mailbox ACL projections";
     wantedBy = [ "timers.target" ];
     timerConfig = {
       OnBootSec = "2min";
-      OnUnitActiveSec = "5min";
-      AccuracySec = "1min";
+      OnUnitActiveSec = "1min";
+      AccuracySec = "15s";
       Persistent = true;
     };
   };
@@ -913,6 +987,7 @@ in
       mail_access_groups = "virtualMail";
       mail_plugins.acl = true;
       mailbox_list_layout = "Maildir++";
+      mail_shared_explicit_inbox = false;
       acl_defaults_from_inbox = true;
       acl_driver = "vfile";
 
@@ -920,7 +995,7 @@ in
 
       "namespace inbox" = {
         inbox = true;
-        separator = ".";
+        separator = "/";
         "mailbox \"Archive\"" = {
           auto = "subscribe";
         };
@@ -944,8 +1019,8 @@ in
 
       "namespace shared" = {
         type = "shared";
-        separator = ".";
-        prefix = "shared.$username.";
+        separator = "/";
+        prefix = "shared/$user/";
         list = "children";
         subscriptions = false;
         mail_driver = "maildir";

@@ -21,13 +21,13 @@ secrets/mail-client.yaml
 `secrets/s-gamma-runtime.yaml` owns server-side runtime material:
 
 ```text
-github/webpage_pat
 network/address_env
 mail/server/env
 mail/tls/fullchain_pem
 mail/tls/key_pem
 dns/named_conf
 dns/zone_001
+web/contact/env
 web/nginx/http_conf
 web/preview/username
 web/preview/password
@@ -66,11 +66,30 @@ DNS and nginx runtime config are included from SOPS-managed files. Put zone
 names, record targets, address literals, `server_name` values, backend targets,
 and preview auth config there instead of in public Nix.
 
+The web contact env secret is a shell env file for the contact form backend:
+
+```text
+SMTP_HOST=...
+SMTP_PORT=...
+SMTP_STARTTLS=...
+RECIPIENT_EMAIL=...
+CONTACT_FROM=...
+CONTACT_SUBJECT=...
+TOKEN_SECRET=...
+```
+
+Shared mailbox access is ACL-driven. `MAIL_SHARED_*` entries may declare ACLs
+from SOPS, but client visibility and SMTP send-as are derived from the actual
+Dovecot ACL state. The `s-gamma-mail-shared-subscriptions` unit refreshes the
+Dovecot sharing map, subscribes users to visible shared mailboxes, and rebuilds
+the Postfix sender-login map for ACL entries with the `post` right.
+
 ## Web runtime
 
-The real webpage source is pinned by `flake.lock` through the `webpage` input.
-At activation/runtime, `s-gamma-webpage-sync.service` copies that pinned source
-to:
+The real webpage source is pinned by `webpage-source.nix`. This is deliberately
+host-local instead of a root flake input, so unrelated hosts do not need access
+to the private webpage repository. At activation/runtime,
+`s-gamma-webpage-sync.service` copies that pinned source to:
 
 ```text
 /persist/srv/kvk/app
