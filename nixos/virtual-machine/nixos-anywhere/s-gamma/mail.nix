@@ -389,7 +389,10 @@ let
       fi
 
       list_users() {
-        doveadm user '*' 2>/dev/null || true
+        for account_id in $(words "''${MAIL_ACCOUNTS:-}"); do
+          [ -n "$account_id" ] || continue
+          ref_to_address "$account_id"
+        done | sort -u
       }
 
       is_long_acl_right() {
@@ -758,7 +761,7 @@ in
     "d /var/vmail 0750 virtualMail virtualMail -"
     "d /var/lib/dovecot 0755 root root -"
     "d /var/lib/dovecot/db 0770 virtualMail virtualMail -"
-    "z /var/lib/dovecot/db 0770 virtualMail virtualMail -"
+    "Z /var/lib/dovecot/db - virtualMail virtualMail -"
     "z /var/lib/acme 0755 root root -"
     "d /var/log/nginx 0750 nginx nginx -"
     "z /var/log/nginx 0750 nginx nginx -"

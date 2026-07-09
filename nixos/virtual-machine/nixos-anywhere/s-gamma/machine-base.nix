@@ -60,8 +60,34 @@ in
     '';
   };
 
+  system.activationScripts.repairPersistentStateRootOwnership = {
+    deps = [ "createPersistentStorageDirs" ];
+    text = ''
+      for path in /persist/var /persist/var/lib /persist/var/log /var /var/lib /var/log; do
+        if [ -d "$path" ]; then
+          chown root:root "$path"
+          chmod 0755 "$path"
+        fi
+      done
+
+      for journalRoot in /persist/var/log/journal /var/log/journal; do
+        if [ -d "$journalRoot" ]; then
+          chown root:systemd-journal "$journalRoot"
+          chmod 2755 "$journalRoot"
+        fi
+
+        for journalDir in "$journalRoot"/*; do
+          [ -d "$journalDir" ] || continue
+          chown root:systemd-journal "$journalDir"
+          chmod 2755 "$journalDir"
+        done
+      done
+    '';
+  };
+
   system.activationScripts.persist-files.deps = [
     "prepareImpermanenceMachineId"
+    "repairPersistentStateRootOwnership"
   ];
 
   boot.loader.grub = {
