@@ -29,6 +29,21 @@ let
   nginxPreviewPasswordPath = config.sops.secrets."web/preview/password".path;
   nginxRuntimeDir = "${runtimeRoot}/nginx";
   nginxHtpasswdPath = "${nginxRuntimeDir}/htpasswd";
+  nginxRenderedHttpConfPath = "${nginxRuntimeDir}/http.conf";
+  nginxSecurityHeaders = ''
+    # Security headers for nginx-generated responses, including redirects and Basic Auth 401s.
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" always;
+    add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+    add_header X-XSS-Protection "0" always;
+  '';
 
   waitForReadableFiles = label: paths: ''
     for path in ${lib.concatMapStringsSep " " lib.escapeShellArg paths}; do
@@ -49,7 +64,8 @@ let
     text = ''
       set -euo pipefail
 
-      conf=${lib.escapeShellArg nginxHttpConfPath}
+      raw_conf=${lib.escapeShellArg nginxHttpConfPath}
+      rendered_conf=${lib.escapeShellArg nginxRenderedHttpConfPath}
       username_file=${lib.escapeShellArg nginxPreviewUsernamePath}
       password_file=${lib.escapeShellArg nginxPreviewPasswordPath}
       nginx_dir=${lib.escapeShellArg nginxRuntimeDir}
@@ -82,6 +98,15 @@ let
       chmod 0440 "$tmp"
       mv "$tmp" "$htpasswd"
 
+      tmp_conf="$(mktemp "$nginx_dir/http.conf.XXXXXX")"
+      cat > "$tmp_conf" <<'NGINX_SECURITY_HEADERS'
+      ${nginxSecurityHeaders}
+      NGINX_SECURITY_HEADERS
+      cat "$raw_conf" >> "$tmp_conf"
+      chown nginx:nginx "$tmp_conf"
+      chmod 0440 "$tmp_conf"
+      mv "$tmp_conf" "$rendered_conf"
+
       awk '
         /^[[:space:]]*ssl_certificate(_key)?[[:space:]]+/ {
           path = $2
@@ -92,7 +117,7 @@ let
             print path
           }
         }
-      ' "$conf" | while IFS= read -r cert_path; do
+      ' "$raw_conf" | while IFS= read -r cert_path; do
         [ -n "$cert_path" ] || continue
         [ -e "$cert_path" ] || continue
 
@@ -1089,7 +1114,7 @@ in
       auth_basic "preview";
       auth_basic_user_file ${nginxHtpasswdPath};
 
-      include ${nginxHttpConfPath};
+      include ${nginxRenderedHttpConfPath};
     '';
   };
 
@@ -1103,7 +1128,7 @@ in
       "s-gamma-webpage.service"
     ];
     preStart = lib.mkBefore (waitForReadableFiles "nginx" [
-      nginxHttpConfPath
+      nginxRenderedHttpConfPath
       nginxHtpasswdPath
     ]);
     serviceConfig.TimeoutStartSec = "5min";
