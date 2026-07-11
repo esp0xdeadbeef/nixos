@@ -89,6 +89,12 @@ let
     ".local/state/aerc"
   ];
 
+  gearyUserDirs = lib.optionals (hasPackage [ "geary" ]) [
+    ".config/geary"
+    ".local/share/geary"
+    ".cache/geary"
+  ];
+
   selectedLlmAgentPackageNames =
     lib.attrByPath
       [
@@ -419,6 +425,7 @@ let
     ".cache/nix-index"
   ]
   ++ aercUserDirs
+  ++ gearyUserDirs
   ++ fishUserDirs
   ++ lib.optionals hasVirtualMachines [
     "vms"

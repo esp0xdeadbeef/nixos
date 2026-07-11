@@ -21,9 +21,9 @@ in
     ./configs/tmuxp/packages.nix
     ./projects
     profiles.home-manager.desktop.legcord
-    profiles.home-manager.desktop.thunderbird
     profiles.home-manager.desktop-i3
     profiles.home-manager.mail.aerc
+    profiles.home-manager.mail.geary
 
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index

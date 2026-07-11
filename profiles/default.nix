@@ -131,6 +131,7 @@
   home-manager = {
     mail = {
       aerc = import ./home-manager/mail/aerc.nix;
+      geary = import ./home-manager/mail/geary.nix;
     };
     desktop = {
       window-manager = import ./home-manager/desktop/window-manager.nix;
