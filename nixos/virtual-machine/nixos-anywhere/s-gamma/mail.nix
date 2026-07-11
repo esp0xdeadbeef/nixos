@@ -1,21 +1,28 @@
 { config
 , lib
+, name
 , pkgs
 , ...
 }:
 let
+  hostName = name;
+  networkAddressesUnit = "${hostName}-network-addresses.service";
+  mailRuntimeConfigService = "${hostName}-mail-runtime-config";
+  mailRuntimeConfigUnit = "${mailRuntimeConfigService}.service";
+  rspamdRuntimeConfigService = "${hostName}-rspamd-runtime-config";
+  sharedSubscriptionsService = "${hostName}-mail-shared-subscriptions";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
   mailClientSopsFile = ../../../../secrets/mail-client.yaml;
 
-  runtimeRoot = "/run/s-gamma";
+  runtimeRoot = "/run/${hostName}";
   postfixRuntimeDir = "${runtimeRoot}/mail/postfix";
   dovecotRuntimeDir = "${runtimeRoot}/mail/dovecot";
+  mailTlsFullchainPath = config.sGamma.certs.mail.fullchainPath;
+  mailTlsKeyPath = config.sGamma.certs.mail.keyPath;
   sharedSenderLoginMap = "${postfixRuntimeDir}/shared-vaccounts";
 
   mailEnvPath = config.sops.secrets."mail/server/env".path;
   mailPasswordPath = config.sops.secrets."mail_client/shared/password".path;
-  tlsFullchainPath = config.sops.secrets."mail/tls/fullchain_pem".path;
-  tlsKeyPath = config.sops.secrets."mail/tls/key_pem".path;
   networkAddressEnvPath = config.sops.secrets."network/address_env".path;
 
   waitForReadableFiles = label: paths: ''
@@ -28,7 +35,7 @@ let
   '';
 
   renderMailRuntime = pkgs.writeShellApplication {
-    name = "s-gamma-render-mail-runtime";
+    name = "${hostName}-render-mail-runtime";
     runtimeInputs = [
       pkgs.coreutils
       pkgs.dovecot
@@ -44,8 +51,8 @@ let
       password_file=${lib.escapeShellArg mailPasswordPath}
       postfix_dir=${lib.escapeShellArg postfixRuntimeDir}
       dovecot_dir=${lib.escapeShellArg dovecotRuntimeDir}
-      tls_fullchain=${lib.escapeShellArg tlsFullchainPath}
-      tls_key=${lib.escapeShellArg tlsKeyPath}
+      tls_fullchain=${lib.escapeShellArg mailTlsFullchainPath}
+      tls_key=${lib.escapeShellArg mailTlsKeyPath}
 
       if [ ! -r "$env_file" ]; then
         echo "mail runtime env is missing: $env_file" >&2
@@ -203,7 +210,7 @@ let
   };
 
   syncSharedMailSubscriptions = pkgs.writeShellApplication {
-    name = "s-gamma-sync-shared-mail-subscriptions";
+    name = "${hostName}-sync-shared-mail-subscriptions";
     runtimeInputs = [
       pkgs.coreutils
       pkgs.dovecot
@@ -511,25 +518,7 @@ in
     "mail/server/env" = {
       sopsFile = runtimeSopsFile;
       restartUnits = [
-        "s-gamma-mail-runtime-config.service"
-        "postfix.service"
-        "dovecot.service"
-      ];
-    };
-
-    "mail/tls/fullchain_pem" = {
-      sopsFile = runtimeSopsFile;
-      mode = "0400";
-      restartUnits = [
-        "postfix.service"
-        "dovecot.service"
-      ];
-    };
-
-    "mail/tls/key_pem" = {
-      sopsFile = runtimeSopsFile;
-      mode = "0400";
-      restartUnits = [
+        mailRuntimeConfigUnit
         "postfix.service"
         "dovecot.service"
       ];
@@ -553,15 +542,15 @@ in
     "Z /var/lib/dovecot/db - virtualMail virtualMail -"
   ];
 
-  systemd.services.s-gamma-mail-runtime-config = {
-    description = "Render s-gamma mail runtime maps from SOPS";
+  systemd.services.${mailRuntimeConfigService} = {
+    description = "Render ${hostName} mail runtime maps from SOPS";
     after = [
       "postfix-setup.service"
-      "s-gamma-network-addresses.service"
+      networkAddressesUnit
     ];
     requires = [
       "postfix-setup.service"
-      "s-gamma-network-addresses.service"
+      networkAddressesUnit
     ];
     before = [
       "postfix.service"
@@ -580,14 +569,14 @@ in
       networkAddressEnvPath
       mailEnvPath
       mailPasswordPath
-      tlsFullchainPath
-      tlsKeyPath
+      mailTlsFullchainPath
+      mailTlsKeyPath
     ];
     script = "${lib.getExe renderMailRuntime}";
   };
 
-  systemd.services.s-gamma-rspamd-runtime-config = {
-    description = "Prepare s-gamma rspamd runtime files";
+  systemd.services.${rspamdRuntimeConfigService} = {
+    description = "Prepare ${hostName} rspamd runtime files";
     before = [ "rspamd.service" ];
     requiredBy = [ "rspamd.service" ];
     path = [ pkgs.coreutils ];
@@ -619,29 +608,29 @@ in
     after = [
       "dovecot.service"
       "rspamd.service"
-      "s-gamma-mail-runtime-config.service"
+      mailRuntimeConfigUnit
     ];
     requires = [
       "dovecot.service"
-      "s-gamma-mail-runtime-config.service"
+      mailRuntimeConfigUnit
     ];
     wants = [ "rspamd.service" ];
   };
 
   systemd.services.dovecot = {
-    after = [ "s-gamma-mail-runtime-config.service" ];
-    requires = [ "s-gamma-mail-runtime-config.service" ];
+    after = [ mailRuntimeConfigUnit ];
+    requires = [ mailRuntimeConfigUnit ];
   };
 
-  systemd.services.s-gamma-mail-shared-subscriptions = {
+  systemd.services.${sharedSubscriptionsService} = {
     description = "Sync Dovecot shared mailbox ACL projections";
     after = [
       "dovecot.service"
-      "s-gamma-mail-runtime-config.service"
+      mailRuntimeConfigUnit
     ];
     requires = [
       "dovecot.service"
-      "s-gamma-mail-runtime-config.service"
+      mailRuntimeConfigUnit
     ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
@@ -650,7 +639,7 @@ in
     };
   };
 
-  systemd.timers.s-gamma-mail-shared-subscriptions = {
+  systemd.timers.${sharedSubscriptionsService} = {
     description = "Refresh Dovecot shared mailbox ACL projections";
     wantedBy = [ "timers.target" ];
     timerConfig = {
@@ -688,8 +677,8 @@ in
       smtpd_tls_auth_only = true;
 
       smtpd_tls_chain_files = [
-        tlsKeyPath
-        tlsFullchainPath
+        mailTlsKeyPath
+        mailTlsFullchainPath
       ];
       smtpd_tls_security_level = "may";
       smtpd_tls_protocols = ">=TLSv1.2";
@@ -836,8 +825,8 @@ in
       "protocol imap".mail_plugins.imap_acl = true;
 
       ssl = "required";
-      ssl_server_cert_file = tlsFullchainPath;
-      ssl_server_key_file = tlsKeyPath;
+      ssl_server_cert_file = mailTlsFullchainPath;
+      ssl_server_key_file = mailTlsKeyPath;
       ssl_min_protocol = "TLSv1.2";
     };
   };

@@ -1,5 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, name, pkgs, ... }:
 let
+  hostName = name;
+  networkAddressesService = "${hostName}-network-addresses";
+  networkAddressesUnit = "${networkAddressesService}.service";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
 
   networkAddressEnvPath = config.sops.secrets."network/address_env".path;
@@ -14,7 +17,7 @@ let
   '';
 
   configureNetworkAddresses = pkgs.writeShellApplication {
-    name = "s-gamma-configure-network-addresses";
+    name = "${hostName}-configure-network-addresses";
     runtimeInputs = [
       pkgs.coreutils
       pkgs.gnugrep
@@ -60,11 +63,11 @@ in
   sops.secrets."network/address_env" = {
     sopsFile = runtimeSopsFile;
     mode = "0400";
-    restartUnits = [ "s-gamma-network-addresses.service" ];
+    restartUnits = [ networkAddressesUnit ];
   };
 
-  systemd.services.s-gamma-network-addresses = {
-    description = "Configure s-gamma runtime network addresses from SOPS";
+  systemd.services.${networkAddressesService} = {
+    description = "Configure ${hostName} runtime network addresses from SOPS";
     after = [ "network.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {

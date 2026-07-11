@@ -23,8 +23,6 @@ secrets/mail-client.yaml
 ```text
 network/address_env
 mail/server/env
-mail/tls/fullchain_pem
-mail/tls/key_pem
 dns/knot_conf
 dns/zone_001
 dns/zone_002
@@ -46,6 +44,8 @@ The mail env secret is a shell env file using generic account IDs:
 MAIL_FQDN=...
 MAIL_DOMAIN=...
 MAIL_DOMAINS=...
+MAIL_TLS_DOMAINS=...
+MAIL_ACME_EMAIL=...
 MAIL_ACCOUNTS=ACCOUNT_001 ACCOUNT_002
 MAIL_ACCOUNT_001_ADDRESS=...
 MAIL_ACCOUNT_001_ALIASES=...
@@ -83,13 +83,18 @@ TOKEN_SECRET=...
 
 Shared mailbox access is ACL-driven. `MAIL_SHARED_*` entries may declare ACLs
 from SOPS, but client visibility and SMTP send-as are derived from the actual
-Dovecot ACL state. The `s-gamma-mail-shared-subscriptions` unit refreshes the
+Dovecot ACL state. The `<host>-mail-shared-subscriptions` unit refreshes the
 Dovecot sharing map, subscribes users to visible shared mailboxes, and rebuilds
 the Postfix sender-login map for ACL entries with the `post` right.
+
+Mail certificate hostnames are SOPS-driven. Set `MAIL_TLS_DOMAINS` in the mail
+server env secret when the mail certificate needs more names than `MAIL_FQDN`.
+`MAIL_ACME_EMAIL` is optional; it defaults to `postmaster@$MAIL_DOMAIN`.
 
 ## Module layout
 
 - `network.nix`: provider address SOPS env and runtime address setup
+- `cert.nix`: ACME certificate renewal and runtime certificate paths
 - `dns.nix`: Knot authoritative DNS, zone secrets, DNS firewall ports
 - `mail.nix`: Postfix, Dovecot, Rspamd, mail secrets, mail firewall ports
 - `web.nix`: pinned webpage sync, contact backend, nginx, web firewall ports
@@ -100,19 +105,19 @@ The real webpage source is pinned by `webpage-source.nix`. This is deliberately
 host-local instead of a root flake input, so unrelated hosts do not need access
 to the private webpage repository. After committing and pushing source changes,
 update `webpage-source.nix` to the new commit and nar hash. At
-activation/runtime, `s-gamma-webpage-sync.service` copies that pinned source to:
+activation/runtime, `<host>-webpage-sync.service` copies that pinned source to:
 
 ```text
 /persist/srv/www/app
 ```
 
-`s-gamma-webpage.service` runs the backend from that directory on localhost.
+`<host>-webpage.service` runs the backend from that directory on localhost.
 Nginx reverse proxies to it and owns the preview access gate. To temporarily
 test an override, stop the service and run the app manually from the runtime
 dir:
 
 ```bash
-systemctl stop s-gamma-webpage.service
+systemctl stop "$(hostname)-webpage.service"
 cd /persist/srv/www/app
 python ./run-server.py
 ```
@@ -137,9 +142,10 @@ nix eval --impure .#nixosConfigurations.s-gamma.config.system.build.toplevel.drv
 Runtime service checks on the host:
 
 ```bash
-systemctl status s-gamma-mail-runtime-config.service
 systemctl status postfix.service dovecot.service knot.service nginx.service
-systemctl status s-gamma-webpage-sync.service s-gamma-webpage.service
+systemctl status "$(hostname)-cert-mail.service"
+systemctl status "$(hostname)-mail-runtime-config.service"
+systemctl status "$(hostname)-webpage-sync.service" "$(hostname)-webpage.service"
 ```
 
 Cutover checklist:

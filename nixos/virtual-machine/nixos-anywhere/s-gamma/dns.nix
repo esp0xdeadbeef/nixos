@@ -1,11 +1,14 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, name, pkgs, ... }:
 let
+  hostName = name;
+  networkAddressesService = "${hostName}-network-addresses";
+  networkAddressesUnit = "${networkAddressesService}.service";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
 
   dnsKnotConfPath = config.sops.secrets."dns/knot_conf".path;
   dnsZonePath = config.sops.secrets."dns/zone_001".path;
   dnsZone2Path = config.sops.secrets."dns/zone_002".path;
-  knotRuntimeZoneDir = "/run/knot/s-gamma-zones";
+  knotRuntimeZoneDir = "/run/knot/${hostName}-zones";
 
   waitForReadableFiles = label: paths: ''
     for path in ${lib.concatMapStringsSep " " lib.escapeShellArg paths}; do
@@ -17,7 +20,7 @@ let
   '';
 
   prepareKnotRuntime = pkgs.writeShellApplication {
-    name = "s-gamma-prepare-knot-runtime";
+    name = "${hostName}-prepare-knot-runtime";
     runtimeInputs = [
       pkgs.coreutils
     ];
@@ -67,18 +70,18 @@ in
     settingsFile = dnsKnotConfPath;
   };
 
-  systemd.services.s-gamma-network-addresses.before = [ "knot.service" ];
+  systemd.services.${networkAddressesService}.before = [ "knot.service" ];
 
   systemd.services.knot = {
-    after = [ "s-gamma-network-addresses.service" ];
-    requires = [ "s-gamma-network-addresses.service" ];
+    after = [ networkAddressesUnit ];
+    requires = [ networkAddressesUnit ];
     preStart = lib.mkBefore ''
       ${waitForReadableFiles "knot" [
         dnsKnotConfPath
         dnsZonePath
         dnsZone2Path
       ]}
-      ${prepareKnotRuntime}/bin/s-gamma-prepare-knot-runtime
+      ${lib.getExe prepareKnotRuntime}
     '';
     serviceConfig.TimeoutStartSec = "5min";
   };

@@ -1,12 +1,13 @@
 { inputs
 , lib
+, name
 , outPath
 , profiles
 , ...
 }:
 let
   system = "x86_64-linux";
-  hostName = "s-gamma";
+  hostName = name;
   installDisk = "/dev/vda";
 in
 {
@@ -18,6 +19,7 @@ in
     inputs.sops-nix.nixosModules.sops
 
     ./network.nix
+    ./cert.nix
     ./dns.nix
     ./hardware.nix
     ./mail.nix

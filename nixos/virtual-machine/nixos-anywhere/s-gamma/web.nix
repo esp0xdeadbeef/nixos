@@ -1,8 +1,17 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, name, pkgs, ... }:
 let
+  hostName = name;
+  networkAddressesService = "${hostName}-network-addresses";
+  networkAddressesUnit = "${networkAddressesService}.service";
+  nginxRuntimeConfigService = "${hostName}-nginx-runtime-config";
+  nginxRuntimeConfigUnit = "${nginxRuntimeConfigService}.service";
+  webpageSyncService = "${hostName}-webpage-sync";
+  webpageSyncUnit = "${webpageSyncService}.service";
+  webpageService = "${hostName}-webpage";
+  webpageUnit = "${webpageService}.service";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
 
-  runtimeRoot = "/run/s-gamma";
+  runtimeRoot = "/run/${hostName}";
   webpageSource = import ./webpage-source.nix;
   webpageRuntimeDir = "/persist/srv/www/app";
   webpageHost = "127.0.0.1";
@@ -40,7 +49,7 @@ let
   '';
 
   prepareNginxRuntime = pkgs.writeShellApplication {
-    name = "s-gamma-prepare-nginx-runtime";
+    name = "${hostName}-prepare-nginx-runtime";
     runtimeInputs = [
       pkgs.coreutils
       pkgs.gawk
@@ -115,7 +124,7 @@ let
   };
 
   syncWebpageSource = pkgs.writeShellApplication {
-    name = "s-gamma-sync-webpage-source";
+    name = "${hostName}-sync-webpage-source";
     runtimeInputs = [
       pkgs.coreutils
       pkgs.rsync
@@ -146,7 +155,7 @@ in
       group = "nginx";
       mode = "0440";
       restartUnits = [
-        "s-gamma-nginx-runtime-config.service"
+        nginxRuntimeConfigUnit
         "nginx.service"
       ];
     };
@@ -156,7 +165,7 @@ in
       owner = "nginx";
       group = "nginx";
       mode = "0440";
-      restartUnits = [ "s-gamma-webpage.service" ];
+      restartUnits = [ webpageUnit ];
     };
 
     "web/preview/username" = {
@@ -165,7 +174,7 @@ in
       group = "nginx";
       mode = "0440";
       restartUnits = [
-        "s-gamma-nginx-runtime-config.service"
+        nginxRuntimeConfigUnit
         "nginx.service"
       ];
     };
@@ -176,7 +185,7 @@ in
       group = "nginx";
       mode = "0440";
       restartUnits = [
-        "s-gamma-nginx-runtime-config.service"
+        nginxRuntimeConfigUnit
         "nginx.service"
       ];
     };
@@ -195,10 +204,10 @@ in
     "z /var/log/nginx/error.log 0640 nginx nginx -"
   ];
 
-  systemd.services.s-gamma-network-addresses.before = [ "nginx.service" ];
+  systemd.services.${networkAddressesService}.before = [ "nginx.service" ];
 
-  systemd.services.s-gamma-nginx-runtime-config = {
-    description = "Prepare s-gamma nginx runtime files from SOPS";
+  systemd.services.${nginxRuntimeConfigService} = {
+    description = "Prepare ${hostName} nginx runtime files from SOPS";
     before = [ "nginx.service" ];
     requiredBy = [ "nginx.service" ];
     serviceConfig = {
@@ -214,10 +223,10 @@ in
     script = "${lib.getExe prepareNginxRuntime}";
   };
 
-  systemd.services.s-gamma-webpage-sync = {
+  systemd.services.${webpageSyncService} = {
     description = "Sync pinned s-gamma webpage source";
-    before = [ "s-gamma-webpage.service" ];
-    requiredBy = [ "s-gamma-webpage.service" ];
+    before = [ webpageUnit ];
+    requiredBy = [ webpageUnit ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
@@ -225,13 +234,13 @@ in
     script = "${lib.getExe syncWebpageSource}";
   };
 
-  systemd.services.s-gamma-webpage = {
-    description = "Run s-gamma webpage backend";
+  systemd.services.${webpageService} = {
+    description = "Run ${hostName} webpage backend";
     after = [
       "network.target"
-      "s-gamma-webpage-sync.service"
+      webpageSyncUnit
     ];
-    requires = [ "s-gamma-webpage-sync.service" ];
+    requires = [ webpageSyncUnit ];
     wantedBy = [ "multi-user.target" ];
     environment = {
       HOST = webpageHost;
@@ -270,14 +279,14 @@ in
 
   systemd.services.nginx = {
     after = [
-      "s-gamma-network-addresses.service"
-      "s-gamma-nginx-runtime-config.service"
-      "s-gamma-webpage.service"
+      networkAddressesUnit
+      nginxRuntimeConfigUnit
+      webpageUnit
     ];
     requires = [
-      "s-gamma-network-addresses.service"
-      "s-gamma-nginx-runtime-config.service"
-      "s-gamma-webpage.service"
+      networkAddressesUnit
+      nginxRuntimeConfigUnit
+      webpageUnit
     ];
     preStart = lib.mkBefore (waitForReadableFiles "nginx" [
       nginxRenderedHttpConfPath
