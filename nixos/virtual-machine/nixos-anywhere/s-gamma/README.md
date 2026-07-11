@@ -88,8 +88,8 @@ the Postfix sender-login map for ACL entries with the `post` right.
 
 The real webpage source is pinned by `webpage-source.nix`. This is deliberately
 host-local instead of a root flake input, so unrelated hosts do not need access
-to the private webpage repository. After committing and pushing changes in the
-Webpage repo, update `webpage-source.nix` to the new commit and nar hash. At
+to the private webpage repository. After committing and pushing source changes,
+update `webpage-source.nix` to the new commit and nar hash. At
 activation/runtime, `s-gamma-webpage-sync.service` copies that pinned source to:
 
 ```text
