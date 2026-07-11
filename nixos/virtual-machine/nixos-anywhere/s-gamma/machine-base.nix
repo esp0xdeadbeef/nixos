@@ -13,6 +13,7 @@ in
 
   imports = [
     "${outPath}/profiles/nixos/base/common.nix"
+    "${outPath}/profiles/nixos/base/maintenance.nix"
     "${outPath}/profiles/nixos/nixpkgs/allow-unfree.nix"
   ];
 
@@ -89,6 +90,11 @@ in
     "prepareImpermanenceMachineId"
     "repairPersistentStateRootOwnership"
   ];
+
+  system.autoUpgrade = {
+    operation = lib.mkForce "boot";
+    allowReboot = lib.mkForce true;
+  };
 
   boot.loader.grub = {
     enable = true;

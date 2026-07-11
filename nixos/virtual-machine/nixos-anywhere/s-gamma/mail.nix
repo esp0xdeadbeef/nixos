@@ -12,7 +12,7 @@ let
   dovecotRuntimeDir = "${runtimeRoot}/mail/dovecot";
   sharedSenderLoginMap = "${postfixRuntimeDir}/shared-vaccounts";
   webpageSource = import ./webpage-source.nix;
-  webpageRuntimeDir = "/persist/srv/kvk/app";
+  webpageRuntimeDir = "/persist/srv/www/app";
   webpageHost = "127.0.0.1";
   webpagePort = 8080;
 
@@ -766,7 +766,7 @@ in
     "d ${dovecotRuntimeDir} 0750 root dovecot2 -"
     "d ${nginxRuntimeDir} 0750 nginx nginx -"
     "d /persist/srv 0755 root root -"
-    "d /persist/srv/kvk 0755 root root -"
+    "d /persist/srv/www 0755 root root -"
     "d ${webpageRuntimeDir} 0755 nginx nginx -"
     "d /var/lib/postfix/data 0700 postfix postfix -"
     "z /var/lib/postfix/data 0700 postfix postfix -"

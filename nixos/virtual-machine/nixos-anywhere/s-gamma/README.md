@@ -88,11 +88,12 @@ the Postfix sender-login map for ACL entries with the `post` right.
 
 The real webpage source is pinned by `webpage-source.nix`. This is deliberately
 host-local instead of a root flake input, so unrelated hosts do not need access
-to the private webpage repository. At activation/runtime,
-`s-gamma-webpage-sync.service` copies that pinned source to:
+to the private webpage repository. After committing and pushing changes in the
+Webpage repo, update `webpage-source.nix` to the new commit and nar hash. At
+activation/runtime, `s-gamma-webpage-sync.service` copies that pinned source to:
 
 ```text
-/persist/srv/kvk/app
+/persist/srv/www/app
 ```
 
 `s-gamma-webpage.service` runs the backend from that directory on localhost.
@@ -102,7 +103,7 @@ dir:
 
 ```bash
 systemctl stop s-gamma-webpage.service
-cd /persist/srv/kvk/app
+cd /persist/srv/www/app
 python ./run-server.py
 ```
 
