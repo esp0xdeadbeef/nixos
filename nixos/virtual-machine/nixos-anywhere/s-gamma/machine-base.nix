@@ -29,6 +29,7 @@ in
       "/var/dkim"
       "/var/lib/acme"
       "/var/lib/dovecot"
+      "/var/lib/knot"
       "/var/lib/nixos"
       "/var/lib/postfix"
       "/var/lib/rspamd"
@@ -192,7 +193,6 @@ in
   networking.firewall.checkReversePath = lib.mkForce false;
 
   environment.systemPackages = with pkgs; [
-    bind
     conntrack-tools
     curl
     dig
@@ -202,6 +202,7 @@ in
     iptables
     iputils
     jq
+    knot-dns
     lsof
     mtr
     netcat-openbsd

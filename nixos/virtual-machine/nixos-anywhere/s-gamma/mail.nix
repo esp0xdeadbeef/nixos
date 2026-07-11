@@ -11,39 +11,12 @@ let
   postfixRuntimeDir = "${runtimeRoot}/mail/postfix";
   dovecotRuntimeDir = "${runtimeRoot}/mail/dovecot";
   sharedSenderLoginMap = "${postfixRuntimeDir}/shared-vaccounts";
-  webpageSource = import ./webpage-source.nix;
-  webpageRuntimeDir = "/persist/srv/www/app";
-  webpageHost = "127.0.0.1";
-  webpagePort = 8080;
 
   mailEnvPath = config.sops.secrets."mail/server/env".path;
   mailPasswordPath = config.sops.secrets."mail_client/shared/password".path;
   tlsFullchainPath = config.sops.secrets."mail/tls/fullchain_pem".path;
   tlsKeyPath = config.sops.secrets."mail/tls/key_pem".path;
   networkAddressEnvPath = config.sops.secrets."network/address_env".path;
-  dnsNamedConfPath = config.sops.secrets."dns/named_conf".path;
-  dnsZonePath = config.sops.secrets."dns/zone_001".path;
-  nginxHttpConfPath = config.sops.secrets."web/nginx/http_conf".path;
-  webContactEnvPath = config.sops.secrets."web/contact/env".path;
-  nginxPreviewUsernamePath = config.sops.secrets."web/preview/username".path;
-  nginxPreviewPasswordPath = config.sops.secrets."web/preview/password".path;
-  nginxRuntimeDir = "${runtimeRoot}/nginx";
-  nginxHtpasswdPath = "${nginxRuntimeDir}/htpasswd";
-  nginxRenderedHttpConfPath = "${nginxRuntimeDir}/http.conf";
-  nginxSecurityHeaders = ''
-    # Security headers for nginx-generated responses, including redirects and Basic Auth 401s.
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" always;
-    add_header Cross-Origin-Embedder-Policy "require-corp" always;
-    add_header Cross-Origin-Resource-Policy "same-origin" always;
-    add_header Cross-Origin-Opener-Policy "same-origin" always;
-    add_header X-Permitted-Cross-Domain-Policies "none" always;
-    add_header X-XSS-Protection "0" always;
-  '';
 
   waitForReadableFiles = label: paths: ''
     for path in ${lib.concatMapStringsSep " " lib.escapeShellArg paths}; do
@@ -53,148 +26,6 @@ let
       done
     done
   '';
-
-  prepareNginxRuntime = pkgs.writeShellApplication {
-    name = "s-gamma-prepare-nginx-runtime";
-    runtimeInputs = [
-      pkgs.coreutils
-      pkgs.gawk
-      pkgs.openssl
-    ];
-    text = ''
-      set -euo pipefail
-
-      raw_conf=${lib.escapeShellArg nginxHttpConfPath}
-      rendered_conf=${lib.escapeShellArg nginxRenderedHttpConfPath}
-      username_file=${lib.escapeShellArg nginxPreviewUsernamePath}
-      password_file=${lib.escapeShellArg nginxPreviewPasswordPath}
-      nginx_dir=${lib.escapeShellArg nginxRuntimeDir}
-      htpasswd=${lib.escapeShellArg nginxHtpasswdPath}
-
-      install -d -m 0750 -o nginx -g nginx "$nginx_dir"
-
-      username="$(tr -d '\r\n' < "$username_file")"
-      password="$(tr -d '\r\n' < "$password_file")"
-
-      if [ -z "$username" ]; then
-        echo "nginx preview username is empty" >&2
-        exit 1
-      fi
-
-      case "$username" in
-        *:*)
-          echo "nginx preview username must not contain ':'" >&2
-          exit 1
-          ;;
-      esac
-
-      password_hash="$(printf '%s' "$password" | openssl passwd -apr1 -stdin)"
-      unset password
-
-      tmp="$(mktemp "$nginx_dir/htpasswd.XXXXXX")"
-      printf '%s:%s\n' "$username" "$password_hash" > "$tmp"
-      unset password_hash
-      chown nginx:nginx "$tmp"
-      chmod 0440 "$tmp"
-      mv "$tmp" "$htpasswd"
-
-      tmp_conf="$(mktemp "$nginx_dir/http.conf.XXXXXX")"
-      cat > "$tmp_conf" <<'NGINX_SECURITY_HEADERS'
-      ${nginxSecurityHeaders}
-      NGINX_SECURITY_HEADERS
-      cat "$raw_conf" >> "$tmp_conf"
-      chown nginx:nginx "$tmp_conf"
-      chmod 0440 "$tmp_conf"
-      mv "$tmp_conf" "$rendered_conf"
-
-      awk '
-        /^[[:space:]]*ssl_certificate(_key)?[[:space:]]+/ {
-          path = $2
-          gsub(/;$/, "", path)
-          gsub(/^"/, "", path)
-          gsub(/"$/, "", path)
-          if (path !~ /^\$/) {
-            print path
-          }
-        }
-      ' "$raw_conf" | while IFS= read -r cert_path; do
-        [ -n "$cert_path" ] || continue
-        [ -e "$cert_path" ] || continue
-
-        cert_dir="$(dirname "$cert_path")"
-        chown root:nginx "$cert_dir" "$cert_path"
-        chmod 0750 "$cert_dir"
-        chmod 0640 "$cert_path"
-      done
-    '';
-  };
-
-  syncWebpageSource = pkgs.writeShellApplication {
-    name = "s-gamma-sync-webpage-source";
-    runtimeInputs = [
-      pkgs.coreutils
-      pkgs.rsync
-    ];
-    text = ''
-      set -euo pipefail
-
-      src=${lib.escapeShellArg "${webpageSource}/"}
-      dst=${lib.escapeShellArg webpageRuntimeDir}
-
-      install -d -m 0755 -o nginx -g nginx "$dst"
-      rsync -a --delete \
-        --chown=nginx:nginx \
-        --chmod=D755,F644 \
-        --filter='protect .env' \
-        --filter='protect .env.*' \
-        "$src" "$dst/"
-
-      chmod 0755 "$dst/run-server.py" "$dst/start-page.sh"
-    '';
-  };
-
-  configureNetworkAddresses = pkgs.writeShellApplication {
-    name = "s-gamma-configure-network-addresses";
-    runtimeInputs = [
-      pkgs.coreutils
-      pkgs.gnugrep
-      pkgs.iproute2
-    ];
-    text = ''
-      set -euo pipefail
-
-      env_file=${lib.escapeShellArg networkAddressEnvPath}
-      interface="''${NETWORK_INTERFACE:-ens3}"
-
-      if [ ! -r "$env_file" ]; then
-        echo "network address env is missing: $env_file" >&2
-        exit 1
-      fi
-
-      set -a
-      # shellcheck disable=SC1090
-      . "$env_file"
-      set +a
-
-      require_env() {
-        name="$1"
-        if [ -z "$(printenv "$name" || true)" ]; then
-          echo "required network address variable is missing: $name" >&2
-          exit 1
-        fi
-      }
-
-      require_env WEB_IPV6
-      require_env WEB_IPV6_PREFIX_LENGTH
-
-      if ! printf '%s\n' "$WEB_IPV6_PREFIX_LENGTH" | grep -Eq '^[0-9]+$'; then
-        echo "WEB_IPV6_PREFIX_LENGTH must be numeric" >&2
-        exit 1
-      fi
-
-      ip -6 addr replace "$WEB_IPV6/$WEB_IPV6_PREFIX_LENGTH" dev "$interface"
-    '';
-  };
 
   renderMailRuntime = pkgs.writeShellApplication {
     name = "s-gamma-render-mail-runtime";
@@ -677,12 +508,6 @@ in
   };
 
   sops.secrets = {
-    "network/address_env" = {
-      sopsFile = runtimeSopsFile;
-      mode = "0400";
-      restartUnits = [ "s-gamma-network-addresses.service" ];
-    };
-
     "mail/server/env" = {
       sopsFile = runtimeSopsFile;
       restartUnits = [
@@ -710,60 +535,6 @@ in
       ];
     };
 
-    "dns/named_conf" = {
-      sopsFile = runtimeSopsFile;
-      owner = "named";
-      group = "named";
-      mode = "0440";
-      restartUnits = [ "bind.service" ];
-    };
-
-    "dns/zone_001" = {
-      sopsFile = runtimeSopsFile;
-      owner = "named";
-      group = "named";
-      mode = "0440";
-      restartUnits = [ "bind.service" ];
-    };
-
-    "web/nginx/http_conf" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [ "nginx.service" ];
-    };
-
-    "web/contact/env" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [ "s-gamma-webpage.service" ];
-    };
-
-    "web/preview/username" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [
-        "s-gamma-nginx-runtime-config.service"
-        "nginx.service"
-      ];
-    };
-
-    "web/preview/password" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [
-        "s-gamma-nginx-runtime-config.service"
-        "nginx.service"
-      ];
-    };
-
     "mail_client/shared/password".sopsFile = mailClientSopsFile;
   };
 
@@ -772,10 +543,6 @@ in
     "d ${runtimeRoot}/mail 0755 root root -"
     "d ${postfixRuntimeDir} 0750 root postfix -"
     "d ${dovecotRuntimeDir} 0750 root dovecot2 -"
-    "d ${nginxRuntimeDir} 0750 nginx nginx -"
-    "d /persist/srv 0755 root root -"
-    "d /persist/srv/www 0755 root root -"
-    "d ${webpageRuntimeDir} 0755 nginx nginx -"
     "d /var/lib/postfix/data 0700 postfix postfix -"
     "z /var/lib/postfix/data 0700 postfix postfix -"
     "z /var/lib/postfix/data/master.lock 0600 postfix postfix -"
@@ -784,31 +551,7 @@ in
     "d /var/lib/dovecot 0755 root root -"
     "d /var/lib/dovecot/db 0770 virtualMail virtualMail -"
     "Z /var/lib/dovecot/db - virtualMail virtualMail -"
-    "z /var/lib/acme 0755 root root -"
-    "d /var/log/nginx 0750 nginx nginx -"
-    "z /var/log/nginx 0750 nginx nginx -"
-    "z /var/log/nginx/access.log 0640 nginx nginx -"
-    "z /var/log/nginx/error.log 0640 nginx nginx -"
   ];
-
-  systemd.services.s-gamma-network-addresses = {
-    description = "Configure s-gamma runtime network addresses from SOPS";
-    after = [ "network.target" ];
-    before = [
-      "bind.service"
-      "nginx.service"
-    ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      TimeoutStartSec = "5min";
-    };
-    preStart = waitForReadableFiles "network addresses" [
-      networkAddressEnvPath
-    ];
-    script = "${lib.getExe configureNetworkAddresses}";
-  };
 
   systemd.services.s-gamma-mail-runtime-config = {
     description = "Render s-gamma mail runtime maps from SOPS";
@@ -870,63 +613,6 @@ in
         exit 1
       fi
     '';
-  };
-
-  systemd.services.s-gamma-nginx-runtime-config = {
-    description = "Prepare s-gamma nginx runtime files from SOPS";
-    before = [ "nginx.service" ];
-    requiredBy = [ "nginx.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      TimeoutStartSec = "5min";
-    };
-    preStart = waitForReadableFiles "nginx runtime" [
-      nginxHttpConfPath
-      nginxPreviewUsernamePath
-      nginxPreviewPasswordPath
-    ];
-    script = "${lib.getExe prepareNginxRuntime}";
-  };
-
-  systemd.services.s-gamma-webpage-sync = {
-    description = "Sync pinned s-gamma webpage source";
-    before = [ "s-gamma-webpage.service" ];
-    requiredBy = [ "s-gamma-webpage.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = "${lib.getExe syncWebpageSource}";
-  };
-
-  systemd.services.s-gamma-webpage = {
-    description = "Run s-gamma webpage backend";
-    after = [
-      "network.target"
-      "s-gamma-webpage-sync.service"
-    ];
-    requires = [ "s-gamma-webpage-sync.service" ];
-    wantedBy = [ "multi-user.target" ];
-    environment = {
-      HOST = webpageHost;
-      PORT = toString webpagePort;
-      WEB_ROOT = "webpagina";
-      CORS_ALLOW_ORIGIN = "*";
-    };
-    path = [ pkgs.python3 ];
-    serviceConfig = {
-      User = "nginx";
-      Group = "nginx";
-      WorkingDirectory = webpageRuntimeDir;
-      EnvironmentFile = webContactEnvPath;
-      ExecStart = "${pkgs.python3}/bin/python3 ./run-server.py";
-      Restart = "always";
-      RestartSec = "5s";
-    };
-    preStart = waitForReadableFiles "web contact" [
-      webContactEnvPath
-    ];
   };
 
   systemd.services.postfix = {
@@ -1156,61 +842,11 @@ in
     };
   };
 
-  services.bind = {
-    enable = true;
-    checkConfig = false;
-    extraConfig = ''
-      include "${dnsNamedConfPath}";
-    '';
-  };
-
-  systemd.services.bind = {
-    preStart = lib.mkBefore (waitForReadableFiles "bind" [
-      dnsNamedConfPath
-      dnsZonePath
-    ]);
-    serviceConfig.TimeoutStartSec = "5min";
-  };
-
-  services.nginx = {
-    enable = true;
-    recommendedGzipSettings = true;
-    recommendedOptimisation = true;
-    recommendedProxySettings = true;
-    recommendedTlsSettings = true;
-    appendHttpConfig = ''
-      auth_basic "preview";
-      auth_basic_user_file ${nginxHtpasswdPath};
-
-      include ${nginxRenderedHttpConfPath};
-    '';
-  };
-
-  systemd.services.nginx = {
-    after = [
-      "s-gamma-nginx-runtime-config.service"
-      "s-gamma-webpage.service"
-    ];
-    requires = [
-      "s-gamma-nginx-runtime-config.service"
-      "s-gamma-webpage.service"
-    ];
-    preStart = lib.mkBefore (waitForReadableFiles "nginx" [
-      nginxRenderedHttpConfPath
-      nginxHtpasswdPath
-    ]);
-    serviceConfig.TimeoutStartSec = "5min";
-  };
-
   networking.firewall.allowedTCPPorts = [
     25
-    53
-    80
     143
-    443
     465
     587
     993
   ];
-  networking.firewall.allowedUDPPorts = [ 53 ];
 }

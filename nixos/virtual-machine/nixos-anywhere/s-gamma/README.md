@@ -10,8 +10,8 @@ verification, and intake portal flow.
 
 ## SOPS inputs
 
-`mail.nix` only references generic secret keys and runtime file paths. Boot-time
-helpers render service-specific files from:
+The host modules only reference generic secret keys and runtime file paths.
+Boot-time helpers render service-specific files from:
 
 ```text
 secrets/s-gamma-runtime.yaml
@@ -25,8 +25,9 @@ network/address_env
 mail/server/env
 mail/tls/fullchain_pem
 mail/tls/key_pem
-dns/named_conf
+dns/knot_conf
 dns/zone_001
+dns/zone_002
 web/contact/env
 web/nginx/http_conf
 web/preview/username
@@ -64,7 +65,9 @@ NETWORK_INTERFACE=...
 
 DNS and nginx runtime config are included from SOPS-managed files. Put zone
 names, record targets, address literals, `server_name` values, backend targets,
-and preview auth config there instead of in public Nix.
+and preview auth config there instead of in public Nix. Add another
+`dns/zone_NNN` secret when the authoritative server must serve an additional
+zone, and include it from the SOPS-managed Knot config.
 
 The web contact env secret is a shell env file for the contact form backend:
 
@@ -83,6 +86,13 @@ from SOPS, but client visibility and SMTP send-as are derived from the actual
 Dovecot ACL state. The `s-gamma-mail-shared-subscriptions` unit refreshes the
 Dovecot sharing map, subscribes users to visible shared mailboxes, and rebuilds
 the Postfix sender-login map for ACL entries with the `post` right.
+
+## Module layout
+
+- `network.nix`: provider address SOPS env and runtime address setup
+- `dns.nix`: Knot authoritative DNS, zone secrets, DNS firewall ports
+- `mail.nix`: Postfix, Dovecot, Rspamd, mail secrets, mail firewall ports
+- `web.nix`: pinned webpage sync, contact backend, nginx, web firewall ports
 
 ## Web runtime
 
@@ -128,7 +138,7 @@ Runtime service checks on the host:
 
 ```bash
 systemctl status s-gamma-mail-runtime-config.service
-systemctl status postfix.service dovecot.service bind.service nginx.service
+systemctl status postfix.service dovecot.service knot.service nginx.service
 systemctl status s-gamma-webpage-sync.service s-gamma-webpage.service
 ```
 

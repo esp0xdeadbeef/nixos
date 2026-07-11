@@ -17,8 +17,11 @@ in
     profiles.nixos.impermanence.module
     inputs.sops-nix.nixosModules.sops
 
+    ./network.nix
+    ./dns.nix
     ./hardware.nix
     ./mail.nix
+    ./web.nix
 
     (import ./disko.nix {
       disk = installDisk;
