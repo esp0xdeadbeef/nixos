@@ -4,6 +4,6 @@ builtins.fetchTree {
   type = "github";
   owner = "esp0xdeadbeef";
   repo = "www";
-  rev = "19d7551b8243847977c056fa6ba9c081745ba4da";
-  narHash = "sha256-E+VuNHbaaHnnuZb/bX8GFPL+e5yXyoHzChHzIiO++8g=";
+  rev = "2193a552d0c1f7250087fda31392af75ab1dec44";
+  narHash = "sha256-5qjDAneCzPL7WtbFOU6BN+rPlQLhoY6Zjy/5xy2vAHE=";
 }
