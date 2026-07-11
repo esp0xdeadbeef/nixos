@@ -630,6 +630,14 @@ let
     smtpd_recipient_restrictions = "reject_non_fqdn_recipient,reject_unknown_recipient_domain,permit_sasl_authenticated,reject";
     milter_macro_daemon_name = "ORIGINATING";
   };
+
+  postfixTls12CipherList = lib.concatStringsSep ":" [
+    "ECDHE-ECDSA-AES256-GCM-SHA384"
+    "ECDHE-ECDSA-CHACHA20-POLY1305"
+    "ECDHE-ECDSA-AES128-GCM-SHA256"
+    "@STRENGTH"
+    "@SECLEVEL=2"
+  ];
 in
 {
   users.groups.virtualMail = { };
@@ -819,6 +827,10 @@ in
       smtpd_tls_mandatory_protocols = ">=TLSv1.2";
       smtpd_tls_ciphers = "high";
       smtpd_tls_mandatory_ciphers = "high";
+
+      tls_high_cipherlist = postfixTls12CipherList;
+      tls_preempt_cipherlist = true;
+      tls_eecdh_auto_curves = "X25519:prime256v1:secp384r1";
 
       smtp_dns_support_level = "dnssec";
       smtp_tls_security_level = "dane";
