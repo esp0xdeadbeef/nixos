@@ -496,9 +496,10 @@ let
       }
 
       clear_managed_subscriptions() {
-        for account_id in $(words "''${MAIL_ACCOUNTS:-}"); do
+        for account_id in $(words "''${MAIL_ACCOUNTS:-} $automatic_client_account_ids $automatic_shared_account_ids"); do
           [ -n "$account_id" ] || continue
-          user="$(ref_to_address "$account_id")"
+          user="$(ref_to_address "$account_id" || true)"
+          [ -n "$user" ] || continue
 
           subscriptions_file="$(subscriptions_file_for_user "$user" || true)"
           [ -n "$subscriptions_file" ] || continue
@@ -536,6 +537,17 @@ let
           fi
 
           visible_mailbox="$(shared_mailbox_name "$owner" "$mailbox")"
+
+          for cleanup_ref in $(words "''${MAIL_ACCOUNTS:-} $automatic_client_account_ids $automatic_shared_account_ids $user_refs"); do
+            [ -n "$cleanup_ref" ] || continue
+            [ "$cleanup_ref" != "$owner_ref" ] || continue
+            cleanup_user="$(ref_to_address "$cleanup_ref" || true)"
+            [ -n "$cleanup_user" ] || continue
+            [ "$cleanup_user" != "$owner" ] || continue
+
+            doveadm acl remove -u "$owner" "$mailbox" "user=$cleanup_user" >/dev/null 2>&1 || true
+          done
+          doveadm acl recalc -u "$owner" >/dev/null
 
           for user_ref in $(words "$user_refs"); do
             [ -n "$user_ref" ] || continue
@@ -627,7 +639,7 @@ let
         fi
 
         if ! doveadm acl debug -u "$user" "$mailbox" >/dev/null 2>&1; then
-          echo "shared-mail-subscriptions: mailbox is not visible for ACL user" >&2
+          echo "shared-mail-subscriptions: mailbox is not visible for ACL user: user=$user mailbox=$mailbox" >&2
           return 1
         fi
 
