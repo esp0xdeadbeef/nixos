@@ -1,4 +1,8 @@
 {
+  mail = {
+    accounts = import ./mail/accounts.nix;
+  };
+
   nixos = {
     base = {
       default = import ./nixos/base;

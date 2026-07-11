@@ -1,33 +1,30 @@
 { config, lib, outPath, pkgs, ... }:
 let
-  mailClientSopsFile = "${outPath}/secrets/mail-client.yaml";
-  accountNames = [
-    "account_001"
-  ];
-  sharedSecretKeys = [
-    "mail_client/shared/password"
-  ];
-  accountSecretKeys = account:
-    map (field: "mail_client/${account}/${field}") [
-      "label"
-      "from"
-      "source"
-      "outgoing"
-    ];
-  secretKeys = sharedSecretKeys ++ lib.flatten (map accountSecretKeys accountNames);
+  mailAccounts = import ../../mail/accounts.nix {
+    secretsRoot = "${outPath}/secrets";
+  };
+  accountNames = mailAccounts.clientAccountNames;
+  accountSecretRefs = lib.flatten (
+    map
+      (
+        account:
+        map (field: mailAccounts.secretRef account field) mailAccounts.clientFields
+      )
+      accountNames
+  );
   placeholder = name: config.sops.placeholder.${name};
   secretPath = name: config.sops.secrets.${name}.path;
-  mkSecret = name: {
-    inherit name;
-    value.sopsFile = mailClientSopsFile;
+  mkSecret = secret: {
+    inherit (secret) name;
+    value.sopsFile = secret.sopsFile;
   };
   mkAccount = account: ''
-    [${placeholder "mail_client/${account}/label"}]
-    from = ${placeholder "mail_client/${account}/from"}
-    source = ${placeholder "mail_client/${account}/source"}
-    source-cred-cmd = ${pkgs.coreutils}/bin/cat ${secretPath "mail_client/shared/password"}
-    outgoing = ${placeholder "mail_client/${account}/outgoing"}
-    outgoing-cred-cmd = ${pkgs.coreutils}/bin/cat ${secretPath "mail_client/shared/password"}
+    [${placeholder (mailAccounts.secretName account "label")}]
+    from = ${placeholder (mailAccounts.secretName account "from")}
+    source = ${placeholder (mailAccounts.secretName account "source")}
+    source-cred-cmd = ${pkgs.coreutils}/bin/cat ${secretPath (mailAccounts.secretName account "password")}
+    outgoing = ${placeholder (mailAccounts.secretName account "outgoing")}
+    outgoing-cred-cmd = ${pkgs.coreutils}/bin/cat ${secretPath (mailAccounts.secretName account "password")}
     default = INBOX
     copy-to = Sent
     postpone = Drafts
@@ -38,7 +35,7 @@ in
     enable = true;
   };
 
-  sops.secrets = builtins.listToAttrs (map mkSecret secretKeys);
+  sops.secrets = builtins.listToAttrs (map mkSecret accountSecretRefs);
 
   sops.templates.aercAccounts = {
     mode = "0400";

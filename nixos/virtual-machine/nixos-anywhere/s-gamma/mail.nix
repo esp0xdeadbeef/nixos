@@ -12,7 +12,9 @@ let
   rspamdRuntimeConfigService = "${hostName}-rspamd-runtime-config";
   sharedSubscriptionsService = "${hostName}-mail-shared-subscriptions";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
-  mailClientSopsFile = ../../../../secrets/mail-client.yaml;
+  mailAccounts = import ../../../../profiles/mail/accounts.nix {
+    secretsRoot = ../../../../secrets;
+  };
 
   runtimeRoot = "/run/${hostName}";
   postfixRuntimeDir = "${runtimeRoot}/mail/postfix";
@@ -22,8 +24,34 @@ let
   sharedSenderLoginMap = "${postfixRuntimeDir}/shared-vaccounts";
 
   mailEnvPath = config.sops.secrets."mail/server/env".path;
-  mailPasswordPath = config.sops.secrets."mail_client/shared/password".path;
   networkAddressEnvPath = config.sops.secrets."network/address_env".path;
+  mailAccountSecretRefs = lib.flatten (
+    map
+      (
+        account:
+        map (field: mailAccounts.secretRef account field) mailAccounts.serverFields
+      )
+      mailAccounts.serverAccountNames
+  );
+  mailAccountSecretPathsByName = builtins.listToAttrs (
+    map
+      (secret: {
+        inherit (secret) name;
+        value = config.sops.secrets.${secret.name}.path;
+      })
+      mailAccountSecretRefs
+  );
+  mailAccountSecretPaths = builtins.attrValues mailAccountSecretPathsByName;
+  mailAccountSecretPathMap = pkgs.writeText "${hostName}-mail-account-secret-paths" (
+    (lib.concatStringsSep "\n" (
+      lib.mapAttrsToList
+        (
+          secretName: path: "${secretName}=${path}"
+        )
+        mailAccountSecretPathsByName
+    ))
+    + "\n"
+  );
 
   waitForReadableFiles = label: paths: ''
     for path in ${lib.concatMapStringsSep " " lib.escapeShellArg paths}; do
@@ -48,7 +76,7 @@ let
 
       env_file=${lib.escapeShellArg mailEnvPath}
       network_env_file=${lib.escapeShellArg networkAddressEnvPath}
-      password_file=${lib.escapeShellArg mailPasswordPath}
+      account_secret_path_map=${lib.escapeShellArg mailAccountSecretPathMap}
       postfix_dir=${lib.escapeShellArg postfixRuntimeDir}
       dovecot_dir=${lib.escapeShellArg dovecotRuntimeDir}
       tls_fullchain=${lib.escapeShellArg mailTlsFullchainPath}
@@ -56,11 +84,6 @@ let
 
       if [ ! -r "$env_file" ]; then
         echo "mail runtime env is missing: $env_file" >&2
-        exit 1
-      fi
-
-      if [ ! -r "$password_file" ]; then
-        echo "shared mail password is missing: $password_file" >&2
         exit 1
       fi
 
@@ -81,6 +104,66 @@ let
 
       words() {
         printf '%s\n' "$1" | tr ',\t\r\n' ' '
+      }
+
+      secret_file() {
+        secret="$1"
+
+        awk -F= -v secret="$secret" '
+          $1 == secret {
+            print substr($0, length($1) + 2)
+            found = 1
+          }
+
+          END {
+            exit(found ? 0 : 1)
+          }
+        ' "$account_secret_path_map"
+      }
+
+      account_secret() {
+        account_id="$1"
+        account_secret_var="MAIL_''${account_id}_ACCOUNT_SECRET"
+        account_secret="$(printenv "$account_secret_var" || true)"
+
+        if [ -z "$account_secret" ]; then
+          echo "missing account secret variable for mail account id: $account_id" >&2
+          exit 1
+        fi
+
+        printf '%s\n' "$account_secret"
+      }
+
+      account_secret_file() {
+        account="$1"
+        field="$2"
+
+        secret_file "$account/$field" || {
+          echo "unknown mail account secret field: $account/$field" >&2
+          exit 1
+        }
+      }
+
+      read_required_account_field() {
+        account="$1"
+        field="$2"
+        path="$(account_secret_file "$account" "$field")"
+
+        if [ ! -r "$path" ]; then
+          echo "mail account field is missing: $account/$field" >&2
+          exit 1
+        fi
+
+        tr -d '\r\n' < "$path"
+      }
+
+      read_optional_account_field() {
+        account="$1"
+        field="$2"
+        path="$(account_secret_file "$account" "$field")"
+
+        [ -r "$path" ] || return 0
+        tr '\t\r\n' ' ' < "$path"
       }
 
       require_env MAIL_FQDN
@@ -112,22 +195,27 @@ let
         printf '%s OK\n' "$domain" >> "$vdomains"
       done
 
-      password="$(tr -d '\r\n' < "$password_file")"
-      password_hash="$(doveadm pw -s BLF-CRYPT -p "$password")"
-      unset password
-
       for account_id in $(words "$MAIL_ACCOUNTS"); do
         [ -n "$account_id" ] || continue
 
-        address_var="MAIL_''${account_id}_ADDRESS"
-        aliases_var="MAIL_''${account_id}_ALIASES"
-        address="$(printenv "$address_var" || true)"
-        aliases="$(printenv "$aliases_var" || true)"
+        account="$(account_secret "$account_id")"
+        address="$(read_required_account_field "$account" username)"
+        aliases="$(read_optional_account_field "$account" aliases)"
+        password_file="$(account_secret_file "$account" password)"
 
         if [ -z "$address" ]; then
-          echo "missing address variable for mail account id: $account_id" >&2
+          echo "empty username for mail account id: $account_id" >&2
           exit 1
         fi
+
+        if [ ! -r "$password_file" ]; then
+          echo "mail password is missing for account id: $account_id" >&2
+          exit 1
+        fi
+
+        password="$(tr -d '\r\n' < "$password_file")"
+        password_hash="$(doveadm pw -s BLF-CRYPT -p "$password")"
+        unset password
 
         printf '%s %s\n' "$address" "$address" >> "$valias"
         printf '%s %s\n' "$address" "$address" >> "$vaccounts_raw"
@@ -222,6 +310,7 @@ let
       set -euo pipefail
 
       env_file=${lib.escapeShellArg mailEnvPath}
+      account_secret_path_map=${lib.escapeShellArg mailAccountSecretPathMap}
       shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
       shared_namespace_prefix=users
       vmail_root=/var/vmail
@@ -232,8 +321,44 @@ let
         printf '%s\n' "''${1:-}" | tr ',\t\r\n' ' '
       }
 
+      secret_file() {
+        secret="$1"
+
+        awk -F= -v secret="$secret" '
+          $1 == secret {
+            print substr($0, length($1) + 2)
+            found = 1
+          }
+
+          END {
+            exit(found ? 0 : 1)
+          }
+        ' "$account_secret_path_map"
+      }
+
+      account_secret_for_ref() {
+        ref="$1"
+        account_secret_var="MAIL_''${ref}_ACCOUNT_SECRET"
+        printenv "$account_secret_var" || true
+      }
+
+      read_account_field() {
+        account="$1"
+        field="$2"
+        path="$(secret_file "$account/$field")" || return 1
+
+        [ -r "$path" ] || return 1
+        tr -d '\r\n' < "$path"
+      }
+
       ref_to_address() {
         ref="$1"
+        account="$(account_secret_for_ref "$ref")"
+        if [ -n "$account" ]; then
+          read_account_field "$account" username
+          return
+        fi
+
         address="$(printenv "MAIL_''${ref}_ADDRESS" || true)"
         if [ -n "$address" ]; then
           printf '%s\n' "$address"
@@ -514,18 +639,25 @@ in
     home = "/var/vmail";
   };
 
-  sops.secrets = {
-    "mail/server/env" = {
-      sopsFile = runtimeSopsFile;
-      restartUnits = [
-        mailRuntimeConfigUnit
-        "postfix.service"
-        "dovecot.service"
-      ];
-    };
-
-    "mail_client/shared/password".sopsFile = mailClientSopsFile;
-  };
+  sops.secrets =
+    {
+      "mail/server/env" = {
+        sopsFile = runtimeSopsFile;
+        restartUnits = [
+          mailRuntimeConfigUnit
+          "postfix.service"
+          "dovecot.service"
+        ];
+      };
+    }
+    // builtins.listToAttrs (
+      map
+        (secret: {
+          inherit (secret) name;
+          value.sopsFile = secret.sopsFile;
+        })
+        mailAccountSecretRefs
+    );
 
   systemd.tmpfiles.rules = [
     "d ${runtimeRoot} 0755 root root -"
@@ -565,13 +697,15 @@ in
       RemainAfterExit = true;
       TimeoutStartSec = "5min";
     };
-    preStart = waitForReadableFiles "mail runtime" [
-      networkAddressEnvPath
-      mailEnvPath
-      mailPasswordPath
-      mailTlsFullchainPath
-      mailTlsKeyPath
-    ];
+    preStart = waitForReadableFiles "mail runtime" (
+      [
+        networkAddressEnvPath
+        mailEnvPath
+        mailTlsFullchainPath
+        mailTlsKeyPath
+      ]
+      ++ mailAccountSecretPaths
+    );
     script = "${lib.getExe renderMailRuntime}";
   };
 

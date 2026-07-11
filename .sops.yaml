@@ -41,7 +41,7 @@ keys:
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
 
 creation_rules:
-  - path_regex: '^(secrets/)*mail-client\.(env|ya?ml)$'
+  - path_regex: '^(secrets/)*mail-account-[A-Za-z0-9_-]+\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
       - age:

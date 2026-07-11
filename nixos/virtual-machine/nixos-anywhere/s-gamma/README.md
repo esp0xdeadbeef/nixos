@@ -15,7 +15,7 @@ Boot-time helpers render service-specific files from:
 
 ```text
 secrets/s-gamma-runtime.yaml
-secrets/mail-client.yaml
+secrets/mail-account-*.yaml
 ```
 
 `secrets/s-gamma-runtime.yaml` owns server-side runtime material:
@@ -32,13 +32,33 @@ web/preview/username
 web/preview/password
 ```
 
-`secrets/mail-client.yaml` owns shared client-side mail login material:
+Each mailbox has its own SOPS file. This keeps mailbox credentials isolated,
+so adding or delegating a mailbox does not require sharing one central mail
+client secret:
 
 ```text
-mail_client/shared/password
+secrets/mail-account-postmaster.yaml
+secrets/mail-account-user-001.yaml
+secrets/mail-account-mailbox-001.yaml
+secrets/mail-account-no-reply.yaml
 ```
 
-The mail env secret is a shell env file using generic account IDs:
+Mailbox account files use this shape:
+
+```text
+mail/accounts/<account>/username
+mail/accounts/<account>/password
+mail/accounts/<account>/aliases
+mail/accounts/<account>/label
+mail/accounts/<account>/from
+mail/accounts/<account>/source
+mail/accounts/<account>/outgoing
+```
+
+Only client-used accounts need `label`, `from`, `source`, and `outgoing`.
+
+The mail env secret is a shell env file using generic account IDs and account
+secret pointers:
 
 ```text
 MAIL_FQDN=...
@@ -47,11 +67,13 @@ MAIL_DOMAINS=...
 MAIL_TLS_DOMAINS=...
 MAIL_ACME_EMAIL=...
 MAIL_ACCOUNTS=ACCOUNT_001 ACCOUNT_002
-MAIL_ACCOUNT_001_ADDRESS=...
-MAIL_ACCOUNT_001_ALIASES=...
-MAIL_ACCOUNT_002_ADDRESS=...
-MAIL_ACCOUNT_002_ALIASES=...
+MAIL_ACCOUNT_001_ACCOUNT_SECRET=mail/accounts/postmaster
+MAIL_ACCOUNT_002_ACCOUNT_SECRET=mail/accounts/user-001
 ```
+
+The public mapping between generic runtime IDs and account secrets lives in
+`profiles/mail/accounts.nix`; the concrete usernames, aliases, passwords, and
+client properties stay in the per-account SOPS files.
 
 The network address env secret is a shell env file for provider addresses:
 
