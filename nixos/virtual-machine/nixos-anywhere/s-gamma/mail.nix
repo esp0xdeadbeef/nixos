@@ -330,11 +330,12 @@ let
       trap 'rm -f "$shared_sender_logins_raw"' EXIT
 
       words() {
-        printf '%s\n' "''${1:-}" | tr ',\t\r\n' ' '
+        local input="''${1:-}"
+        printf '%s\n' "$input" | tr ',\t\r\n' ' '
       }
 
       secret_file() {
-        secret="$1"
+        local secret="$1"
 
         awk -F= -v secret="$secret" '
           $1 == secret {
@@ -349,14 +350,15 @@ let
       }
 
       account_secret_for_ref() {
-        ref="$1"
-        account_secret_var="MAIL_''${ref}_ACCOUNT_SECRET"
+        local ref="$1"
+        local account_secret_var="MAIL_''${ref}_ACCOUNT_SECRET"
         printenv "$account_secret_var" || true
       }
 
       read_account_field() {
-        account="$1"
-        field="$2"
+        local account="$1"
+        local field="$2"
+        local path
         path="$(secret_file "$account/$field")" || return 1
 
         [ -r "$path" ] || return 1
@@ -364,7 +366,9 @@ let
       }
 
       ref_to_address() {
-        ref="$1"
+        local ref="$1"
+        local account
+        local address
         account="$(account_secret_for_ref "$ref")"
         if [ -n "$account" ]; then
           read_account_field "$account" username
@@ -380,8 +384,8 @@ let
       }
 
       shared_var() {
-        shared_id="$1"
-        field="$2"
+        local shared_id="$1"
+        local field="$2"
         printenv "MAIL_SHARED_''${shared_id}_''${field}" || true
       }
 
@@ -398,9 +402,9 @@ let
       fi
 
       owner_localpart() {
-        owner="$1"
-        owner_local="''${owner%@*}"
-        owner_domain="''${owner#*@}"
+        local owner="$1"
+        local owner_local="''${owner%@*}"
+        local owner_domain="''${owner#*@}"
 
         if [ -z "$owner_local" ] || [ -z "$owner_domain" ] || [ "$owner_domain" = "$owner" ]; then
           return 1
@@ -410,8 +414,9 @@ let
       }
 
       shared_mailbox_name() {
-        owner="$1"
-        mailbox="$2"
+        local owner="$1"
+        local mailbox="$2"
+        local owner_local
         owner_local="$(owner_localpart "$owner")"
 
         case "$mailbox" in
@@ -428,7 +433,8 @@ let
       }
 
       right_list_has_post() {
-        rights="$1"
+        local rights="$1"
+        local right
 
         for right in $(words "$rights"); do
           case "$right" in
@@ -448,9 +454,9 @@ let
       }
 
       add_sender_login() {
-        owner="$1"
-        user="$2"
-        rights="$3"
+        local owner="$1"
+        local user="$2"
+        local rights="$3"
 
         if right_list_has_post "$rights"; then
           printf '%s %s\n' "$owner" "$user" >> "$shared_sender_logins_raw"
@@ -458,15 +464,17 @@ let
       }
 
       subscriptions_file_for_user() {
-        user="$1"
+        local user="$1"
+        local user_local
+        local user_domain="''${user#*@}"
         user_local="$(owner_localpart "$user")"
-        user_domain="''${user#*@}"
 
         printf '%s/%s/%s/mail/subscriptions\n' "$vmail_root" "$user_domain" "$user_local"
       }
 
       remove_managed_subscriptions() {
-        subscriptions_file="$1"
+        local subscriptions_file="$1"
+        local tmp
 
         [ -f "$subscriptions_file" ] || return 0
 
@@ -631,8 +639,8 @@ let
       }
 
       subscribe_user() {
-        user="$1"
-        mailbox="$2"
+        local user="$1"
+        local mailbox="$2"
 
         if ! doveadm user "$user" >/dev/null 2>&1; then
           return 0
