@@ -186,7 +186,7 @@ let
       fi
 
       if systemctl is-active --quiet nginx.service; then
-        systemctl try-reload-or-restart nginx.service || true
+        systemctl --no-block try-reload-or-restart nginx.service || true
       fi
     '';
   };

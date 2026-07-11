@@ -416,7 +416,7 @@ let
 
         case "$mailbox" in
           ""|INBOX)
-            printf '%s/%s\n' "$shared_namespace_prefix" "$owner_local"
+            printf '%s/%s/INBOX\n' "$shared_namespace_prefix" "$owner_local"
             ;;
           INBOX/*)
             printf '%s/%s/%s\n' "$shared_namespace_prefix" "$owner_local" "''${mailbox#INBOX/}"
