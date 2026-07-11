@@ -843,6 +843,35 @@ in
     script = "${lib.getExe renderMailRuntime}";
   };
 
+  systemd.services.s-gamma-rspamd-runtime-config = {
+    description = "Prepare s-gamma rspamd runtime files";
+    before = [ "rspamd.service" ];
+    requiredBy = [ "rspamd.service" ];
+    path = [ pkgs.coreutils ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      set -euo pipefail
+
+      install -d -m 0755 -o root -g root /var/dkim
+
+      found=0
+      for key in /var/dkim/*.key; do
+        [ -e "$key" ] || continue
+        found=1
+        chown rspamd:rspamd "$key"
+        chmod 0400 "$key"
+      done
+
+      if [ "$found" -eq 0 ]; then
+        echo "rspamd: no DKIM key found in /var/dkim" >&2
+        exit 1
+      fi
+    '';
+  };
+
   systemd.services.s-gamma-nginx-runtime-config = {
     description = "Prepare s-gamma nginx runtime files from SOPS";
     before = [ "nginx.service" ];
@@ -903,12 +932,14 @@ in
   systemd.services.postfix = {
     after = [
       "dovecot.service"
+      "rspamd.service"
       "s-gamma-mail-runtime-config.service"
     ];
     requires = [
       "dovecot.service"
       "s-gamma-mail-runtime-config.service"
     ];
+    wants = [ "rspamd.service" ];
   };
 
   systemd.services.dovecot = {
@@ -990,6 +1021,28 @@ in
 
     submissionOptions = commonSubmissionOptions;
     submissionsOptions = commonSubmissionOptions;
+  };
+
+  services.rspamd = {
+    enable = true;
+    postfix = {
+      enable = true;
+      config = {
+        smtpd_milters = [ "unix:/run/rspamd/rspamd-milter.sock" ];
+        non_smtpd_milters = [ "unix:/run/rspamd/rspamd-milter.sock" ];
+        milter_default_action = "accept";
+        milter_protocol = "6";
+      };
+    };
+    locals."dkim_signing.conf".text = ''
+      enabled = true;
+      sign_authenticated = true;
+      sign_local = true;
+      allow_username_mismatch = true;
+
+      selector = "mail";
+      path = "/var/dkim/$domain.$selector.key";
+    '';
   };
 
   services.dovecot2 = {
