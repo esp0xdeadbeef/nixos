@@ -144,6 +144,12 @@ let
     "continue"
   ];
 
+  hasThunderbird =
+    hasPackage [ "thunderbird" ]
+    || lib.any
+      (userConfig: userConfig.programs.thunderbird.enable or false)
+      (lib.attrValues homeManagerUsers);
+
   hasVirtualMachines =
     (config.virtualisation.libvirtd.enable or false)
     || hasPackage [
@@ -264,7 +270,7 @@ let
       [
         ".mozilla"
       ]
-    ++ lib.optionals (hasPackage [ "thunderbird" ]) [
+    ++ lib.optionals hasThunderbird [
       ".thunderbird"
     ]
     ++ lib.optionals (hasPackage [ "quickemu" ]) [
