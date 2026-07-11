@@ -176,6 +176,16 @@ let
         tr '\t\r\n' ' ' < "$path"
       }
 
+      write_address_domain() {
+        address="$1"
+        output="$2"
+        domain="''${address#*@}"
+
+        if [ -n "$domain" ] && [ "$domain" != "$address" ]; then
+          printf '%s\n' "$domain" >> "$output"
+        fi
+      }
+
       require_env MAIL_FQDN
       require_env MAIL_DOMAIN
       require_env MAIL_DOMAINS
@@ -187,6 +197,9 @@ let
       install -d -m 0750 -o root -g dovecot2 "$dovecot_dir"
 
       vdomains="$postfix_dir/vdomains"
+      vdomains_raw="$postfix_dir/vdomains.raw"
+      valias_domains="$postfix_dir/valias_domains"
+      valias_domains_raw="$postfix_dir/valias_domains.raw"
       valias="$postfix_dir/valias"
       vaccounts_raw="$postfix_dir/vaccounts.raw"
       vaccounts="$postfix_dir/vaccounts"
@@ -194,6 +207,9 @@ let
       passwd_file="$dovecot_dir/passwd"
 
       : > "$vdomains"
+      : > "$vdomains_raw"
+      : > "$valias_domains"
+      : > "$valias_domains_raw"
       : > "$valias"
       : > "$vaccounts_raw"
       : > "$vaccounts"
@@ -202,7 +218,7 @@ let
 
       for domain in $(words "$MAIL_DOMAINS"); do
         [ -n "$domain" ] || continue
-        printf '%s OK\n' "$domain" >> "$vdomains"
+        printf '%s\n' "$domain" >> "$vdomains_raw"
       done
 
       for account_id in $(words "$MAIL_ACCOUNTS"); do
@@ -217,6 +233,8 @@ let
           echo "empty username for mail account id: $account_id" >&2
           exit 1
         fi
+
+        write_address_domain "$address" "$vdomains_raw"
 
         if [ ! -r "$password_file" ]; then
           echo "mail password is missing for account id: $account_id" >&2
@@ -233,10 +251,30 @@ let
 
         for alias in $(words "$aliases"); do
           [ -n "$alias" ] || continue
+          write_address_domain "$alias" "$valias_domains_raw"
           printf '%s %s\n' "$alias" "$address" >> "$valias"
           printf '%s %s\n' "$alias" "$address" >> "$vaccounts_raw"
         done
       done
+
+      awk '
+        NF && !seen[$1]++ {
+          print $1, "OK"
+        }
+      ' "$vdomains_raw" > "$vdomains"
+
+      awk '
+        NR == FNR {
+          if (NF) {
+            mailbox[$1] = 1
+          }
+          next
+        }
+
+        NF && !($1 in mailbox) && !seen[$1]++ {
+          print $1, "OK"
+        }
+      ' "$vdomains_raw" "$valias_domains_raw" > "$valias_domains"
 
       awk '
         {
@@ -271,18 +309,19 @@ let
         }
       ' "$vaccounts_raw" > "$vaccounts"
 
-      rm -f "$vaccounts_raw"
-      chown root:postfix "$vdomains" "$valias" "$vaccounts" "$shared_vaccounts"
-      chmod 0640 "$vdomains" "$valias" "$vaccounts" "$shared_vaccounts"
+      rm -f "$vdomains_raw" "$valias_domains_raw" "$vaccounts_raw"
+      chown root:postfix "$vdomains" "$valias_domains" "$valias" "$vaccounts" "$shared_vaccounts"
+      chmod 0640 "$vdomains" "$valias_domains" "$valias" "$vaccounts" "$shared_vaccounts"
       chown root:dovecot2 "$passwd_file"
       chmod 0440 "$passwd_file"
 
       postmap "$vdomains"
+      postmap "$valias_domains"
       postmap "$valias"
       postmap "$vaccounts"
       postmap "$shared_vaccounts"
-      chown root:postfix "$vdomains.db" "$valias.db" "$vaccounts.db" "$shared_vaccounts.db"
-      chmod 0640 "$vdomains.db" "$valias.db" "$vaccounts.db" "$shared_vaccounts.db"
+      chown root:postfix "$vdomains.db" "$valias_domains.db" "$valias.db" "$vaccounts.db" "$shared_vaccounts.db"
+      chmod 0640 "$vdomains.db" "$valias_domains.db" "$valias.db" "$vaccounts.db" "$shared_vaccounts.db"
 
       main_cf=/var/lib/postfix/conf/main.cf
       if [ -L "$main_cf" ]; then
@@ -298,6 +337,7 @@ let
         "smtp_helo_name = $MAIL_FQDN" \
         "smtpd_banner = $MAIL_FQDN ESMTP" \
         "virtual_mailbox_domains = hash:$vdomains" \
+        "virtual_alias_domains = hash:$valias_domains" \
         "virtual_mailbox_maps = hash:$valias" \
         "virtual_alias_maps = hash:$valias" \
         "smtpd_sender_login_maps = hash:$vaccounts hash:$shared_vaccounts" \
