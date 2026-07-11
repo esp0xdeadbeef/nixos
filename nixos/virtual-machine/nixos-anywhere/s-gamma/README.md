@@ -120,24 +120,35 @@ server env secret when the mail certificate needs more names than `MAIL_FQDN`.
 - `cert.nix`: ACME certificate renewal and runtime certificate paths
 - `dns.nix`: Knot authoritative DNS, zone secrets, DNS firewall ports
 - `mail.nix`: Postfix, Dovecot, Rspamd, mail secrets, mail firewall ports
-- `web.nix`: pinned webpage sync, contact backend, nginx, web firewall ports
+- `web.nix`: runtime webpage sync, contact backend, nginx, web firewall ports
 
 ## Web runtime
 
-The real webpage source is pinned by `webpage-source.nix`. This is deliberately
-host-local instead of a root flake input, so unrelated hosts do not need access
-to the private webpage repository. After committing and pushing source changes,
-update `webpage-source.nix` to the new commit and nar hash. At
-activation/runtime, `<host>-webpage-sync.service` copies that pinned source to:
+The real webpage source is private and is not fetched by Nix evaluation or put in
+the Nix store. `<host>-webpage-sync.service` clones or updates the `main` branch
+of `esp0xdeadbeef/www` at runtime using `/run/secrets/gh-token`, then copies the
+working tree to:
 
 ```text
 /persist/srv/www/app
 ```
 
-`<host>-webpage.service` runs the backend from that directory on localhost.
-Nginx reverse proxies to it and owns the preview access gate. To temporarily
-test an override, stop the service and run the app manually from the runtime
-dir:
+The source checkout itself lives at `/persist/srv/www/source`. This avoids
+private GitHub tarball failures during `nixos-rebuild`, and avoids storing the
+webpage source or GitHub token in `/nix/store`.
+
+After committing and pushing webpage changes, restart the sync and app units, or
+let the next boot/upgrade start refresh the checkout:
+
+```bash
+systemctl start "$(hostname)-webpage-sync.service"
+systemctl restart "$(hostname)-webpage.service"
+```
+
+`<host>-webpage.service` runs the backend from `/persist/srv/www/app` on
+localhost. Nginx reverse proxies to it and owns the preview access gate. To
+temporarily test an override, stop the service and run the app manually from the
+runtime dir:
 
 ```bash
 systemctl stop "$(hostname)-webpage.service"

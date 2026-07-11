@@ -13,7 +13,10 @@ let
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
 
   runtimeRoot = "/run/${hostName}";
-  webpageSource = import ./webpage-source.nix;
+  githubTokenPath = config.sops.secrets.gh-token.path;
+  webpageRepoUrl = "https://github.com/esp0xdeadbeef/www.git";
+  webpageRepoBranch = "main";
+  webpageSourceDir = "/persist/srv/www/source";
   webpageRuntimeDir = "/persist/srv/www/app";
   webpageHost = "127.0.0.1";
   webpagePort = 8080;
@@ -128,21 +131,65 @@ let
     name = "${hostName}-sync-webpage-source";
     runtimeInputs = [
       pkgs.coreutils
+      pkgs.gitMinimal
       pkgs.rsync
     ];
     text = ''
       set -euo pipefail
 
-      src=${lib.escapeShellArg "${webpageSource}/"}
+      repo_url=${lib.escapeShellArg webpageRepoUrl}
+      repo_branch=${lib.escapeShellArg webpageRepoBranch}
+      token_file=${lib.escapeShellArg githubTokenPath}
+      src=${lib.escapeShellArg webpageSourceDir}
       dst=${lib.escapeShellArg webpageRuntimeDir}
 
+      if [ ! -s "$token_file" ]; then
+        echo "missing GitHub token for webpage sync: $token_file" >&2
+        exit 1
+      fi
+
+      install -d -m 0755 -o root -g root "$(dirname "$src")"
       install -d -m 0755 -o nginx -g nginx "$dst"
+
+      askpass="$(mktemp)"
+      trap 'rm -f "$askpass"' EXIT
+      cat > "$askpass" <<'EOF'
+      #!/bin/sh
+      case "$1" in
+        *Username*) printf '%s\n' x-access-token ;;
+        *Password*) tr -d '\r\n' < "$GITHUB_TOKEN_FILE" ;;
+        *) printf '\n' ;;
+      esac
+      EOF
+      chmod 0700 "$askpass"
+
+      export GIT_ASKPASS="$askpass"
+      export GIT_TERMINAL_PROMPT=0
+      export GITHUB_TOKEN_FILE="$token_file"
+
+      if [ -d "$src/.git" ]; then
+        git -C "$src" remote set-url origin "$repo_url"
+        git -C "$src" fetch --depth=1 origin "$repo_branch"
+        git -C "$src" checkout -B "$repo_branch" FETCH_HEAD
+        git -C "$src" reset --hard FETCH_HEAD
+        git -C "$src" clean -fdx
+      else
+        tmp="$(mktemp -d "$(dirname "$src")/source.tmp.XXXXXX")"
+        trap 'rm -f "$askpass"; rm -rf "$tmp"' EXIT
+        git clone --depth=1 --branch "$repo_branch" "$repo_url" "$tmp/repo"
+        rm -rf "$src"
+        mv "$tmp/repo" "$src"
+        rmdir "$tmp"
+      fi
+
+      chown -R root:root "$src"
       rsync -a --delete \
         --chown=nginx:nginx \
         --chmod=D755,F644 \
+        --exclude='.git/' \
         --filter='protect .env' \
         --filter='protect .env.*' \
-        "$src" "$dst/"
+        "$src/" "$dst/"
 
       chmod 0755 "$dst/run-server.py" "$dst/start-page.sh"
     '';
@@ -197,6 +244,7 @@ in
     "d ${nginxRuntimeDir} 0750 nginx nginx -"
     "d /persist/srv 0755 root root -"
     "d /persist/srv/www 0755 root root -"
+    "d ${webpageSourceDir} 0755 root root -"
     "d ${webpageRuntimeDir} 0755 nginx nginx -"
     "z /var/lib/acme 0755 root root -"
     "d /var/log/nginx 0750 nginx nginx -"
@@ -227,13 +275,15 @@ in
   };
 
   systemd.services.${webpageSyncService} = {
-    description = "Sync pinned s-gamma webpage source";
+    description = "Sync s-gamma webpage source from GitHub";
     before = [ webpageUnit ];
     requiredBy = [ webpageUnit ];
     serviceConfig = {
       Type = "oneshot";
-      RemainAfterExit = true;
     };
+    preStart = waitForReadableFiles "webpage sync" [
+      githubTokenPath
+    ];
     script = "${lib.getExe syncWebpageSource}";
   };
 
