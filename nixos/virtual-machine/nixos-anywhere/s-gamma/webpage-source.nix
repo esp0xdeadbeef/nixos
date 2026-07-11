@@ -4,6 +4,6 @@ builtins.fetchTree {
   type = "git";
   url = "ssh://git@github.com/esp0xdeadbeef/Webpage.git";
   ref = "refs/heads/main";
-  rev = "5f936e359336001e260604173a3f686c88c1d07c";
-  narHash = "sha256-OjazAOXmLN7Eifd77HMrRQHzALawJxFN7TLVejEs0kE=";
+  rev = "6bec1fd9c5413649c205bab1534b15d55f1dfe44";
+  narHash = "sha256-DJo16Mxq5AaVx2pwaib2ePVa9UrmoxukZlA69KP4fqE=";
 }
