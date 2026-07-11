@@ -52,9 +52,7 @@
   home.username = "deadbeef";
   home.homeDirectory = "/home/deadbeef";
   home.enableNixpkgsReleaseCheck = false;
-  sops.defaultSopsFile = "${outPath}/secrets/l-portal-default.yaml";
-  sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
-  sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
+  sops.age.keyFile = "/persist/home/deadbeef/.config/sops/age/keys.txt";
 
   xdg.mimeApps = {
     enable = true;
