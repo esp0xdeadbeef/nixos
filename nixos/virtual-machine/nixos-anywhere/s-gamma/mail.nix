@@ -209,6 +209,7 @@ let
       set -euo pipefail
 
       env_file=${lib.escapeShellArg mailEnvPath}
+      network_env_file=${lib.escapeShellArg networkAddressEnvPath}
       password_file=${lib.escapeShellArg mailPasswordPath}
       postfix_dir=${lib.escapeShellArg postfixRuntimeDir}
       dovecot_dir=${lib.escapeShellArg dovecotRuntimeDir}
@@ -228,6 +229,8 @@ let
       set -a
       # shellcheck disable=SC1090
       . "$env_file"
+      # shellcheck disable=SC1090
+      . "$network_env_file"
       set +a
 
       require_env() {
@@ -246,6 +249,8 @@ let
       require_env MAIL_DOMAIN
       require_env MAIL_DOMAINS
       require_env MAIL_ACCOUNTS
+      require_env PUBLIC_IPV4
+      require_env WEB_IPV6
 
       install -d -m 0750 -o root -g postfix "$postfix_dir"
       install -d -m 0750 -o root -g dovecot2 "$dovecot_dir"
@@ -352,6 +357,9 @@ let
         "myhostname = $MAIL_FQDN" \
         "mydomain = $MAIL_DOMAIN" \
         "myorigin = $MAIL_DOMAIN" \
+        "smtp_bind_address = $PUBLIC_IPV4" \
+        "smtp_bind_address6 = $WEB_IPV6" \
+        "smtp_helo_name = $MAIL_FQDN" \
         "smtpd_banner = $MAIL_FQDN ESMTP" \
         "virtual_mailbox_domains = hash:$vdomains" \
         "virtual_mailbox_maps = hash:$valias" \
@@ -804,8 +812,14 @@ in
 
   systemd.services.s-gamma-mail-runtime-config = {
     description = "Render s-gamma mail runtime maps from SOPS";
-    after = [ "postfix-setup.service" ];
-    requires = [ "postfix-setup.service" ];
+    after = [
+      "postfix-setup.service"
+      "s-gamma-network-addresses.service"
+    ];
+    requires = [
+      "postfix-setup.service"
+      "s-gamma-network-addresses.service"
+    ];
     before = [
       "postfix.service"
       "dovecot.service"
@@ -820,6 +834,7 @@ in
       TimeoutStartSec = "5min";
     };
     preStart = waitForReadableFiles "mail runtime" [
+      networkAddressEnvPath
       mailEnvPath
       mailPasswordPath
       tlsFullchainPath
