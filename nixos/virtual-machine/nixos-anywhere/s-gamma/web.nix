@@ -143,6 +143,16 @@ let
       src=${lib.escapeShellArg webpageSourceDir}
       dst=${lib.escapeShellArg webpageRuntimeDir}
 
+      keep_existing_app() {
+        if [ -f "$dst/run-server.py" ]; then
+          echo "webpage sync failed; keeping existing runtime app in $dst" >&2
+          exit 0
+        fi
+
+        echo "webpage sync failed and no existing runtime app is available in $dst" >&2
+        exit 1
+      }
+
       if [ ! -s "$token_file" ]; then
         echo "missing GitHub token for webpage sync: $token_file" >&2
         exit 1
@@ -168,15 +178,15 @@ let
       export GITHUB_TOKEN_FILE="$token_file"
 
       if [ -d "$src/.git" ]; then
-        git -C "$src" remote set-url origin "$repo_url"
-        git -C "$src" fetch --depth=1 origin "$repo_branch"
-        git -C "$src" checkout -B "$repo_branch" FETCH_HEAD
-        git -C "$src" reset --hard FETCH_HEAD
-        git -C "$src" clean -fdx
+        git -C "$src" remote set-url origin "$repo_url" || keep_existing_app
+        git -C "$src" fetch --depth=1 origin "$repo_branch" || keep_existing_app
+        git -C "$src" checkout -B "$repo_branch" FETCH_HEAD || keep_existing_app
+        git -C "$src" reset --hard FETCH_HEAD || keep_existing_app
+        git -C "$src" clean -fdx || keep_existing_app
       else
         tmp="$(mktemp -d "$(dirname "$src")/source.tmp.XXXXXX")"
         trap 'rm -f "$askpass"; rm -rf "$tmp"' EXIT
-        git clone --depth=1 --branch "$repo_branch" "$repo_url" "$tmp/repo"
+        git clone --depth=1 --branch "$repo_branch" "$repo_url" "$tmp/repo" || keep_existing_app
         rm -rf "$src"
         mv "$tmp/repo" "$src"
         rmdir "$tmp"
@@ -276,7 +286,9 @@ in
 
   systemd.services.${webpageSyncService} = {
     description = "Sync s-gamma webpage source from GitHub";
+    after = [ "network-online.target" ];
     before = [ webpageUnit ];
+    wants = [ "network-online.target" ];
     requiredBy = [ webpageUnit ];
     serviceConfig = {
       Type = "oneshot";
