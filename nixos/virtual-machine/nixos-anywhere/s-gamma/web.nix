@@ -8,6 +8,8 @@ let
   certMailUnit = "${hostName}-cert-mail.service";
   webpageSyncService = "${hostName}-webpage-sync";
   webpageSyncUnit = "${webpageSyncService}.service";
+  webpageReloadService = "${hostName}-webpage-reload";
+  webpageReloadUnit = "${webpageReloadService}.service";
   webpageService = "${hostName}-webpage";
   webpageUnit = "${webpageService}.service";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
@@ -18,6 +20,7 @@ let
   webpageRepoBranch = "main";
   webpageSourceDir = "/persist/srv/www/source";
   webpageRuntimeDir = "/persist/srv/www/app";
+  webpageRestartMarker = "${runtimeRoot}/webpage-restart-needed";
   webpageHost = "127.0.0.1";
   webpagePort = 8080;
 
@@ -133,7 +136,6 @@ let
       pkgs.coreutils
       pkgs.gitMinimal
       pkgs.rsync
-      pkgs.systemd
     ];
     text = ''
       set -euo pipefail
@@ -143,6 +145,7 @@ let
       token_file=${lib.escapeShellArg githubTokenPath}
       src=${lib.escapeShellArg webpageSourceDir}
       dst=${lib.escapeShellArg webpageRuntimeDir}
+      restart_marker=${lib.escapeShellArg webpageRestartMarker}
 
       keep_existing_app() {
         if [ -f "$dst/run-server.py" ]; then
@@ -193,6 +196,9 @@ let
         rmdir "$tmp"
       fi
 
+      runtime_rev="$(cat "$dst/.source-rev" 2>/dev/null || true)"
+      source_rev="$(git -C "$src" rev-parse HEAD)"
+
       chown -R root:root "$src"
       rsync -a --delete \
         --chown=nginx:nginx \
@@ -204,8 +210,32 @@ let
 
       chmod 0755 "$dst/run-server.py" "$dst/start-page.sh"
 
+      printf '%s\n' "$source_rev" > "$dst/.source-rev"
+      chown nginx:nginx "$dst/.source-rev"
+      chmod 0644 "$dst/.source-rev"
+
+      if [ "$source_rev" != "$runtime_rev" ]; then
+        touch "$restart_marker"
+      fi
+    '';
+  };
+
+  reloadWebpageAfterSync = pkgs.writeShellApplication {
+    name = "${hostName}-reload-webpage-after-sync";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.systemd
+    ];
+    text = ''
+      set -euo pipefail
+
+      marker=${lib.escapeShellArg webpageRestartMarker}
+
+      [ -e "$marker" ] || exit 0
+      rm -f "$marker"
+
       if systemctl --quiet is-active ${lib.escapeShellArg webpageUnit}; then
-        systemctl try-restart ${lib.escapeShellArg webpageUnit}
+        systemctl restart ${lib.escapeShellArg webpageUnit}
       fi
     '';
   };
@@ -294,7 +324,8 @@ in
     after = [ "network-online.target" ];
     before = [ webpageUnit ];
     wants = [ "network-online.target" ];
-    requiredBy = [ webpageUnit ];
+    wantedBy = [ "multi-user.target" ];
+    unitConfig.OnSuccess = [ webpageReloadUnit ];
     serviceConfig = {
       Type = "oneshot";
     };
@@ -302,6 +333,13 @@ in
       githubTokenPath
     ];
     script = "${lib.getExe syncWebpageSource}";
+  };
+
+  systemd.services.${webpageReloadService} = {
+    description = "Reload ${hostName} webpage after source sync";
+    after = [ webpageSyncUnit ];
+    serviceConfig.Type = "oneshot";
+    script = "${lib.getExe reloadWebpageAfterSync}";
   };
 
   systemd.timers.${webpageSyncService} = {
@@ -320,7 +358,6 @@ in
       "network.target"
       webpageSyncUnit
     ];
-    requires = [ webpageSyncUnit ];
     wantedBy = [ "multi-user.target" ];
     environment = {
       HOST = webpageHost;
