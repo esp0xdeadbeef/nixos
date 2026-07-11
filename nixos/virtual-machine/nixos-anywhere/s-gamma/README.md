@@ -138,11 +138,12 @@ private GitHub tarball failures during `nixos-rebuild`, and avoids storing the
 webpage source or GitHub token in `/nix/store`.
 
 After committing and pushing webpage changes, restart the sync and app units, or
-let the next boot/upgrade start refresh the checkout:
+let the `<host>-webpage-sync.timer` refresh the checkout. The sync service keeps
+the existing runtime app when GitHub is temporarily unavailable during boot.
+For an immediate refresh:
 
 ```bash
 systemctl start "$(hostname)-webpage-sync.service"
-systemctl restart "$(hostname)-webpage.service"
 ```
 
 `<host>-webpage.service` runs the backend from `/persist/srv/www/app` on

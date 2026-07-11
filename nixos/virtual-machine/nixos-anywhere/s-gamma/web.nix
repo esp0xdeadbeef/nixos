@@ -133,6 +133,7 @@ let
       pkgs.coreutils
       pkgs.gitMinimal
       pkgs.rsync
+      pkgs.systemd
     ];
     text = ''
       set -euo pipefail
@@ -202,6 +203,10 @@ let
         "$src/" "$dst/"
 
       chmod 0755 "$dst/run-server.py" "$dst/start-page.sh"
+
+      if systemctl --quiet is-active ${lib.escapeShellArg webpageUnit}; then
+        systemctl try-restart ${lib.escapeShellArg webpageUnit}
+      fi
     '';
   };
 in
@@ -297,6 +302,16 @@ in
       githubTokenPath
     ];
     script = "${lib.getExe syncWebpageSource}";
+  };
+
+  systemd.timers.${webpageSyncService} = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "5min";
+      OnUnitActiveSec = "5min";
+      AccuracySec = "1min";
+      Persistent = true;
+    };
   };
 
   systemd.services.${webpageService} = {
