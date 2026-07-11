@@ -178,6 +178,16 @@ let
 
       install -m 0444 -o root -g root "$persistent_fullchain" "$runtime_fullchain"
       install -m 0400 -o root -g root "$persistent_key" "$runtime_key"
+
+      if id -g nginx >/dev/null 2>&1; then
+        chown root:nginx "$runtime_dir" "$runtime_fullchain" "$runtime_key"
+        chmod 0750 "$runtime_dir"
+        chmod 0640 "$runtime_fullchain" "$runtime_key"
+      fi
+
+      if systemctl is-active --quiet nginx.service; then
+        systemctl try-reload-or-restart nginx.service || true
+      fi
     '';
   };
 in

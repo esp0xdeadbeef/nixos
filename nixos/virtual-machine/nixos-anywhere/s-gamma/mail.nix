@@ -42,6 +42,16 @@ let
       mailAccountSecretRefs
   );
   mailAccountSecretPaths = builtins.attrValues mailAccountSecretPathsByName;
+  mailClientAccountIds = map
+    (account: mailAccounts.accounts.${account}.serverId)
+    mailAccounts.clientAccountNames;
+  mailAutomaticSharedAccountIds = map
+    (account: mailAccounts.accounts.${account}.serverId)
+    (
+      builtins.filter
+        (account: !(mailAccounts.accounts.${account}.client or false))
+        mailAccounts.serverAccountNames
+    );
   mailAccountSecretPathMap = pkgs.writeText "${hostName}-mail-account-secret-paths" (
     (lib.concatStringsSep "\n" (
       lib.mapAttrsToList
@@ -311,6 +321,8 @@ let
 
       env_file=${lib.escapeShellArg mailEnvPath}
       account_secret_path_map=${lib.escapeShellArg mailAccountSecretPathMap}
+      automatic_client_account_ids=${lib.escapeShellArg (lib.concatStringsSep " " mailClientAccountIds)}
+      automatic_shared_account_ids=${lib.escapeShellArg (lib.concatStringsSep " " mailAutomaticSharedAccountIds)}
       shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
       shared_namespace_prefix=users
       vmail_root=/var/vmail
@@ -494,6 +506,61 @@ let
         done
       }
 
+      sync_automatic_account_mailboxes() {
+        owner_refs="''${MAIL_SHARED_AUTO_OWNERS:-$automatic_shared_account_ids}"
+        user_refs="''${MAIL_SHARED_AUTO_USERS:-$automatic_client_account_ids}"
+        mailbox="''${MAIL_SHARED_AUTO_MAILBOX:-INBOX}"
+        rights="''${MAIL_SHARED_AUTO_RIGHTS:-lookup read write write-seen write-deleted insert post expunge create delete}"
+
+        [ -n "$owner_refs" ] || return 0
+        [ -n "$user_refs" ] || return 0
+        [ -n "$mailbox" ] || mailbox=INBOX
+
+        rights_args=()
+        for right in $(words "$rights"); do
+          [ -n "$right" ] || continue
+          rights_args+=("$right")
+        done
+
+        for owner_ref in $(words "$owner_refs"); do
+          [ -n "$owner_ref" ] || continue
+          owner="$(ref_to_address "$owner_ref")"
+
+          if ! doveadm user "$owner" >/dev/null 2>&1; then
+            echo "shared-mail-subscriptions: automatic owner is not a Dovecot user: $owner_ref" >&2
+            continue
+          fi
+
+          if ! doveadm mailbox status -u "$owner" uidvalidity "$mailbox" >/dev/null 2>&1; then
+            doveadm mailbox create -u "$owner" -s "$mailbox" >/dev/null 2>&1 || true
+          fi
+
+          visible_mailbox="$(shared_mailbox_name "$owner" "$mailbox")"
+
+          for user_ref in $(words "$user_refs"); do
+            [ -n "$user_ref" ] || continue
+            [ "$user_ref" != "$owner_ref" ] || continue
+            user="$(ref_to_address "$user_ref")"
+            [ "$user" != "$owner" ] || continue
+
+            if ! doveadm user "$user" >/dev/null 2>&1; then
+              echo "shared-mail-subscriptions: automatic ACL user is not a Dovecot user: $user_ref" >&2
+              continue
+            fi
+
+            doveadm acl add -u "$owner" "$mailbox" "user=$user" "''${rights_args[@]}" >/dev/null
+            doveadm acl recalc -u "$owner" >/dev/null
+            add_sender_login "$owner" "$user" "$rights"
+
+            if subscribe_user "$user" "$visible_mailbox"; then
+              subscribed=$((subscribed + 1))
+            else
+              failed=$((failed + 1))
+            fi
+          done
+        done
+      }
+
       sync_declared_shared_mailboxes() {
         for shared_id in $(words "''${MAIL_SHARED_MAILBOXES:-}"); do
           [ -n "$shared_id" ] || continue
@@ -572,6 +639,7 @@ let
       : > "$shared_sender_logins_raw"
 
       clear_managed_subscriptions
+      sync_automatic_account_mailboxes
       sync_declared_shared_mailboxes
 
       awk '

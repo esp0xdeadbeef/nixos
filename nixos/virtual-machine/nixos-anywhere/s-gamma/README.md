@@ -103,11 +103,12 @@ CONTACT_SUBJECT=...
 TOKEN_SECRET=...
 ```
 
-Shared mailbox access is ACL-driven. `MAIL_SHARED_*` entries may declare ACLs
-from SOPS, but client visibility and SMTP send-as are derived from the actual
-Dovecot ACL state. The `<host>-mail-shared-subscriptions` unit refreshes the
-Dovecot sharing map, subscribes users to visible shared mailboxes, and rebuilds
-the Postfix sender-login map for ACL entries with the `post` right.
+Shared mailbox access is ACL-driven. Non-client mail accounts are automatically
+shared to client mail accounts. `MAIL_SHARED_*` entries may add explicit ACLs
+from SOPS, but they are not needed for normal account-to-client sharing. The
+`<host>-mail-shared-subscriptions` unit refreshes the Dovecot sharing map,
+subscribes users to visible shared mailboxes, and rebuilds the Postfix
+sender-login map for ACL entries with the `post` right.
 
 Mail certificate hostnames are SOPS-driven. Set `MAIL_TLS_DOMAINS` in the mail
 server env secret when the mail certificate needs more names than `MAIL_FQDN`.

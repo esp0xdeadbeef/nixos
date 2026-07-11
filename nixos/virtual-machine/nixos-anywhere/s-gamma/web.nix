@@ -5,6 +5,7 @@ let
   networkAddressesUnit = "${networkAddressesService}.service";
   nginxRuntimeConfigService = "${hostName}-nginx-runtime-config";
   nginxRuntimeConfigUnit = "${nginxRuntimeConfigService}.service";
+  certMailUnit = "${hostName}-cert-mail.service";
   webpageSyncService = "${hostName}-webpage-sync";
   webpageSyncUnit = "${webpageSyncService}.service";
   webpageService = "${hostName}-webpage";
@@ -208,7 +209,9 @@ in
 
   systemd.services.${nginxRuntimeConfigService} = {
     description = "Prepare ${hostName} nginx runtime files from SOPS";
+    after = [ certMailUnit ];
     before = [ "nginx.service" ];
+    requires = [ certMailUnit ];
     requiredBy = [ "nginx.service" ];
     serviceConfig = {
       Type = "oneshot";
@@ -280,11 +283,13 @@ in
   systemd.services.nginx = {
     after = [
       networkAddressesUnit
+      certMailUnit
       nginxRuntimeConfigUnit
       webpageUnit
     ];
     requires = [
       networkAddressesUnit
+      certMailUnit
       nginxRuntimeConfigUnit
       webpageUnit
     ];
