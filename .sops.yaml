@@ -41,6 +41,18 @@ keys:
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
 
 creation_rules:
+  - path_regex: '^(secrets/)*mailbox-[A-Za-z0-9_-]+\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-envil-root
+          - *l-envil-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *l-portal-root
+          - *l-portal-deadbeef
+          - *s-gamma
+
   - path_regex: '^(secrets/)*mail-account-[A-Za-z0-9_-]+\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:

@@ -1,5 +1,6 @@
 { config
 , lib
+, mailboxSets
 , name
 , pkgs
 , ...
@@ -11,10 +12,9 @@ let
   mailRuntimeConfigUnit = "${mailRuntimeConfigService}.service";
   rspamdRuntimeConfigService = "${hostName}-rspamd-runtime-config";
   sharedSubscriptionsService = "${hostName}-mail-shared-subscriptions";
+  mailRetentionService = "${hostName}-mail-retention";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
-  mailAccounts = import ../../../../profiles/mail/accounts.nix {
-    secretsRoot = ../../../../secrets;
-  };
+  retentionMaxDays = config.local.mail.mailboxSets.retention.maxDays;
 
   runtimeRoot = "/run/${hostName}";
   postfixRuntimeDir = "${runtimeRoot}/mail/postfix";
@@ -25,43 +25,21 @@ let
 
   mailEnvPath = config.sops.secrets."mail/server/env".path;
   networkAddressEnvPath = config.sops.secrets."network/address_env".path;
-  mailAccountSecretRefs = lib.flatten (
-    map
-      (
-        account:
-        map (field: mailAccounts.secretRef account field) mailAccounts.serverFields
-      )
-      mailAccounts.serverAccountNames
-  );
-  mailAccountSecretPathsByName = builtins.listToAttrs (
-    map
-      (secret: {
-        inherit (secret) name;
-        value = config.sops.secrets.${secret.name}.path;
-      })
-      mailAccountSecretRefs
-  );
-  mailAccountSecretPaths = builtins.attrValues mailAccountSecretPathsByName;
-  mailClientAccountIds = map
-    (account: mailAccounts.accounts.${account}.serverId)
-    mailAccounts.clientAccountNames;
-  mailAutomaticSharedAccountIds = map
-    (account: mailAccounts.accounts.${account}.serverId)
-    (
-      builtins.filter
-        (account: !(mailAccounts.accounts.${account}.client or false))
-        mailAccounts.serverAccountNames
-    );
-  mailAccountSecretPathMap = pkgs.writeText "${hostName}-mail-account-secret-paths" (
-    (lib.concatStringsSep "\n" (
-      lib.mapAttrsToList
-        (
-          secretName: path: "${secretName}=${path}"
-        )
-        mailAccountSecretPathsByName
-    ))
-    + "\n"
-  );
+  mailSecretEnvRefs = mailboxSets.envSecretRefs;
+  mailboxSetEnvPaths = mailboxSetEnvPathsConfig.paths;
+  mailboxSetEnvPathList = mailboxSetEnvPathsConfig.pathList;
+  mailboxSetEnvPathsConfig = mailboxSets.mkEnvPaths {
+    inherit config lib pkgs;
+    name = "${hostName}-mailbox-set-env-paths";
+    secretRefs = mailboxSets.mailboxSetEnvSecretRefs;
+  };
+  mailAccountEnvPaths = mailAccountEnvPathsConfig.paths;
+  mailAccountEnvPathList = mailAccountEnvPathsConfig.pathList;
+  mailAccountEnvPathsConfig = mailboxSets.mkEnvPaths {
+    inherit config lib pkgs;
+    name = "${hostName}-mail-account-env-paths";
+    secretRefs = mailboxSets.mailAccountEnvSecretRefs;
+  };
 
   waitForReadableFiles = label: paths: ''
     for path in ${lib.concatMapStringsSep " " lib.escapeShellArg paths}; do
@@ -86,7 +64,8 @@ let
 
       env_file=${lib.escapeShellArg mailEnvPath}
       network_env_file=${lib.escapeShellArg networkAddressEnvPath}
-      account_secret_path_map=${lib.escapeShellArg mailAccountSecretPathMap}
+      mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
+      mail_account_env_path_list=${lib.escapeShellArg mailAccountEnvPathList}
       postfix_dir=${lib.escapeShellArg postfixRuntimeDir}
       dovecot_dir=${lib.escapeShellArg dovecotRuntimeDir}
       tls_fullchain=${lib.escapeShellArg mailTlsFullchainPath}
@@ -116,11 +95,19 @@ let
         printf '%s\n' "$1" | tr ',\t\r\n' ' '
       }
 
-      secret_file() {
-        secret="$1"
+      bool_true() {
+        case "''${1:-}" in
+          1|true|yes|on) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
 
-        awk -F= -v secret="$secret" '
-          $1 == secret {
+      account_env_path() {
+        account_ref="$1"
+        secret_name="mail/accounts/$account_ref/env"
+
+        awk -F= -v secret_name="$secret_name" '
+          $1 == secret_name {
             print substr($0, length($1) + 2)
             found = 1
           }
@@ -128,52 +115,60 @@ let
           END {
             exit(found ? 0 : 1)
           }
-        ' "$account_secret_path_map"
+        ' "$mail_account_env_path_list"
       }
 
-      account_secret() {
-        account_id="$1"
-        account_secret_var="MAIL_''${account_id}_ACCOUNT_SECRET"
-        account_secret="$(printenv "$account_secret_var" || true)"
-
-        if [ -z "$account_secret" ]; then
-          echo "missing account secret variable for mail account id: $account_id" >&2
-          exit 1
-        fi
-
-        printf '%s\n' "$account_secret"
+      unset_account_vars() {
+        for field in LOCALPART PASSWORD ALIASES CLIENT SERVER LABEL DISPLAY_NAME FROM SOURCE OUTGOING USERNAME IMAP_HOST SMTP_HOST MAIL_HOST RETENTION_DAYS RETENTION_MAILBOXES; do
+          unset "MAIL_ACCOUNT_$field"
+        done
       }
 
-      account_secret_file() {
-        account="$1"
-        field="$2"
-
-        secret_file "$account/$field" || {
-          echo "unknown mail account secret field: $account/$field" >&2
+      load_account_env() {
+        account_ref="$1"
+        account_path="$(account_env_path "$account_ref")" || {
+          echo "mail account secret is not declared for this server: $account_ref" >&2
           exit 1
         }
-      }
 
-      read_required_account_field() {
-        account="$1"
-        field="$2"
-        path="$(account_secret_file "$account" "$field")"
-
-        if [ ! -r "$path" ]; then
-          echo "mail account field is missing: $account/$field" >&2
+        if [ ! -r "$account_path" ]; then
+          echo "mail account env is missing: $account_path" >&2
           exit 1
         fi
 
-        tr -d '\r\n' < "$path"
+        unset_account_vars
+        set -a
+        # shellcheck disable=SC1090
+        . "$account_path"
+        set +a
       }
 
-      read_optional_account_field() {
-        account="$1"
-        field="$2"
-        path="$(account_secret_file "$account" "$field")"
+      account_var() {
+        field="$1"
+        printenv "MAIL_ACCOUNT_$field" || true
+      }
 
-        [ -r "$path" ] || return 0
-        tr '\t\r\n' ' ' < "$path"
+      account_address() {
+        domain="$1"
+        account_ref="$2"
+        localpart="$(account_var LOCALPART)"
+
+        if [ -z "$localpart" ]; then
+          echo "mail account is missing LOCALPART: $account_ref" >&2
+          exit 1
+        fi
+
+        printf '%s@%s\n' "$localpart" "$domain"
+      }
+
+      expand_address() {
+        domain="$1"
+        value="$2"
+
+        case "$value" in
+          *@*) printf '%s\n' "$value" ;;
+          *) printf '%s@%s\n' "$value" "$domain" ;;
+        esac
       }
 
       write_address_domain() {
@@ -187,9 +182,6 @@ let
       }
 
       require_env MAIL_FQDN
-      require_env MAIL_DOMAIN
-      require_env MAIL_DOMAINS
-      require_env MAIL_ACCOUNTS
       require_env PUBLIC_IPV4
       require_env WEB_IPV6
 
@@ -216,46 +208,81 @@ let
       : > "$shared_vaccounts"
       : > "$passwd_file"
 
-      for domain in $(words "$MAIL_DOMAINS"); do
-        [ -n "$domain" ] || continue
+      first_domain=""
+
+      while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        mailbox_set_path="''${entry#*=}"
+
+        if [ ! -r "$mailbox_set_path" ]; then
+          echo "mailbox set env is missing: $mailbox_set_path" >&2
+          exit 1
+        fi
+
+        unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS
+        set -a
+        # shellcheck disable=SC1090
+        . "$mailbox_set_path"
+        set +a
+
+        domain="''${MAILBOX_DOMAIN:-}"
+        account_ids="''${MAILBOX_ACCOUNTS:-}"
+
+        if [ -z "$domain" ]; then
+          echo "mailbox set is missing MAILBOX_DOMAIN: $mailbox_set_path" >&2
+          exit 1
+        fi
+        if [ -z "$account_ids" ]; then
+          echo "mailbox set is missing MAILBOX_ACCOUNTS: $mailbox_set_path" >&2
+          exit 1
+        fi
+        if [ -z "$first_domain" ]; then
+          first_domain="$domain"
+        fi
+
         printf '%s\n' "$domain" >> "$vdomains_raw"
-      done
 
-      for account_id in $(words "$MAIL_ACCOUNTS"); do
-        [ -n "$account_id" ] || continue
+        for account_ref in $(words "$account_ids"); do
+          [ -n "$account_ref" ] || continue
 
-        account="$(account_secret "$account_id")"
-        address="$(read_required_account_field "$account" username)"
-        aliases="$(read_optional_account_field "$account" aliases)"
-        password_file="$(account_secret_file "$account" password)"
+          load_account_env "$account_ref"
+          if ! bool_true "''${MAIL_ACCOUNT_SERVER:-true}"; then
+            unset_account_vars
+            continue
+          fi
 
-        if [ -z "$address" ]; then
-          echo "empty username for mail account id: $account_id" >&2
-          exit 1
-        fi
+          address="$(account_address "$domain" "$account_ref")"
+          aliases="$(account_var ALIASES)"
+          password="$(account_var PASSWORD)"
 
-        write_address_domain "$address" "$vdomains_raw"
+          if [ -z "$password" ]; then
+            echo "mail account is missing PASSWORD: $account_ref" >&2
+            exit 1
+          fi
 
-        if [ ! -r "$password_file" ]; then
-          echo "mail password is missing for account id: $account_id" >&2
-          exit 1
-        fi
+          password_hash="$(doveadm pw -s BLF-CRYPT -p "$password")"
+          unset password
 
-        password="$(tr -d '\r\n' < "$password_file")"
-        password_hash="$(doveadm pw -s BLF-CRYPT -p "$password")"
-        unset password
+          printf '%s %s\n' "$address" "$address" >> "$valias"
+          printf '%s %s\n' "$address" "$address" >> "$vaccounts_raw"
+          printf '%s:%s::::::\n' "$address" "$password_hash" >> "$passwd_file"
 
-        printf '%s %s\n' "$address" "$address" >> "$valias"
-        printf '%s %s\n' "$address" "$address" >> "$vaccounts_raw"
-        printf '%s:%s::::::\n' "$address" "$password_hash" >> "$passwd_file"
+          for alias in $(words "$aliases"); do
+            [ -n "$alias" ] || continue
+            alias_address="$(expand_address "$domain" "$alias")"
+            write_address_domain "$alias_address" "$valias_domains_raw"
+            printf '%s %s\n' "$alias_address" "$address" >> "$valias"
+            printf '%s %s\n' "$alias_address" "$address" >> "$vaccounts_raw"
+          done
 
-        for alias in $(words "$aliases"); do
-          [ -n "$alias" ] || continue
-          write_address_domain "$alias" "$valias_domains_raw"
-          printf '%s %s\n' "$alias" "$address" >> "$valias"
-          printf '%s %s\n' "$alias" "$address" >> "$vaccounts_raw"
+          unset_account_vars
         done
-      done
+      done < "$mailbox_set_env_path_list"
+
+      if [ -z "$first_domain" ]; then
+        echo "no mailbox set domains were configured" >&2
+        exit 1
+      fi
 
       awk '
         NF && !seen[$1]++ {
@@ -330,8 +357,8 @@ let
 
       postconf -c /var/lib/postfix/conf -e \
         "myhostname = $MAIL_FQDN" \
-        "mydomain = $MAIL_DOMAIN" \
-        "myorigin = $MAIL_DOMAIN" \
+        "mydomain = $first_domain" \
+        "myorigin = $first_domain" \
         "smtp_bind_address = $PUBLIC_IPV4" \
         "smtp_bind_address6 = $WEB_IPV6" \
         "smtp_helo_name = $MAIL_FQDN" \
@@ -360,9 +387,8 @@ let
       set -euo pipefail
 
       env_file=${lib.escapeShellArg mailEnvPath}
-      account_secret_path_map=${lib.escapeShellArg mailAccountSecretPathMap}
-      automatic_client_account_ids=${lib.escapeShellArg (lib.concatStringsSep " " mailClientAccountIds)}
-      automatic_shared_account_ids=${lib.escapeShellArg (lib.concatStringsSep " " mailAutomaticSharedAccountIds)}
+      mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
+      mail_account_env_path_list=${lib.escapeShellArg mailAccountEnvPathList}
       shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
       shared_namespace_prefix=users
       vmail_root=/var/vmail
@@ -374,11 +400,25 @@ let
         printf '%s\n' "$input" | tr ',\t\r\n' ' '
       }
 
-      secret_file() {
-        local secret="$1"
+      shared_var() {
+        local shared_id="$1"
+        local field="$2"
+        printenv "MAIL_SHARED_''${shared_id}_''${field}" || true
+      }
 
-        awk -F= -v secret="$secret" '
-          $1 == secret {
+      bool_true() {
+        case "''${1:-}" in
+          1|true|yes|on) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
+      account_env_path() {
+        local account_ref="$1"
+        local secret_name="mail/accounts/$account_ref/env"
+
+        awk -F= -v secret_name="$secret_name" '
+          $1 == secret_name {
             print substr($0, length($1) + 2)
             found = 1
           }
@@ -386,47 +426,90 @@ let
           END {
             exit(found ? 0 : 1)
           }
-        ' "$account_secret_path_map"
+        ' "$mail_account_env_path_list"
       }
 
-      account_secret_for_ref() {
-        local ref="$1"
-        local account_secret_var="MAIL_''${ref}_ACCOUNT_SECRET"
-        printenv "$account_secret_var" || true
+      unset_account_vars() {
+        local field
+
+        for field in LOCALPART PASSWORD ALIASES CLIENT SERVER LABEL DISPLAY_NAME FROM SOURCE OUTGOING USERNAME IMAP_HOST SMTP_HOST MAIL_HOST RETENTION_DAYS RETENTION_MAILBOXES; do
+          unset "MAIL_ACCOUNT_$field"
+        done
       }
 
-      read_account_field() {
-        local account="$1"
-        local field="$2"
-        local path
-        path="$(secret_file "$account/$field")" || return 1
+      load_account_env() {
+        local account_ref="$1"
+        local account_path
 
-        [ -r "$path" ] || return 1
-        tr -d '\r\n' < "$path"
+        account_path="$(account_env_path "$account_ref")" || return 1
+        [ -r "$account_path" ] || return 1
+
+        unset_account_vars
+        set -a
+        # shellcheck disable=SC1090
+        . "$account_path"
+        set +a
       }
 
-      ref_to_address() {
-        local ref="$1"
-        local account
-        local address
-        account="$(account_secret_for_ref "$ref")"
-        if [ -n "$account" ]; then
-          read_account_field "$account" username
-          return
+      account_var() {
+        local field="$1"
+        printenv "MAIL_ACCOUNT_$field" || true
+      }
+
+      account_address() {
+        local domain="$1"
+        local account_ref="$2"
+        local localpart
+        localpart="$(account_var LOCALPART)"
+
+        if [ -z "$localpart" ]; then
+          return 1
         fi
 
-        address="$(printenv "MAIL_''${ref}_ADDRESS" || true)"
-        if [ -n "$address" ]; then
-          printf '%s\n' "$address"
-        else
-          printf '%s\n' "$ref"
-        fi
+        printf '%s@%s\n' "$localpart" "$domain"
       }
 
-      shared_var() {
-        local shared_id="$1"
-        local field="$2"
-        printenv "MAIL_SHARED_''${shared_id}_''${field}" || true
+      load_mailbox_users() {
+        client_users=()
+        owner_users=()
+        all_users=()
+
+        while IFS= read -r entry; do
+          [ -n "$entry" ] || continue
+          mailbox_set_path="''${entry#*=}"
+          [ -r "$mailbox_set_path" ] || continue
+
+          unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS
+          set -a
+          # shellcheck disable=SC1090
+          . "$mailbox_set_path"
+          set +a
+
+          domain="''${MAILBOX_DOMAIN:-}"
+          account_ids="''${MAILBOX_ACCOUNTS:-}"
+          [ -n "$domain" ] || continue
+
+          for account_ref in $(words "$account_ids"); do
+            [ -n "$account_ref" ] || continue
+            load_account_env "$account_ref" || continue
+            if ! bool_true "''${MAIL_ACCOUNT_SERVER:-true}"; then
+              unset_account_vars
+              continue
+            fi
+
+            user="$(account_address "$domain" "$account_ref" || true)"
+            [ -n "$user" ] || continue
+
+            all_users+=("$user")
+            if bool_true "$(account_var CLIENT)"; then
+              client_users+=("$user")
+            else
+              owner_users+=("$user")
+            fi
+
+            unset_account_vars
+          done
+        done < "$mailbox_set_env_path_list"
       }
 
       if [ -r "$env_file" ]; then
@@ -544,11 +627,7 @@ let
       }
 
       clear_managed_subscriptions() {
-        for account_id in $(words "''${MAIL_ACCOUNTS:-} $automatic_client_account_ids $automatic_shared_account_ids"); do
-          [ -n "$account_id" ] || continue
-          user="$(ref_to_address "$account_id" || true)"
-          [ -n "$user" ] || continue
-
+        for user in "''${all_users[@]}"; do
           subscriptions_file="$(subscriptions_file_for_user "$user" || true)"
           [ -n "$subscriptions_file" ] || continue
           remove_managed_subscriptions "$subscriptions_file"
@@ -556,13 +635,11 @@ let
       }
 
       sync_automatic_account_mailboxes() {
-        owner_refs="''${MAIL_SHARED_AUTO_OWNERS:-$automatic_shared_account_ids}"
-        user_refs="''${MAIL_SHARED_AUTO_USERS:-$automatic_client_account_ids}"
         mailbox="''${MAIL_SHARED_AUTO_MAILBOX:-INBOX}"
         rights="''${MAIL_SHARED_AUTO_RIGHTS:-lookup read write write-seen write-deleted insert post expunge create delete}"
 
-        [ -n "$owner_refs" ] || return 0
-        [ -n "$user_refs" ] || return 0
+        [ "''${#owner_users[@]}" -ne 0 ] || return 0
+        [ "''${#client_users[@]}" -ne 0 ] || return 0
         [ -n "$mailbox" ] || mailbox=INBOX
 
         rights_args=()
@@ -571,12 +648,9 @@ let
           rights_args+=("$right")
         done
 
-        for owner_ref in $(words "$owner_refs"); do
-          [ -n "$owner_ref" ] || continue
-          owner="$(ref_to_address "$owner_ref")"
-
+        for owner in "''${owner_users[@]}"; do
           if ! doveadm user "$owner" >/dev/null 2>&1; then
-            echo "shared-mail-subscriptions: automatic owner is not a Dovecot user: $owner_ref" >&2
+            echo "shared-mail-subscriptions: automatic owner is not a Dovecot user: $owner" >&2
             continue
           fi
 
@@ -586,25 +660,18 @@ let
 
           visible_mailbox="$(shared_mailbox_name "$owner" "$mailbox")"
 
-          for cleanup_ref in $(words "''${MAIL_ACCOUNTS:-} $automatic_client_account_ids $automatic_shared_account_ids $user_refs"); do
-            [ -n "$cleanup_ref" ] || continue
-            [ "$cleanup_ref" != "$owner_ref" ] || continue
-            cleanup_user="$(ref_to_address "$cleanup_ref" || true)"
-            [ -n "$cleanup_user" ] || continue
+          for cleanup_user in "''${all_users[@]}"; do
             [ "$cleanup_user" != "$owner" ] || continue
 
             doveadm acl remove -u "$owner" "$mailbox" "user=$cleanup_user" >/dev/null 2>&1 || true
           done
           doveadm acl recalc -u "$owner" >/dev/null
 
-          for user_ref in $(words "$user_refs"); do
-            [ -n "$user_ref" ] || continue
-            [ "$user_ref" != "$owner_ref" ] || continue
-            user="$(ref_to_address "$user_ref")"
+          for user in "''${client_users[@]}"; do
             [ "$user" != "$owner" ] || continue
 
             if ! doveadm user "$user" >/dev/null 2>&1; then
-              echo "shared-mail-subscriptions: automatic ACL user is not a Dovecot user: $user_ref" >&2
+              echo "shared-mail-subscriptions: automatic ACL user is not a Dovecot user: $user" >&2
               continue
             fi
 
@@ -638,7 +705,7 @@ let
           [ -n "$mailbox" ] || mailbox=INBOX
           [ -n "$rights" ] || rights="lookup read write write-seen write-deleted insert post expunge create delete"
 
-          owner="$(ref_to_address "$owner_ref")"
+          owner="$owner_ref"
           if ! doveadm user "$owner" >/dev/null 2>&1; then
             echo "shared-mail-subscriptions: owner is not a Dovecot user: $owner_ref" >&2
             continue
@@ -658,7 +725,7 @@ let
 
           for user_ref in $(words "$user_refs"); do
             [ -n "$user_ref" ] || continue
-            user="$(ref_to_address "$user_ref")"
+            user="$user_ref"
 
             if ! doveadm user "$user" >/dev/null 2>&1; then
               echo "shared-mail-subscriptions: ACL user is not a Dovecot user: $user_ref" >&2
@@ -698,6 +765,7 @@ let
       failed=0
       : > "$shared_sender_logins_raw"
 
+      load_mailbox_users
       clear_managed_subscriptions
       sync_automatic_account_mailboxes
       sync_declared_shared_mailboxes
@@ -747,6 +815,188 @@ let
     '';
   };
 
+  applyMailRetention = pkgs.writeShellApplication {
+    name = "${hostName}-apply-mail-retention";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.dovecot
+      pkgs.gawk
+    ];
+    text = ''
+      set -euo pipefail
+
+      mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
+      mail_account_env_path_list=${lib.escapeShellArg mailAccountEnvPathList}
+      retention_max_days=${lib.escapeShellArg (toString retentionMaxDays)}
+
+      words() {
+        local input="''${1:-}"
+        printf '%s\n' "$input" | tr ',\t\r\n' ' '
+      }
+
+      bool_true() {
+        case "''${1:-}" in
+          1|true|yes|on) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
+      account_env_path() {
+        local account_ref="$1"
+        local secret_name="mail/accounts/$account_ref/env"
+
+        awk -F= -v secret_name="$secret_name" '
+          $1 == secret_name {
+            print substr($0, length($1) + 2)
+            found = 1
+          }
+
+          END {
+            exit(found ? 0 : 1)
+          }
+        ' "$mail_account_env_path_list"
+      }
+
+      unset_account_vars() {
+        local field
+
+        for field in LOCALPART PASSWORD ALIASES CLIENT SERVER LABEL DISPLAY_NAME FROM SOURCE OUTGOING USERNAME IMAP_HOST SMTP_HOST MAIL_HOST RETENTION_DAYS RETENTION_MAILBOXES; do
+          unset "MAIL_ACCOUNT_$field"
+        done
+      }
+
+      load_account_env() {
+        local account_ref="$1"
+        local account_path
+
+        account_path="$(account_env_path "$account_ref")" || return 1
+        [ -r "$account_path" ] || return 1
+
+        unset_account_vars
+        set -a
+        # shellcheck disable=SC1090
+        . "$account_path"
+        set +a
+      }
+
+      account_var() {
+        local field="$1"
+        printenv "MAIL_ACCOUNT_$field" || true
+      }
+
+      account_address() {
+        local domain="$1"
+        local account_ref="$2"
+        local localpart
+        localpart="$(account_var LOCALPART)"
+
+        if [ -z "$localpart" ]; then
+          echo "mail-retention: account is missing LOCALPART: $account_ref" >&2
+          return 1
+        fi
+
+        printf '%s@%s\n' "$localpart" "$domain"
+      }
+
+      effective_retention_days() {
+        local account_ref="$1"
+        local configured_days="$2"
+
+        if [ -z "$configured_days" ]; then
+          return 1
+        fi
+
+        case "$configured_days" in
+          *[!0-9]*|0)
+            echo "mail-retention: invalid MAIL_ACCOUNT_RETENTION_DAYS for $account_ref: $configured_days" >&2
+            return 2
+            ;;
+        esac
+
+        if [ "$configured_days" -gt "$retention_max_days" ]; then
+          echo "mail-retention: capping $account_ref retention from $configured_days to $retention_max_days day(s)" >&2
+          printf '%s\n' "$retention_max_days"
+        else
+          printf '%s\n' "$configured_days"
+        fi
+      }
+
+      expunge_mailbox() {
+        local user="$1"
+        local mailbox="$2"
+        local retention_days="$3"
+
+        [ -n "$mailbox" ] || return 0
+        doveadm expunge -u "$user" mailbox "$mailbox" savedbefore "''${retention_days}d"
+      }
+
+      apply_account_retention() {
+        local account_ref="$1"
+        local domain="$2"
+        local configured_days
+        local retention_days
+        local user
+        local mailbox
+        local mailbox_count=0
+        local configured_mailboxes
+
+        configured_days="$(account_var RETENTION_DAYS)"
+        retention_days="$(effective_retention_days "$account_ref" "$configured_days")" || return 0
+        user="$(account_address "$domain" "$account_ref")" || return 1
+
+        if ! doveadm user "$user" >/dev/null 2>&1; then
+          echo "mail-retention: skipping unknown Dovecot user: $user" >&2
+          return 0
+        fi
+
+        configured_mailboxes="$(account_var RETENTION_MAILBOXES)"
+        if [ -n "$configured_mailboxes" ]; then
+          for mailbox in $(words "$configured_mailboxes"); do
+            expunge_mailbox "$user" "$mailbox" "$retention_days"
+            mailbox_count=$((mailbox_count + 1))
+          done
+        else
+          while IFS= read -r mailbox; do
+            [ -n "$mailbox" ] || continue
+            expunge_mailbox "$user" "$mailbox" "$retention_days"
+            mailbox_count=$((mailbox_count + 1))
+          done < <(doveadm mailbox list -u "$user")
+        fi
+
+        echo "mail-retention: applied $retention_days day(s) to $mailbox_count mailbox(es) for $user"
+      }
+
+      while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        mailbox_set_path="''${entry#*=}"
+        [ -r "$mailbox_set_path" ] || continue
+
+        unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS MAILBOX_MAIL_HOST MAILBOX_IMAP_HOST MAILBOX_SMTP_HOST MAILBOX_IMAP_PORT MAILBOX_SMTP_PORT
+        set -a
+        # shellcheck disable=SC1090
+        . "$mailbox_set_path"
+        set +a
+
+        domain="''${MAILBOX_DOMAIN:-}"
+        account_refs="''${MAILBOX_ACCOUNTS:-}"
+        [ -n "$domain" ] || continue
+
+        for account_ref in $(words "$account_refs"); do
+          [ -n "$account_ref" ] || continue
+          load_account_env "$account_ref" || continue
+
+          if ! bool_true "''${MAIL_ACCOUNT_SERVER:-true}"; then
+            unset_account_vars
+            continue
+          fi
+
+          apply_account_retention "$account_ref" "$domain"
+          unset_account_vars
+        done
+      done < "$mailbox_set_env_path_list"
+    '';
+  };
+
   commonSubmissionOptions = {
     smtpd_tls_security_level = "encrypt";
     smtpd_sasl_auth_enable = "yes";
@@ -790,9 +1040,16 @@ in
       map
         (secret: {
           inherit (secret) name;
-          value.sopsFile = secret.sopsFile;
+          value = {
+            inherit (secret) key sopsFile;
+            restartUnits = [
+              mailRuntimeConfigUnit
+              "postfix.service"
+              "dovecot.service"
+            ];
+          };
         })
-        mailAccountSecretRefs
+        mailSecretEnvRefs
     );
 
   systemd.tmpfiles.rules = [
@@ -840,7 +1097,8 @@ in
         mailTlsFullchainPath
         mailTlsKeyPath
       ]
-      ++ mailAccountSecretPaths
+      ++ mailboxSetEnvPaths
+      ++ mailAccountEnvPaths
     );
     script = "${lib.getExe renderMailRuntime}";
   };
@@ -916,6 +1174,35 @@ in
       OnBootSec = "2min";
       OnUnitActiveSec = "1min";
       AccuracySec = "15s";
+      Persistent = true;
+    };
+  };
+
+  systemd.services.${mailRetentionService} = {
+    description = "Apply Dovecot retention policies from SOPS mail account profiles";
+    after = [
+      "dovecot.service"
+      mailRuntimeConfigUnit
+    ];
+    requires = [
+      "dovecot.service"
+      mailRuntimeConfigUnit
+    ];
+    preStart = waitForReadableFiles "mail retention" (
+      mailboxSetEnvPaths ++ mailAccountEnvPaths
+    );
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = lib.getExe applyMailRetention;
+    };
+  };
+
+  systemd.timers.${mailRetentionService} = {
+    description = "Run Dovecot mail retention policies";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 04:20:00";
+      RandomizedDelaySec = "30min";
       Persistent = true;
     };
   };

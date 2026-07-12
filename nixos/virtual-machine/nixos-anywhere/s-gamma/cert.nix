@@ -65,9 +65,8 @@ let
       }
 
       require_env MAIL_FQDN
-      require_env MAIL_DOMAIN
 
-      acme_email="''${MAIL_ACME_EMAIL:-postmaster@$MAIL_DOMAIN}"
+      acme_email="''${MAIL_ACME_EMAIL:-postmaster@$MAIL_FQDN}"
       domains_raw="''${MAIL_TLS_DOMAINS:-$MAIL_FQDN}"
 
       primary_domain=""

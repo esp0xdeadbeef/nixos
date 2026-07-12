@@ -1,4 +1,4 @@
-{ config, lib, name, pkgs, ... }:
+{ config, lib, mailboxSets ? null, name, pkgs, ... }:
 let
   hostName = name;
   networkAddressesService = "${hostName}-network-addresses";
@@ -12,6 +12,8 @@ let
   webpageReloadUnit = "${webpageReloadService}.service";
   webpageService = "${hostName}-webpage";
   webpageUnit = "${webpageService}.service";
+  webpageEnvService = "${hostName}-webpage-env";
+  webpageEnvUnit = "${webpageEnvService}.service";
   runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
 
   runtimeRoot = "/run/${hostName}";
@@ -21,6 +23,8 @@ let
   webpageSourceDir = "/persist/srv/www/source";
   webpageRuntimeDir = "/persist/srv/www/app";
   webpageRestartMarker = "${runtimeRoot}/webpage-restart-needed";
+  webpageEnvDir = "${runtimeRoot}/webpage";
+  webpageRenderedEnvPath = "${webpageEnvDir}/env";
   webpageHost = "127.0.0.1";
   webpagePort = 8080;
 
@@ -31,6 +35,36 @@ let
   nginxRuntimeDir = "${runtimeRoot}/nginx";
   nginxHtpasswdPath = "${nginxRuntimeDir}/htpasswd";
   nginxRenderedHttpConfPath = "${nginxRuntimeDir}/http.conf";
+  emptyMailboxPathList = pkgs.writeText "${hostName}-empty-mailbox-env-paths" "";
+  mailboxSetEnvPathsConfig =
+    if mailboxSets == null then {
+      pathList = emptyMailboxPathList;
+      paths = [ ];
+    } else
+      mailboxSets.mkEnvPaths {
+        inherit config lib pkgs;
+        name = "${hostName}-web-mailbox-set-env-paths";
+        secretRefs = mailboxSets.mailboxSetEnvSecretRefs;
+      };
+  mailAccountEnvPathsConfig =
+    if mailboxSets == null then {
+      pathList = emptyMailboxPathList;
+      paths = [ ];
+    } else
+      mailboxSets.mkEnvPaths {
+        inherit config lib pkgs;
+        name = "${hostName}-web-mail-account-env-paths";
+        secretRefs = mailboxSets.mailAccountEnvSecretRefs;
+      };
+  mailboxSetEnvPaths = mailboxSetEnvPathsConfig.paths;
+  mailboxSetEnvPathList = mailboxSetEnvPathsConfig.pathList;
+  mailAccountEnvPaths = mailAccountEnvPathsConfig.paths;
+  mailAccountEnvPathList = mailAccountEnvPathsConfig.pathList;
+  webMailSecretEnvRefs =
+    if mailboxSets == null then
+      [ ]
+    else
+      mailboxSets.envSecretRefs;
   nginxSecurityHeaders = ''
     # Security headers for nginx-generated responses, including redirects and Basic Auth 401s.
     add_header X-Frame-Options "DENY" always;
@@ -127,6 +161,192 @@ let
         chmod 0750 "$cert_dir"
         chmod 0640 "$cert_path"
       done
+    '';
+  };
+
+  renderWebpageEnvironment = pkgs.writeShellApplication {
+    name = "${hostName}-render-webpage-environment";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.gnused
+    ];
+    text = ''
+      set -euo pipefail
+
+      base_env=${lib.escapeShellArg webContactEnvPath}
+      mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
+      mail_account_env_path_list=${lib.escapeShellArg mailAccountEnvPathList}
+      runtime_dir=${lib.escapeShellArg webpageEnvDir}
+      rendered_env=${lib.escapeShellArg webpageRenderedEnvPath}
+
+      install -d -m 0750 -o nginx -g nginx "$runtime_dir"
+
+      set -a
+      # shellcheck source=/dev/null
+      . "$base_env"
+      set +a
+
+      declare -A account_path_by_id
+      declare -A account_domain_by_id
+      declare -A account_smtp_host_by_id
+      declare -A account_smtp_port_by_id
+
+      words() {
+        local raw="''${1//,/ }"
+        raw="''${raw//;/ }"
+        local word
+        for word in $raw; do
+          printf '%s\n' "$word"
+        done
+      }
+
+      env_flag() {
+        local value="''${!1:-}"
+        case "''${value,,}" in
+          1|true|yes|on)
+            return 0
+            ;;
+          *)
+            return 1
+            ;;
+        esac
+      }
+
+      secret_id_from_name() {
+        local secret_name="$1"
+        secret_name="''${secret_name%/env}"
+        printf '%s\n' "''${secret_name##*/}"
+      }
+
+      load_account_env() {
+        local account_path="$1"
+        local field
+
+        for field in LOCALPART PASSWORD ALIASES CLIENT SERVER LABEL DISPLAY_NAME FROM SOURCE OUTGOING ADDRESS USERNAME IMAP_HOST SMTP_HOST MAIL_HOST IMAP_PORT SMTP_PORT; do
+          unset "MAIL_ACCOUNT_$field"
+        done
+
+        # shellcheck source=/dev/null
+        . "$account_path"
+      }
+
+      load_account_context() {
+        local account_id="$1"
+        local account_path="''${account_path_by_id[$account_id]:-}"
+
+        [ -n "$account_path" ] || return 1
+        [ -r "$account_path" ] || return 1
+
+        load_account_env "$account_path"
+
+        account_domain="''${account_domain_by_id[$account_id]:-}"
+        account_address="''${MAIL_ACCOUNT_ADDRESS:-}"
+        if [ -z "$account_address" ] && [ -n "''${MAIL_ACCOUNT_LOCALPART:-}" ] && [ -n "$account_domain" ]; then
+          account_address="''${MAIL_ACCOUNT_LOCALPART}@$account_domain"
+        fi
+
+        account_username="''${MAIL_ACCOUNT_USERNAME:-$account_address}"
+        account_password="''${MAIL_ACCOUNT_PASSWORD:-}"
+        account_smtp_host="''${MAIL_ACCOUNT_SMTP_HOST:-}"
+        [ -n "$account_smtp_host" ] || account_smtp_host="''${MAIL_ACCOUNT_MAIL_HOST:-}"
+        [ -n "$account_smtp_host" ] || account_smtp_host="''${account_smtp_host_by_id[$account_id]:-}"
+        account_smtp_port="''${MAIL_ACCOUNT_SMTP_PORT:-}"
+        [ -n "$account_smtp_port" ] || account_smtp_port="''${account_smtp_port_by_id[$account_id]:-}"
+
+        [ -n "$account_address" ]
+      }
+
+      while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        secret_name="''${entry%%=*}"
+        account_path="''${entry#*=}"
+        account_id="$(secret_id_from_name "$secret_name")"
+        account_path_by_id["$account_id"]="$account_path"
+      done < "$mail_account_env_path_list"
+
+      while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        mailbox_set_path="''${entry#*=}"
+        [ -r "$mailbox_set_path" ] || continue
+
+        unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS MAILBOX_MAIL_HOST MAILBOX_IMAP_HOST MAILBOX_SMTP_HOST MAILBOX_IMAP_PORT MAILBOX_SMTP_PORT
+        # shellcheck source=/dev/null
+        . "$mailbox_set_path"
+
+        mailbox_smtp_host="''${MAILBOX_SMTP_HOST:-}"
+        [ -n "$mailbox_smtp_host" ] || mailbox_smtp_host="''${MAILBOX_MAIL_HOST:-}"
+
+        for account_id in $(words "''${MAILBOX_ACCOUNTS:-}"); do
+          account_domain_by_id["$account_id"]="''${MAILBOX_DOMAIN:-}"
+          account_smtp_host_by_id["$account_id"]="$mailbox_smtp_host"
+          account_smtp_port_by_id["$account_id"]="''${MAILBOX_SMTP_PORT:-}"
+        done
+      done < "$mailbox_set_env_path_list"
+
+      public_account="''${WEB_PUBLIC_CONTACT_ACCOUNT:-''${WEB_CONTACT_ACCOUNT:-}}"
+      form_account="''${WEB_FORM_ACCOUNT:-''${WEB_CONTACT_ACCOUNT:-}}"
+
+      if [ -n "$public_account" ] && load_account_context "$public_account"; then
+        [ -n "''${WEB_CONTACT_EMAIL:-}" ] || WEB_CONTACT_EMAIL="$account_address"
+        [ -n "''${WEB_SITE_DOMAIN:-}" ] || WEB_SITE_DOMAIN="$account_domain"
+      fi
+
+      if [ -n "$form_account" ] && load_account_context "$form_account"; then
+        [ -n "''${CONTACT_FROM:-}" ] || CONTACT_FROM="$account_address"
+        [ -n "''${SMTP_HOST:-}" ] || SMTP_HOST="$account_smtp_host"
+        [ -n "''${SMTP_PORT:-}" ] || SMTP_PORT="$account_smtp_port"
+
+        if env_flag WEB_FORM_SMTP_AUTH_FROM_ACCOUNT; then
+          [ -n "''${SMTP_USERNAME:-}" ] || SMTP_USERNAME="$account_username"
+          [ -n "''${SMTP_PASSWORD:-}" ] || SMTP_PASSWORD="$account_password"
+        fi
+      fi
+
+      [ -n "''${WEB_SITE_NAME:-}" ] || WEB_SITE_NAME="''${CONTACT_BRAND:-Website}"
+      [ -n "''${CONTACT_BRAND:-}" ] || CONTACT_BRAND="$WEB_SITE_NAME"
+      if [ -z "''${WEB_SITE_URL:-}" ] && [ -n "''${WEB_SITE_DOMAIN:-}" ]; then
+        WEB_SITE_URL="https://$WEB_SITE_DOMAIN"
+      fi
+      [ -n "''${CONTACT_SITE_URL:-}" ] || CONTACT_SITE_URL="''${WEB_SITE_URL:-}"
+      [ -n "''${WEB_REDIRECT_TARGET_URL:-}" ] || WEB_REDIRECT_TARGET_URL="''${WEB_SITE_URL:-/}"
+
+      quote_env() {
+        printf '%q' "$1"
+      }
+
+      emit_env() {
+        local name="$1"
+        local value="''${!name:-}"
+        printf '%s=' "$name"
+        quote_env "$value"
+        printf '\n'
+      }
+
+      tmp="$(mktemp "$runtime_dir/env.XXXXXX")"
+      cat "$base_env" > "$tmp"
+      {
+        printf '\n# Derived from web/contact/env and generic mailbox secrets.\n'
+        for name in \
+          WEB_SITE_NAME \
+          WEB_SITE_DOMAIN \
+          WEB_SITE_URL \
+          WEB_REDIRECT_TARGET_URL \
+          WEB_CONTACT_EMAIL \
+          CONTACT_BRAND \
+          CONTACT_SITE_URL \
+          CONTACT_FROM \
+          SMTP_HOST \
+          SMTP_PORT \
+          SMTP_USERNAME \
+          SMTP_PASSWORD
+        do
+          emit_env "$name"
+        done
+      } >> "$tmp"
+
+      chown nginx:nginx "$tmp"
+      chmod 0440 "$tmp"
+      mv "$tmp" "$rendered_env"
     '';
   };
 
@@ -241,52 +461,71 @@ let
   };
 in
 {
-  sops.secrets = {
-    "web/nginx/http_conf" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [
-        nginxRuntimeConfigUnit
-        "nginx.service"
-      ];
-    };
+  sops.secrets =
+    {
+      "web/nginx/http_conf" = {
+        sopsFile = runtimeSopsFile;
+        owner = "nginx";
+        group = "nginx";
+        mode = "0440";
+        restartUnits = [
+          nginxRuntimeConfigUnit
+          "nginx.service"
+        ];
+      };
 
-    "web/contact/env" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [ webpageUnit ];
-    };
+      "web/contact/env" = {
+        sopsFile = runtimeSopsFile;
+        owner = "nginx";
+        group = "nginx";
+        mode = "0440";
+        restartUnits = [
+          webpageEnvUnit
+          webpageUnit
+        ];
+      };
 
-    "web/preview/username" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [
-        nginxRuntimeConfigUnit
-        "nginx.service"
-      ];
-    };
+      "web/preview/username" = {
+        sopsFile = runtimeSopsFile;
+        owner = "nginx";
+        group = "nginx";
+        mode = "0440";
+        restartUnits = [
+          nginxRuntimeConfigUnit
+          "nginx.service"
+        ];
+      };
 
-    "web/preview/password" = {
-      sopsFile = runtimeSopsFile;
-      owner = "nginx";
-      group = "nginx";
-      mode = "0440";
-      restartUnits = [
-        nginxRuntimeConfigUnit
-        "nginx.service"
-      ];
-    };
-  };
+      "web/preview/password" = {
+        sopsFile = runtimeSopsFile;
+        owner = "nginx";
+        group = "nginx";
+        mode = "0440";
+        restartUnits = [
+          nginxRuntimeConfigUnit
+          "nginx.service"
+        ];
+      };
+    }
+    // builtins.listToAttrs (
+      map
+        (secret: {
+          inherit (secret) name;
+          value = {
+            inherit (secret) key sopsFile;
+            restartUnits = [
+              webpageEnvUnit
+              webpageUnit
+            ];
+          };
+        })
+        webMailSecretEnvRefs
+    );
 
   systemd.tmpfiles.rules = [
     "d ${runtimeRoot} 0755 root root -"
     "d ${nginxRuntimeDir} 0750 nginx nginx -"
+    "d ${webpageEnvDir} 0750 nginx nginx -"
     "d /persist/srv 0755 root root -"
     "d /persist/srv/www 0755 root root -"
     "d ${webpageSourceDir} 0755 root root -"
@@ -342,6 +581,25 @@ in
     script = "${lib.getExe reloadWebpageAfterSync}";
   };
 
+  systemd.services.${webpageEnvService} = {
+    description = "Prepare ${hostName} webpage environment from SOPS";
+    before = [ webpageUnit ];
+    requiredBy = [ webpageUnit ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      TimeoutStartSec = "2min";
+    };
+    preStart = waitForReadableFiles "webpage env" (
+      [
+        webContactEnvPath
+      ]
+      ++ mailboxSetEnvPaths
+      ++ mailAccountEnvPaths
+    );
+    script = "${lib.getExe renderWebpageEnvironment}";
+  };
+
   systemd.timers.${webpageSyncService} = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
@@ -357,7 +615,9 @@ in
     after = [
       "network.target"
       webpageSyncUnit
+      webpageEnvUnit
     ];
+    requires = [ webpageEnvUnit ];
     wantedBy = [ "multi-user.target" ];
     environment = {
       HOST = webpageHost;
@@ -370,13 +630,13 @@ in
       User = "nginx";
       Group = "nginx";
       WorkingDirectory = webpageRuntimeDir;
-      EnvironmentFile = webContactEnvPath;
+      EnvironmentFile = webpageRenderedEnvPath;
       ExecStart = "${pkgs.python3}/bin/python3 ./run-server.py";
       Restart = "always";
       RestartSec = "5s";
     };
     preStart = waitForReadableFiles "web contact" [
-      webContactEnvPath
+      webpageRenderedEnvPath
     ];
   };
 

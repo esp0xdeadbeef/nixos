@@ -15,7 +15,7 @@ Boot-time helpers render service-specific files from:
 
 ```text
 secrets/s-gamma-runtime.yaml
-secrets/mail-account-*.yaml
+secrets/mailbox-*.yaml
 ```
 
 `secrets/s-gamma-runtime.yaml` owns server-side runtime material:
@@ -32,48 +32,157 @@ web/preview/username
 web/preview/password
 ```
 
-Each mailbox has its own SOPS file. This keeps mailbox credentials isolated,
-so adding or delegating a mailbox does not require sharing one central mail
-client secret:
+Mail config is split into two generic secret classes. Filenames are opaque ids;
+do not put domains, people, providers, or brand names in them:
 
 ```text
-secrets/mail-account-postmaster.yaml
-secrets/mail-account-user-001.yaml
-secrets/mail-account-mailbox-001.yaml
-secrets/mail-account-no-reply.yaml
+secrets/mailbox-001.yaml
+secrets/mailbox-002.yaml
+secrets/mail-account-001.yaml
+secrets/mail-account-002.yaml
 ```
 
-Mailbox account files use this shape:
+`mailbox-*.yaml` describes a hosted mail domain/set. `mail-account-*.yaml`
+describes one account credential/profile. Hosted accounts are linked by generic
+ids inside the encrypted mailbox set:
 
 ```text
-mail/accounts/<account>/username
-mail/accounts/<account>/password
-mail/accounts/<account>/aliases
-mail/accounts/<account>/label
-mail/accounts/<account>/from
-mail/accounts/<account>/source
-mail/accounts/<account>/outgoing
+MAILBOX_DOMAIN=example.com
+MAILBOX_MAIL_HOST=mail.example.com
+MAILBOX_ACCOUNTS=mail-account-001 mail-account-002
 ```
 
-Only client-used accounts need `label`, `from`, `source`, and `outgoing`.
-
-The mail env secret is a shell env file using generic account IDs and account
-secret pointers:
+The account secret stores account-local data:
 
 ```text
-MAIL_FQDN=...
-MAIL_DOMAIN=...
-MAIL_DOMAINS=...
-MAIL_TLS_DOMAINS=...
-MAIL_ACME_EMAIL=...
-MAIL_ACCOUNTS=ACCOUNT_001 ACCOUNT_002
-MAIL_ACCOUNT_001_ACCOUNT_SECRET=mail/accounts/postmaster
-MAIL_ACCOUNT_002_ACCOUNT_SECRET=mail/accounts/user-001
+MAIL_ACCOUNT_LOCALPART=alice
+MAIL_ACCOUNT_PASSWORD=change-me
+MAIL_ACCOUNT_ALIASES=contact support
+MAIL_ACCOUNT_CLIENT=true
+MAIL_ACCOUNT_SERVER=true
+MAIL_ACCOUNT_LABEL=Example Mail
+MAIL_ACCOUNT_DISPLAY_NAME=Alice Example
+MAIL_ACCOUNT_RETENTION_DAYS=30
 ```
 
-The public mapping between generic runtime IDs and account secrets lives in
-`profiles/mail/accounts.nix`; the concrete usernames, aliases, passwords, and
-client properties stay in the per-account SOPS files.
+Create or edit these secrets from a workstation checkout that already has SOPS
+access. Do not run this on the mail server; the server only consumes encrypted
+files during activation.
+
+To create another hosted mailbox set:
+
+```bash
+mailbox_set=mailbox-003
+target="secrets/${mailbox_set}.yaml"
+tmp="$(mktemp)"
+encrypted="$(mktemp)"
+trap 'rm -f "$tmp" "$encrypted"' EXIT
+
+test ! -e "$target"
+
+cat > "$tmp" <<'YAML'
+mailbox:
+    env: |
+        MAILBOX_DOMAIN=example.com
+        MAILBOX_MAIL_HOST=mail.example.com
+        MAILBOX_ACCOUNTS=mail-account-003 mail-account-004
+YAML
+
+sops --encrypt --filename-override "$target" "$tmp" > "$encrypted"
+install -m 0600 "$encrypted" "$target"
+```
+
+To create a hosted account secret:
+
+```bash
+account=mail-account-003
+target="secrets/${account}.yaml"
+tmp="$(mktemp)"
+encrypted="$(mktemp)"
+trap 'rm -f "$tmp" "$encrypted"' EXIT
+
+test ! -e "$target"
+
+cat > "$tmp" <<'YAML'
+mail:
+    account:
+        env: |
+            MAIL_ACCOUNT_LOCALPART=alice
+            MAIL_ACCOUNT_PASSWORD=change-me
+            MAIL_ACCOUNT_ALIASES=contact
+            MAIL_ACCOUNT_CLIENT=true
+            MAIL_ACCOUNT_SERVER=true
+            MAIL_ACCOUNT_LABEL=Example Mail
+            MAIL_ACCOUNT_DISPLAY_NAME=Alice Example
+            MAIL_ACCOUNT_RETENTION_DAYS=30
+YAML
+
+sops --encrypt --filename-override "$target" "$tmp" > "$encrypted"
+install -m 0600 "$encrypted" "$target"
+```
+
+To create a client-only external account, such as Gmail in Geary/aerc, do not
+add it to any hosted `MAILBOX_ACCOUNTS` list and set `MAIL_ACCOUNT_SERVER=false`:
+
+```bash
+account=mail-account-900
+target="secrets/${account}.yaml"
+tmp="$(mktemp)"
+encrypted="$(mktemp)"
+trap 'rm -f "$tmp" "$encrypted"' EXIT
+
+test ! -e "$target"
+
+cat > "$tmp" <<'YAML'
+mail:
+    account:
+        env: |
+            MAIL_ACCOUNT_ADDRESS=alice@example.net
+            MAIL_ACCOUNT_USERNAME=alice@example.net
+            MAIL_ACCOUNT_PASSWORD=app-password
+            MAIL_ACCOUNT_CLIENT=true
+            MAIL_ACCOUNT_SERVER=false
+            MAIL_ACCOUNT_LABEL=Example External
+            MAIL_ACCOUNT_DISPLAY_NAME=Alice Example
+            MAIL_ACCOUNT_SOURCE=imaps://alice%40example.net@imap.example.net
+            MAIL_ACCOUNT_OUTGOING=smtps://alice%40example.net@smtp.example.net
+YAML
+
+sops --encrypt --filename-override "$target" "$tmp" > "$encrypted"
+install -m 0600 "$encrypted" "$target"
+```
+
+To edit existing secrets:
+
+```bash
+sops edit secrets/mailbox-003.yaml
+sops edit secrets/mail-account-003.yaml
+```
+
+To check that secrets decrypt without printing them:
+
+```bash
+sops -d --extract '["mailbox"]["env"]' secrets/mailbox-003.yaml >/dev/null
+sops -d --extract '["mail"]["account"]["env"]' secrets/mail-account-003.yaml >/dev/null
+```
+
+The server discovers hosted `mailbox-*.yaml` secrets, but it only receives
+`mail-account-*.yaml` secrets listed in its `local.mail.mailboxSets.accountNames`
+whitelist. Client-only external accounts stay off that server list. Home Manager
+mail clients discover all account secrets and include external accounts where
+`MAIL_ACCOUNT_CLIENT=true` and `MAIL_ACCOUNT_SERVER=false`.
+
+If `SOURCE` and `OUTGOING` are omitted for a hosted client account, the mail
+clients derive them from `MAILBOX_MAIL_HOST`. Use explicit values for external
+providers or when a provider needs different IMAP and SMTP hosts.
+
+Retention is account-driven. Set `MAIL_ACCOUNT_RETENTION_DAYS=30` on
+administrative or shared mailboxes such as contact, no-reply, and postmaster
+accounts. The server-side retention timer caps account-provided values at
+`local.mail.mailboxSets.retention.maxDays`, which defaults to 30 days.
+By default the timer applies to all Dovecot mailboxes for that account. Set
+`MAIL_ACCOUNT_RETENTION_MAILBOXES="INBOX Junk"` when a specific account needs a
+smaller mailbox list.
 
 The network address env secret is a shell env file for provider addresses:
 
@@ -94,13 +203,40 @@ zone, and include it from the SOPS-managed Knot config.
 The web contact env secret is a shell env file for the contact form backend:
 
 ```text
+WEB_SITE_NAME=Example
+WEB_SITE_DOMAIN=example.com
+WEB_CONTACT_ACCOUNT=mail-account-003
+WEB_FORM_SMTP_AUTH_FROM_ACCOUNT=false
 SMTP_HOST=...
 SMTP_PORT=...
 SMTP_STARTTLS=...
-RECIPIENT_EMAIL=...
 CONTACT_FROM=...
 CONTACT_SUBJECT=...
 TOKEN_SECRET=...
+```
+
+`WEB_CONTACT_ACCOUNT` links the webpage to one generic
+`secrets/mail-account-*.yaml` id. When that account is part of a hosted
+`MAILBOX_ACCOUNTS` set, the webpage environment renderer derives
+`WEB_CONTACT_EMAIL`, `CONTACT_FROM`, `SMTP_HOST`, `SMTP_PORT`, and
+`WEB_SITE_URL` from the same mailbox/account secrets that configure mail. Use
+`WEB_PUBLIC_CONTACT_ACCOUNT` and `WEB_FORM_ACCOUNT` only when the public contact
+address and the form sender should be different account ids. Explicit
+`WEB_CONTACT_EMAIL`, `CONTACT_FROM`, `SMTP_HOST`, or `SMTP_PORT` values in
+`web/contact/env` still override derived values.
+
+Keep public site text and URLs in `web/contact/env` with generic variable names,
+not in Nix modules or static HTML. Useful optional public fields are:
+
+```text
+WEB_SITE_TITLE=Example | Offensive security vanuit Nederland
+WEB_SITE_DESCRIPTION=Example levert securityonderzoek.
+WEB_CONTACT_PHONE=+31 00 000 0000
+WEB_CONTACT_PHONE_HREF=tel:+31000000000
+WEB_LEGAL_ENTITY=Example, eenmanszaak in oprichting
+WEB_LEGAL_UPDATED=1 januari 2026
+WEB_FOOTER_TAGLINE=Offensive security vanuit Nederland.
+WEB_REDIRECT_TARGET_URL=https://example.com
 ```
 
 Shared mailbox access is ACL-driven. Non-client mail accounts are automatically
@@ -112,7 +248,7 @@ sender-login map for ACL entries with the `post` right.
 
 Mail certificate hostnames are SOPS-driven. Set `MAIL_TLS_DOMAINS` in the mail
 server env secret when the mail certificate needs more names than `MAIL_FQDN`.
-`MAIL_ACME_EMAIL` is optional; it defaults to `postmaster@$MAIL_DOMAIN`.
+`MAIL_ACME_EMAIL` is optional; it defaults to `postmaster@$MAIL_FQDN`.
 
 ## Module layout
 

@@ -1,6 +1,6 @@
 {
   mail = {
-    accounts = import ./mail/accounts.nix;
+    mailbox-sets = import ./mail/mailbox-sets.nix;
   };
 
   nixos = {
@@ -55,6 +55,9 @@
     network = {
       private = import ./nixos/network/private.nix;
       workstation = import ./nixos/network/workstation.nix;
+    };
+    mail = {
+      mailbox-sets = import ./nixos/mail/mailbox-sets.nix;
     };
     server = {
       dell = import ./nixos/server/dell.nix;
