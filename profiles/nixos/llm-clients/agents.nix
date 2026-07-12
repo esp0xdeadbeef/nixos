@@ -124,6 +124,8 @@ in
       }
     ];
 
-    environment.systemPackages = cfg.packages;
+    environment.systemPackages = cfg.packages ++ [
+      pkgs.psmisc
+    ];
   };
 }
