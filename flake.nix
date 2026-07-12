@@ -47,29 +47,29 @@
     };
 
     network-compiler-prod = {
-      url = "github:esp0xdeadbeef/network-compiler/878f54c735165d37f73156a445cbe688db743f0a";
+      url = "github:esp0xdeadbeef/network-compiler/0745f6ebc3e86c0970f74bd52fb209d9fdd8e27d";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-forwarding-model-prod = {
-      url = "github:esp0xdeadbeef/network-forwarding-model/c351590f7d47791b0da2c6b7caac54cefa60334a";
+      url = "github:esp0xdeadbeef/network-forwarding-model/2f92f74bec0e8e9a03f840dc73a304b963894638";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-prod";
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/c2d6ea82cda48cb13afcef1f6e346a69d8eea2d7";
+      url = "github:esp0xdeadbeef/network-control-plane-model/bf126c4aac782843a21be28a2d9b82384d15e6be";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
     };
 
     nixos-network-compiler-prod = {
-      url = "github:esp0xdeadbeef/nixos-network-compiler/878f54c735165d37f73156a445cbe688db743f0a";
+      url = "github:esp0xdeadbeef/nixos-network-compiler/0745f6ebc3e86c0970f74bd52fb209d9fdd8e27d";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-renderer-nixos-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/e9bf98b526275f2d5e01ac28ca0aaee79d875723";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/38ae8e6c68041a76d95e4bbc93c921377afb1837";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
