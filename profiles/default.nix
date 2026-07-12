@@ -59,6 +59,9 @@
     mail = {
       mailbox-sets = import ./nixos/mail/mailbox-sets.nix;
     };
+    web = {
+      redirect-domains = import ./nixos/web/redirect-domains.nix;
+    };
     server = {
       dell = import ./nixos/server/dell.nix;
       dell-vm-host = import ./nixos/server/dell-vm-host.nix;

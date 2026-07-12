@@ -1,4 +1,5 @@
 { inputs
+, config
 , lib
 , name
 , outPath
@@ -9,6 +10,7 @@ let
   system = "x86_64-linux";
   hostName = name;
   installDisk = "/dev/vda";
+  runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
 in
 {
   networking.hostName = lib.mkForce hostName;
@@ -17,6 +19,7 @@ in
     inputs.disko.nixosModules.disko
     profiles.nixos.impermanence.module
     profiles.nixos.mail.mailbox-sets
+    profiles.nixos.web.redirect-domains
     inputs.sops-nix.nixosModules.sops
 
     ./network.nix
@@ -46,6 +49,18 @@ in
       "mail-account-004"
       "mail-account-005"
     ];
+  };
+
+  local.web.redirectDomains = {
+    enable = true;
+    sopsFile = runtimeSopsFile;
+    afterUnits = [ "${hostName}-cert-mail.service" ];
+    requiresUnits = [ "${hostName}-cert-mail.service" ];
+    tls = {
+      enable = true;
+      fullchainPath = config.sGamma.certs.mail.fullchainPath;
+      keyPath = config.sGamma.certs.mail.keyPath;
+    };
   };
 
   system.stateVersion = "26.05";

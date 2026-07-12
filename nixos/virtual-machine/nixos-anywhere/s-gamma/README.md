@@ -30,6 +30,7 @@ web/contact/env
 web/nginx/http_conf
 web/preview/username
 web/preview/password
+web/redirects/env
 ```
 
 Mail config is split into two generic secret classes. Filenames are opaque ids;
@@ -236,8 +237,21 @@ WEB_CONTACT_PHONE_HREF=tel:+31000000000
 WEB_LEGAL_ENTITY=Example, eenmanszaak in oprichting
 WEB_LEGAL_UPDATED=1 januari 2026
 WEB_FOOTER_TAGLINE=Offensive security vanuit Nederland.
-WEB_REDIRECT_TARGET_URL=https://example.com
 ```
+
+Web redirects are configured from a separate SOPS env secret:
+
+```text
+WEB_REDIRECT_DOMAINS=example.net www.example.net
+WEB_REDIRECT_TARGET_URL=https://example.com
+WEB_REDIRECT_STATUS=301
+```
+
+To add another web-only redirect domain, keep the concrete domain in
+`web/redirects/env`, point DNS A/AAAA records at this host, and include the same
+names in `MAIL_TLS_DOMAINS` so the shared runtime certificate covers HTTPS. The
+public Nix module only enables `profiles.nixos.web.redirect-domains`; redirect
+domain names and targets should not be committed outside encrypted SOPS data.
 
 Shared mailbox access is ACL-driven. Non-client mail accounts are automatically
 shared to client mail accounts. `MAIL_SHARED_*` entries may add explicit ACLs
