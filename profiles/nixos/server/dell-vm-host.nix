@@ -1,4 +1,5 @@
 { inputs
+, lib
 , name
 , outPath
 , pkgs
@@ -38,6 +39,19 @@
   ];
 
   boot.loader.systemd-boot.configurationLimit = 12;
+
+  # Dell iDRAC exposes an Avocent USB keyboard/mouse device on these R730 hosts.
+  # Loading the matching input modules early avoids late udev module autoloading
+  # while the kernel is already tearing down BPF/ftrace state during reboot.
+  boot.kernelModules = lib.mkAfter [
+    "hid_generic"
+    "usbhid"
+    "mac_hid"
+    "mousedev"
+    "evdev"
+    "input_leds"
+    "joydev"
+  ];
 
   local.impermanence.extraUserDirectories = [
     "Documents"
