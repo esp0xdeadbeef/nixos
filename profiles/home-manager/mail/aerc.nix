@@ -19,6 +19,7 @@ let
     name = "aerc-mail-account-env-paths";
     secretRefs = mailboxSets.mailAccountEnvSecretRefs;
   };
+  defaultBinds = builtins.readFile ./aerc-binds.conf;
   passwordHelper = pkgs.writeShellApplication {
     name = "mail-account-password";
     text = ''
@@ -259,7 +260,11 @@ let
         fi
 
         label="$(account_var LABEL)"
-        [ -n "$label" ] || label="$address"
+        if [ -z "$label" ]; then
+          label="$address"
+        elif [ "$label" != "$address" ]; then
+          label="$label <$address>"
+        fi
         sender="$(sender_for "$address")"
 
         source="$(resolve_source "$address")" || {
@@ -377,7 +382,10 @@ let
   };
 in
 {
-  programs.aerc.enable = true;
+  programs.aerc = {
+    enable = true;
+    extraBinds = defaultBinds;
+  };
 
   sops.secrets = mailboxSets.mkSopsSecrets { };
 

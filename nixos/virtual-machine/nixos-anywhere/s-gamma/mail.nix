@@ -390,7 +390,7 @@ let
       mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
       mail_account_env_path_list=${lib.escapeShellArg mailAccountEnvPathList}
       shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
-      shared_namespace_prefix=users
+      shared_namespace_prefix=shared
       vmail_root=/var/vmail
       shared_sender_logins_raw="$shared_sender_logins.raw"
       trap 'rm -f "$shared_sender_logins_raw"' EXIT
@@ -539,18 +539,30 @@ let
       shared_mailbox_name() {
         local owner="$1"
         local mailbox="$2"
+        local owner_domain="''${owner#*@}"
         local owner_local
+        local owner_prefix
         owner_local="$(owner_localpart "$owner")"
+
+        if [ -z "$owner_domain" ] || [ "$owner_domain" = "$owner" ]; then
+          return 1
+        fi
+
+        if [ -n "$shared_namespace_prefix" ]; then
+          owner_prefix="$shared_namespace_prefix/$owner_domain/$owner_local"
+        else
+          owner_prefix="$owner_domain/$owner_local"
+        fi
 
         case "$mailbox" in
           ""|INBOX)
-            printf '%s/%s/INBOX\n' "$shared_namespace_prefix" "$owner_local"
+            printf '%s/INBOX\n' "$owner_prefix"
             ;;
           INBOX/*)
-            printf '%s/%s/%s\n' "$shared_namespace_prefix" "$owner_local" "''${mailbox#INBOX/}"
+            printf '%s/%s\n' "$owner_prefix" "''${mailbox#INBOX/}"
             ;;
           *)
-            printf '%s/%s/%s\n' "$shared_namespace_prefix" "$owner_local" "$mailbox"
+            printf '%s/%s\n' "$owner_prefix" "$mailbox"
             ;;
         esac
       }
@@ -597,20 +609,45 @@ let
 
       remove_managed_subscriptions() {
         local subscriptions_file="$1"
+        local managed_domain
+        local managed_domains
+        local managed_user
         local tmp
 
         [ -f "$subscriptions_file" ] || return 0
 
+        managed_domains="$(
+          for managed_user in "''${all_users[@]}"; do
+            managed_domain="''${managed_user#*@}"
+            if [ -n "$managed_domain" ] && [ "$managed_domain" != "$managed_user" ]; then
+              printf '%s\n' "$managed_domain"
+            fi
+          done | sort -u | tr '\n' ' '
+        )"
+
         tmp="$(mktemp "''${subscriptions_file}.tmp.XXXXXX")"
-        awk -v current="$shared_namespace_prefix" '
+        awk -v current="$shared_namespace_prefix" -v managed_domains="$managed_domains" '
+          BEGIN {
+            split(managed_domains, domains, " ")
+          }
+
           {
             keep = 1
             prefixes[1] = "shared"
-            prefixes[2] = current
+            prefixes[2] = "users"
+            prefixes[3] = current
 
-            for (i = 1; i <= 2; i++) {
+            for (i = 1; i <= 3; i++) {
               prefix = prefixes[i]
-              if ($0 == prefix || index($0, prefix "/") == 1 || index($0, prefix "\t") == 1) {
+              if (prefix != "" && ($0 == prefix || index($0, prefix "/") == 1 || index($0, prefix "\t") == 1)) {
+                keep = 0
+                break
+              }
+            }
+
+            for (i in domains) {
+              domain = domains[i]
+              if (domain != "" && ($0 == domain || index($0, domain "/") == 1 || index($0, domain "\t") == 1)) {
                 keep = 0
                 break
               }
@@ -761,6 +798,33 @@ let
         doveadm mailbox subscribe -u "$user" "$mailbox" >/dev/null
       }
 
+      sync_visible_shared_subscriptions() {
+        local user
+        local visible_mailbox
+
+        [ -n "$shared_namespace_prefix" ] || return 0
+
+        for user in "''${client_users[@]}"; do
+          if ! doveadm user "$user" >/dev/null 2>&1; then
+            continue
+          fi
+
+          while IFS= read -r visible_mailbox; do
+            [ -n "$visible_mailbox" ] || continue
+
+            case "$visible_mailbox" in
+              "$shared_namespace_prefix"/*)
+                if subscribe_user "$user" "$visible_mailbox"; then
+                  subscribed=$((subscribed + 1))
+                else
+                  failed=$((failed + 1))
+                fi
+                ;;
+            esac
+          done < <(doveadm mailbox list -u "$user")
+        done
+      }
+
       subscribed=0
       failed=0
       : > "$shared_sender_logins_raw"
@@ -769,6 +833,7 @@ let
       clear_managed_subscriptions
       sync_automatic_account_mailboxes
       sync_declared_shared_mailboxes
+      sync_visible_shared_subscriptions
 
       awk '
         {
@@ -1341,7 +1406,7 @@ in
       "namespace shared" = {
         type = "shared";
         separator = "/";
-        prefix = "users/$username/";
+        prefix = "shared/$domain/$username/";
         list = "yes";
         subscriptions = false;
         mail_driver = "maildir";

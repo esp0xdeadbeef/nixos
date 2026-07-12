@@ -23,8 +23,10 @@ let
     name = "geary-mail-account-sync";
     runtimeInputs = [
       pkgs.coreutils
+      pkgs.geary
       pkgs.gawk
       pkgs.libsecret
+      pkgs.procps
       pkgs.python3
     ];
     text = ''
@@ -36,8 +38,18 @@ let
       secret_tool=${lib.escapeShellArg "${pkgs.libsecret}/bin/secret-tool"}
       config_base="''${XDG_CONFIG_HOME:-$HOME/.config}/geary"
       data_base="''${XDG_DATA_HOME:-$HOME/.local/share}/geary"
+      manifest_file="$config_base/.nix-managed-accounts"
 
       install -d -m 0700 "$config_base" "$data_base"
+      old_manifest="$(mktemp "$manifest_file.old.XXXXXX")"
+      new_manifest="$(mktemp "$manifest_file.new.XXXXXX")"
+      trap 'rm -f "$old_manifest" "$new_manifest"' EXIT
+
+      if [ -f "$manifest_file" ]; then
+        cp "$manifest_file" "$old_manifest"
+      else
+        : > "$old_manifest"
+      fi
 
       words() {
         local input="''${1:-}"
@@ -373,7 +385,11 @@ let
         fi
 
         label="$(account_var LABEL)"
-        [ -n "$label" ] || label="$address"
+        if [ -z "$label" ]; then
+          label="$address"
+        elif [ "$label" != "$address" ]; then
+          label="$label <$address>"
+        fi
         sender="$(sender_for "$address")"
         source="$(resolve_source "$address")" || {
           echo "mail account is missing SOURCE or IMAP host: $account_ref" >&2
@@ -391,6 +407,7 @@ let
 
         geary_account_id="account_$(printf '%02d' "$((ordinal + 1))")"
         parsed="$(write_config "$geary_account_id" "$ordinal" "$label" "$sender" "$source" "$outgoing")"
+        generated_account_ids+=("$geary_account_id")
         IFS=$'\t' read -r imap_user parsed_imap_host smtp_user parsed_smtp_host outgoing_credentials <<< "$parsed"
         store_passwords "$password" "$imap_user" "$parsed_imap_host" "$smtp_user" "$parsed_smtp_host" "$outgoing_credentials"
         ordinal=$((ordinal + 1))
@@ -466,9 +483,63 @@ let
         done < "$mail_account_path_list"
       }
 
+      account_id_is_generated() {
+        local needle="$1"
+        local account_id
+
+        for account_id in "''${generated_account_ids[@]}"; do
+          if [ "$account_id" = "$needle" ]; then
+            return 0
+          fi
+        done
+
+        return 1
+      }
+
+      remove_stale_managed_accounts() {
+        local old_account_id
+        local _old_checksum
+
+        while IFS=$'\t' read -r old_account_id _old_checksum; do
+          [ -n "$old_account_id" ] || continue
+          if ! account_id_is_generated "$old_account_id"; then
+            rm -rf -- "''${config_base:?}/$old_account_id" "''${data_base:?}/$old_account_id"
+          fi
+        done < "$old_manifest"
+      }
+
+      write_managed_manifest() {
+        local account_id
+        local config_file
+        local checksum
+
+        : > "$new_manifest"
+        for account_id in "''${generated_account_ids[@]}"; do
+          config_file="$config_base/$account_id/geary.ini"
+          [ -f "$config_file" ] || continue
+          checksum="$(sha256sum "$config_file" | awk '{ print $1 }')"
+          printf '%s\t%s\n' "$account_id" "$checksum" >> "$new_manifest"
+        done
+      }
+
+      quit_geary_if_accounts_changed() {
+        if cmp -s "$old_manifest" "$new_manifest"; then
+          return 0
+        fi
+
+        if pgrep -u "$(id -u)" -f '/bin/geary( |$)' >/dev/null 2>&1; then
+          geary -q >/dev/null 2>&1 || true
+        fi
+      }
+
+      generated_account_ids=()
       ordinal=0
       sync_hosted_accounts
       sync_external_accounts
+      remove_stale_managed_accounts
+      write_managed_manifest
+      quit_geary_if_accounts_changed
+      install -m 0600 "$new_manifest" "$manifest_file"
     '';
   };
 in
