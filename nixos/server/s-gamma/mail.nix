@@ -15,6 +15,8 @@ in
     sopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
     sharedNamespacePrefix = "s";
     sharedNamespaceIncludeDomain = hasMultipleMailboxSets;
+    sharedExplicitInbox = true;
+    sharedInheritInboxAcl = true;
 
     networkAddress.unit = "${config.networking.hostName}-network-addresses.service";
 

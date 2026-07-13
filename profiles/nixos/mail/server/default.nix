@@ -145,6 +145,18 @@ in
       description = "Whether shared mailbox names include the owner domain, yielding s/example.com/name instead of s/name.";
     };
 
+    sharedExplicitInbox = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Whether shared INBOXes are visible as s/example.com/name/INBOX instead of s/example.com/name.";
+    };
+
+    sharedInheritInboxAcl = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Whether Dovecot should use INBOX ACLs as defaults for shared child mailboxes.";
+    };
+
     networkAddress = {
       secretName = lib.mkOption {
         type = lib.types.str;
@@ -490,8 +502,8 @@ in
         mail_access_groups = "virtualMail";
         mail_plugins.acl = true;
         mailbox_list_layout = "Maildir++";
-        mail_shared_explicit_inbox = false;
-        acl_defaults_from_inbox = false;
+        mail_shared_explicit_inbox = cfg.sharedExplicitInbox;
+        acl_defaults_from_inbox = cfg.sharedInheritInboxAcl;
         acl_driver = "vfile";
 
         "acl_sharing_map"."dict file".path = "/var/lib/dovecot/db/shared-mailboxes.db";

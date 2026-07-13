@@ -26,6 +26,8 @@ pkgs.writeShellApplication {
     shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
     shared_namespace_prefix=${lib.escapeShellArg cfg.sharedNamespacePrefix}
     shared_namespace_include_domain=${lib.escapeShellArg (if cfg.sharedNamespaceIncludeDomain then "1" else "0")}
+    shared_namespace_explicit_inbox=${lib.escapeShellArg (if cfg.sharedExplicitInbox then "1" else "0")}
+    shared_inherit_inbox_acl=${lib.escapeShellArg (if cfg.sharedInheritInboxAcl then "1" else "0")}
     vmail_root=/var/vmail
     shared_sender_logins_raw="$shared_sender_logins.raw"
     trap 'rm -f "$shared_sender_logins_raw"' EXIT
@@ -195,10 +197,18 @@ pkgs.writeShellApplication {
 
       case "$mailbox" in
         ""|INBOX)
-          printf '%s\n' "$owner_prefix"
+          if [ "$shared_namespace_explicit_inbox" = "1" ]; then
+            printf '%s/INBOX\n' "$owner_prefix"
+          else
+            printf '%s\n' "$owner_prefix"
+          fi
           ;;
         INBOX/*)
-          printf '%s/%s\n' "$owner_prefix" "''${mailbox#INBOX/}"
+          if [ "$shared_namespace_explicit_inbox" = "1" ]; then
+            printf '%s/%s\n' "$owner_prefix" "$mailbox"
+          else
+            printf '%s/%s\n' "$owner_prefix" "''${mailbox#INBOX/}"
+          fi
           ;;
         *)
           printf '%s/%s\n' "$owner_prefix" "$mailbox"
@@ -323,13 +333,80 @@ pkgs.writeShellApplication {
       done
     }
 
+    configured_automatic_mailboxes() {
+      if [ -n "''${MAIL_SHARED_AUTO_MAILBOXES:-}" ]; then
+        words "$MAIL_SHARED_AUTO_MAILBOXES"
+        return
+      fi
+
+      if [ -n "''${MAIL_SHARED_AUTO_MAILBOX:-}" ]; then
+        words "$MAIL_SHARED_AUTO_MAILBOX"
+        return
+      fi
+
+      printf '%s\n' INBOX
+    }
+
+    mailbox_uses_inbox_acl_defaults() {
+      local mailbox="$1"
+
+      [ "$shared_inherit_inbox_acl" = "1" ] || return 1
+      case "$mailbox" in
+        ""|INBOX)
+          return 0
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+    }
+
+    private_mailbox_visible() {
+      local mailbox="$1"
+      local managed_domain
+      local managed_user
+
+      case "$mailbox" in
+        "$shared_namespace_prefix"|"$shared_namespace_prefix"/*|shared|shared/*|users|users/*)
+          return 1
+          ;;
+      esac
+
+      for managed_user in "''${all_users[@]}"; do
+        managed_domain="''${managed_user#*@}"
+        [ -n "$managed_domain" ] || continue
+        [ "$managed_domain" != "$managed_user" ] || continue
+
+        case "$mailbox" in
+          "$managed_domain"|"$managed_domain"/*)
+            return 1
+            ;;
+        esac
+      done
+
+      return 0
+    }
+
+    visible_mailboxes_for_share() {
+      local owner="$1"
+      local mailbox="$2"
+
+      if mailbox_uses_inbox_acl_defaults "$mailbox"; then
+        while IFS= read -r owner_mailbox; do
+          [ -n "$owner_mailbox" ] || continue
+          private_mailbox_visible "$owner_mailbox" || continue
+          printf '%s\n' "$owner_mailbox"
+        done < <(doveadm mailbox list -u "$owner")
+      else
+        printf '%s\n' "$mailbox"
+      fi
+    }
+
     sync_automatic_account_mailboxes() {
-      mailbox="''${MAIL_SHARED_AUTO_MAILBOX:-INBOX}"
       rights="''${MAIL_SHARED_AUTO_RIGHTS:-lookup read write write-seen write-deleted insert post expunge create delete}"
 
       [ "''${#owner_users[@]}" -ne 0 ] || return 0
       [ "''${#client_users[@]}" -ne 0 ] || return 0
-      [ -n "$mailbox" ] || mailbox=INBOX
 
       rights_args=()
       for right in $(words "$rights"); do
@@ -343,37 +420,44 @@ pkgs.writeShellApplication {
           continue
         fi
 
-        if ! doveadm mailbox status -u "$owner" uidvalidity "$mailbox" >/dev/null 2>&1; then
-          doveadm mailbox create -u "$owner" -s "$mailbox" >/dev/null 2>&1 || true
-        fi
+        for mailbox in $(configured_automatic_mailboxes); do
+          [ -n "$mailbox" ] || continue
 
-        visible_mailbox="$(shared_mailbox_name "$owner" "$mailbox")"
-
-        for cleanup_user in "''${all_users[@]}"; do
-          [ "$cleanup_user" != "$owner" ] || continue
-
-          doveadm acl delete -u "$owner" "$mailbox" "user=$cleanup_user" >/dev/null 2>&1 || true
-        done
-        doveadm acl recalc -u "$owner" >/dev/null
-
-        for user in "''${client_users[@]}"; do
-          [ "$user" != "$owner" ] || continue
-          same_mail_domain "$owner" "$user" || continue
-
-          if ! doveadm user "$user" >/dev/null 2>&1; then
-            echo "shared-mail-subscriptions: automatic ACL user is not a Dovecot user: $user" >&2
-            continue
+          if ! doveadm mailbox status -u "$owner" uidvalidity "$mailbox" >/dev/null 2>&1; then
+            doveadm mailbox create -u "$owner" -s "$mailbox" >/dev/null 2>&1 || true
           fi
 
-          doveadm acl add -u "$owner" "$mailbox" "user=$user" "''${rights_args[@]}" >/dev/null
+          for cleanup_user in "''${all_users[@]}"; do
+            [ "$cleanup_user" != "$owner" ] || continue
+
+            doveadm acl delete -u "$owner" "$mailbox" "user=$cleanup_user" >/dev/null 2>&1 || true
+          done
           doveadm acl recalc -u "$owner" >/dev/null
-          add_sender_login "$owner" "$user" "$rights"
 
-          if subscribe_user "$user" "$visible_mailbox"; then
-            subscribed=$((subscribed + 1))
-          else
-            failed=$((failed + 1))
-          fi
+          for user in "''${client_users[@]}"; do
+            [ "$user" != "$owner" ] || continue
+            same_mail_domain "$owner" "$user" || continue
+
+            if ! doveadm user "$user" >/dev/null 2>&1; then
+              echo "shared-mail-subscriptions: automatic ACL user is not a Dovecot user: $user" >&2
+              continue
+            fi
+
+            doveadm acl add -u "$owner" "$mailbox" "user=$user" "''${rights_args[@]}" >/dev/null
+            doveadm acl recalc -u "$owner" >/dev/null
+            add_sender_login "$owner" "$user" "$rights"
+
+            while IFS= read -r visible_source_mailbox; do
+              [ -n "$visible_source_mailbox" ] || continue
+              visible_mailbox="$(shared_mailbox_name "$owner" "$visible_source_mailbox")"
+
+              if subscribe_user "$user" "$visible_mailbox"; then
+                subscribed=$((subscribed + 1))
+              else
+                failed=$((failed + 1))
+              fi
+            done < <(visible_mailboxes_for_share "$owner" "$mailbox")
+          done
         done
       done
     }
@@ -411,8 +495,6 @@ pkgs.writeShellApplication {
           rights_args+=("$right")
         done
 
-        visible_mailbox="$(shared_mailbox_name "$owner" "$mailbox")"
-
         for user_ref in $(words "$user_refs"); do
           [ -n "$user_ref" ] || continue
           user="$user_ref"
@@ -427,11 +509,16 @@ pkgs.writeShellApplication {
           doveadm acl recalc -u "$owner" >/dev/null
           add_sender_login "$owner" "$user" "$rights"
 
-          if subscribe_user "$user" "$visible_mailbox"; then
-            subscribed=$((subscribed + 1))
-          else
-            failed=$((failed + 1))
-          fi
+          while IFS= read -r visible_source_mailbox; do
+            [ -n "$visible_source_mailbox" ] || continue
+            visible_mailbox="$(shared_mailbox_name "$owner" "$visible_source_mailbox")"
+
+            if subscribe_user "$user" "$visible_mailbox"; then
+              subscribed=$((subscribed + 1))
+            else
+              failed=$((failed + 1))
+            fi
+          done < <(visible_mailboxes_for_share "$owner" "$mailbox")
         done
       done
     }
