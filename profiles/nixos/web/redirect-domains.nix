@@ -125,7 +125,7 @@ let
         listen [::]:80;
         server_name $server_names;
         auth_basic off;
-        return $status $target\$request_uri;
+        return $status https://\$host\$request_uri;
       }
       NGINX
 

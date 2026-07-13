@@ -58,7 +58,7 @@
     };
     mail = {
       mailbox-sets = import ./nixos/mail/mailbox-sets.nix;
-      server = import ./nixos/mail/server.nix;
+      server = import ./nixos/mail/server;
     };
     web = {
       redirect-domains = import ./nixos/web/redirect-domains.nix;

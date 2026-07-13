@@ -214,6 +214,7 @@ The web contact env secret is a shell env file for the contact form backend:
 ```text
 WEB_SITE_NAME=Example
 WEB_SITE_DOMAIN=example.com
+WEB_CONTACT_MAILBOX_SET=mailbox-001
 WEB_CONTACT_ACCOUNT=mail-account-003
 WEB_FORM_SMTP_AUTH_FROM_ACCOUNT=false
 SMTP_HOST=...
@@ -225,12 +226,15 @@ TOKEN_SECRET=...
 ```
 
 `WEB_CONTACT_ACCOUNT` links the webpage to one generic
-`secrets/mail-account-*.yaml` id. When that account is part of a hosted
-`MAILBOX_ACCOUNTS` set, the webpage environment renderer derives
+`secrets/mail-account-*.yaml` id. `WEB_CONTACT_MAILBOX_SET` selects the hosted
+mailbox set/domain when the same account id appears in more than one
+`MAILBOX_ACCOUNTS` set. The webpage environment renderer derives
 `WEB_CONTACT_EMAIL`, `CONTACT_FROM`, `SMTP_HOST`, `SMTP_PORT`, and
-`WEB_SITE_URL` from the same mailbox/account secrets that configure mail. Use
-`WEB_PUBLIC_CONTACT_ACCOUNT` and `WEB_FORM_ACCOUNT` only when the public contact
-address and the form sender should be different account ids. Explicit
+`WEB_SITE_URL` from the same mailbox/account secrets that configure mail.
+
+Use `WEB_PUBLIC_CONTACT_ACCOUNT` plus `WEB_PUBLIC_CONTACT_MAILBOX_SET` and
+`WEB_FORM_ACCOUNT` plus `WEB_FORM_MAILBOX_SET` when the public contact address
+and the form sender should be different account ids. Explicit
 `WEB_CONTACT_EMAIL`, `CONTACT_FROM`, `SMTP_HOST`, or `SMTP_PORT` values in
 `web/contact/env` still override derived values.
 
@@ -245,6 +249,17 @@ WEB_CONTACT_PHONE_HREF=tel:+31000000000
 WEB_LEGAL_ENTITY=Example, eenmanszaak in oprichting
 WEB_LEGAL_UPDATED=1 januari 2026
 WEB_FOOTER_TAGLINE=Offensive security vanuit Nederland.
+```
+
+The renderer also publishes a `security.txt` file from the same runtime env.
+By default it uses `WEB_CONTACT_EMAIL` and `WEB_SITE_URL`; override these only
+when the disclosure contact or canonical URL must differ:
+
+```text
+WEB_SECURITY_CONTACT_EMAIL=security@example.com
+WEB_SECURITY_SITE_URL=https://example.com
+WEB_SECURITY_CANONICAL_URL=https://example.com/.well-known/security.txt
+WEB_SECURITY_EXPIRES_AFTER=+180 days
 ```
 
 Web redirects are configured from a separate SOPS env secret:

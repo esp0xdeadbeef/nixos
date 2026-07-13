@@ -17,11 +17,14 @@ let
   runtimeSopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
 
   runtimeRoot = "/run/${hostName}";
+  mailTlsFullchainPath = config.sGamma.certs.mail.fullchainPath;
+  mailTlsKeyPath = config.sGamma.certs.mail.keyPath;
   githubTokenPath = config.sops.secrets.gh-token.path;
   webpageRepoUrl = "https://github.com/esp0xdeadbeef/www.git";
   webpageRepoBranch = "main";
   webpageSourceDir = "/persist/srv/www/source";
   webpageRuntimeDir = "/persist/srv/www/app";
+  webpagePublicDir = "${webpageRuntimeDir}/webpagina";
   webpageRestartMarker = "${runtimeRoot}/webpage-restart-needed";
   webpageEnvDir = "${runtimeRoot}/webpage";
   webpageRenderedEnvPath = "${webpageEnvDir}/env";
@@ -30,11 +33,13 @@ let
 
   nginxHttpConfPath = config.sops.secrets."web/nginx/http_conf".path;
   webContactEnvPath = config.sops.secrets."web/contact/env".path;
+  webRedirectEnvPath = config.sops.secrets."web/redirects/env".path;
   nginxPreviewUsernamePath = config.sops.secrets."web/preview/username".path;
   nginxPreviewPasswordPath = config.sops.secrets."web/preview/password".path;
   nginxRuntimeDir = "${runtimeRoot}/nginx";
   nginxHtpasswdPath = "${nginxRuntimeDir}/htpasswd";
   nginxRenderedHttpConfPath = "${nginxRuntimeDir}/http.conf";
+  nginxGeneratedMailboxConfPath = "${nginxRuntimeDir}/mailbox-domains.conf";
   emptyMailboxPathList = pkgs.writeText "${hostName}-empty-mailbox-env-paths" "";
   mailboxSetEnvPathsConfig =
     if mailboxSets == null then {
@@ -70,8 +75,6 @@ let
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" always;
     add_header Cross-Origin-Embedder-Policy "require-corp" always;
     add_header Cross-Origin-Resource-Policy "same-origin" always;
@@ -94,17 +97,24 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.gawk
+      pkgs.gnugrep
       pkgs.openssl
     ];
     text = ''
       set -euo pipefail
 
       raw_conf=${lib.escapeShellArg nginxHttpConfPath}
+      redirect_env=${lib.escapeShellArg webRedirectEnvPath}
       rendered_conf=${lib.escapeShellArg nginxRenderedHttpConfPath}
+      generated_mailbox_conf=${lib.escapeShellArg nginxGeneratedMailboxConfPath}
       username_file=${lib.escapeShellArg nginxPreviewUsernamePath}
       password_file=${lib.escapeShellArg nginxPreviewPasswordPath}
+      mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
+      tls_fullchain=${lib.escapeShellArg mailTlsFullchainPath}
+      tls_key=${lib.escapeShellArg mailTlsKeyPath}
       nginx_dir=${lib.escapeShellArg nginxRuntimeDir}
       htpasswd=${lib.escapeShellArg nginxHtpasswdPath}
+      webpage_upstream=${lib.escapeShellArg "http://${webpageHost}:${toString webpagePort}"}
 
       install -d -m 0750 -o nginx -g nginx "$nginx_dir"
 
@@ -133,11 +143,251 @@ let
       chmod 0440 "$tmp"
       mv "$tmp" "$htpasswd"
 
+      words() {
+        local input="''${1:-}"
+        printf '%s\n' "$input" | tr ',\t\r\n' ' '
+      }
+
+      redirect_domains=""
+      if [ -r "$redirect_env" ]; then
+        set -a
+        # shellcheck disable=SC1090
+        . "$redirect_env"
+        set +a
+        redirect_domains="''${WEB_REDIRECT_DOMAINS:-}"
+        unset WEB_REDIRECT_DOMAINS WEB_REDIRECT_TARGET_URL WEB_REDIRECT_STATUS
+      fi
+
+      validate_domain() {
+        local domain="$1"
+
+        case "$domain" in
+          *[!A-Za-z0-9.-]* | .* | *..* | *.)
+            echo "invalid nginx mailbox domain: $domain" >&2
+            exit 1
+            ;;
+        esac
+      }
+
+      raw_has_server_name() {
+        local name="$1"
+
+        awk -v name="$name" '
+          /^[[:space:]]*server_name[[:space:]]/ {
+            for (i = 2; i <= NF; i++) {
+              value = $i
+              gsub(/;$/, "", value)
+              if (value == name) {
+                found = 1
+              }
+            }
+          }
+
+          END {
+            exit(found ? 0 : 1)
+          }
+        ' "$raw_conf"
+      }
+
+      redirect_manages_domain() {
+        local name="$1"
+        local redirect_domain
+
+        for redirect_domain in $(words "$redirect_domains"); do
+          [ "$redirect_domain" = "$name" ] && return 0
+        done
+
+        return 1
+      }
+
+      generated_domain_names=()
+
+      generated_domain_exists() {
+        local name="$1"
+        local generated_domain
+
+        for generated_domain in "''${generated_domain_names[@]}"; do
+          [ "$generated_domain" = "$name" ] && return 0
+        done
+
+        return 1
+      }
+
+      remember_generated_domains() {
+        local name
+
+        for name in "$@"; do
+          generated_domain_names+=("$name")
+        done
+      }
+
+      emit_web_domain() {
+        local domain="$1"
+        local www_domain="$2"
+
+        cat <<NGINX
+
+      server {
+        listen 80;
+        listen [::]:80;
+        server_name $domain $www_domain;
+        auth_basic off;
+        return 301 https://$domain\$request_uri;
+      }
+
+      server {
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        http2 on;
+        server_name $domain;
+        auth_basic off;
+        ssl_certificate $tls_fullchain;
+        ssl_certificate_key $tls_key;
+
+        location / {
+          proxy_pass $webpage_upstream;
+          proxy_set_header Host \$host;
+          proxy_set_header X-Real-IP \$remote_addr;
+          proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+
+      }
+
+      server {
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        http2 on;
+        server_name $www_domain;
+        auth_basic off;
+        ssl_certificate $tls_fullchain;
+        ssl_certificate_key $tls_key;
+        return 301 https://$domain\$request_uri;
+      }
+      NGINX
+      }
+
+      emit_mail_redirect() {
+        local mail_host="$1"
+        local target_domain="$2"
+
+        cat <<NGINX
+
+      server {
+        listen 80;
+        listen [::]:80;
+        server_name $mail_host;
+        auth_basic off;
+        return 301 https://$target_domain\$request_uri;
+      }
+
+      server {
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        http2 on;
+        server_name $mail_host;
+        auth_basic off;
+        ssl_certificate $tls_fullchain;
+        ssl_certificate_key $tls_key;
+        return 301 https://$target_domain\$request_uri;
+      }
+      NGINX
+      }
+
+      emit_proxy_domain() {
+        local domain="$1"
+
+        cat <<NGINX
+
+      server {
+        listen 80;
+        listen [::]:80;
+        server_name $domain;
+        auth_basic off;
+        return 301 https://$domain\$request_uri;
+      }
+
+      server {
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        http2 on;
+        server_name $domain;
+        auth_basic off;
+        ssl_certificate $tls_fullchain;
+        ssl_certificate_key $tls_key;
+
+        location / {
+          proxy_pass $webpage_upstream;
+          proxy_set_header Host \$host;
+          proxy_set_header X-Real-IP \$remote_addr;
+          proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+      }
+      NGINX
+      }
+
+      tmp_generated="$(mktemp "$nginx_dir/mailbox-domains.conf.XXXXXX")"
+      {
+        printf '# Generated from mailbox profile secrets. Raw nginx config takes precedence.\n'
+
+        while IFS= read -r entry; do
+          [ -n "$entry" ] || continue
+          mailbox_set_path="''${entry#*=}"
+          [ -r "$mailbox_set_path" ] || continue
+
+          unset MAILBOX_DOMAIN MAILBOX_MAIL_HOST
+          set -a
+          # shellcheck disable=SC1090
+          . "$mailbox_set_path"
+          set +a
+
+          domain="''${MAILBOX_DOMAIN:-}"
+          [ -n "$domain" ] || continue
+          validate_domain "$domain"
+
+          www_domain="www.$domain"
+          validate_domain "$www_domain"
+
+          if ! raw_has_server_name "$domain" \
+            && ! raw_has_server_name "$www_domain"; then
+            emit_web_domain "$domain" "$www_domain"
+            remember_generated_domains "$domain" "$www_domain"
+          fi
+
+          mail_host="''${MAILBOX_MAIL_HOST:-mail.$domain}"
+          [ -n "$mail_host" ] || continue
+          validate_domain "$mail_host"
+          if [ "$mail_host" != "$domain" ] \
+            && [ "$mail_host" != "$www_domain" ] \
+            && ! redirect_manages_domain "$mail_host" \
+            && ! raw_has_server_name "$mail_host"; then
+            emit_mail_redirect "$mail_host" "$domain"
+            remember_generated_domains "$mail_host"
+          fi
+        done < "$mailbox_set_env_path_list"
+
+        for redirect_domain in $(words "$redirect_domains"); do
+          [ -n "$redirect_domain" ] || continue
+          validate_domain "$redirect_domain"
+
+          if ! raw_has_server_name "$redirect_domain" \
+            && ! generated_domain_exists "$redirect_domain"; then
+            emit_proxy_domain "$redirect_domain"
+            remember_generated_domains "$redirect_domain"
+          fi
+        done
+      } > "$tmp_generated"
+      chown nginx:nginx "$tmp_generated"
+      chmod 0440 "$tmp_generated"
+      mv "$tmp_generated" "$generated_mailbox_conf"
+
       tmp_conf="$(mktemp "$nginx_dir/http.conf.XXXXXX")"
       cat > "$tmp_conf" <<'NGINX_SECURITY_HEADERS'
       ${nginxSecurityHeaders}
       NGINX_SECURITY_HEADERS
       cat "$raw_conf" >> "$tmp_conf"
+      cat "$generated_mailbox_conf" >> "$tmp_conf"
       chown nginx:nginx "$tmp_conf"
       chmod 0440 "$tmp_conf"
       mv "$tmp_conf" "$rendered_conf"
@@ -174,22 +424,29 @@ let
       set -euo pipefail
 
       base_env=${lib.escapeShellArg webContactEnvPath}
+      redirect_env=${lib.escapeShellArg webRedirectEnvPath}
       mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
       mail_account_env_path_list=${lib.escapeShellArg mailAccountEnvPathList}
       runtime_dir=${lib.escapeShellArg webpageEnvDir}
       rendered_env=${lib.escapeShellArg webpageRenderedEnvPath}
+      public_dir=${lib.escapeShellArg webpagePublicDir}
 
       install -d -m 0750 -o nginx -g nginx "$runtime_dir"
 
       set -a
       # shellcheck source=/dev/null
       . "$base_env"
+      # shellcheck source=/dev/null
+      . "$redirect_env"
       set +a
 
       declare -A account_path_by_id
       declare -A account_domain_by_id
       declare -A account_smtp_host_by_id
       declare -A account_smtp_port_by_id
+      declare -A account_domain_by_context
+      declare -A account_smtp_host_by_context
+      declare -A account_smtp_port_by_context
 
       words() {
         local raw="''${1//,/ }"
@@ -232,14 +489,26 @@ let
 
       load_account_context() {
         local account_id="$1"
+        local mailbox_set_id="''${2:-}"
         local account_path="''${account_path_by_id[$account_id]:-}"
+        local context_key
 
         [ -n "$account_path" ] || return 1
         [ -r "$account_path" ] || return 1
 
         load_account_env "$account_path"
 
-        account_domain="''${account_domain_by_id[$account_id]:-}"
+        if [ -n "$mailbox_set_id" ]; then
+          context_key="$mailbox_set_id/$account_id"
+          account_domain="''${account_domain_by_context[$context_key]:-}"
+          account_context_smtp_host="''${account_smtp_host_by_context[$context_key]:-}"
+          account_context_smtp_port="''${account_smtp_port_by_context[$context_key]:-}"
+        else
+          account_domain="''${account_domain_by_id[$account_id]:-}"
+          account_context_smtp_host="''${account_smtp_host_by_id[$account_id]:-}"
+          account_context_smtp_port="''${account_smtp_port_by_id[$account_id]:-}"
+        fi
+
         account_address="''${MAIL_ACCOUNT_ADDRESS:-}"
         if [ -z "$account_address" ] && [ -n "''${MAIL_ACCOUNT_LOCALPART:-}" ] && [ -n "$account_domain" ]; then
           account_address="''${MAIL_ACCOUNT_LOCALPART}@$account_domain"
@@ -249,9 +518,9 @@ let
         account_password="''${MAIL_ACCOUNT_PASSWORD:-}"
         account_smtp_host="''${MAIL_ACCOUNT_SMTP_HOST:-}"
         [ -n "$account_smtp_host" ] || account_smtp_host="''${MAIL_ACCOUNT_MAIL_HOST:-}"
-        [ -n "$account_smtp_host" ] || account_smtp_host="''${account_smtp_host_by_id[$account_id]:-}"
+        [ -n "$account_smtp_host" ] || account_smtp_host="$account_context_smtp_host"
         account_smtp_port="''${MAIL_ACCOUNT_SMTP_PORT:-}"
-        [ -n "$account_smtp_port" ] || account_smtp_port="''${account_smtp_port_by_id[$account_id]:-}"
+        [ -n "$account_smtp_port" ] || account_smtp_port="$account_context_smtp_port"
 
         [ -n "$account_address" ]
       }
@@ -266,7 +535,9 @@ let
 
       while IFS= read -r entry; do
         [ -n "$entry" ] || continue
+        secret_name="''${entry%%=*}"
         mailbox_set_path="''${entry#*=}"
+        mailbox_set_id="$(secret_id_from_name "$secret_name")"
         [ -r "$mailbox_set_path" ] || continue
 
         unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS MAILBOX_MAIL_HOST MAILBOX_IMAP_HOST MAILBOX_SMTP_HOST MAILBOX_IMAP_PORT MAILBOX_SMTP_PORT
@@ -280,18 +551,23 @@ let
           account_domain_by_id["$account_id"]="''${MAILBOX_DOMAIN:-}"
           account_smtp_host_by_id["$account_id"]="$mailbox_smtp_host"
           account_smtp_port_by_id["$account_id"]="''${MAILBOX_SMTP_PORT:-}"
+          account_domain_by_context["$mailbox_set_id/$account_id"]="''${MAILBOX_DOMAIN:-}"
+          account_smtp_host_by_context["$mailbox_set_id/$account_id"]="$mailbox_smtp_host"
+          account_smtp_port_by_context["$mailbox_set_id/$account_id"]="''${MAILBOX_SMTP_PORT:-}"
         done
       done < "$mailbox_set_env_path_list"
 
       public_account="''${WEB_PUBLIC_CONTACT_ACCOUNT:-''${WEB_CONTACT_ACCOUNT:-}}"
       form_account="''${WEB_FORM_ACCOUNT:-''${WEB_CONTACT_ACCOUNT:-}}"
+      public_mailbox_set="''${WEB_PUBLIC_CONTACT_MAILBOX_SET:-''${WEB_CONTACT_MAILBOX_SET:-}}"
+      form_mailbox_set="''${WEB_FORM_MAILBOX_SET:-''${WEB_CONTACT_MAILBOX_SET:-}}"
 
-      if [ -n "$public_account" ] && load_account_context "$public_account"; then
+      if [ -n "$public_account" ] && load_account_context "$public_account" "$public_mailbox_set"; then
         [ -n "''${WEB_CONTACT_EMAIL:-}" ] || WEB_CONTACT_EMAIL="$account_address"
         [ -n "''${WEB_SITE_DOMAIN:-}" ] || WEB_SITE_DOMAIN="$account_domain"
       fi
 
-      if [ -n "$form_account" ] && load_account_context "$form_account"; then
+      if [ -n "$form_account" ] && load_account_context "$form_account" "$form_mailbox_set"; then
         [ -n "''${CONTACT_FROM:-}" ] || CONTACT_FROM="$account_address"
         [ -n "''${SMTP_HOST:-}" ] || SMTP_HOST="$account_smtp_host"
         [ -n "''${SMTP_PORT:-}" ] || SMTP_PORT="$account_smtp_port"
@@ -325,11 +601,18 @@ let
       tmp="$(mktemp "$runtime_dir/env.XXXXXX")"
       cat "$base_env" > "$tmp"
       {
+        printf '\n# Redirects rendered from web/redirects/env.\n'
+        cat "$redirect_env"
+      } >> "$tmp"
+      {
         printf '\n# Derived from web/contact/env and generic mailbox secrets.\n'
         for name in \
           WEB_SITE_NAME \
           WEB_SITE_DOMAIN \
           WEB_SITE_URL \
+          WEB_HOST_DEFAULT_PATHS \
+          WEB_REDIRECT_DOMAINS \
+          WEB_REDIRECT_STATUS \
           WEB_REDIRECT_TARGET_URL \
           WEB_CONTACT_EMAIL \
           CONTACT_BRAND \
@@ -347,6 +630,31 @@ let
       chown nginx:nginx "$tmp"
       chmod 0440 "$tmp"
       mv "$tmp" "$rendered_env"
+
+      security_contact="''${WEB_SECURITY_CONTACT_EMAIL:-''${WEB_CONTACT_EMAIL:-}}"
+      security_site_url="''${WEB_SECURITY_SITE_URL:-''${WEB_SITE_URL:-}}"
+      if [ -n "$security_contact" ] && [ -n "$security_site_url" ]; then
+        security_dir="$public_dir/.well-known"
+        security_path="$security_dir/security.txt"
+        security_legacy_path="$public_dir/security.txt"
+        canonical="''${WEB_SECURITY_CANONICAL_URL:-''${security_site_url%/}/.well-known/security.txt}"
+        expires="$(date -u -d "''${WEB_SECURITY_EXPIRES_AFTER:-+180 days}" '+%Y-%m-%dT%H:%M:%SZ')"
+
+        install -d -m 0755 -o nginx -g nginx "$security_dir"
+        tmp_security="$(mktemp "$security_dir/security.txt.XXXXXX")"
+        {
+          printf 'Contact: mailto:%s\n' "$security_contact"
+          printf 'Expires: %s\n' "$expires"
+          printf 'Preferred-Languages: nl, en\n'
+          printf 'Canonical: %s\n' "$canonical"
+        } > "$tmp_security"
+        chown nginx:nginx "$tmp_security"
+        chmod 0644 "$tmp_security"
+        mv "$tmp_security" "$security_path"
+        cp "$security_path" "$security_legacy_path"
+        chown nginx:nginx "$security_legacy_path"
+        chmod 0644 "$security_legacy_path"
+      fi
     '';
   };
 
@@ -426,6 +734,8 @@ let
         --exclude='.git/' \
         --filter='protect .env' \
         --filter='protect .env.*' \
+        --filter='protect webpagina/.well-known/***' \
+        --filter='protect webpagina/security.txt' \
         "$src/" "$dst/"
 
       chmod 0755 "$dst/run-server.py" "$dst/start-page.sh"
@@ -485,6 +795,19 @@ in
         ];
       };
 
+      "web/redirects/env" = {
+        sopsFile = runtimeSopsFile;
+        owner = "nginx";
+        group = "nginx";
+        mode = "0440";
+        restartUnits = [
+          nginxRuntimeConfigUnit
+          "nginx.service"
+          webpageEnvUnit
+          webpageUnit
+        ];
+      };
+
       "web/preview/username" = {
         sopsFile = runtimeSopsFile;
         owner = "nginx";
@@ -514,6 +837,9 @@ in
           value = {
             inherit (secret) key sopsFile;
             restartUnits = [
+              certMailUnit
+              nginxRuntimeConfigUnit
+              "nginx.service"
               webpageEnvUnit
               webpageUnit
             ];
@@ -554,7 +880,10 @@ in
       nginxHttpConfPath
       nginxPreviewUsernamePath
       nginxPreviewPasswordPath
-    ];
+      webRedirectEnvPath
+      mailTlsFullchainPath
+      mailTlsKeyPath
+    ] + waitForReadableFiles "nginx runtime mailbox sets" mailboxSetEnvPaths;
     script = "${lib.getExe prepareNginxRuntime}";
   };
 
@@ -593,6 +922,7 @@ in
     preStart = waitForReadableFiles "webpage env" (
       [
         webContactEnvPath
+        webRedirectEnvPath
       ]
       ++ mailboxSetEnvPaths
       ++ mailAccountEnvPaths
@@ -647,7 +977,13 @@ in
     recommendedProxySettings = true;
     recommendedTlsSettings = true;
     appendHttpConfig = ''
-      auth_basic "preview";
+      map $uri $s_gamma_preview_realm {
+        default "preview";
+        /.well-known/security.txt off;
+        /security.txt off;
+      }
+
+      auth_basic $s_gamma_preview_realm;
       auth_basic_user_file ${nginxHtpasswdPath};
 
       include ${nginxRenderedHttpConfPath};
@@ -669,6 +1005,7 @@ in
     ];
     preStart = lib.mkBefore (waitForReadableFiles "nginx" [
       nginxRenderedHttpConfPath
+      nginxGeneratedMailboxConfPath
       nginxHtpasswdPath
     ]);
     serviceConfig.TimeoutStartSec = "5min";

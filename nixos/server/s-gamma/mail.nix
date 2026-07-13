@@ -1,4 +1,9 @@
-{ config, outPath, profiles, ... }:
+{ config, lib, mailboxSets ? null, outPath, profiles, ... }:
+
+let
+  hasMultipleMailboxSets =
+    mailboxSets != null && lib.length mailboxSets.mailboxSetNames > 1;
+in
 
 {
   imports = [
@@ -9,7 +14,7 @@
     enable = true;
     sopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
     sharedNamespacePrefix = "s";
-    sharedNamespaceIncludeDomain = false;
+    sharedNamespaceIncludeDomain = hasMultipleMailboxSets;
 
     networkAddress.unit = "${config.networking.hostName}-network-addresses.service";
 

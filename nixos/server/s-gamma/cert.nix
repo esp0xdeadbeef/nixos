@@ -1,4 +1,10 @@
-{ config, lib, name, pkgs, ... }:
+{ config
+, lib
+, mailboxSets ? null
+, name
+, pkgs
+, ...
+}:
 let
   hostName = name;
   networkAddressesUnit = "${hostName}-network-addresses.service";
@@ -13,6 +19,19 @@ let
   mailEnvPath = config.sops.secrets."mail/server/env".path;
   mailTlsFullchainPath = config.sGamma.certs.mail.fullchainPath;
   mailTlsKeyPath = config.sGamma.certs.mail.keyPath;
+  emptyMailboxPathList = pkgs.writeText "${hostName}-cert-empty-mailbox-env-paths" "";
+  mailboxSetEnvPathsConfig =
+    if mailboxSets == null then {
+      pathList = emptyMailboxPathList;
+      paths = [ ];
+    } else
+      mailboxSets.mkEnvPaths {
+        inherit config lib pkgs;
+        name = "${hostName}-cert-mailbox-set-env-paths";
+        secretRefs = mailboxSets.mailboxSetEnvSecretRefs;
+      };
+  mailboxSetEnvPathList = mailboxSetEnvPathsConfig.pathList;
+  mailboxSetEnvPaths = mailboxSetEnvPathsConfig.paths;
 
   waitForReadableFiles = label: paths: ''
     for path in ${lib.concatMapStringsSep " " lib.escapeShellArg paths}; do
@@ -28,6 +47,7 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.gnugrep
+      pkgs.gnused
       pkgs.lego
       pkgs.openssl
       pkgs.systemd
@@ -41,6 +61,7 @@ let
       runtime_key=${lib.escapeShellArg mailTlsKeyPath}
       acme_dir=${lib.escapeShellArg mailAcmeDir}
       lego_dir=${lib.escapeShellArg mailAcmeLegoDir}
+      mailbox_set_env_path_list=${lib.escapeShellArg mailboxSetEnvPathList}
 
       if [ ! -r "$env_file" ]; then
         echo "mail certificate env is missing: $env_file" >&2
@@ -67,23 +88,62 @@ let
       require_env MAIL_FQDN
 
       acme_email="''${MAIL_ACME_EMAIL:-postmaster@$MAIL_FQDN}"
-      domains_raw="''${MAIL_TLS_DOMAINS:-$MAIL_FQDN}"
 
       primary_domain=""
+      domain_names=()
       domain_args=()
-      for domain in $(words "$domains_raw"); do
-        [ -n "$domain" ] || continue
+
+      add_domain() {
+        local domain="$1"
+        local existing
+
+        [ -n "$domain" ] || return 0
         case "$domain" in
           *[!A-Za-z0-9.-]* | .* | *..* | *.)
             echo "invalid mail TLS domain: $domain" >&2
             exit 1
             ;;
         esac
+
+        for existing in "''${domain_names[@]}"; do
+          if [ "$existing" = "$domain" ]; then
+            return 0
+          fi
+        done
+
         if [ -z "$primary_domain" ]; then
           primary_domain="$domain"
         fi
+        domain_names+=("$domain")
         domain_args+=(--domains "$domain")
+      }
+
+      add_domain "$MAIL_FQDN"
+
+      for domain in $(words "''${MAIL_TLS_DOMAINS:-}"); do
+        add_domain "$domain"
       done
+
+      while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        mailbox_set_path="''${entry#*=}"
+        [ -r "$mailbox_set_path" ] || continue
+
+        unset MAILBOX_DOMAIN MAILBOX_MAIL_HOST
+        set -a
+        # shellcheck disable=SC1090
+        . "$mailbox_set_path"
+        set +a
+
+        mailbox_domain="''${MAILBOX_DOMAIN:-}"
+        [ -n "$mailbox_domain" ] || continue
+
+        mailbox_mail_host="''${MAILBOX_MAIL_HOST:-mail.$mailbox_domain}"
+        add_domain "$mailbox_mail_host"
+        add_domain "imap.$mailbox_domain"
+        add_domain "$mailbox_domain"
+        add_domain "www.$mailbox_domain"
+      done < "$mailbox_set_env_path_list"
 
       if [ -z "$primary_domain" ]; then
         echo "MAIL_TLS_DOMAINS resolved to an empty domain list" >&2
@@ -104,6 +164,16 @@ let
         needs_renew=1
       elif ! openssl x509 -checkend 2592000 -noout -in "$persistent_fullchain" >/dev/null 2>&1; then
         needs_renew=1
+      else
+        for domain in "''${domain_names[@]}"; do
+          if ! openssl x509 -in "$persistent_fullchain" -noout -ext subjectAltName \
+            | tr ',' '\n' \
+            | sed 's/^[[:space:]]*//' \
+            | grep -Fx "DNS:$domain" >/dev/null; then
+            needs_renew=1
+            break
+          fi
+        done
       fi
 
       if [ "$needs_renew" -eq 1 ]; then
@@ -128,7 +198,11 @@ let
             --http \
             --http.port ":80" \
             "''${domain_args[@]}" \
-            renew --days 30 || lego \
+            renew \
+            --days 99999 \
+            --ari-disable \
+            --no-random-sleep \
+            --force-cert-domains || lego \
             --path "$lego_dir" \
             --accept-tos \
             --email "$acme_email" \
@@ -208,9 +282,30 @@ in
   };
 
   config = {
-    sops.secrets."mail/server/env".restartUnits = [
-      certMailUnit
-    ];
+    sops.secrets =
+      {
+        "mail/server/env".restartUnits = [
+          certMailUnit
+        ];
+      }
+      // builtins.listToAttrs (
+        map
+          (secret: {
+            inherit (secret) name;
+            value = {
+              inherit (secret) key sopsFile;
+              restartUnits = [
+                certMailUnit
+              ];
+            };
+          })
+          (
+            if mailboxSets == null then
+              [ ]
+            else
+              mailboxSets.mailboxSetEnvSecretRefs
+          )
+      );
 
     systemd.tmpfiles.rules = [
       "d ${runtimeRoot} 0755 root root -"
@@ -239,7 +334,7 @@ in
       };
       preStart = waitForReadableFiles "mail certificate" [
         mailEnvPath
-      ];
+      ] + waitForReadableFiles "mail certificate mailbox sets" mailboxSetEnvPaths;
       script = "${lib.getExe renewMailCertificate}";
     };
 
