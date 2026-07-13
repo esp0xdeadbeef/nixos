@@ -266,8 +266,13 @@ shared only to client mail accounts in the same hosted mailbox set/domain.
 `MAIL_SHARED_*` entries may add explicit same-domain ACLs from SOPS, but they
 are not needed for normal account-to-client sharing. The
 `<host>-mail-shared-subscriptions` unit refreshes the Dovecot sharing map,
-subscribes users to same-domain visible shared mailboxes, and rebuilds the
-Postfix sender-login map for ACL entries with the `post` right.
+subscribes users to explicitly managed same-domain shared mailbox roots, and
+rebuilds the Postfix sender-login map for ACL entries with the `post` right.
+s-gamma uses the short shared namespace layout, so client-visible shared
+mailboxes look like `s/contact`. Set
+`profiles.mail.server.sharedNamespaceIncludeDomain = true` for deployments that
+need disambiguation across multiple shared domain listings, yielding
+`s/example.com/contact`.
 
 Mail certificate hostnames are SOPS-driven. Set `MAIL_TLS_DOMAINS` in the mail
 server env secret when the mail certificate needs more names than `MAIL_FQDN`.

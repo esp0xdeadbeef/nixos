@@ -391,6 +391,7 @@ let
       mail_account_env_path_list=${lib.escapeShellArg mailAccountEnvPathList}
       shared_sender_logins=${lib.escapeShellArg sharedSenderLoginMap}
       shared_namespace_prefix=${lib.escapeShellArg cfg.sharedNamespacePrefix}
+      shared_namespace_include_domain=${lib.escapeShellArg (if cfg.sharedNamespaceIncludeDomain then "1" else "0")}
       vmail_root=/var/vmail
       shared_sender_logins_raw="$shared_sender_logins.raw"
       trap 'rm -f "$shared_sender_logins_raw"' EXIT
@@ -549,14 +550,18 @@ let
         fi
 
         if [ -n "$shared_namespace_prefix" ]; then
-          owner_prefix="$shared_namespace_prefix/$owner_domain/$owner_local"
+          if [ "$shared_namespace_include_domain" = "1" ]; then
+            owner_prefix="$shared_namespace_prefix/$owner_domain/$owner_local"
+          else
+            owner_prefix="$shared_namespace_prefix/$owner_local"
+          fi
         else
           owner_prefix="$owner_domain/$owner_local"
         fi
 
         case "$mailbox" in
           ""|INBOX)
-            printf '%s/INBOX\n' "$owner_prefix"
+            printf '%s\n' "$owner_prefix"
             ;;
           INBOX/*)
             printf '%s/%s\n' "$owner_prefix" "''${mailbox#INBOX/}"
@@ -813,39 +818,6 @@ let
         doveadm mailbox subscribe -u "$user" "$mailbox" >/dev/null
       }
 
-      sync_visible_shared_subscriptions() {
-        local user
-        local user_domain
-        local visible_mailbox
-
-        [ -n "$shared_namespace_prefix" ] || return 0
-
-        for user in "''${client_users[@]}"; do
-          if ! doveadm user "$user" >/dev/null 2>&1; then
-            continue
-          fi
-
-          user_domain="''${user#*@}"
-          if [ -z "$user_domain" ] || [ "$user_domain" = "$user" ]; then
-            continue
-          fi
-
-          while IFS= read -r visible_mailbox; do
-            [ -n "$visible_mailbox" ] || continue
-
-            case "$visible_mailbox" in
-              "$shared_namespace_prefix/$user_domain"/*)
-                if subscribe_user "$user" "$visible_mailbox"; then
-                  subscribed=$((subscribed + 1))
-                else
-                  failed=$((failed + 1))
-                fi
-                ;;
-            esac
-          done < <(doveadm mailbox list -u "$user")
-        done
-      }
-
       subscribed=0
       failed=0
       : > "$shared_sender_logins_raw"
@@ -854,7 +826,6 @@ let
       clear_managed_subscriptions
       sync_automatic_account_mailboxes
       sync_declared_shared_mailboxes
-      sync_visible_shared_subscriptions
 
       awk '
         {
@@ -1129,6 +1100,12 @@ in
       type = lib.types.str;
       default = "s";
       description = "Visible IMAP shared namespace prefix.";
+    };
+
+    sharedNamespaceIncludeDomain = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether shared mailbox names include the owner domain, yielding s/example.com/name instead of s/name.";
     };
 
     networkAddress = {
@@ -1477,7 +1454,7 @@ in
         mail_plugins.acl = true;
         mailbox_list_layout = "Maildir++";
         mail_shared_explicit_inbox = false;
-        acl_defaults_from_inbox = true;
+        acl_defaults_from_inbox = false;
         acl_driver = "vfile";
 
         "acl_sharing_map"."dict file".path = "/var/lib/dovecot/db/shared-mailboxes.db";
@@ -1509,8 +1486,10 @@ in
         "namespace shared" = {
           type = "shared";
           separator = "/";
-          prefix = "${cfg.sharedNamespacePrefix}/$domain/$username/";
-          list = "yes";
+          prefix = "${cfg.sharedNamespacePrefix}/"
+            + lib.optionalString cfg.sharedNamespaceIncludeDomain "$domain/"
+            + "$username/";
+          list = "children";
           subscriptions = false;
           mail_driver = "maildir";
           mail_path = "/var/vmail/%{owner_user | domain}/%{owner_user | username}/mail";

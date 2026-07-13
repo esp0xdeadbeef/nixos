@@ -9,6 +9,7 @@
     enable = true;
     sopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
     sharedNamespacePrefix = "s";
+    sharedNamespaceIncludeDomain = false;
 
     networkAddress.unit = "${config.networking.hostName}-network-addresses.service";
 
