@@ -24,11 +24,13 @@ in
 
   sops.secrets.pppoe-username = { };
   sops.secrets.pppoe-password = { };
+  sops.secrets.s-nebula-container-mac = { };
 
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./kea-legacy-lease-paths.nix
     ./vlan2-kea-reservations-override.nix
+    ./vlan3-kea-reservations-override.nix
     ./legacy-parity-contract.nix
 
     (import ./renderers.nix {

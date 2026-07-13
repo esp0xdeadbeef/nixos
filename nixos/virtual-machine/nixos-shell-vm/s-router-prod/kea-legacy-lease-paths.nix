@@ -3,6 +3,7 @@
 let
   vlanContainers = {
     access-vlan2 = "vlan2";
+    access-vlan3 = "vlan3";
     access-vlan7 = "vlan7";
   };
 

@@ -49,7 +49,8 @@ let
     , bridge
     , interfaceName
     , addr4
-    , addr6
+    , addr6 ? null
+    , ipv6Ra ? null
     ,
     }:
     {
@@ -57,8 +58,10 @@ let
       attach = bridgeAttach bridge;
       interface = {
         name = interfaceName;
-        inherit addr4 addr6;
-      };
+        inherit addr4;
+      }
+      // (if addr6 == null then { } else { inherit addr6; })
+      // (if ipv6Ra == null then { } else { inherit ipv6Ra; });
     };
 
   mkNode =
@@ -86,6 +89,26 @@ let
     ];
     outgoingInterfaces = [ address ];
     roles.recursion.outgoingInterfaces = [ address ];
+  };
+
+  localDns = records: {
+    forwarders = [ ];
+    outgoingInterfaces = [ ];
+    roles.recursion.outgoingInterfaces = [ ];
+    localZones = [
+      {
+        name = "lan.";
+        type = "static";
+      }
+    ];
+    localRecords = records;
+    upstreamResolvers = [
+      {
+        dst = "192.168.3.1";
+        scope = "local-access";
+        source = "router-self";
+      }
+    ];
   };
 
   dhcp4Advertisement =
@@ -124,9 +147,12 @@ let
   upstreamPolicyVlan2Link = "p2p-policy-upstream-selector--access-access-vlan2--uplink-wan";
   upstreamPolicyVlan7Link = "p2p-policy-upstream-selector--access-access-vlan7--uplink-wan";
   policyDownstreamVlan2Link = "p2p-downstream-selector-policy--access-access-vlan2";
+  policyDownstreamVlan3Link = "p2p-downstream-selector-policy--access-access-vlan3";
   policyDownstreamVlan7Link = "p2p-downstream-selector-policy--access-access-vlan7";
   downstreamAccessVlan2Link = "p2p-access-vlan2-downstream-selector";
+  downstreamAccessVlan3Link = "p2p-access-vlan3-downstream-selector";
   downstreamAccessVlan7Link = "p2p-access-vlan7-downstream-selector";
+  sNebulaContainerAddress = "192.168.3.10";
 
   core =
     (mkNode "core" {
@@ -234,6 +260,13 @@ let
       interfaceName = "downstream-vlan2";
     };
 
+    downstream-vlan3 = p2pPort {
+      link = policyDownstreamVlan3Link;
+      adapterName = "prod-85d312b436f1";
+      bridge = "rt-policy-downstream-vlan3";
+      interfaceName = "downstream-vlan3";
+    };
+
     downstream-vlan7 = p2pPort {
       link = policyDownstreamVlan7Link;
       adapterName = "prod-750978245400";
@@ -250,6 +283,13 @@ let
       interfaceName = "policy-vlan2";
     };
 
+    policy-vlan3 = p2pPort {
+      link = policyDownstreamVlan3Link;
+      adapterName = "prod-405ce986d1bb";
+      bridge = "rt-policy-downstream-vlan3";
+      interfaceName = "policy-vlan3";
+    };
+
     policy-vlan7 = p2pPort {
       link = policyDownstreamVlan7Link;
       adapterName = "prod-61b06694fc25";
@@ -262,6 +302,13 @@ let
       adapterName = "prod-540264d3608b";
       bridge = "rt-downstream-access-vlan2";
       interfaceName = "access-vlan2";
+    };
+
+    access-vlan3 = p2pPort {
+      link = downstreamAccessVlan3Link;
+      adapterName = "prod-35d943f82599";
+      bridge = "rt-downstream-access-vlan3";
+      interfaceName = "access-vlan3";
     };
 
     access-vlan7 = p2pPort {
@@ -310,6 +357,53 @@ let
 
         ipv6Ra = {
           tenant-vlan2 = disabledRa "tenant-vlan2";
+        };
+      };
+    };
+
+  accessVlan3 =
+    (mkNode "access-vlan3" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessVlan3Link;
+        adapterName = "prod-2097f33d7a15";
+        bridge = "rt-downstream-access-vlan3";
+        interfaceName = "access-vlan3";
+      };
+
+      tenant-vlan3 = tenantPort {
+        logicalInterface = "tenant-vlan3";
+        bridge = "lan3";
+        interfaceName = "lan3";
+        addr4 = "192.168.3.1/24";
+        addr6 = "fd42:dead:beef:3::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = localDns [
+          {
+            name = "s-nebula-container.lan.";
+            a = [ sNebulaContainerAddress ];
+          }
+        ];
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-vlan3 = dhcp4Advertisement {
+            tenant = "vlan3";
+            interface = "tenant-vlan3";
+            subnet = "192.168.3.0/24";
+            poolStart = "192.168.3.100";
+            poolEnd = "192.168.3.200";
+            router = "192.168.3.1";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-vlan3 = disabledRa "tenant-vlan3";
         };
       };
     };
@@ -365,6 +459,11 @@ in
       ipv6 = [ "fd42:1::1" ];
     };
 
+    vlan3-dns = {
+      ipv4 = [ "192.168.3.1" ];
+      ipv6 = [ ];
+    };
+
     vlan7-dns = {
       ipv4 = [ "192.168.2.1" ];
       ipv6 = [ "fd42:dead:beef:7::1" ];
@@ -414,6 +513,12 @@ in
             parentUplink = "trunk";
           };
 
+          lan3 = {
+            name = "lan3";
+            vlan = 3;
+            parentUplink = "trunk";
+          };
+
           lan7 = {
             name = "lan7";
             vlan = 7;
@@ -424,8 +529,10 @@ in
         bridgeNetworks = {
           rt-core-upstream-selector = { };
           rt-downstream-access-vlan2 = { };
+          rt-downstream-access-vlan3 = { };
           rt-downstream-access-vlan7 = { };
           rt-policy-downstream-vlan2 = { };
+          rt-policy-downstream-vlan3 = { };
           rt-policy-downstream-vlan7 = { };
           rt-upstream-policy-vlan2 = { };
           rt-upstream-policy-vlan7 = { };
@@ -442,6 +549,7 @@ in
       ${nodeName "policy"} = policy;
       ${nodeName "downstream-selector"} = downstreamSelector;
       ${nodeName "access-vlan2"} = accessVlan2;
+      ${nodeName "access-vlan3"} = accessVlan3;
       ${nodeName "access-vlan7"} = accessVlan7;
     };
   };
@@ -468,6 +576,10 @@ in
       };
 
       access-vlan2 = {
+        deploymentHost = prodHost;
+      };
+
+      access-vlan3 = {
         deploymentHost = prodHost;
       };
 

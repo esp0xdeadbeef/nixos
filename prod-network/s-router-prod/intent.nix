@@ -104,6 +104,11 @@ in
         }
         {
           kind = "tenant";
+          name = "vlan3";
+          ipv4 = "192.168.3.0/24";
+        }
+        {
+          kind = "tenant";
           name = "vlan7";
           ipv4 = "192.168.2.0/24";
           ipv6 = "fd42:dead:beef:7::/64";
@@ -117,6 +122,13 @@ in
           tenant = "vlan2";
           ipv4 = [ "192.168.1.1" ];
           ipv6 = [ "fd42:1::1" ];
+        }
+        {
+          kind = "host";
+          name = "vlan3-dns";
+          tenant = "vlan3";
+          ipv4 = [ "192.168.3.1" ];
+          ipv6 = [ ];
         }
         {
           kind = "host";
@@ -134,6 +146,11 @@ in
         {
           name = "vlan2-dns";
           providers = [ "vlan2-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "vlan3-dns";
+          providers = [ "vlan3-dns" ];
           trafficType = "dns";
         }
         {
@@ -167,6 +184,20 @@ in
           to = {
             kind = "service";
             name = "vlan7-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+        }
+        {
+          id = "allow-vlan3-to-vlan3-dns";
+          priority = 82;
+          from = {
+            kind = "tenant";
+            name = "vlan3";
+          };
+          to = {
+            kind = "service";
+            name = "vlan3-dns";
           };
           trafficType = "dns";
           action = "allow";
@@ -207,9 +238,11 @@ in
 
       interfaceTags = {
         tenant-vlan2 = "vlan2";
+        tenant-vlan3 = "vlan3";
         tenant-vlan7 = "vlan7";
         external-wan = "wan";
         service-vlan2-dns = "vlan2-dns";
+        service-vlan3-dns = "vlan3-dns";
         service-vlan7-dns = "vlan7-dns";
       };
     };
@@ -249,6 +282,16 @@ in
           ];
         };
 
+        access-vlan3 = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "vlan3";
+            }
+          ];
+        };
+
         access-vlan7 = {
           role = "access";
           attachments = [
@@ -276,6 +319,10 @@ in
         [
           "downstream-selector"
           "access-vlan2"
+        ]
+        [
+          "downstream-selector"
+          "access-vlan3"
         ]
         [
           "downstream-selector"

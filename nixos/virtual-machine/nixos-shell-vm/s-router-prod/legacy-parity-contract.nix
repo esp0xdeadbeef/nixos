@@ -8,6 +8,7 @@ let
   ];
 
   expectedContainers = [
+    "access-vlan3"
     "access-vlan2"
     "access-vlan7"
     "core"
@@ -64,6 +65,17 @@ let
     && builtins.elem "/run/unbound/s-router-prod-vlan2-local.conf" (server.include or [ ])
     && builtins.hasAttr "gen-s-router-prod-vlan2-unbound-local-data"
       config.containers.access-vlan2.config.systemd.services;
+
+  hasVlan3LocalDns =
+    let
+      server = unboundServerFor "access-vlan3";
+    in
+    builtins.elem "lan. static" (server."local-zone" or [ ])
+    && builtins.elem ''"s-nebula-container.lan. IN A 192.168.3.10"'' (server."local-data" or [ ]);
+
+  hasNoVlan3DnsUpstream =
+    unboundForwardersFor "access-vlan3" == [ ]
+    && !(lib.hasInfix "nft add rule inet router output" (dnsNftScriptFor "access-vlan3"));
 
   dnsNftScriptFor =
     containerName:
@@ -123,7 +135,20 @@ let
           (hook: lib.hasInfix "rewrite-kea-${vlanName}-lease-path" (toString hook))
           postHooks;
     in
-    hasContainer "access-vlan2" "vlan2" && hasContainer "access-vlan7" "vlan7";
+    hasContainer "access-vlan2" "vlan2"
+    && hasContainer "access-vlan3" "vlan3"
+    && hasContainer "access-vlan7" "vlan7";
+
+  hasVlan3SecretReservation =
+    let
+      postHooks = execStartPostList (
+        (keaGenServiceFor "access-vlan3" "vlan3").serviceConfig.ExecStartPost or null
+      );
+    in
+    config.sops.secrets ? s-nebula-container-mac
+    && builtins.any
+      (hook: lib.hasInfix "apply-s-router-prod-vlan3-kea-reservation" (toString hook))
+      postHooks;
 in
 {
   assertions = [
@@ -176,9 +201,12 @@ in
       '';
     }
     {
-      assertion = builtins.elem "lan2" netdevBridgeNames && builtins.elem "lan7" netdevBridgeNames;
+      assertion =
+        builtins.elem "lan2" netdevBridgeNames
+        && builtins.elem "lan3" netdevBridgeNames
+        && builtins.elem "lan7" netdevBridgeNames;
       message = ''
-        s-router-prod must render the legacy client VLAN bridges lan2 and lan7 from inventory.
+        s-router-prod must render the client VLAN bridges lan2, lan3, and lan7 from inventory.
       '';
     }
     {
@@ -200,10 +228,11 @@ in
       assertion =
         config.sops.secrets ? pppoe-username
         && config.sops.secrets ? pppoe-password
-        && config.sops.secrets ? s-router-prod-vlan2-reservations-json;
+        && config.sops.secrets ? s-router-prod-vlan2-reservations-json
+        && config.sops.secrets ? s-nebula-container-mac;
       message = ''
-        s-router-prod must keep PPPoE credentials and VLAN 2 reservations wired as
-        runtime secrets, not rendered model data.
+        s-router-prod must keep PPPoE credentials, VLAN 2 reservations, and the
+        s-nebula-container MAC wired as runtime secrets, not rendered model data.
       '';
     }
     {
@@ -230,6 +259,21 @@ in
       message = ''
         s-router-prod must render DNS service egress from the local gateway source
         addresses, matching the FS-540-HDS-010-SDS-010-SMS-045 intent pattern.
+      '';
+    }
+    {
+      assertion = hasVlan3LocalDns && hasNoVlan3DnsUpstream;
+      message = ''
+        s-router-prod VLAN 3 must expose only local DMZ DNS data for
+        s-nebula-container and must not render DNS upstream egress.
+      '';
+    }
+    {
+      assertion = hasVlan3SecretReservation;
+      message = ''
+        s-router-prod VLAN 3 must apply the s-nebula-container DHCP reservation
+        from a runtime MAC secret instead of rendering the MAC into inventory or
+        the Nix store.
       '';
     }
     {
