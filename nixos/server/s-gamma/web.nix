@@ -583,7 +583,10 @@ let
       if [ -z "''${WEB_SITE_URL:-}" ] && [ -n "''${WEB_SITE_DOMAIN:-}" ]; then
         WEB_SITE_URL="https://$WEB_SITE_DOMAIN"
       fi
-      [ -n "''${CONTACT_SITE_URL:-}" ] || CONTACT_SITE_URL="''${WEB_SITE_URL:-}"
+      if [ -n "''${WEB_SITE_URL:-}" ]; then
+        # shellcheck disable=SC2034
+        CONTACT_SITE_URL="$WEB_SITE_URL"
+      fi
       [ -n "''${WEB_REDIRECT_TARGET_URL:-}" ] || WEB_REDIRECT_TARGET_URL="''${WEB_SITE_URL:-/}"
 
       quote_env() {
