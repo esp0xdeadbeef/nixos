@@ -69,6 +69,8 @@ creation_rules:
     encrypted_regex: ".*"
     key_groups:
       - age:
+          - *l-portal-root
+          - *l-portal-deadbeef
           - *l-envil-root
           - *l-envil-deadbeef
           - *l-esp-root

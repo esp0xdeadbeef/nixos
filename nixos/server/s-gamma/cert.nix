@@ -17,6 +17,7 @@ let
   mailAcmeLegoDir = "${mailAcmeDir}/lego";
 
   mailEnvPath = config.sops.secrets."mail/server/env".path;
+  networkAddressEnvPath = config.sops.secrets."network/address_env".path;
   mailTlsFullchainPath = config.sGamma.certs.mail.fullchainPath;
   mailTlsKeyPath = config.sGamma.certs.mail.keyPath;
   emptyMailboxPathList = pkgs.writeText "${hostName}-cert-empty-mailbox-env-paths" "";
@@ -46,6 +47,7 @@ let
     name = "${hostName}-renew-mail-certificate";
     runtimeInputs = [
       pkgs.coreutils
+      pkgs.dnsutils
       pkgs.gnugrep
       pkgs.gnused
       pkgs.lego
@@ -56,6 +58,7 @@ let
       set -euo pipefail
 
       env_file=${lib.escapeShellArg mailEnvPath}
+      network_env_file=${lib.escapeShellArg networkAddressEnvPath}
       runtime_dir=${lib.escapeShellArg mailTlsRuntimeDir}
       runtime_fullchain=${lib.escapeShellArg mailTlsFullchainPath}
       runtime_key=${lib.escapeShellArg mailTlsKeyPath}
@@ -73,6 +76,11 @@ let
       . "$env_file"
       set +a
 
+      set -a
+      # shellcheck disable=SC1090
+      . "$network_env_file"
+      set +a
+
       require_env() {
         name="$1"
         if [ -z "$(printenv "$name" || true)" ]; then
@@ -86,6 +94,8 @@ let
       }
 
       require_env MAIL_FQDN
+      require_env PUBLIC_IPV4
+      require_env WEB_IPV6
 
       acme_email="''${MAIL_ACME_EMAIL:-postmaster@$MAIL_FQDN}"
 
@@ -118,6 +128,38 @@ let
         domain_args+=(--domains "$domain")
       }
 
+      domain_resolves_to_host() {
+        local domain="$1"
+        local resolver
+        local dig_args
+
+        for resolver in "" "@1.1.1.1" "@8.8.8.8" "@9.9.9.9"; do
+          dig_args=()
+          if [ -n "$resolver" ]; then
+            dig_args+=("$resolver")
+          fi
+
+          if dig +short "''${dig_args[@]}" "$domain" A | grep -Fx "$PUBLIC_IPV4" >/dev/null; then
+            return 0
+          fi
+
+          if dig +short "''${dig_args[@]}" "$domain" AAAA | grep -Fx "$WEB_IPV6" >/dev/null; then
+            return 0
+          fi
+        done
+
+        echo "mail certificate: skipping $domain until public DNS resolves to this host" >&2
+        return 1
+      }
+
+      add_optional_domain() {
+        local domain="$1"
+
+        if domain_resolves_to_host "$domain"; then
+          add_domain "$domain"
+        fi
+      }
+
       add_domain "$MAIL_FQDN"
 
       for domain in $(words "''${MAIL_TLS_DOMAINS:-}"); do
@@ -139,10 +181,10 @@ let
         [ -n "$mailbox_domain" ] || continue
 
         mailbox_mail_host="''${MAILBOX_MAIL_HOST:-mail.$mailbox_domain}"
-        add_domain "$mailbox_mail_host"
-        add_domain "imap.$mailbox_domain"
-        add_domain "$mailbox_domain"
-        add_domain "www.$mailbox_domain"
+        add_optional_domain "$mailbox_mail_host"
+        add_optional_domain "imap.$mailbox_domain"
+        add_optional_domain "$mailbox_domain"
+        add_optional_domain "www.$mailbox_domain"
       done < "$mailbox_set_env_path_list"
 
       if [ -z "$primary_domain" ]; then
@@ -159,25 +201,36 @@ let
       persistent_fullchain="$acme_dir/fullchain.pem"
       persistent_key="$acme_dir/key.pem"
 
-      needs_renew=0
-      if [ ! -s "$persistent_fullchain" ] || [ ! -s "$persistent_key" ]; then
-        needs_renew=1
-      elif ! openssl x509 -checkend 2592000 -noout -in "$persistent_fullchain" >/dev/null 2>&1; then
-        needs_renew=1
-      else
+      certificate_matches_request() {
+        local certificate="$1"
+        local domain
+
+        [ -s "$certificate" ] || return 1
+        openssl x509 -checkend 2592000 -noout -in "$certificate" >/dev/null 2>&1 || return 1
+
         for domain in "''${domain_names[@]}"; do
-          if ! openssl x509 -in "$persistent_fullchain" -noout -ext subjectAltName \
+          if ! openssl x509 -in "$certificate" -noout -ext subjectAltName \
             | tr ',' '\n' \
             | sed 's/^[[:space:]]*//' \
             | grep -Fx "DNS:$domain" >/dev/null; then
-            needs_renew=1
-            break
+            return 1
           fi
         done
+
+        return 0
+      }
+
+      needs_renew=0
+      was_nginx_active=0
+      if ! certificate_matches_request "$persistent_fullchain" || [ ! -s "$persistent_key" ]; then
+        needs_renew=1
+      fi
+
+      if [ "$needs_renew" -eq 1 ] && certificate_matches_request "$cert_crt" && [ -s "$cert_key" ]; then
+        needs_renew=0
       fi
 
       if [ "$needs_renew" -eq 1 ]; then
-        was_nginx_active=0
         if systemctl is-active --quiet nginx.service; then
           was_nginx_active=1
           systemctl stop nginx.service
@@ -220,12 +273,6 @@ let
             "''${domain_args[@]}" \
             run
         fi
-
-        if [ "$was_nginx_active" -eq 1 ]; then
-          systemctl start nginx.service
-          was_nginx_active=0
-        fi
-        trap - EXIT
       fi
 
       if [ ! -s "$cert_crt" ] || [ ! -s "$cert_key" ]; then
@@ -252,15 +299,23 @@ let
       install -m 0444 -o root -g root "$persistent_fullchain" "$runtime_fullchain"
       install -m 0400 -o root -g root "$persistent_key" "$runtime_key"
 
-      if id -g nginx >/dev/null 2>&1; then
-        chown root:nginx "$runtime_dir" "$runtime_fullchain" "$runtime_key"
-        chmod 0750 "$runtime_dir"
-        chmod 0640 "$runtime_fullchain" "$runtime_key"
-      fi
+      chown root:nginx "$runtime_dir" "$runtime_fullchain" "$runtime_key"
+      chmod 0750 "$runtime_dir"
+      chmod 0640 "$runtime_fullchain" "$runtime_key"
 
-      if systemctl is-active --quiet nginx.service; then
+      if [ "$was_nginx_active" -eq 1 ]; then
+        systemctl start nginx.service
+        was_nginx_active=0
+        trap - EXIT
+      elif systemctl is-active --quiet nginx.service; then
         systemctl --no-block try-reload-or-restart nginx.service || true
       fi
+
+      for mail_unit in postfix.service dovecot.service; do
+        if systemctl is-active --quiet "$mail_unit"; then
+          systemctl --no-block try-reload-or-restart "$mail_unit" || true
+        fi
+      done
     '';
   };
 in
@@ -310,7 +365,7 @@ in
     systemd.tmpfiles.rules = [
       "d ${runtimeRoot} 0755 root root -"
       "d ${runtimeRoot}/mail 0755 root root -"
-      "d ${mailTlsRuntimeDir} 0750 root root -"
+      "d ${mailTlsRuntimeDir} 0750 root nginx -"
       "d ${mailAcmeDir} 0700 root root -"
     ];
 
@@ -327,13 +382,13 @@ in
         "postfix.service"
         "dovecot.service"
       ];
-      requiredBy = [ mailRuntimeConfigUnit ];
       serviceConfig = {
         Type = "oneshot";
         TimeoutStartSec = "10min";
       };
       preStart = waitForReadableFiles "mail certificate" [
         mailEnvPath
+        networkAddressEnvPath
       ] + waitForReadableFiles "mail certificate mailbox sets" mailboxSetEnvPaths;
       script = "${lib.getExe renewMailCertificate}";
     };

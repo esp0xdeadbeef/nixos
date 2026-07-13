@@ -349,7 +349,9 @@ let
           www_domain="www.$domain"
           validate_domain "$www_domain"
 
-          if ! raw_has_server_name "$domain" \
+          if ! redirect_manages_domain "$domain" \
+            && ! redirect_manages_domain "$www_domain" \
+            && ! raw_has_server_name "$domain" \
             && ! raw_has_server_name "$www_domain"; then
             emit_web_domain "$domain" "$www_domain"
             remember_generated_domains "$domain" "$www_domain"
@@ -870,9 +872,7 @@ in
 
   systemd.services.${nginxRuntimeConfigService} = {
     description = "Prepare ${hostName} nginx runtime files from SOPS";
-    after = [ certMailUnit ];
     before = [ "nginx.service" ];
-    requires = [ certMailUnit ];
     requiredBy = [ "nginx.service" ];
     serviceConfig = {
       Type = "oneshot";
@@ -996,13 +996,11 @@ in
   systemd.services.nginx = {
     after = [
       networkAddressesUnit
-      certMailUnit
       nginxRuntimeConfigUnit
       webpageUnit
     ];
     requires = [
       networkAddressesUnit
-      certMailUnit
       nginxRuntimeConfigUnit
       webpageUnit
     ];
