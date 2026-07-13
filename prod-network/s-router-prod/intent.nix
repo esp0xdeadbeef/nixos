@@ -61,6 +61,22 @@ let
         }
       ];
     }
+
+    {
+      name = "nebula";
+      match = [
+        {
+          proto = "udp";
+          dports = [ 4242 ];
+          family = "any";
+        }
+        {
+          proto = "tcp";
+          dports = [ 4242 ];
+          family = "any";
+        }
+      ];
+    }
   ];
 
   allowTenantToWan =
@@ -132,6 +148,13 @@ in
         }
         {
           kind = "host";
+          name = "s-nebula-container";
+          tenant = "vlan3";
+          ipv4 = [ "192.168.3.10" ];
+          ipv6 = [ ];
+        }
+        {
+          kind = "host";
           name = "vlan7-dns";
           tenant = "vlan7";
           ipv4 = [ "192.168.2.1" ];
@@ -157,6 +180,11 @@ in
           name = "vlan7-dns";
           providers = [ "vlan7-dns" ];
           trafficType = "dns";
+        }
+        {
+          name = "s-nebula-container";
+          providers = [ "s-nebula-container" ];
+          trafficType = "nebula";
         }
       ];
       relations = [
@@ -203,6 +231,42 @@ in
           action = "allow";
         }
         {
+          id = "allow-wan-to-s-nebula-container";
+          priority = 95;
+          from = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          to = {
+            kind = "service";
+            name = "s-nebula-container";
+          };
+          trafficType = "nebula";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-nebula-container";
+            targetEndpoint = "s-nebula-container";
+            targetPort = 4242;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 4242;
+              }
+              {
+                protocol = "tcp";
+                publicPort = 4242;
+              }
+            ];
+          };
+        }
+        {
           id = "allow-vlan2-dns-to-wan";
           priority = 90;
           from = {
@@ -241,6 +305,7 @@ in
         tenant-vlan3 = "vlan3";
         tenant-vlan7 = "vlan7";
         external-wan = "wan";
+        service-s-nebula-container = "s-nebula-container";
         service-vlan2-dns = "vlan2-dns";
         service-vlan3-dns = "vlan3-dns";
         service-vlan7-dns = "vlan7-dns";
