@@ -206,10 +206,102 @@ This is simple, but it scales poorly because `library/01-general` is too broad.
 Every host that imports it gets desktop packages, virtualization packages, and
 other assumptions whether it needs them or not.
 
+It also makes cache behavior worse than necessary. `outPath` is currently based
+on `self.outPath`, so values like `"${outPath}/some/file.nix"` carry a reference
+to the whole flake source. That means unrelated repository changes can affect
+derivations or generated config that only need one module, patch, secret file, or
+model input.
+
 The README's generated importer command also hints at a previous approach where
 directory content determined imports automatically. That is fine during early
 personal config growth, but long term it makes review and rollback harder.
 Imports should become intentional API boundaries.
+
+### Add A Relative Repo Helper
+
+Do not try to make `outPath` itself relative. A value such as `"../../.."` is a
+string, not a Nix path literal, and Nix will not resolve it relative to the file
+that happens to use it. Replacing `outPath` with a function would also break
+existing `"${outPath}/..."` and `outPath + "/..."` call sites.
+
+Instead, add a new helper to `specialArgs`, tentatively named `relativeRepo`, and
+keep `outPath = self.outPath` as a legacy compatibility value until the migration
+is complete.
+
+The helper should be evaluated at the call site by passing `__curPos`. It can
+find the repository root by walking upward from `builtins.dirOf __curPos.file`
+until it finds `flake.nix`.
+
+Expose two separate operations:
+
+```nix
+relativeRepo.import __curPos "library/10-vms/nixos-shell-vm/host-config"
+relativeRepo.path __curPos "secrets/${config.networking.hostName}.yaml"
+```
+
+- `relativeRepo.import` is only for module imports and eval-only imports. It may
+  return an absolute string into the flake source.
+- `relativeRepo.path` is for real file dependencies such as `sopsFile`,
+  `lib.fileContents`, patches, renderer model inputs, and any value that can
+  enter a derivation or runtime config. It should wrap the target with
+  `builtins.path` so the store context is attached to the specific file or
+  directory rather than to the whole flake source.
+
+Sketch:
+
+```nix
+relativeRepo =
+  let
+    findRoot = dir:
+      if builtins.pathExists (dir + "/flake.nix") then
+        dir
+      else
+        let
+          parent = builtins.dirOf dir;
+        in
+        if parent == dir then
+          throw "relativeRepo: could not find flake.nix above ${dir}"
+        else
+          findRoot parent;
+
+    rootOf = pos: findRoot (builtins.dirOf pos.file);
+    clean = rel: lib.removePrefix "/" rel;
+  in
+  {
+    import = pos: rel: rootOf pos + "/${clean rel}";
+
+    path = pos: rel:
+      builtins.path {
+        path = rootOf pos + "/${clean rel}";
+        name = builtins.baseNameOf rel;
+      };
+  };
+```
+
+Migration examples:
+
+```nix
+imports = [
+  (relativeRepo.import __curPos "library/01-general/desktop/shell-env.nix")
+];
+
+sops.defaultSopsFile =
+  relativeRepo.path __curPos "secrets/${config.networking.hostName}.yaml";
+```
+
+This should be introduced before removing old `outPath` usage. Migrate call
+sites by category:
+
+1. Module imports and simple `import` expressions can move to
+   `relativeRepo.import`.
+2. Secrets, SSH public keys, patches, renderer inputs, and source directories
+   should move to `relativeRepo.path`.
+3. Broad source roots such as `vmSourceForHost` should be reviewed separately;
+   they may need purpose-built filtered sources rather than a generic repo path.
+
+Validate the helper with targeted evals before broad migration. In particular,
+check that `builtins.getContext` for `relativeRepo.path` points at the specific
+target store path, while imports still evaluate successfully.
 
 ### Improve Import Boundaries
 
