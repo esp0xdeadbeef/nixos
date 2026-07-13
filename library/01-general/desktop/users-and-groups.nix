@@ -49,9 +49,7 @@ in
           count = 65536;
         }
       ];
-      openssh.authorizedKeys.keys = [
-        (keyFor "desktop-rsa")
-      ];
+      openssh.authorizedKeys.keys = [ ];
       packages = with pkgs; [ ];
     };
   };

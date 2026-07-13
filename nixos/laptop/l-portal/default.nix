@@ -135,7 +135,6 @@ in
       (keyFor "l-esp")
       (keyFor "l-esp-alt")
       (keyFor "l-esp-root")
-      (keyFor "l-esp-rsa")
     ];
 
     extraGroups = [

@@ -51,6 +51,7 @@ ids inside the encrypted mailbox set:
 MAILBOX_DOMAIN=example.com
 MAILBOX_MAIL_HOST=mail.example.com
 MAILBOX_ACCOUNTS=mail-account-001 mail-account-002
+MAILBOX_DEFAULT_ACCOUNT=mail-account-001
 ```
 
 The account secret stores account-local data:
@@ -177,6 +178,13 @@ If `SOURCE` and `OUTGOING` are omitted for a hosted client account, the mail
 clients derive them from `MAILBOX_MAIL_HOST`. Use explicit values for external
 providers or when a provider needs different IMAP and SMTP hosts.
 
+Client account order is default-aware. For hosted accounts, set
+`MAILBOX_DEFAULT_ACCOUNT=mail-account-001` or
+`MAILBOX_DEFAULT_ADDRESS=alice@example.com` in exactly one mailbox set. For a
+client-only external account, set `MAIL_ACCOUNT_DEFAULT=true`. aerc and Geary
+render default accounts first and then render the remaining client accounts in
+the normal discovered order.
+
 Retention is account-driven. Set `MAIL_ACCOUNT_RETENTION_DAYS=30` on
 administrative or shared mailboxes such as contact, no-reply, and postmaster
 accounts. The server-side retention timer caps account-provided values at
@@ -254,11 +262,12 @@ public Nix module only enables `profiles.nixos.web.redirect-domains`; redirect
 domain names and targets should not be committed outside encrypted SOPS data.
 
 Shared mailbox access is ACL-driven. Non-client mail accounts are automatically
-shared to client mail accounts. `MAIL_SHARED_*` entries may add explicit ACLs
-from SOPS, but they are not needed for normal account-to-client sharing. The
+shared only to client mail accounts in the same hosted mailbox set/domain.
+`MAIL_SHARED_*` entries may add explicit same-domain ACLs from SOPS, but they
+are not needed for normal account-to-client sharing. The
 `<host>-mail-shared-subscriptions` unit refreshes the Dovecot sharing map,
-subscribes users to visible shared mailboxes, and rebuilds the Postfix
-sender-login map for ACL entries with the `post` right.
+subscribes users to same-domain visible shared mailboxes, and rebuilds the
+Postfix sender-login map for ACL entries with the `post` right.
 
 Mail certificate hostnames are SOPS-driven. Set `MAIL_TLS_DOMAINS` in the mail
 server env secret when the mail certificate needs more names than `MAIL_FQDN`.

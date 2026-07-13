@@ -1,9 +1,9 @@
-{ config, lib, name, pkgs, ... }:
+{ config, lib, name, outPath, pkgs, ... }:
 let
   hostName = name;
   networkAddressesService = "${hostName}-network-addresses";
   networkAddressesUnit = "${networkAddressesService}.service";
-  runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
+  runtimeSopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
 
   dnsKnotConfPath = config.sops.secrets."dns/knot_conf".path;
   dnsZonePath = config.sops.secrets."dns/zone_001".path;

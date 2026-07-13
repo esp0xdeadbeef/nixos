@@ -113,7 +113,7 @@ let
       unset_account_vars() {
         local field
 
-        for field in LOCALPART PASSWORD ALIASES CLIENT SERVER LABEL DISPLAY_NAME FROM SOURCE OUTGOING ADDRESS USERNAME IMAP_HOST SMTP_HOST MAIL_HOST IMAP_PORT SMTP_PORT; do
+        for field in LOCALPART PASSWORD ALIASES CLIENT SERVER DEFAULT LABEL DISPLAY_NAME FROM SOURCE OUTGOING ADDRESS USERNAME IMAP_HOST SMTP_HOST MAIL_HOST IMAP_PORT SMTP_PORT; do
           unset "MAIL_ACCOUNT_$field"
         done
       }
@@ -149,6 +149,25 @@ let
       account_var() {
         local field="$1"
         printenv "MAIL_ACCOUNT_$field" || true
+      }
+
+      account_is_default() {
+        local account_ref="$1"
+        local address="$2"
+
+        if bool_true "$(account_var DEFAULT)"; then
+          return 0
+        fi
+
+        if [ -n "''${MAILBOX_DEFAULT_ACCOUNT:-}" ] && [ "$account_ref" = "''${MAILBOX_DEFAULT_ACCOUNT:-}" ]; then
+          return 0
+        fi
+
+        if [ -n "''${MAILBOX_DEFAULT_ADDRESS:-}" ] && [ "$address" = "''${MAILBOX_DEFAULT_ADDRESS:-}" ]; then
+          return 0
+        fi
+
+        return 1
       }
 
       hosted_address() {
@@ -254,10 +273,29 @@ let
         local sender
         local source
         local outgoing
+        local is_default
 
         if ! bool_true "$(account_var CLIENT)"; then
           return 0
         fi
+
+        is_default=0
+        if account_is_default "$account_ref" "$address"; then
+          is_default=1
+        fi
+
+        case "$write_account_pass" in
+          default)
+            [ "$is_default" -eq 1 ] || return 0
+            ;;
+          rest)
+            [ "$is_default" -eq 0 ] || return 0
+            ;;
+          *)
+            echo "invalid aerc account sync pass: $write_account_pass" >&2
+            exit 1
+            ;;
+        esac
 
         label="$(account_var LABEL)"
         if [ -z "$label" ]; then
@@ -305,7 +343,7 @@ let
             exit 1
           fi
 
-          unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS MAILBOX_MAIL_HOST MAILBOX_IMAP_HOST MAILBOX_SMTP_HOST MAILBOX_IMAP_PORT MAILBOX_SMTP_PORT
+          unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS MAILBOX_DEFAULT_ACCOUNT MAILBOX_DEFAULT_ADDRESS MAILBOX_MAIL_HOST MAILBOX_IMAP_HOST MAILBOX_SMTP_HOST MAILBOX_IMAP_PORT MAILBOX_SMTP_PORT
           set -a
           # shellcheck disable=SC1090
           . "$mailbox_set_env_file"
@@ -346,6 +384,7 @@ let
           account_ref="''${secret_name#mail/accounts/}"
           account_ref="''${account_ref%/env}"
 
+          unset MAILBOX_DOMAIN MAILBOX_ACCOUNTS MAILBOX_DEFAULT_ACCOUNT MAILBOX_DEFAULT_ADDRESS MAILBOX_MAIL_HOST MAILBOX_IMAP_HOST MAILBOX_SMTP_HOST MAILBOX_IMAP_PORT MAILBOX_SMTP_PORT
           load_account_env_file "$account_env_file"
 
           if ! bool_true "$(account_var CLIENT)" || ! bool_false "''${MAIL_ACCOUNT_SERVER:-true}"; then
@@ -374,6 +413,11 @@ let
         printf '# The source/outgoing URIs intentionally exclude passwords.\n\n'
       } > "$tmp"
 
+      write_account_pass=default
+      sync_hosted_accounts
+      sync_external_accounts
+
+      write_account_pass=rest
       sync_hosted_accounts
       sync_external_accounts
 

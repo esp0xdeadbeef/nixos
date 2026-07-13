@@ -1,4 +1,4 @@
-{ config, lib, mailboxSets ? null, name, pkgs, ... }:
+{ config, lib, mailboxSets ? null, name, outPath, pkgs, ... }:
 let
   hostName = name;
   networkAddressesService = "${hostName}-network-addresses";
@@ -14,7 +14,7 @@ let
   webpageUnit = "${webpageService}.service";
   webpageEnvService = "${hostName}-webpage-env";
   webpageEnvUnit = "${webpageEnvService}.service";
-  runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
+  runtimeSopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
 
   runtimeRoot = "/run/${hostName}";
   githubTokenPath = config.sops.secrets.gh-token.path;

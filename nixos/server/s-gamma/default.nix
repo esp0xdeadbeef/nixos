@@ -7,36 +7,39 @@
 , ...
 }:
 let
-  system = "x86_64-linux";
   hostName = name;
   installDisk = "/dev/vda";
-  runtimeSopsFile = ../../../../secrets/s-gamma-runtime.yaml;
+  runtimeSopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
 in
 {
   networking.hostName = lib.mkForce hostName;
 
   imports = [
     inputs.disko.nixosModules.disko
-    profiles.nixos.impermanence.module
     profiles.nixos.mail.mailbox-sets
+    profiles.nixos.users.deadbeef-ssh
     profiles.nixos.web.redirect-domains
     inputs.sops-nix.nixosModules.sops
 
+    ./base.nix
+    ./github-token.nix
+    ./impermanence.nix
     ./network.nix
+    ./packages.nix
     ./cert.nix
     ./dns.nix
     ./hardware.nix
     ./mail.nix
+    ./ssh.nix
+    ./upgrade.nix
     ./web.nix
 
     (import ./disko.nix {
       disk = installDisk;
     })
 
-    (import ./machine-base.nix {
-      inherit lib outPath;
-      pkgs = inputs.nixpkgs.legacyPackages.${system};
-      inherit hostName installDisk;
+    (import ./boot.nix {
+      inherit installDisk;
     })
   ];
 

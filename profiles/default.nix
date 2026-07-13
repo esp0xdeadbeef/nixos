@@ -58,6 +58,7 @@
     };
     mail = {
       mailbox-sets = import ./nixos/mail/mailbox-sets.nix;
+      server = import ./nixos/mail/server.nix;
     };
     web = {
       redirect-domains = import ./nixos/web/redirect-domains.nix;
@@ -71,6 +72,7 @@
       persist-root-ssh = import ./nixos/sops/persist-root-ssh.nix;
     };
     users = {
+      deadbeef-ssh = import ./nixos/users/deadbeef-ssh.nix;
       deadbeef-sops = import ./nixos/users/deadbeef-sops.nix;
     };
     virtualization = {
@@ -110,6 +112,7 @@
           };
         };
       default = import ./nixos/impermanence;
+      minimal = import ./nixos/impermanence/minimal.nix;
     };
     laptop = {
       autorandr-default = import ./nixos/laptop/autorandr-default.nix;
