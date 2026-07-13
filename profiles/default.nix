@@ -1,5 +1,6 @@
 {
   mail = {
+    inventory = import ./mail/inventory.nix;
     mailbox-sets = import ./mail/mailbox-sets.nix;
   };
 
@@ -62,6 +63,7 @@
     };
     web = {
       redirect-domains = import ./nixos/web/redirect-domains.nix;
+      server = import ./nixos/web/server;
     };
     server = {
       dell = import ./nixos/server/dell.nix;

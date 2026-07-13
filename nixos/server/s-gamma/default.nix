@@ -44,14 +44,8 @@ in
 
   local.mail.mailboxSets = {
     enable = true;
-    accountNames = [
-      "mail-account-001"
-      "mail-account-002"
-      "mail-account-003"
-      "mail-account-004"
-      "mail-account-005"
-      "mail-account-006"
-    ];
+    names = profiles.mail.inventory.hostedMailboxSets;
+    accountNames = profiles.mail.inventory.hostedMailAccounts;
   };
 
   system.stateVersion = "26.05";

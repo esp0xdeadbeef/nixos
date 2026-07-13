@@ -402,6 +402,21 @@ pkgs.writeShellApplication {
       fi
     }
 
+    ensure_mailbox() {
+      local user="$1"
+      local mailbox="$2"
+
+      if ! doveadm mailbox status -u "$user" uidvalidity "$mailbox" >/dev/null 2>&1; then
+        doveadm mailbox create -u "$user" -s "$mailbox" >/dev/null 2>&1 || true
+      fi
+
+      # Some Dovecot mailbox drivers list subscribed special-use mailboxes before
+      # the backing Maildir exists. Update materializes the mailbox through
+      # Dovecot itself so shared namespace lookups can resolve it immediately.
+      doveadm mailbox update -u "$user" "$mailbox" >/dev/null 2>&1 || true
+      doveadm mailbox status -u "$user" messages "$mailbox" >/dev/null 2>&1 || true
+    }
+
     sync_automatic_account_mailboxes() {
       rights="''${MAIL_SHARED_AUTO_RIGHTS:-lookup read write write-seen write-deleted insert post expunge create delete}"
 
@@ -423,15 +438,19 @@ pkgs.writeShellApplication {
         for mailbox in $(configured_automatic_mailboxes); do
           [ -n "$mailbox" ] || continue
 
-          if ! doveadm mailbox status -u "$owner" uidvalidity "$mailbox" >/dev/null 2>&1; then
-            doveadm mailbox create -u "$owner" -s "$mailbox" >/dev/null 2>&1 || true
-          fi
+          ensure_mailbox "$owner" "$mailbox"
 
-          for cleanup_user in "''${all_users[@]}"; do
-            [ "$cleanup_user" != "$owner" ] || continue
+          while IFS= read -r visible_source_mailbox; do
+            [ -n "$visible_source_mailbox" ] || continue
+            ensure_mailbox "$owner" "$visible_source_mailbox"
 
-            doveadm acl delete -u "$owner" "$mailbox" "user=$cleanup_user" >/dev/null 2>&1 || true
-          done
+            for cleanup_user in "''${all_users[@]}"; do
+              [ "$cleanup_user" != "$owner" ] || continue
+              same_mail_domain "$owner" "$cleanup_user" || continue
+
+              doveadm acl delete -u "$owner" "$visible_source_mailbox" "user=$cleanup_user" >/dev/null 2>&1 || true
+            done
+          done < <(visible_mailboxes_for_share "$owner" "$mailbox")
           doveadm acl recalc -u "$owner" >/dev/null
 
           for user in "''${client_users[@]}"; do
@@ -449,6 +468,11 @@ pkgs.writeShellApplication {
 
             while IFS= read -r visible_source_mailbox; do
               [ -n "$visible_source_mailbox" ] || continue
+              ensure_mailbox "$owner" "$visible_source_mailbox"
+              if [ "$visible_source_mailbox" != "$mailbox" ]; then
+                doveadm acl add -u "$owner" "$visible_source_mailbox" "user=$user" "''${rights_args[@]}" >/dev/null
+                doveadm acl recalc -u "$owner" >/dev/null
+              fi
               visible_mailbox="$(shared_mailbox_name "$owner" "$visible_source_mailbox")"
 
               if subscribe_user "$user" "$visible_mailbox"; then
@@ -485,9 +509,7 @@ pkgs.writeShellApplication {
           continue
         fi
 
-        if ! doveadm mailbox status -u "$owner" uidvalidity "$mailbox" >/dev/null 2>&1; then
-          doveadm mailbox create -u "$owner" -s "$mailbox" >/dev/null 2>&1 || true
-        fi
+        ensure_mailbox "$owner" "$mailbox"
 
         rights_args=()
         for right in $(words "$rights"); do
@@ -511,6 +533,11 @@ pkgs.writeShellApplication {
 
           while IFS= read -r visible_source_mailbox; do
             [ -n "$visible_source_mailbox" ] || continue
+            ensure_mailbox "$owner" "$visible_source_mailbox"
+            if [ "$visible_source_mailbox" != "$mailbox" ]; then
+              doveadm acl add -u "$owner" "$visible_source_mailbox" "user=$user" "''${rights_args[@]}" >/dev/null
+              doveadm acl recalc -u "$owner" >/dev/null
+            fi
             visible_mailbox="$(shared_mailbox_name "$owner" "$visible_source_mailbox")"
 
             if subscribe_user "$user" "$visible_mailbox"; then
@@ -526,17 +553,23 @@ pkgs.writeShellApplication {
     subscribe_user() {
       local user="$1"
       local mailbox="$2"
+      local attempt
 
       if ! doveadm user "$user" >/dev/null 2>&1; then
         return 0
       fi
 
-      if ! doveadm acl debug -u "$user" "$mailbox" >/dev/null 2>&1; then
-        echo "shared-mail-subscriptions: mailbox is not visible for ACL user: user=$user mailbox=$mailbox" >&2
-        return 1
-      fi
+      for attempt in 1 2 3; do
+        if doveadm acl debug -u "$user" "$mailbox" >/dev/null 2>&1; then
+          doveadm mailbox subscribe -u "$user" "$mailbox" >/dev/null
+          return 0
+        fi
 
-      doveadm mailbox subscribe -u "$user" "$mailbox" >/dev/null
+        [ "$attempt" = 3 ] || sleep 1
+      done
+
+      echo "shared-mail-subscriptions: mailbox is not visible for ACL user: user=$user mailbox=$mailbox" >&2
+      return 1
     }
 
     subscribed=0

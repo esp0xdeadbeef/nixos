@@ -6,7 +6,9 @@
 , ...
 }:
 let
+  mailboxSetNames = profiles.mail.inventory.hostedMailboxSets;
   mailboxSets = profiles.mail.mailbox-sets {
+    inherit mailboxSetNames;
     secretsRoot = outPath + "/secrets";
   };
   mailboxSetEnvPaths = mailboxSets.mkEnvPaths {
@@ -155,15 +157,19 @@ let
         local account_ref="$1"
         local address="$2"
 
-        if bool_true "$(account_var DEFAULT)"; then
-          return 0
-        fi
-
         if [ -n "''${MAILBOX_DEFAULT_ACCOUNT:-}" ] && [ "$account_ref" = "''${MAILBOX_DEFAULT_ACCOUNT:-}" ]; then
           return 0
         fi
 
         if [ -n "''${MAILBOX_DEFAULT_ADDRESS:-}" ] && [ "$address" = "''${MAILBOX_DEFAULT_ADDRESS:-}" ]; then
+          return 0
+        fi
+
+        if [ -n "''${MAILBOX_DOMAIN:-}" ]; then
+          return 1
+        fi
+
+        if bool_true "$(account_var DEFAULT)"; then
           return 0
         fi
 
@@ -198,6 +204,27 @@ let
           printf '%s <%s>\n' "$display_name" "$address"
         else
           printf '%s\n' "$address"
+        fi
+      }
+
+      account_label_for() {
+        local address="$1"
+        local label
+
+        label="$(account_var LABEL)"
+        if [ -z "$label" ]; then
+          printf '%s\n' "$address"
+        elif [ "$label" = "$address" ]; then
+          printf '%s\n' "$label"
+        else
+          case "$label" in
+            *@*)
+              printf '%s\n' "$address"
+              ;;
+            *)
+              printf '%s <%s>\n' "$label" "$address"
+              ;;
+          esac
         fi
       }
 
@@ -297,12 +324,7 @@ let
             ;;
         esac
 
-        label="$(account_var LABEL)"
-        if [ -z "$label" ]; then
-          label="$address"
-        elif [ "$label" != "$address" ]; then
-          label="$label <$address>"
-        fi
+        label="$(account_label_for "$address")"
         sender="$(sender_for "$address")"
 
         source="$(resolve_source "$address")" || {

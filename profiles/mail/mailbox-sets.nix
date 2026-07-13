@@ -110,27 +110,23 @@ rec {
     , secretRefs ? mailboxSetEnvSecretRefs
     }:
     let
+      pathFor = secret: config.sops.secrets.${secret.name}.path;
+      pathEntries = map (secret: "${secret.name}=${pathFor secret}") secretRefs;
       pathsByName = builtins.listToAttrs (
         map
           (secret: {
             inherit (secret) name;
-            value = config.sops.secrets.${secret.name}.path;
+            value = pathFor secret;
           })
           secretRefs
       );
       pathList = pkgs.writeText name (
-        (lib.concatStringsSep "\n" (
-          lib.mapAttrsToList
-            (
-              secretName: path: "${secretName}=${path}"
-            )
-            pathsByName
-        ))
+        (lib.concatStringsSep "\n" pathEntries)
         + "\n"
       );
     in
     {
       inherit pathList pathsByName;
-      paths = builtins.attrValues pathsByName;
+      paths = map pathFor secretRefs;
     };
 }
