@@ -1,7 +1,15 @@
 { config, lib, ... }:
 {
-  containers."${config.networking.hostName}-container".extraVeths = lib.mkForce {
-    veth0.hostBridge = "vlan2";
+  sops.secrets.s-nebula-container-mac = { };
+
+  containers."${config.networking.hostName}-container" = {
+    extraVeths = lib.mkForce {
+      veth0.hostBridge = "vlan3";
+    };
+    bindMounts."/run/secrets/s-nebula-container-mac" = {
+      hostPath = config.sops.secrets.s-nebula-container-mac.path;
+      isReadOnly = true;
+    };
   };
   environment.persistence."/persist".directories = [
     {
