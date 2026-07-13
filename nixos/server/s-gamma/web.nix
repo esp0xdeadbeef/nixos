@@ -980,6 +980,12 @@ in
     recommendedProxySettings = true;
     recommendedTlsSettings = true;
     appendHttpConfig = ''
+      log_format s_gamma_host_combined '$remote_addr host=$host server=$server_name '
+        'request="$request" status=$status bytes=$body_bytes_sent '
+        'location="$sent_http_location" auth="$sent_http_www_authenticate" '
+        'referer="$http_referer" user_agent="$http_user_agent"';
+      access_log /var/log/nginx/access.log s_gamma_host_combined;
+
       map $uri $s_gamma_preview_realm {
         default "preview";
         /.well-known/security.txt off;
