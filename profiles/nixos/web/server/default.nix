@@ -231,8 +231,15 @@ let
         listen 80;
         listen [::]:80;
         server_name $domain $www_domain;
-        auth_basic off;
-        return 301 https://$domain\$request_uri;
+
+        location / {
+          root /var/empty;
+          try_files /__managed_web_redirect_never_exists @managed_web_redirect;
+        }
+
+        location @managed_web_redirect {
+          return 301 https://$domain\$request_uri;
+        }
       }
 
       server {
@@ -258,10 +265,17 @@ let
         listen [::]:443 ssl;
         http2 on;
         server_name $www_domain;
-        auth_basic off;
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
-        return 301 https://$domain\$request_uri;
+
+        location / {
+          root /var/empty;
+          try_files /__managed_web_redirect_never_exists @managed_web_redirect;
+        }
+
+        location @managed_web_redirect {
+          return 301 https://$domain\$request_uri;
+        }
       }
       NGINX
       }
@@ -276,8 +290,15 @@ let
         listen 80;
         listen [::]:80;
         server_name $mail_host;
-        auth_basic off;
-        return 301 https://$target_domain\$request_uri;
+
+        location / {
+          root /var/empty;
+          try_files /__managed_web_redirect_never_exists @managed_web_redirect;
+        }
+
+        location @managed_web_redirect {
+          return 301 https://$target_domain\$request_uri;
+        }
       }
 
       server {
@@ -285,10 +306,17 @@ let
         listen [::]:443 ssl;
         http2 on;
         server_name $mail_host;
-        auth_basic off;
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
-        return 301 https://$target_domain\$request_uri;
+
+        location / {
+          root /var/empty;
+          try_files /__managed_web_redirect_never_exists @managed_web_redirect;
+        }
+
+        location @managed_web_redirect {
+          return 301 https://$target_domain\$request_uri;
+        }
       }
       NGINX
       }
@@ -302,8 +330,15 @@ let
         listen 80;
         listen [::]:80;
         server_name $domain;
-        auth_basic off;
-        return 301 https://$domain\$request_uri;
+
+        location / {
+          root /var/empty;
+          try_files /__managed_web_redirect_never_exists @managed_web_redirect;
+        }
+
+        location @managed_web_redirect {
+          return 301 https://$domain\$request_uri;
+        }
       }
 
       server {
@@ -721,13 +756,44 @@ let
       dst=${lib.escapeShellArg webpageRuntimeDir}
       restart_marker=${lib.escapeShellArg webpageRestartMarker}
 
-      keep_existing_app() {
-        if [ -f "$dst/run-server.py" ]; then
+      has_existing_app() {
+        [ -f "$dst/run-server.py" ]
+      }
+
+      has_source_checkout() {
+        [ -d "$src/.git" ] \
+          && [ -f "$src/run-server.py" ] \
+          && git -C "$src" rev-parse --verify HEAD >/dev/null 2>&1
+      }
+
+      handle_remote_sync_failure() {
+        if has_existing_app; then
           echo "webpage sync failed; keeping existing runtime app in $dst" >&2
           exit 0
         fi
 
-        echo "webpage sync failed and no existing runtime app is available in $dst" >&2
+        if has_source_checkout; then
+          echo "webpage remote sync failed; rebuilding runtime app from existing source checkout in $src" >&2
+          git -C "$src" reset --hard HEAD
+          git -C "$src" clean -fdx
+          return 0
+        fi
+
+        echo "webpage sync failed and no existing runtime app or source checkout is available" >&2
+        exit 1
+      }
+
+      require_source_checkout() {
+        if has_source_checkout; then
+          return 0
+        fi
+
+        if [ -f "$dst/run-server.py" ]; then
+          echo "webpage source checkout is unavailable; keeping existing runtime app in $dst" >&2
+          exit 0
+        fi
+
+        echo "webpage source checkout is unavailable and no existing runtime app is available in $dst" >&2
         exit 1
       }
 
@@ -756,19 +822,27 @@ let
       export GITHUB_TOKEN_FILE="$token_file"
 
       if [ -d "$src/.git" ]; then
-        git -C "$src" remote set-url origin "$repo_url" || keep_existing_app
-        git -C "$src" fetch --depth=1 origin "$repo_branch" || keep_existing_app
-        git -C "$src" checkout -B "$repo_branch" FETCH_HEAD || keep_existing_app
-        git -C "$src" reset --hard FETCH_HEAD || keep_existing_app
-        git -C "$src" clean -fdx || keep_existing_app
+        if git -C "$src" remote set-url origin "$repo_url" \
+          && git -C "$src" fetch --depth=1 origin "$repo_branch" \
+          && git -C "$src" checkout -B "$repo_branch" FETCH_HEAD \
+          && git -C "$src" reset --hard FETCH_HEAD \
+          && git -C "$src" clean -fdx; then
+          :
+        else
+          handle_remote_sync_failure
+        fi
       else
         tmp="$(mktemp -d "$(dirname "$src")/source.tmp.XXXXXX")"
         trap 'rm -f "$askpass"; rm -rf "$tmp"' EXIT
-        git clone --depth=1 --branch "$repo_branch" "$repo_url" "$tmp/repo" || keep_existing_app
+        if ! git clone --depth=1 --branch "$repo_branch" "$repo_url" "$tmp/repo"; then
+          handle_remote_sync_failure
+        fi
         rm -rf "$src"
         mv "$tmp/repo" "$src"
         rmdir "$tmp"
       fi
+
+      require_source_checkout
 
       runtime_rev="$(cat "$dst/.source-rev" 2>/dev/null || true)"
       source_rev="$(git -C "$src" rev-parse HEAD)"
@@ -778,6 +852,8 @@ let
         --chown=nginx:nginx \
         --chmod=D755,F644 \
         --exclude='.git/' \
+        --exclude='.env' \
+        --exclude='.env.*' \
         --filter='protect .env' \
         --filter='protect .env.*' \
         --filter='protect webpagina/.well-known/***' \
@@ -1083,6 +1159,7 @@ in
       after = [ "network-online.target" ];
       before = [ webpageUnit ];
       wants = [ "network-online.target" ];
+      requiredBy = [ webpageUnit ];
       wantedBy = [ "multi-user.target" ];
       unitConfig.OnSuccess = [ webpageReloadUnit ];
       serviceConfig = {
@@ -1138,7 +1215,10 @@ in
         webpageSyncUnit
         webpageEnvUnit
       ];
-      requires = [ webpageEnvUnit ];
+      requires = [
+        webpageSyncUnit
+        webpageEnvUnit
+      ];
       wantedBy = [ "multi-user.target" ];
       environment = {
         HOST = webpageHost;

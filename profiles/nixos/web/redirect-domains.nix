@@ -124,8 +124,15 @@ let
         listen 80;
         listen [::]:80;
         server_name $server_names;
-        auth_basic off;
-        return $status https://\$host\$request_uri;
+
+        location / {
+          root /var/empty;
+          try_files /__managed_web_redirect_never_exists @managed_web_redirect;
+        }
+
+        location @managed_web_redirect {
+          return $status https://\$host\$request_uri;
+        }
       }
       NGINX
 
@@ -137,10 +144,17 @@ let
         listen [::]:443 ssl;
         http2 on;
         server_name $server_names;
-        auth_basic off;
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
-        return $status $target\$request_uri;
+
+        location / {
+          root /var/empty;
+          try_files /__managed_web_redirect_never_exists @managed_web_redirect;
+        }
+
+        location @managed_web_redirect {
+          return $status $target\$request_uri;
+        }
       }
       NGINX
           fi
