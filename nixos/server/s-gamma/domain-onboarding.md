@@ -62,6 +62,24 @@ openssl x509 -in <leaf-cert.pem> -pubkey -noout |
 The UI may display the TLSA data lowercase or line-wrapped after saving. Trust
 the authoritative `dig @ns.theory7.net` result over the visual formatting.
 
+After deploying a certificate that adds names, recompute the live certificate
+SPKI hash and compare it with every `_25._tcp.<domain>` record that uses the
+shared mail certificate. ACME may issue a certificate with a new key when the SAN
+set changes; in that case, update the TLSA record for every existing hosted
+domain, not only the newly added one.
+
+```bash
+ssh root@<server> "cat /persist/var/lib/acme/s-gamma-mail/fullchain.pem" |
+  openssl x509 -pubkey -noout |
+  openssl pkey -pubin -outform DER |
+  openssl dgst -sha256 -binary |
+  xxd -p -c 256 |
+  tr '[:lower:]' '[:upper:]'
+```
+
+Check each authoritative Theory7 nameserver before considering DANE done; a
+single lagging secondary can still serve the stale TLSA record.
+
 Open the domain's DNSSEC page and use `DNSSEC inschakelen`. For domains using
 Theory7 nameservers, the page fetches the PowerDNS key and saves it at the
 registry. Verify both the registry/RDAP state and live DNS; the registry
