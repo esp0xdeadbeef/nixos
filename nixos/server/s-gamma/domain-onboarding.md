@@ -142,6 +142,55 @@ WEB_REDIRECT_STATUS=301
 If the domain must be covered by the shared mail/web certificate, include the
 concrete names in the encrypted `MAIL_TLS_DOMAINS` value, not in Nix modules.
 
+### Change the canonical web domain
+
+Changing the primary public domain is an encrypted runtime change. Keep concrete
+domains in `secrets/s-gamma-runtime.yaml` only.
+
+In encrypted `web/contact/env`, update the public site fields and, when the
+public/form mail addresses should move with the domain, point the mailbox-set
+selectors at the hosted mailbox set for the new canonical domain:
+
+```text
+CONTACT_SITE_URL=https://<new-canonical-domain>/
+WEB_SITE_DOMAIN=<new-canonical-domain>
+WEB_SITE_URL=https://<new-canonical-domain>
+WEB_PUBLIC_CONTACT_MAILBOX_SET=mailbox-NNN
+WEB_FORM_MAILBOX_SET=mailbox-NNN
+WEB_CONTACT_MAILBOX_SET=mailbox-NNN
+```
+
+In encrypted `web/redirects/env`, change the target and adjust the domain list:
+
+```text
+WEB_REDIRECT_TARGET_URL=https://<new-canonical-domain>
+WEB_REDIRECT_DOMAINS=<old-canonical-domain> www.<old-canonical-domain> ...
+```
+
+Do not leave the new canonical apex or `www.<new-canonical-domain>` in
+`WEB_REDIRECT_DOMAINS`. The nginx generator treats the apex and `www` pair
+together; if either one is in the redirect list, it will not emit the normal
+canonical web vhost for the apex. Leaving the apex out lets the site serve from
+the canonical domain and lets nginx redirect `www` to the apex.
+
+For mail-style web hostnames, leave `mail.<new-canonical-domain>` out when it is
+the hosted mailbox `MAILBOX_MAIL_HOST`; nginx will emit a direct redirect to the
+apex. Add `imap.<new-canonical-domain>` to `WEB_REDIRECT_DOMAINS` only when that
+hostname should also have a web redirect response instead of falling through to
+the default vhost.
+
+After deploying, verify:
+
+```bash
+ssh root@<server> "grep -n 'WEB_SITE_DOMAIN\|WEB_SITE_URL\|WEB_REDIRECT_TARGET_URL' /run/s-gamma/webpage/env"
+curl -I https://<new-canonical-domain>/
+curl -I https://<old-canonical-domain>/
+```
+
+During preview, unauthenticated checks should still return `401` with
+`Basic realm="preview"`. Use preview credentials only for redirect-page/body
+checks; do not disable basic auth to test this.
+
 New untracked SOPS files are not visible to flake evaluation. Mark them with
 intent-to-add before evaluating or deploying:
 
