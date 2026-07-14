@@ -957,6 +957,23 @@ let
         echo "Vue asset output is missing index.html: $logo_preview_store_path" >&2
         exit 1
       fi
+      if ! favicon_store_path="$(
+        nix --extra-experimental-features 'nix-command flakes' build \
+          --no-link \
+          --print-out-paths \
+          "$src#favicon-assets"
+      )"; then
+        if has_existing_app; then
+          echo "Favicon build failed; keeping existing runtime app in $dst" >&2
+          exit 0
+        fi
+        echo "Favicon build failed and no existing runtime app is available" >&2
+        exit 1
+      fi
+      if [ ! -s "$favicon_store_path/favicon.ico" ]; then
+        echo "Favicon asset output is missing favicon.ico: $favicon_store_path" >&2
+        exit 1
+      fi
 
       generated_state="$state/generated-logo-directions"
       generation_logs_state="$state/logo-generation-logs"
@@ -999,6 +1016,10 @@ let
       rm -rf "$dst/preview/logo-inspectie/dist"
       ln -s "$logo_preview_store_path" "$dst/preview/logo-inspectie/dist"
       chown -h nginx:nginx "$dst/preview/logo-inspectie/dist"
+
+      rm -f "$dst/webpagina/favicon.ico"
+      ln -s "$favicon_store_path/favicon.ico" "$dst/webpagina/favicon.ico"
+      chown -h nginx:nginx "$dst/webpagina/favicon.ico"
 
       install -d -m 0755 -o nginx -g nginx "$dst/webpagina" "$dst/var"
       rm -rf \
