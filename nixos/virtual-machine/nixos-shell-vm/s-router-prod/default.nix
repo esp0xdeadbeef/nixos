@@ -29,6 +29,7 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./kea-legacy-lease-paths.nix
+    ./nebula-public-ingress-hotpatch.nix
     ./vlan2-kea-reservations-override.nix
     ./vlan3-kea-reservations-override.nix
     ./legacy-parity-contract.nix
