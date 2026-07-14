@@ -29,7 +29,6 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./kea-legacy-lease-paths.nix
-    ./nebula-public-ingress-hotpatch.nix
     ./vlan2-kea-reservations-override.nix
     ./vlan3-kea-reservations-override.nix
     ./legacy-parity-contract.nix
@@ -49,6 +48,18 @@ in
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
     })
   ];
+
+  # Temporary until network-renderer-nixos materializes
+  # publicIngressTupleAuthority as core-owned DNAT.
+  containers.core.config.networking.nftables.ruleset = lib.mkAfter ''
+    table ip s_router_prod_nebula_hotpatch {
+      chain prerouting {
+        type nat hook prerouting priority -101; policy accept;
+        iifname "ppp0" udp dport 4242 counter dnat to 192.168.3.10:4242 comment "hotpatch-nebula-public-ingress-udp"
+        iifname "ppp0" tcp dport 4242 counter dnat to 192.168.3.10:4242 comment "hotpatch-nebula-public-ingress-tcp"
+      }
+    }
+  '';
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 }
