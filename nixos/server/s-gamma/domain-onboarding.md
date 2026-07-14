@@ -191,6 +191,12 @@ During preview, unauthenticated checks should still return `401` with
 `Basic realm="preview"`. Use preview credentials only for redirect-page/body
 checks; do not disable basic auth to test this.
 
+`WEB_SITE_DOMAIN` also owns temporary host-specific backend tooling such as
+`/__preview/logo-inspectie/`. Changing the canonical domain moves that explicit
+nginx endpoint to the new host. Verify that it returns `401` on the canonical
+host while preview auth is active and `404` on every redirect domain; a `30x` to
+the tool on the canonical host means the isolation is incomplete.
+
 New untracked SOPS files are not visible to flake evaluation. Mark them with
 intent-to-add before evaluating or deploying:
 

@@ -24,6 +24,7 @@ let
   webpageRepoBranch = cfg.source.branch;
   webpageSourceDir = cfg.source.checkoutDir;
   webpageRuntimeDir = cfg.runtime.appDir;
+  webpageStateDir = cfg.runtime.stateDir;
   webpagePublicDir = "${webpageRuntimeDir}/${cfg.runtime.publicSubdir}";
   webpageRestartMarker = "${runtimeRoot}/webpage-restart-needed";
   webpageEnvDir = "${runtimeRoot}/webpage";
@@ -104,6 +105,7 @@ let
       set -euo pipefail
 
       raw_conf=${lib.escapeShellArg nginxHttpConfPath}
+      contact_env=${lib.escapeShellArg webContactEnvPath}
       redirect_env=${lib.escapeShellArg webRedirectEnvPath}
       rendered_conf=${lib.escapeShellArg nginxRenderedHttpConfPath}
       generated_mailbox_conf=${lib.escapeShellArg nginxGeneratedMailboxConfPath}
@@ -163,11 +165,23 @@ let
 
         case "$domain" in
           *[!A-Za-z0-9.-]* | .* | *..* | *.)
-            echo "invalid nginx mailbox domain: $domain" >&2
+            echo "invalid nginx web domain: $domain" >&2
             exit 1
             ;;
         esac
       }
+
+      site_domain="$(
+        set -a
+        # shellcheck disable=SC1090
+        . "$contact_env"
+        set +a
+        printf '%s' "''${WEB_SITE_DOMAIN:-}"
+      )"
+      site_domain="''${site_domain,,}"
+      if [ -n "$site_domain" ]; then
+        validate_domain "$site_domain"
+      fi
 
       raw_has_server_name() {
         local name="$1"
@@ -229,6 +243,52 @@ let
       NGINX
       }
 
+      emit_logo_preview_proxy_locations() {
+        cat <<NGINX
+        location = /__preview/logo-inspectie {
+          proxy_pass $webpage_upstream;
+          proxy_read_timeout 180s;
+          proxy_send_timeout 180s;
+          proxy_set_header Host \$host;
+          proxy_set_header X-Real-IP \$remote_addr;
+          proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+
+        location ^~ /__preview/logo-inspectie/ {
+          proxy_pass $webpage_upstream;
+          proxy_read_timeout 180s;
+          proxy_send_timeout 180s;
+          proxy_set_header Host \$host;
+          proxy_set_header X-Real-IP \$remote_addr;
+          proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+      NGINX
+      }
+
+      emit_logo_preview_not_found_locations() {
+        cat <<'NGINX'
+        location = /__preview/logo-inspectie {
+          return 404;
+        }
+
+        location ^~ /__preview/logo-inspectie/ {
+          return 404;
+        }
+      NGINX
+      }
+
+      emit_logo_preview_locations_for_domain() {
+        local domain="$1"
+
+        if [ -n "$site_domain" ] && [ "$domain" = "$site_domain" ]; then
+          emit_logo_preview_proxy_locations
+        else
+          emit_logo_preview_not_found_locations
+        fi
+      }
+
       emit_web_domain() {
         local domain="$1"
         local www_domain="$2"
@@ -258,6 +318,10 @@ let
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
 
+      NGINX
+        emit_logo_preview_locations_for_domain "$domain"
+        cat <<NGINX
+
         location / {
           proxy_pass $webpage_upstream;
           proxy_read_timeout 180s;
@@ -277,6 +341,10 @@ let
         server_name $www_domain;
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
+
+      NGINX
+        emit_logo_preview_not_found_locations
+        cat <<NGINX
 
         location / {
           root /var/empty;
@@ -319,6 +387,10 @@ let
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
 
+      NGINX
+        emit_logo_preview_not_found_locations
+        cat <<NGINX
+
         location / {
           root /var/empty;
           try_files /__managed_web_redirect_never_exists @managed_web_redirect;
@@ -358,6 +430,10 @@ let
         server_name $domain;
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
+
+      NGINX
+        emit_logo_preview_locations_for_domain "$domain"
+        cat <<NGINX
 
         location / {
           proxy_pass $webpage_upstream;
@@ -759,6 +835,7 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.gitMinimal
+      pkgs.nix
       pkgs.rsync
     ];
     text = ''
@@ -769,6 +846,7 @@ let
       token_file=${lib.escapeShellArg githubTokenPath}
       src=${lib.escapeShellArg webpageSourceDir}
       dst=${lib.escapeShellArg webpageRuntimeDir}
+      state=${lib.escapeShellArg webpageStateDir}
       restart_marker=${lib.escapeShellArg webpageRestartMarker}
 
       has_existing_app() {
@@ -862,6 +940,45 @@ let
       runtime_rev="$(cat "$dst/.source-rev" 2>/dev/null || true)"
       source_rev="$(git -C "$src" rev-parse HEAD)"
 
+      if ! logo_preview_store_path="$(
+        nix --extra-experimental-features 'nix-command flakes' build \
+          --no-link \
+          --print-out-paths \
+          "$src#logo-preview-assets"
+      )"; then
+        if has_existing_app; then
+          echo "Vue asset build failed; keeping existing runtime app in $dst" >&2
+          exit 0
+        fi
+        echo "Vue asset build failed and no existing runtime app is available" >&2
+        exit 1
+      fi
+      if [ ! -f "$logo_preview_store_path/index.html" ]; then
+        echo "Vue asset output is missing index.html: $logo_preview_store_path" >&2
+        exit 1
+      fi
+
+      generated_state="$state/generated-logo-directions"
+      generation_logs_state="$state/logo-generation-logs"
+      discussions_state="$state/logo-discussions"
+      install -d -m 0755 -o nginx -g nginx "$state" "$generated_state"
+      install -d -m 0700 -o nginx -g nginx "$generation_logs_state" "$discussions_state"
+
+      migrate_runtime_data() {
+        local old_path="$1"
+        local state_path="$2"
+        if [ -d "$old_path" ] && [ ! -L "$old_path" ]; then
+          rsync -a "$old_path/" "$state_path/"
+        fi
+      }
+
+      migrate_runtime_data "$dst/webpagina/generated-logo-directions" "$generated_state"
+      migrate_runtime_data "$dst/var/logo-generation-logs" "$generation_logs_state"
+      migrate_runtime_data "$dst/var/logo-discussions" "$discussions_state"
+      chown -R nginx:nginx "$state"
+      chmod 0755 "$state" "$generated_state"
+      chmod 0700 "$generation_logs_state" "$discussions_state"
+
       chown -R root:root "$src"
       rsync -a --delete \
         --chown=nginx:nginx \
@@ -871,10 +988,30 @@ let
         --exclude='.env.*' \
         --filter='protect .env' \
         --filter='protect .env.*' \
-        --filter='protect webpagina/generated-logo-directions/***' \
+        --exclude='webpagina/generated-logo-directions/' \
+        --exclude='var/logo-generation-logs/' \
+        --exclude='var/logo-discussions/' \
         --filter='protect webpagina/.well-known/***' \
         --filter='protect webpagina/security.txt' \
         "$src/" "$dst/"
+
+      install -d -m 0755 -o nginx -g nginx "$dst/preview/logo-inspectie"
+      rm -rf "$dst/preview/logo-inspectie/dist"
+      ln -s "$logo_preview_store_path" "$dst/preview/logo-inspectie/dist"
+      chown -h nginx:nginx "$dst/preview/logo-inspectie/dist"
+
+      install -d -m 0755 -o nginx -g nginx "$dst/webpagina" "$dst/var"
+      rm -rf \
+        "$dst/webpagina/generated-logo-directions" \
+        "$dst/var/logo-generation-logs" \
+        "$dst/var/logo-discussions"
+      ln -s "$generated_state" "$dst/webpagina/generated-logo-directions"
+      ln -s "$generation_logs_state" "$dst/var/logo-generation-logs"
+      ln -s "$discussions_state" "$dst/var/logo-discussions"
+      chown -h nginx:nginx \
+        "$dst/webpagina/generated-logo-directions" \
+        "$dst/var/logo-generation-logs" \
+        "$dst/var/logo-discussions"
 
       chmod 0755 "$dst/run-server.py" "$dst/start-page.sh"
 
@@ -960,6 +1097,12 @@ in
         type = lib.types.str;
         default = "webpagina";
         description = "Public web root subdirectory inside runtime.appDir.";
+      };
+
+      stateDir = lib.mkOption {
+        type = lib.types.str;
+        default = "/persist/srv/www/state";
+        description = "Persistent generated SVG, request-log, and discussion state outside runtime.appDir.";
       };
     };
 
@@ -1075,6 +1218,8 @@ in
           group = "nginx";
           mode = "0440";
           restartUnits = [
+            nginxRuntimeConfigUnit
+            "nginx.service"
             webpageEnvUnit
             webpageUnit
           ];
@@ -1163,6 +1308,7 @@ in
         nginxHttpConfPath
         nginxPreviewUsernamePath
         nginxPreviewPasswordPath
+        webContactEnvPath
         webRedirectEnvPath
         mailTlsFullchainPath
         mailTlsKeyPath

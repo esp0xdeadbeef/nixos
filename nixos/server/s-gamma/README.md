@@ -334,9 +334,39 @@ WEB_LOGO_GENERATION_API_KEY=...
 ```
 
 The website backend disables the preview route on and after the expiry date. The
-DeepSeek key must stay in SOPS only. Runtime-generated SVGs are stored below
-`webpagina/generated-logo-directions/`; the webpage sync protects that directory
-so periodic syncs do not remove reviewed generated SVGs.
+DeepSeek key must stay in SOPS only. Nginx creates explicit
+`/__preview/logo-inspectie` locations for the host in `WEB_SITE_DOMAIN`; the same
+paths return `404` on every generated redirect, `www`, and mail host. The backend
+also checks the request host, so a redirect-domain request cannot reach the tool
+through a different proxy configuration.
+
+Runtime-generated SVGs are exposed below
+`webpagina/generated-logo-directions/`. Full DeepSeek request/response logs are
+available to the backend in `var/logo-generation-logs/`; they include the prompt
+and optional reference SVG text, but never the API key. Private per-SVG DeepSeek
+discussions and write-through review notes are available in
+`var/logo-discussions/`.
+Discussion files are keyed by the SVG content hash, and their full thread is
+included as backend-owned context in later generations from that reference. The
+runtime manifest derives the selectable apex-domain list from encrypted web
+environment values; concrete domains remain outside this repository. Periodic
+The actual data lives outside the rsync target under `/persist/srv/www/state/`;
+the sync migrates legacy in-app data and recreates symlinks after each update.
+Consequently `rsync --delete`, periodic syncs, and reboots do not remove these
+runtime files.
+
+The inspection UI itself is built by the webpage repository's
+`logo-preview-assets` flake package. The sync service verifies the pinned npm
+dependency hash, builds the Vue bundle, and replaces
+`preview/logo-inspectie/dist` with a symlink to the resulting immutable
+`/nix/store/*-logo-inspectie-assets-*` path. A failed frontend build leaves the
+existing runtime application untouched. Check the deployed provenance with:
+
+```bash
+readlink /persist/srv/www/app/preview/logo-inspectie/dist
+readlink /persist/srv/www/app/webpagina/generated-logo-directions
+readlink /persist/srv/www/app/var/logo-discussions
+```
 
 After committing and pushing webpage changes, restart the sync and app units, or
 let the `<host>-webpage-sync.timer` refresh the checkout. The sync service keeps
