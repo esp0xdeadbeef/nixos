@@ -221,6 +221,14 @@ let
         done
       }
 
+      emit_preview_auth_map() {
+        cat <<NGINX
+      map "\$scheme:\$host" \$managed_web_preview_realm {
+        default \$managed_web_preview_path_realm;
+      }
+      NGINX
+      }
+
       emit_web_domain() {
         local domain="$1"
         local www_domain="$2"
@@ -418,11 +426,14 @@ let
       mv "$tmp_generated" "$generated_mailbox_conf"
 
       tmp_conf="$(mktemp "$nginx_dir/http.conf.XXXXXX")"
-      cat > "$tmp_conf" <<'NGINX_SECURITY_HEADERS'
+      {
+        cat <<'NGINX_SECURITY_HEADERS'
       ${nginxSecurityHeaders}
       NGINX_SECURITY_HEADERS
-      cat "$raw_conf" >> "$tmp_conf"
-      cat "$generated_mailbox_conf" >> "$tmp_conf"
+        emit_preview_auth_map
+        cat "$raw_conf"
+        cat "$generated_mailbox_conf"
+      } > "$tmp_conf"
       chown nginx:nginx "$tmp_conf"
       chmod 0440 "$tmp_conf"
       mv "$tmp_conf" "$rendered_conf"
@@ -1254,7 +1265,7 @@ in
           'referer="$http_referer" user_agent="$http_user_agent"';
         access_log /var/log/nginx/access.log managed_web_host_combined;
 
-        map $uri $managed_web_preview_realm {
+        map $uri $managed_web_preview_path_realm {
           default "preview";
           /.well-known/security.txt off;
           /security.txt off;
