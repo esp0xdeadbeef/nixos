@@ -18,6 +18,7 @@
 
     nixos-router-vpn-gateway = {
       url = "github:esp0xdeadbeef/nixos-router-vpn-gateway";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
     nixos-mailserver = {
