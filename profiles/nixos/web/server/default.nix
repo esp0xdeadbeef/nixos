@@ -487,7 +487,6 @@ in
       after = [ "network-online.target" ];
       before = [ webpageUnit ];
       wants = [ "network-online.target" ];
-      requiredBy = [ webpageUnit ];
       wantedBy = [ "multi-user.target" ];
       unitConfig.OnSuccess = [ webpageReloadUnit ];
       serviceConfig = {
@@ -574,10 +573,7 @@ in
         webpageSyncUnit
         webpageEnvUnit
       ];
-      requires = [
-        webpageSyncUnit
-        webpageEnvUnit
-      ];
+      requires = [ webpageEnvUnit ];
       wantedBy = [ "multi-user.target" ];
       environment = {
         HOST = webpageHost;
