@@ -183,7 +183,9 @@ Client account order is default-aware. For hosted accounts, set
 `MAILBOX_DEFAULT_ADDRESS=alice@example.com` in exactly one mailbox set. For a
 client-only external account, set `MAIL_ACCOUNT_DEFAULT=true`. aerc and Geary
 render default accounts first and then render the remaining client accounts in
-the normal discovered order.
+the normal discovered order. On `s-gamma`, that one hosted default mailbox set
+is also the source of truth for the canonical website domain. Activation fails
+when no hosted set, or more than one hosted set, contains a default marker.
 
 Retention is account-driven. Set `MAIL_ACCOUNT_RETENTION_DAYS=30` on
 administrative or shared mailboxes such as contact, no-reply, and postmaster
@@ -213,7 +215,6 @@ The web contact env secret is a shell env file for the contact form backend:
 
 ```text
 WEB_SITE_NAME=Example
-WEB_SITE_DOMAIN=example.com
 WEB_CONTACT_MAILBOX_SET=mailbox-001
 WEB_CONTACT_ACCOUNT=mail-account-003
 WEB_FORM_SMTP_AUTH_FROM_ACCOUNT=false
@@ -230,7 +231,9 @@ TOKEN_SECRET=...
 mailbox set/domain when the same account id appears in more than one
 `MAILBOX_ACCOUNTS` set. The webpage environment renderer derives
 `WEB_CONTACT_EMAIL`, `CONTACT_FROM`, `SMTP_HOST`, `SMTP_PORT`, and
-`WEB_SITE_URL` from the same mailbox/account secrets that configure mail.
+`WEB_SITE_DOMAIN`, `WEB_SITE_URL`, `CONTACT_SITE_URL`, and the redirect target
+from the same mailbox/account secrets that configure mail. Do not duplicate
+those canonical values in `web/contact/env` or `web/redirects/env`.
 
 Use `WEB_PUBLIC_CONTACT_ACCOUNT` plus `WEB_PUBLIC_CONTACT_MAILBOX_SET` and
 `WEB_FORM_ACCOUNT` plus `WEB_FORM_MAILBOX_SET` when the public contact address
@@ -251,22 +254,26 @@ WEB_LEGAL_UPDATED=1 januari 2026
 WEB_FOOTER_TAGLINE=Offensive security vanuit Nederland.
 ```
 
-The renderer also publishes a `security.txt` file from the same runtime env.
-By default it uses `WEB_CONTACT_EMAIL` and `WEB_SITE_URL`; override these only
-when the disclosure contact or canonical URL must differ:
+The Python backend serves RFC 9116 `security.txt` dynamically from
+`/.well-known/security.txt`; `/security.txt` permanently redirects to that
+location. By default it uses `WEB_CONTACT_EMAIL`, the selected canonical domain,
+and an expiry six months after the request. Override fields only when needed:
 
 ```text
-WEB_SECURITY_CONTACT_EMAIL=security@example.com
-WEB_SECURITY_SITE_URL=https://example.com
-WEB_SECURITY_CANONICAL_URL=https://example.com/.well-known/security.txt
-WEB_SECURITY_EXPIRES_AFTER=+180 days
+WEB_SECURITY_CONTACT=mailto:security@example.com
+WEB_SECURITY_CANONICAL=https://example.com/.well-known/security.txt
+WEB_SECURITY_EXPIRES=2027-01-01T00:00:00Z
+WEB_SECURITY_LANGUAGES=nl,en
+WEB_SECURITY_POLICY=https://example.com/security-policy
 ```
+
+The endpoint is only served when the request host equals the derived canonical
+domain. Redirect hosts continue to serve their interstitial for every path.
 
 Web redirects are configured from a separate SOPS env secret:
 
 ```text
 WEB_REDIRECT_DOMAINS=example.net www.example.net
-WEB_REDIRECT_TARGET_URL=https://example.com
 WEB_REDIRECT_STATUS=301
 ```
 
@@ -274,7 +281,9 @@ To add another web-only redirect domain, keep the concrete domain in
 `web/redirects/env`, point DNS A/AAAA records at this host, and include the same
 names in `MAIL_TLS_DOMAINS` so the shared runtime certificate covers HTTPS. The
 public Nix module only enables `profiles.nixos.web.redirect-domains`; redirect
-domain names and targets should not be committed outside encrypted SOPS data.
+domain names should not be committed outside encrypted SOPS data. The target is
+always derived as `https://<canonical-domain>` from the single default mailbox
+set.
 
 Shared mailbox access is ACL-driven. Non-client mail accounts are automatically
 shared only to client mail accounts in the same hosted mailbox set/domain.
@@ -309,18 +318,27 @@ server env secret when the mail certificate needs more names than `MAIL_FQDN`.
 
 ## Web runtime
 
-The real webpage source is private and is not fetched by Nix evaluation or put in
-the Nix store. `<host>-webpage-sync.service` clones or updates the `main` branch
-of `esp0xdeadbeef/www` at runtime using `/run/secrets/gh-token`, then copies the
-working tree to:
+The webpage source is not fetched during Nix evaluation.
+`<host>-webpage-sync.service` clones or updates the `main` branch of
+`esp0xdeadbeef/www` at runtime using `/run/secrets/gh-token`, then runs that
+checkout's `deploy/sync-runtime.sh` to update:
 
 ```text
 /persist/srv/www/app
 ```
 
 The source checkout itself lives at `/persist/srv/www/source`. This avoids
-private GitHub tarball failures during `nixos-rebuild`, and avoids storing the
-webpage source or GitHub token in `/nix/store`.
+private GitHub fetches during `nixos-rebuild`. Runtime flake builds import the
+checkout as a local build input for pinned frontend, favicon, Python, and font
+outputs; the PAT and SOPS values never enter the store.
+
+Application deployment logic belongs to the `www` repository. Besides
+`sync-runtime.sh`, it owns `render-environment.sh`,
+`prepare-nginx-runtime.sh`, `reload-after-sync.sh`, and the legacy provider-data
+cleanup. The public Nix module only supplies SOPS paths, service identities,
+ordering, runtime paths, and the PAT-authenticated bootstrap needed before those
+scripts exist. Read the `www` README before changing sync masks or runtime
+behavior.
 
 Preview-only website tooling must be controlled from encrypted runtime env, not
 from public Nix. For temporary logo inspection and SVG generation, keep these in
@@ -335,27 +353,47 @@ WEB_LOGO_GENERATION_API_KEY=...
 
 The website backend disables the preview route on and after the expiry date. The
 DeepSeek key must stay in SOPS only. Nginx creates explicit
-`/__preview/logo-inspectie` locations for the host in `WEB_SITE_DOMAIN`; the same
+`/__preview/logo-inspectie` locations for the derived `WEB_SITE_DOMAIN`; the same
 paths return `404` on every generated redirect, `www`, and mail host. The backend
 also checks the request host, so a redirect-domain request cannot reach the tool
 through a different proxy configuration.
 
 Runtime-generated SVGs are exposed below
-`webpagina/generated-logo-directions/`. Full DeepSeek request/response logs are
-available to the backend in `var/logo-generation-logs/`; they include the prompt
-and optional reference SVG text, but never the API key. Private per-SVG DeepSeek
-discussions and write-through review notes are available in
-`var/logo-discussions/`.
+`webpagina/generated-logo-directions/`. The backend deliberately does not
+archive raw DeepSeek requests, responses, reasoning, or failed attempts. It
+persists only functional review state: SVG metadata with the visible prompt,
+private per-SVG chat messages, write-through drafts, notes, and slogans.
 Validated SVGs returned inside a discussion are written as new generated files,
 attached to the assistant message, and inherit the full discussion thread.
 Discussion files are keyed by the SVG content hash, and their full thread is
 included as backend-owned context in later generations from that reference. The
 runtime manifest derives the selectable apex-domain list from encrypted web
-environment values; concrete domains remain outside this repository. Periodic
-The actual data lives outside the rsync target under `/persist/srv/www/state/`;
-the sync migrates legacy in-app data and recreates symlinks after each update.
-Consequently `rsync --delete`, periodic syncs, and reboots do not remove these
-runtime files.
+environment values; concrete domains remain outside this repository.
+
+The webpage repository's `backend-runtime` flake package supplies a
+service-only `FONTCONFIG_FILE` with ten pinned font packages and a Python
+environment containing FontTools and Brotli.
+It subsets used glyphs to WOFF2 and embeds them in every newly stored SVG. These
+fonts are not added to the host-wide `fonts.packages`, and the browser does not
+need them installed or fetched through JavaScript. Embedded font data is removed
+from model references before they are sent back to DeepSeek.
+
+The complete runtime app lives persistently under `/persist/srv/www/app`.
+`sync-runtime.sh` protects `webpagina/generated-logo-directions/`,
+`var/logo-discussions/`, and `var/logo-slogans/` from `rsync --delete`, and
+migrates any old `/persist/srv/www/state/` directories once. Periodic syncs and
+reboots therefore retain the functional state without runtime symlinks. Old
+provider-log directories and legacy raw provider fields are removed.
+
+The backend runs as the dedicated `<host>-webpage` system user, not as `nginx`.
+SOPS source files remain `root:root 0400`. A root-owned one-shot renderer reads
+mail and web secrets, writes only an explicit allowlist to
+`/run/<host>/webpage/env`, and makes that file readable only by the backend.
+Nginx receives only its generated HTTP include and htpasswd under
+`/run/<host>/nginx`; it cannot read the backend env, mailbox/account source
+secrets, DeepSeek key, or SMTP credential. Generated SVGs are public preview
+state, while discussions and slogans are mode `0700` state owned by the backend
+user.
 
 The inspection UI itself is built by the webpage repository's
 `logo-preview-assets` flake package. The sync service verifies the pinned npm
@@ -366,8 +404,10 @@ existing runtime application untouched. Check the deployed provenance with:
 
 ```bash
 readlink /persist/srv/www/app/preview/logo-inspectie/dist
-readlink /persist/srv/www/app/webpagina/generated-logo-directions
-readlink /persist/srv/www/app/var/logo-discussions
+readlink /persist/srv/www/app/.backend-runtime
+test -d /persist/srv/www/app/webpagina/generated-logo-directions
+test -d /persist/srv/www/app/var/logo-discussions
+test -d /persist/srv/www/app/var/logo-slogans
 ```
 
 After committing and pushing webpage changes, restart the sync and app units, or
@@ -379,16 +419,11 @@ For an immediate refresh:
 systemctl start "$(hostname)-webpage-sync.service"
 ```
 
-`<host>-webpage.service` runs the backend from `/persist/srv/www/app` on
-localhost. Nginx reverse proxies to it and owns the preview access gate. To
-temporarily test an override, stop the service and run the app manually from the
-runtime dir:
-
-```bash
-systemctl stop "$(hostname)-webpage.service"
-cd /persist/srv/www/app
-python ./run-server.py
-```
+`<host>-webpage.service` runs the backend as `<host>-webpage` from
+`/persist/srv/www/app` on localhost. Nginx reverse proxies to it and owns the
+preview access gate. Preserve that service identity during manual debugging;
+running the backend as `nginx` defeats the credential boundary, while running it
+as root can hide permission errors.
 
 Expected live behavior during migration:
 

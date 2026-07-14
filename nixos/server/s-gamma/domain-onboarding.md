@@ -126,8 +126,13 @@ plus generic account ids:
 MAILBOX_DOMAIN=<domain>
 MAILBOX_MAIL_HOST=mail.<domain>
 MAILBOX_ACCOUNTS=mail-account-NNN mail-account-NNN
-MAILBOX_DEFAULT_ACCOUNT=mail-account-NNN
 ```
+
+Add `MAILBOX_DEFAULT_ACCOUNT=mail-account-NNN` only when this domain should
+become the canonical website domain and the default account in aerc/Geary.
+Exactly one hosted mailbox set across the complete inventory must contain
+`MAILBOX_DEFAULT_ACCOUNT` or `MAILBOX_DEFAULT_ADDRESS`; adding the marker to an
+ordinary redirect domain makes activation fail.
 
 Add only the generic mailbox id to `profiles/mail/inventory.nix`. Do not add the
 domain name there. If the domain should be a web redirect, edit only the
@@ -135,7 +140,6 @@ encrypted `web/redirects/env` value in `secrets/s-gamma-runtime.yaml`:
 
 ```text
 WEB_REDIRECT_DOMAINS=<domain> www.<domain>
-WEB_REDIRECT_TARGET_URL=https://<canonical-domain>
 WEB_REDIRECT_STATUS=301
 ```
 
@@ -144,28 +148,31 @@ concrete names in the encrypted `MAIL_TLS_DOMAINS` value, not in Nix modules.
 
 ### Change the canonical web domain
 
-Changing the primary public domain is an encrypted runtime change. Keep concrete
-domains in `secrets/s-gamma-runtime.yaml` only.
+Changing the primary public domain is an encrypted mailbox change. The canonical
+domain is `MAILBOX_DOMAIN` from the single hosted mailbox set carrying
+`MAILBOX_DEFAULT_ACCOUNT` or `MAILBOX_DEFAULT_ADDRESS`. Move that marker from
+the old set to the new set; do not duplicate the domain in `web/contact/env`.
+The same marker makes this domain/account the first default in aerc and Geary.
 
-In encrypted `web/contact/env`, update the public site fields and, when the
-public/form mail addresses should move with the domain, point the mailbox-set
-selectors at the hosted mailbox set for the new canonical domain:
+When the public/form mail addresses should also move, update only their generic
+mailbox-set selectors in encrypted `web/contact/env`:
 
 ```text
-CONTACT_SITE_URL=https://<new-canonical-domain>/
-WEB_SITE_DOMAIN=<new-canonical-domain>
-WEB_SITE_URL=https://<new-canonical-domain>
 WEB_PUBLIC_CONTACT_MAILBOX_SET=mailbox-NNN
 WEB_FORM_MAILBOX_SET=mailbox-NNN
 WEB_CONTACT_MAILBOX_SET=mailbox-NNN
 ```
 
-In encrypted `web/redirects/env`, change the target and adjust the domain list:
+In encrypted `web/redirects/env`, adjust only the domain list:
 
 ```text
-WEB_REDIRECT_TARGET_URL=https://<new-canonical-domain>
 WEB_REDIRECT_DOMAINS=<old-canonical-domain> www.<old-canonical-domain> ...
 ```
+
+The webpage renderer derives `WEB_SITE_DOMAIN`, `WEB_SITE_URL`,
+`CONTACT_SITE_URL`, `WEB_REDIRECT_TARGET_URL`, and the allowed redirect target
+from the default mailbox set. Both the webpage and nginx environment renderers
+require exactly one default and reject a conflicting legacy `WEB_SITE_DOMAIN`.
 
 Do not leave the new canonical apex or `www.<new-canonical-domain>` in
 `WEB_REDIRECT_DOMAINS`. The nginx generator treats the apex and `www` pair
@@ -187,11 +194,12 @@ curl -I https://<new-canonical-domain>/
 curl -I https://<old-canonical-domain>/
 ```
 
-During preview, unauthenticated checks should still return `401` with
-`Basic realm="preview"`. Use preview credentials only for redirect-page/body
-checks; do not disable basic auth to test this.
+During preview, an unauthenticated check on the canonical domain must return
+`401` with `Basic realm="preview"`. Redirect domains are deliberately public:
+they return the redirect interstitial without credentials and then navigate to
+the canonical target. Do not weaken auth on the canonical host to test this.
 
-`WEB_SITE_DOMAIN` also owns temporary host-specific backend tooling such as
+The derived `WEB_SITE_DOMAIN` also owns temporary host-specific backend tooling such as
 `/__preview/logo-inspectie/`. Changing the canonical domain moves that explicit
 nginx endpoint to the new host. Verify that it returns `401` on the canonical
 host while preview auth is active and `404` on every redirect domain; a `30x` to
@@ -269,17 +277,19 @@ ssh root@<server> "cat /persist/var/lib/acme/s-gamma-mail/fullchain.pem" |
 
 ## Basic auth
 
-The website must stay behind preview auth until the release date. Do not remove
-or override the global nginx `auth_basic` settings in
-`profiles/nixos/web/server/default.nix`. The only unauthenticated web paths
-should be `security.txt` endpoints.
+The canonical website must stay behind preview auth until the release date. Do
+not remove the global nginx `auth_basic` settings in
+`profiles/nixos/web/server/default.nix`. The `security.txt` endpoints and hosts
+listed in encrypted `WEB_REDIRECT_DOMAINS` are the intentional exceptions.
 
-The runtime nginx include must not contain host-level `off` entries. The preview
-realm map should only delegate to the path-level map:
+The runtime nginx include renders host-level `off` entries only for the encrypted
+redirect-domain list; concrete domains stay out of Nix source:
 
 ```nginx
 map "$scheme:$host" $managed_web_preview_realm {
   default $managed_web_preview_path_realm;
+  "http:<redirect-domain>" off;
+  "https:<redirect-domain>" off;
 }
 ```
 
@@ -302,8 +312,9 @@ ssh root@<server> "sed -n '1,80p' /run/s-gamma/nginx/http.conf"
 Verify before finishing:
 
 ```bash
-curl -I https://<domain>/
-curl -I https://<domain>/.well-known/security.txt
+curl -I https://<canonical-domain>/
+curl -I https://<canonical-domain>/.well-known/security.txt
+curl -I https://<redirect-domain>/any/nonexistent/file
 ```
 
 When public DNS is still propagating, force the check against `s-gamma`:
@@ -316,6 +327,25 @@ curl -k -sS -o /dev/null -D - --resolve <domain>:443:<server-ip> https://<domain
 Expected during preview:
 
 ```text
-https://<domain>/                  -> 401 with Basic realm="preview"
-https://<domain>/.well-known/security.txt -> 200
+https://<canonical-domain>/                       -> 401 with Basic realm="preview"
+https://<canonical-domain>/.well-known/security.txt -> 200
+https://<redirect-domain>/any/nonexistent/file    -> 200 HTML, no WWW-Authenticate
 ```
+
+## Runtime privilege checks
+
+The Python backend and nginx must not share an identity. After deployment,
+verify the service user and the rendered credential boundary:
+
+```bash
+ssh root@<server> 'systemctl show s-gamma-webpage.service -p User -p Group'
+ssh root@<server> 'stat -c "%U:%G %a %n" /run/s-gamma/webpage /run/s-gamma/webpage/env /run/s-gamma/nginx/http.conf /run/s-gamma/nginx/htpasswd'
+ssh root@<server> 'sudo -u s-gamma-webpage test -r /run/s-gamma/webpage/env'
+ssh root@<server> 'sudo -u nginx test ! -r /run/s-gamma/webpage/env'
+ssh root@<server> 'sudo -u nginx test -r /run/s-gamma/nginx/http.conf'
+```
+
+SOPS source secrets are `root:root 0400`. Root-owned one-shot services render a
+minimal backend env and nginx-only files; neither long-running service gets the
+complete source secret set. Do not add `nginx` to the backend group or run the
+Python service as `nginx` to work around a failed permission check.
