@@ -240,7 +240,6 @@ let
         listen [::]:443 ssl;
         http2 on;
         server_name $domain;
-        auth_basic off;
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
 
@@ -312,7 +311,6 @@ let
         listen [::]:443 ssl;
         http2 on;
         server_name $domain;
-        auth_basic off;
         ssl_certificate $tls_fullchain;
         ssl_certificate_key $tls_key;
 
