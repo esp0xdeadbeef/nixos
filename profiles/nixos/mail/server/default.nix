@@ -158,10 +158,18 @@ in
     };
 
     sharedSubscriptions = {
-      service.wantedBy = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [ "multi-user.target" ];
-        description = "Systemd targets that should directly start the Dovecot shared mailbox ACL projection sync.";
+      service = {
+        wantedBy = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "multi-user.target" ];
+          description = "Systemd targets that should directly start the Dovecot shared mailbox ACL projection sync.";
+        };
+
+        startWithDovecot = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether Dovecot should automatically start the shared mailbox ACL projection sync after it starts.";
+        };
       };
 
       timer = {
@@ -370,6 +378,9 @@ in
     systemd.services.dovecot = {
       after = [ mailRuntimeConfigUnit ];
       requires = [ mailRuntimeConfigUnit ];
+      wants = lib.optionals cfg.sharedSubscriptions.service.startWithDovecot [
+        "${sharedSubscriptionsService}.service"
+      ];
     };
 
     systemd.services.${sharedSubscriptionsService} = {

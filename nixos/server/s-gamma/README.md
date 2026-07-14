@@ -282,7 +282,10 @@ shared only to client mail accounts in the same hosted mailbox set/domain.
 are not needed for normal account-to-client sharing. The
 `<host>-mail-shared-subscriptions` unit refreshes the Dovecot sharing map,
 subscribes users to explicitly managed same-domain shared mailbox folders, and
-rebuilds the Postfix sender-login map for ACL entries with the `post` right.
+rebuilds the Postfix sender-login map for ACL entries with the `post` right. On
+`s-gamma` this unit is started automatically by Dovecot on boot and restart, so
+mailbox subscriptions are projected when the mail runtime is initialized without
+running a periodic refresh timer.
 Set `profiles.mail.server.sharedNamespaceIncludeDomain = true` for deployments
 that need disambiguation across multiple shared domain listings, yielding
 `s/example.com/contact`. Set `profiles.mail.server.sharedExplicitInbox = true`

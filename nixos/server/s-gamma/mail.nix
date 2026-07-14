@@ -19,7 +19,7 @@ in
     sharedInheritInboxAcl = true;
     sharedSubscriptions = {
       service.wantedBy = [ ];
-      timer.onUnitActiveSec = null;
+      timer.enable = false;
     };
 
     networkAddress.unit = "${config.networking.hostName}-network-addresses.service";
