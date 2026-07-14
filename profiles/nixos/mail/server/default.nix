@@ -157,10 +157,32 @@ in
       description = "Whether Dovecot should use INBOX ACLs as defaults for shared child mailboxes.";
     };
 
-    sharedSubscriptions.timer.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Whether to periodically refresh Dovecot shared mailbox ACL projections.";
+    sharedSubscriptions = {
+      service.wantedBy = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "multi-user.target" ];
+        description = "Systemd targets that should directly start the Dovecot shared mailbox ACL projection sync.";
+      };
+
+      timer = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether to refresh Dovecot shared mailbox ACL projections from a timer.";
+        };
+
+        onBootSec = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = "2min";
+          description = "Delay after boot before refreshing Dovecot shared mailbox ACL projections.";
+        };
+
+        onUnitActiveSec = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = "15min";
+          description = "Periodic interval for refreshing Dovecot shared mailbox ACL projections.";
+        };
+      };
     };
 
     networkAddress = {
@@ -360,7 +382,7 @@ in
         "dovecot.service"
         mailRuntimeConfigUnit
       ];
-      wantedBy = [ "multi-user.target" ];
+      wantedBy = cfg.sharedSubscriptions.service.wantedBy;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe syncSharedMailSubscriptions;
@@ -370,12 +392,17 @@ in
     systemd.timers.${sharedSubscriptionsService} = lib.mkIf cfg.sharedSubscriptions.timer.enable {
       description = "Refresh Dovecot shared mailbox ACL projections";
       wantedBy = [ "timers.target" ];
-      timerConfig = {
-        OnBootSec = "2min";
-        OnUnitActiveSec = "15min";
-        AccuracySec = "1min";
-        Persistent = true;
-      };
+      timerConfig =
+        {
+          AccuracySec = "1min";
+          Persistent = true;
+        }
+        // lib.optionalAttrs (cfg.sharedSubscriptions.timer.onBootSec != null) {
+          OnBootSec = cfg.sharedSubscriptions.timer.onBootSec;
+        }
+        // lib.optionalAttrs (cfg.sharedSubscriptions.timer.onUnitActiveSec != null) {
+          OnUnitActiveSec = cfg.sharedSubscriptions.timer.onUnitActiveSec;
+        };
     };
 
     systemd.services.${mailRetentionService} = {
