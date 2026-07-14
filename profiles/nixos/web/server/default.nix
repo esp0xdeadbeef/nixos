@@ -867,6 +867,7 @@ let
         --exclude='.env.*' \
         --filter='protect .env' \
         --filter='protect .env.*' \
+        --filter='protect webpagina/generated-logo-directions/***' \
         --filter='protect webpagina/.well-known/***' \
         --filter='protect webpagina/security.txt' \
         "$src/" "$dst/"

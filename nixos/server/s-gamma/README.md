@@ -322,6 +322,22 @@ The source checkout itself lives at `/persist/srv/www/source`. This avoids
 private GitHub tarball failures during `nixos-rebuild`, and avoids storing the
 webpage source or GitHub token in `/nix/store`.
 
+Preview-only website tooling must be controlled from encrypted runtime env, not
+from public Nix. For temporary logo inspection and SVG generation, keep these in
+`web/contact/env`:
+
+```bash
+WEB_LOGO_INSPECTION_ENABLED=true
+WEB_PREVIEW_TOOLS_EXPIRES_ON=2026-08-01
+WEB_LOGO_GENERATION_MODEL=deepseek-v4-pro
+WEB_LOGO_GENERATION_API_KEY=...
+```
+
+The website backend disables the preview route on and after the expiry date. The
+DeepSeek key must stay in SOPS only. Runtime-generated SVGs are stored below
+`webpagina/generated-logo-directions/`; the webpage sync protects that directory
+so periodic syncs do not remove reviewed generated SVGs.
+
 After committing and pushing webpage changes, restart the sync and app units, or
 let the `<host>-webpage-sync.timer` refresh the checkout. The sync service keeps
 the existing runtime app when GitHub is temporarily unavailable during boot.
