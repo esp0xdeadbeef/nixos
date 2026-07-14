@@ -157,6 +157,12 @@ in
       description = "Whether Dovecot should use INBOX ACLs as defaults for shared child mailboxes.";
     };
 
+    sharedSubscriptions.timer.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether to periodically refresh Dovecot shared mailbox ACL projections.";
+    };
+
     networkAddress = {
       secretName = lib.mkOption {
         type = lib.types.str;
@@ -361,7 +367,7 @@ in
       };
     };
 
-    systemd.timers.${sharedSubscriptionsService} = {
+    systemd.timers.${sharedSubscriptionsService} = lib.mkIf cfg.sharedSubscriptions.timer.enable {
       description = "Refresh Dovecot shared mailbox ACL projections";
       wantedBy = [ "timers.target" ];
       timerConfig = {

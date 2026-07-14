@@ -11,6 +11,7 @@ let
   certMailService = "${hostName}-cert-mail";
   certMailUnit = "${certMailService}.service";
   mailRuntimeConfigUnit = "${hostName}-mail-runtime-config.service";
+  nginxRuntimeConfigUnit = "${hostName}-nginx-runtime-config.service";
   runtimeRoot = "/run/${hostName}";
   mailTlsRuntimeDir = "${runtimeRoot}/mail/tls";
   mailAcmeDir = "/var/lib/acme/${hostName}-mail";
@@ -379,6 +380,7 @@ in
       requires = [ networkAddressesUnit ];
       before = [
         mailRuntimeConfigUnit
+        nginxRuntimeConfigUnit
         "postfix.service"
         "dovecot.service"
       ];
@@ -391,6 +393,16 @@ in
         networkAddressEnvPath
       ] + waitForReadableFiles "mail certificate mailbox sets" mailboxSetEnvPaths;
       script = "${lib.getExe renewMailCertificate}";
+    };
+
+    systemd.services."${hostName}-mail-runtime-config" = {
+      after = [ certMailUnit ];
+      requires = [ certMailUnit ];
+    };
+
+    systemd.services."${hostName}-nginx-runtime-config" = {
+      after = [ certMailUnit ];
+      requires = [ certMailUnit ];
     };
 
     systemd.timers.${certMailService} = {

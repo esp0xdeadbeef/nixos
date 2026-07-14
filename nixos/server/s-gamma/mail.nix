@@ -17,6 +17,7 @@ in
     sharedNamespaceIncludeDomain = hasMultipleMailboxSets;
     sharedExplicitInbox = true;
     sharedInheritInboxAcl = true;
+    sharedSubscriptions.timer.enable = false;
 
     networkAddress.unit = "${config.networking.hostName}-network-addresses.service";
 
