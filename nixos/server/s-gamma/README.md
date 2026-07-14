@@ -346,6 +346,8 @@ available to the backend in `var/logo-generation-logs/`; they include the prompt
 and optional reference SVG text, but never the API key. Private per-SVG DeepSeek
 discussions and write-through review notes are available in
 `var/logo-discussions/`.
+Validated SVGs returned inside a discussion are written as new generated files,
+attached to the assistant message, and inherit the full discussion thread.
 Discussion files are keyed by the SVG content hash, and their full thread is
 included as backend-owned context in later generations from that reference. The
 runtime manifest derives the selectable apex-domain list from encrypted web
