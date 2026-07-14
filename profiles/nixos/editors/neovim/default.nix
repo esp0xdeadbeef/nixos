@@ -45,7 +45,7 @@ in
     nil
     nixfmt
     nodejs
-    prettier
+    unstablePkgs.prettier
     pyright
     typescript-language-server
     vim
