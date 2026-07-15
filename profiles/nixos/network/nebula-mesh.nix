@@ -1,5 +1,4 @@
 { config
-, lib
 , pkgs
 , ...
 }:
@@ -10,7 +9,8 @@ let
   publicIpSecret = "nebula-lighthouse-public-ip";
   lighthouseAddress = "100.64.0.1";
   renderedConfig = "nebula-mesh.json";
-  restartUnits = [ "nebula@mesh.service" ];
+  serviceName = "nebula-mesh";
+  restartUnits = [ "${serviceName}.service" ];
   firewallRules = [
     {
       host = "any";
@@ -77,23 +77,54 @@ in
     mode = "0440";
   };
 
-  services.nebula.networks.mesh = {
-    enable = true;
-    isLighthouse = false;
-    lighthouses = [ lighthouseAddress ];
-    staticHostMap.${lighthouseAddress} = [ "192.168.3.10:4242" ];
-    ca = config.sops.secrets.${caSecret}.path;
-    cert = config.sops.secrets.${certSecret}.path;
-    key = config.sops.secrets.${keySecret}.path;
-    firewall = {
-      inbound = firewallRules;
-      outbound = firewallRules;
+  users = {
+    groups.${serviceName} = { };
+    users.${serviceName} = {
+      description = "Nebula mesh service user";
+      group = serviceName;
+      isSystemUser = true;
     };
   };
 
-  systemd.services."nebula@mesh" = {
-    requires = [ "sops-nix.service" ];
-    after = [ "sops-nix.service" ];
-    serviceConfig.ExecStart = lib.mkForce "${pkgs.nebula}/bin/nebula -config ${config.sops.templates.${renderedConfig}.path}";
+  systemd.services.${serviceName} = {
+    description = "Nebula VPN service for mesh";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "basic.target" ];
+    after = [
+      "basic.target"
+      "network.target"
+    ];
+    before = [ "sshd.service" ];
+    unitConfig.StartLimitIntervalSec = 0;
+    serviceConfig = {
+      Type = "notify";
+      Restart = "always";
+      ExecStartPre = "${pkgs.nebula}/bin/nebula -test -config ${config.sops.templates.${renderedConfig}.path}";
+      ExecStart = "${pkgs.nebula}/bin/nebula -config ${config.sops.templates.${renderedConfig}.path}";
+      ExecReload = "${pkgs.coreutils}/bin/kill -s HUP $MAINPID";
+      UMask = "0027";
+      CapabilityBoundingSet = "CAP_NET_ADMIN";
+      AmbientCapabilities = "CAP_NET_ADMIN";
+      LockPersonality = true;
+      NoNewPrivileges = true;
+      PrivateDevices = false;
+      DeviceAllow = "/dev/net/tun rw";
+      DevicePolicy = "closed";
+      PrivateTmp = true;
+      PrivateUsers = false;
+      ProtectClock = true;
+      ProtectControlGroups = true;
+      ProtectHome = true;
+      ProtectHostname = true;
+      ProtectKernelLogs = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ProtectProc = "invisible";
+      ProtectSystem = true;
+      RestrictNamespaces = true;
+      RestrictSUIDSGID = true;
+      User = serviceName;
+      Group = serviceName;
+    };
   };
 }
