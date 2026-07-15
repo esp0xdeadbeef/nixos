@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ pkgs, ... }:
 
 {
   environment.systemPackages = with pkgs; [
@@ -14,5 +14,21 @@
     key = "/persist/etc/nebula/beacon.key";
     ca = "/persist/etc/nebula/ca.crt";
 
+    firewall = {
+      inbound = [
+        {
+          host = "any";
+          port = "any";
+          proto = "any";
+        }
+      ];
+      outbound = [
+        {
+          host = "any";
+          port = "any";
+          proto = "any";
+        }
+      ];
+    };
   };
 }
