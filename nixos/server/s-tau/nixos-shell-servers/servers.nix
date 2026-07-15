@@ -83,6 +83,8 @@ let
       name = "s-router-clab";
       args = {
         description = "s-router-clab VM (nixos-shell)";
+        registerImage = true;
+        rebuildFromLatestLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
       };
     }
@@ -90,6 +92,8 @@ let
       name = "s-router-nixos";
       args = {
         description = "s-router-nixos VM (nixos-shell)";
+        registerImage = true;
+        rebuildFromLatestLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-nixos"}";
       };
     }
@@ -105,6 +109,8 @@ let
       name = "s-router-test-clients";
       args = {
         description = "s-router-test-clients VM (nixos-shell)";
+        registerImage = true;
+        rebuildFromLatestLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-test-clients"}";
       };
     }
@@ -137,7 +143,10 @@ let
     value = self.nixosConfigurations.${vm.name}.config.system.build.nixos-shell;
   };
 
-  mkService = vm: mkVM vm.name (vm.args // { registerImage = false; });
+  mkService = vm:
+    mkVM vm.name (vm.args // {
+      registerImage = vm.args.registerImage or false;
+    });
 in
 {
   config = lib.mkMerge (

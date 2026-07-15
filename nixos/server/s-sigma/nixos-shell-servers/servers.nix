@@ -91,6 +91,8 @@ let
       name = "s-router-clab";
       args = {
         description = "s-router-clab VM (nixos-shell)";
+        registerImage = true;
+        rebuildFromLatestLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
       };
     }
@@ -98,6 +100,8 @@ let
       name = "s-router-nixos";
       args = {
         description = "s-router-nixos VM (nixos-shell)";
+        registerImage = true;
+        rebuildFromLatestLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-nixos"}";
       };
     }
@@ -105,6 +109,8 @@ let
       name = "s-router-test-clients";
       args = {
         description = "s-router-test-clients VM (nixos-shell)";
+        registerImage = true;
+        rebuildFromLatestLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-test-clients"}";
       };
     }
@@ -131,18 +137,34 @@ let
     }
   ];
 
+  managedRunnerHosts = [
+    "s-router-clab"
+    "s-router-nixos"
+    "s-router-test-clients"
+  ];
+
+  runnerWrapper = host: pkgs.writeShellScript "run-${host}" ''
+    exec /run/current-system/sw/bin/run-vm ${lib.escapeShellArg host} "$@"
+  '';
+
   mkImage = vm: {
     inherit (vm) name;
     value = self.nixosConfigurations.${vm.name}.config.system.build.nixos-shell;
   };
 
-  mkService = vm: mkVM vm.name (vm.args // { registerImage = false; });
+  mkService = vm:
+    mkVM vm.name (vm.args // {
+      registerImage = vm.args.registerImage or false;
+    });
 in
 {
   config = lib.mkMerge (
     [
       {
         system.build.vmImages = lib.listToAttrs (map mkImage vms);
+        systemd.tmpfiles.rules = map
+          (host: "L+ /root/${host}.sh - - - - ${runnerWrapper host}")
+          managedRunnerHosts;
       }
     ]
     ++ map mkService vms

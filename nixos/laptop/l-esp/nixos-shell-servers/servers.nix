@@ -1,8 +1,7 @@
-{
-  lib,
-  pkgs,
-  self,
-  ...
+{ lib
+, pkgs
+, self
+, ...
 }:
 
 let
@@ -12,15 +11,16 @@ let
 in
 {
   config = lib.mkMerge [
-    #(mkVM "s-test-l-esp" {
-    #  description = "l-esp test VM (nixos-shell)";
-    #  repository = "path:/home/deadbeef/github/nixos";
-    #  workingDir = "/persist/nix-shell-vms";
-    #  persistDir = "/persist/vm-persists";
-    #  restartTime = 30;
-    #  stateDiskSize = "20G";
-    #  autoStart = false;
-    #  nixBuildFlags = [ "--impure" ];
-    #})
+    (mkVM "s-test-l-esp" {
+      autoStart = false;
+      description = "l-esp test VM (nixos-shell)";
+      nixBuildFlags = [ "--impure" ];
+      persistDir = "/persist/vm-persists";
+      rebuildFromLatestLocks = true;
+      repository = "path:${self.lib.vmSourceForHost "s-test-l-esp"}";
+      restartTime = 30;
+      stateDiskSize = "20G";
+      workingDir = "/persist/nix-shell-vms";
+    })
   ];
 }

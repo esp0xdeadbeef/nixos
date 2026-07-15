@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${FAKE_NIX_HOST:?}"
+: "${FAKE_NIX_IMAGE_BASE:?}"
+: "${FAKE_NIX_LOG:?}"
+: "${NIXOS_SHELL_IMAGE_ROOT:?}"
+
+printf '%s\n' "$*" >>"$FAKE_NIX_LOG"
+
+out_link=
+flake_attr=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --out-link)
+      shift
+      out_link="$1"
+      ;;
+    *#nixosConfigurations.*)
+      flake_attr="$1"
+      ;;
+  esac
+  shift
+done
+
+if [ -n "${FAKE_NIX_CRITICAL_DIR:-}" ]; then
+  if ! mkdir "$FAKE_NIX_CRITICAL_DIR" 2>/dev/null; then
+    : >"${FAKE_NIX_OVERLAP_FAILURE:?}"
+  else
+    trap 'rmdir "$FAKE_NIX_CRITICAL_DIR" 2>/dev/null || true' EXIT
+  fi
+fi
+
+if [ "${FAKE_NIX_SLEEP:-0}" != 0 ]; then
+  sleep "$FAKE_NIX_SLEEP"
+fi
+
+case "${FAKE_NIX_MODE:-success}" in
+  success)
+    ;;
+  fail)
+    exit 1
+    ;;
+  fail-primary)
+    if [[ "$flake_attr" == bad:* ]]; then
+      exit 1
+    fi
+    ;;
+  *)
+    echo "unknown FAKE_NIX_MODE=${FAKE_NIX_MODE}" >&2
+    exit 64
+    ;;
+esac
+
+test -n "$out_link"
+image="$FAKE_NIX_IMAGE_BASE/$(basename "$NIXOS_SHELL_IMAGE_ROOT")"
+mkdir -p "$image/bin"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$image/bin/run-$FAKE_NIX_HOST-vm"
+chmod +x "$image/bin/run-$FAKE_NIX_HOST-vm"
+ln -sfn "$image" "$out_link"
