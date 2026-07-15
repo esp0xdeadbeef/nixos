@@ -5,6 +5,11 @@ Nebula address `100.64.0.1`. External clients can reach it through the public
 ingress address `SOPS-configured-address:4242`; LAN clients may use the private address
 directly.
 
+The public ingress path source-NATs traffic to preserve the DMZ return path.
+That hides an external client's routable endpoint from the lighthouse, so the
+lighthouse also acts as the relay at `100.64.0.1`. Clients advertise that relay
+and use it only when they cannot establish a direct peer tunnel.
+
 ## Address allocations
 
 | Address | Node | Status |

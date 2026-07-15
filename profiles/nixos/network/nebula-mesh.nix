@@ -59,6 +59,11 @@ in
         am_lighthouse = false;
         hosts = [ lighthouseAddress ];
       };
+      relay = {
+        am_relay = false;
+        relays = [ lighthouseAddress ];
+        use_relays = true;
+      };
       listen = {
         host = "0.0.0.0";
         port = 0;

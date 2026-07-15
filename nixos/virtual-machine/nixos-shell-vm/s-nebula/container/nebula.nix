@@ -9,6 +9,7 @@
   services.nebula.networks.mesh = {
     enable = true;
     isLighthouse = true;
+    isRelay = true;
 
     cert = "/persist/etc/nebula/beacon.crt";
     key = "/persist/etc/nebula/beacon.key";
