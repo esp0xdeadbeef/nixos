@@ -15,6 +15,7 @@
     key = "/persist/etc/nebula/beacon.key";
     ca = "/persist/etc/nebula/ca.crt";
 
+    # Temporary while clients are being onboarded and mesh paths are tested.
     firewall = {
       inbound = [
         {

@@ -11,6 +11,7 @@ let
   renderedConfig = "nebula-mesh.json";
   serviceName = "nebula-mesh";
   restartUnits = [ "${serviceName}.service" ];
+  # Temporary while clients are being onboarded and mesh paths are tested.
   firewallRules = [
     {
       host = "any";

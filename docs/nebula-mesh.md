@@ -10,6 +10,14 @@ That hides an external client's routable endpoint from the lighthouse, so the
 lighthouse also acts as the relay at `100.64.0.1`. Clients advertise that relay
 and use it only when they cannot establish a direct peer tunnel.
 
+## Temporary firewall policy
+
+During client onboarding, the Nebula firewall on both the lighthouse and the
+shared client profile permits all authenticated overlay traffic in both
+directions (`host: any`, `port: any`, `proto: any`). This is the Nebula
+certificate-aware firewall, not the NixOS/nftables host firewall. Replace this
+temporary policy with scoped rules after the required client flows are known.
+
 ## Address allocations
 
 | Address | Node | Status |
