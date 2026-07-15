@@ -7,6 +7,7 @@
 {
   imports = [
     profiles.nixos.laptop.intel-workstation
+    profiles.nixos.network.nebula-mesh
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm.open-webui
     profiles.nixos.containers.firefox-vnc

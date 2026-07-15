@@ -9,10 +9,6 @@
     enable = true;
     rootMapperName = "crypted";
 
-    extraSystemDirectories = [
-      "/etc/nebula"
-    ];
-
     extraUserFiles = [
       ".xlayoutdisplay"
     ];

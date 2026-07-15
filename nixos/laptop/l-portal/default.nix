@@ -13,6 +13,7 @@ in
   imports = [
     profiles.nixos.base.default
     profiles.nixos.laptop.default
+    profiles.nixos.network.nebula-mesh
     profiles.nixos.boot.usb-removable
     profiles.nixos.desktop.i3
     profiles.nixos.editors.neovim

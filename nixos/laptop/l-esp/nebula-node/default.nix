@@ -1,6 +1,0 @@
-{ pkgs, ... }:
-{
-  imports = [
-    ./node.nix
-  ];
-}

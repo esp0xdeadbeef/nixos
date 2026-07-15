@@ -10,8 +10,5 @@
     rootMapperName = "root";
     colordMode = "0755";
 
-    extraSystemDirectories = [
-      "/etc/nebula"
-    ];
   };
 }

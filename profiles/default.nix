@@ -54,6 +54,7 @@
       password-login = import ./nixos/ssh/password-login.nix;
     };
     network = {
+      nebula-mesh = import ./nixos/network/nebula-mesh.nix;
       private = import ./nixos/network/private.nix;
       workstation = import ./nixos/network/workstation.nix;
     };

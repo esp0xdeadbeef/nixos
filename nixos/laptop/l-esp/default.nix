@@ -6,6 +6,7 @@
 {
   imports = [
     profiles.nixos.laptop.intel-workstation
+    profiles.nixos.network.nebula-mesh
     profiles.nixos.vm-host.nixos-shell
 
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
@@ -13,7 +14,6 @@
     ./connect-nas
     ./hardware
     ./llms
-    ./nebula-node
     ./optional
     ./nixos-shell-servers
   ];
