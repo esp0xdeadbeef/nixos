@@ -3,6 +3,7 @@
   imports = [
     profiles.nixos.server.dell-vm-host
     profiles.nixos.llm-clients.cache
+    profiles.nixos.network.nebula-mesh
 
     ./libvirt.nix
     ./nixos-shell-servers

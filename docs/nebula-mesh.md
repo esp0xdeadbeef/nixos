@@ -2,8 +2,8 @@
 
 The lighthouse runs in `s-nebula-container` on `192.168.3.10:4242` and uses
 Nebula address `100.64.0.1`. External clients can reach it through the public
-ingress address `SOPS-configured-address:4242`; LAN clients may use the private address
-directly.
+ingress endpoint stored in the `nebula-lighthouse-public-ip` SOPS secret; LAN
+clients may use the private address directly.
 
 The public ingress path source-NATs traffic to preserve the DMZ return path.
 That hides an external client's routable endpoint from the lighthouse, so the
@@ -29,6 +29,7 @@ temporary policy with scoped rules after the required client flows are known.
 | `100.64.0.13` | `l-envil` | allocated |
 | `100.64.0.14` | `l-portal` | allocated |
 | `100.64.0.15` | `s-gamma` | allocated |
+| `100.64.0.16` | `s-sigma` | allocated |
 
 Do not create a certificate for `s-nebula` itself until it has been assigned a
 different, confirmed-free address. The accidentally generated `.12`
