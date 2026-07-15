@@ -231,6 +231,35 @@ in
           action = "allow";
         }
         {
+          id = "deny-vlan3-to-vlan2";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "vlan3";
+          };
+          to = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          trafficType = "any";
+          action = "deny";
+        }
+        {
+          id = "allow-vlan2-to-vlan3";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "tenant";
+            name = "vlan3";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-wan-to-s-nebula-container";
           priority = 95;
           from = {

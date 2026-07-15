@@ -12,6 +12,9 @@ let
     "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
     "-nic bridge,br=vmbr1,mac=52:54:00:12:34:57,model=virtio-net-pci"
   ];
+  nebulaPublicIngressHotpatch = import ./nebula-public-ingress-hotpatch.nix {
+    inherit lib;
+  };
 in
 {
   _module.args.sRouterProdProfile = {
@@ -29,6 +32,8 @@ in
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./kea-legacy-lease-paths.nix
+    nebulaPublicIngressHotpatch.nixosModule
+    ./vlan2-vlan3-stateful-return-hotpatch.nix
     ./vlan2-kea-reservations-override.nix
     ./vlan3-kea-reservations-override.nix
     ./legacy-parity-contract.nix
@@ -43,23 +48,12 @@ in
         ;
 
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
+      controlPlaneTransform = nebulaPublicIngressHotpatch.patchControlPlane;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
       system = "x86_64-linux";
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
     })
   ];
-
-  # Temporary until network-renderer-nixos materializes
-  # publicIngressTupleAuthority as core-owned DNAT.
-  containers.core.config.networking.nftables.ruleset = lib.mkAfter ''
-    table ip s_router_prod_nebula_hotpatch {
-      chain prerouting {
-        type nat hook prerouting priority -101; policy accept;
-        iifname "ppp0" udp dport 4242 counter dnat to 192.168.3.10:4242 comment "hotpatch-nebula-public-ingress-udp"
-        iifname "ppp0" tcp dport 4242 counter dnat to 192.168.3.10:4242 comment "hotpatch-nebula-public-ingress-tcp"
-      }
-    }
-  '';
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 }

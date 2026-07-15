@@ -5,6 +5,7 @@
 , selectorFile
 , system
 , controlPlaneModelInput ? inputs.network-control-plane-model
+, controlPlaneTransform ? cpm: cpm
 , nixosRendererInput ? inputs.network-renderer-nixos
 , hostName ? "s-router-prod"
 ,
@@ -22,11 +23,12 @@ let
     inputPath = intentPath;
     inherit inventoryPath;
   };
+  cpmForRenderer = controlPlaneTransform cpmBuilt;
 
   rendererInput = {
     inherit hostName;
-    cpm = cpmBuilt;
-    controlPlane = cpmBuilt;
+    cpm = cpmForRenderer;
+    controlPlane = cpmForRenderer;
   };
 
   render-nixos =
@@ -39,7 +41,7 @@ let
 
   renderer-contract = {
     inherit render-nixos;
-    cpm = cpmBuilt;
+    cpm = cpmForRenderer;
     inventory = import inventoryPath { };
     inherit intentPath inventoryPath;
   };
