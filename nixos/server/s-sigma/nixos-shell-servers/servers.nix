@@ -147,6 +147,22 @@ let
     exec /run/current-system/sw/bin/run-vm ${lib.escapeShellArg host} "$@"
   '';
 
+  prodRunner = pkgs.writeShellApplication {
+    name = "restart-s-router-prod";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.nix
+      pkgs.procps
+      pkgs.systemd
+      pkgs.tmux
+      pkgs.util-linux
+    ];
+    text = ''
+      export S_ROUTER_PROD_FLAKE=${lib.escapeShellArg "path:${self.lib.vmSourceForHost "s-router-prod"}"}
+      ${builtins.readFile ./restart-s-router-prod.sh}
+    '';
+  };
+
   mkImage = vm: {
     inherit (vm) name;
     value = self.nixosConfigurations.${vm.name}.config.system.build.nixos-shell;
@@ -161,10 +177,13 @@ in
   config = lib.mkMerge (
     [
       {
+        system.build.restartSRouterProd = prodRunner;
         system.build.vmImages = lib.listToAttrs (map mkImage vms);
-        systemd.tmpfiles.rules = map
-          (host: "L+ /root/${host}.sh - - - - ${runnerWrapper host}")
-          managedRunnerHosts;
+        systemd.tmpfiles.rules =
+          (map
+            (host: "L+ /root/${host}.sh - - - - ${runnerWrapper host}")
+            managedRunnerHosts)
+          ++ [ "L+ /root/s-router-prod.sh - - - - ${lib.getExe prodRunner}" ];
       }
     ]
     ++ map mkService vms

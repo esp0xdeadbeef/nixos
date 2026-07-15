@@ -9,7 +9,7 @@
 let
   hostName = name;
   installDisk = "/dev/vda";
-  runtimeSopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
+  nebulaSopsFile = outPath + "/secrets/s-gamma.yaml";
 in
 {
   networking.hostName = lib.mkForce hostName;
@@ -17,6 +17,7 @@ in
   imports = [
     inputs.disko.nixosModules.disko
     profiles.nixos.mail.mailbox-sets
+    profiles.nixos.network.nebula-mesh
     profiles.nixos.users.deadbeef-ssh
     inputs.sops-nix.nixosModules.sops
 
@@ -47,6 +48,16 @@ in
     names = profiles.mail.inventory.hostedMailboxSets;
     accountNames = profiles.mail.inventory.hostedMailAccounts;
   };
+
+  sops.secrets = lib.genAttrs [
+    "nebula-ca-crt"
+    "nebula-host-crt"
+    "nebula-host-key"
+    "nebula-lighthouse-public-ip"
+  ]
+    (_: {
+      sopsFile = nebulaSopsFile;
+    });
 
   system.stateVersion = "26.05";
 }
