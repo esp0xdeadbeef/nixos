@@ -11,8 +11,7 @@ name:
 , persistDir ? "/persist/vm-persists"
 , extraTmpfiles ? [ ]
 , repository ? "path:${self.lib.vmSourceForHost name}"
-, rebuildFromLatestLocks ? false
-, latestLocksRepository ? "github:esp0xdeadbeef/nixos"
+, updateFlakeLocks ? false
 , updateOnGuestShutdown ? true
 , updateImageBeforeStart ? false
 , restartVmAfterImageUpdate ? false
@@ -38,6 +37,8 @@ name:
 
 assert lib.assertMsg (!updateImageBeforeStart || registerImage)
   "${name}: updateImageBeforeStart requires registerImage = true";
+assert lib.assertMsg (lib.hasPrefix "path:/nix/store/" repository)
+  "${name}: repository must be the store-pinned source captured by the host switch";
 assert lib.assertMsg (!restartVmAfterImageUpdate || registerImage)
   "${name}: restartVmAfterImageUpdate requires registerImage = true";
 assert lib.assertMsg (!(updateImageBeforeStart && restartVmAfterImageUpdate))
@@ -54,16 +55,10 @@ let
   imageServiceName = "${name}-image";
   rolloutServiceName = "${name}-rollout";
   automaticUpdateMode =
-    if rebuildFromLatestLocks then
+    if updateFlakeLocks || imageUpdateTimer || restartVmAfterImageUpdate then
       "--force"
     else
       "--if-stale";
-
-  flakeRef =
-    if rebuildFromLatestLocks then
-      latestLocksRepository
-    else
-      repository;
   automaticGeneration = toString self.outPath;
   qmpSocket = "/run/${vmServiceName}.qmp";
 
@@ -131,9 +126,7 @@ let
     host_lock="$image_root/update.lock"
     global_lock="''${NIXOS_SHELL_GLOBAL_UPDATE_LOCK:-/run/lock/nixos-shell-image-update.lock}"
     generation="''${NIXOS_SHELL_UPDATE_GENERATION:-${automaticGeneration}}"
-    primary_flake="''${NIXOS_SHELL_PRIMARY_FLAKE:-${flakeRef}}"
-    fallback_flake="''${NIXOS_SHELL_FALLBACK_FLAKE:-${repository}}"
-    primary_refresh="''${NIXOS_SHELL_PRIMARY_REFRESH:-${lib.boolToString rebuildFromLatestLocks}}"
+    source_flake="''${NIXOS_SHELL_SOURCE_FLAKE:-${repository}}"
     nix_bin="''${NIXOS_SHELL_NIX_BIN:-${pkgs.nix}/bin/nix}"
     nix_store_bin="''${NIXOS_SHELL_NIX_STORE_BIN:-${pkgs.nix}/bin/nix-store}"
     flock_bin="''${NIXOS_SHELL_FLOCK_BIN:-${pkgs.util-linux}/bin/flock}"
@@ -179,39 +172,80 @@ let
 
     build_candidate() {
       local flake_ref="$1"
-      local refresh="$2"
-      local -a refresh_flags=()
-
-      if [ "$refresh" = true ]; then
-        refresh_flags+=(--refresh)
-      fi
 
       "$nix_bin" build \
-        "''${refresh_flags[@]}" \
         ${nixBuildFlagsStr} \
         "$flake_ref#nixosConfigurations.${name}.config.system.build.nixos-shell" \
         --out-link "$candidate_link"
     }
 
+    ${lib.optionalString updateFlakeLocks ''
+      build_with_updated_locks() {
+      local source_ref="$1"
+      local source_path=
+      local worktree=
+      local status=0
+
+      case "$source_ref" in
+        path:*)
+          source_path="''${source_ref#path:}"
+          ;;
+        *)
+          echo "${name}: lock updates require a path: source, got $source_ref" >&2
+          return 64
+          ;;
+      esac
+
+      worktree="$(mktemp -d "$image_root/.flake-update.XXXXXX")"
+      cp -a --reflink=auto "$source_path/." "$worktree/"
+      chmod -R u+w "$worktree"
+
+      "$nix_bin" flake update --refresh --flake "path:$worktree" || status=$?
+      if [ "$status" -eq 0 ]; then
+        build_candidate "path:$worktree" || status=$?
+      fi
+
+      rm -rf "$worktree"
+      return "$status"
+      }
+    ''}
+
     current_image="$(readlink -f "$current_link" 2>/dev/null || true)"
     current_runner="$current_image/bin/run-${name}-vm"
 
-    if ! build_candidate "$primary_flake" "$primary_refresh"; then
+    build_status=0
+    ${
+      if updateFlakeLocks then
+        ''
+      build_with_updated_locks "$source_flake" || build_status=$?
+    ''
+      else
+        ''
+      build_candidate "$source_flake" || build_status=$?
+    ''
+    }
+
+    if [ "$build_status" -ne 0 ]; then
       if [ -n "$current_image" ] && [ -x "$current_runner" ]; then
         echo "${name}: image update failed; keeping $current_image" >&2
         exit 1
       fi
 
-      if [ "$primary_flake" = "$fallback_flake" ]; then
-        echo "${name}: image update failed and no cached fallback exists" >&2
-        exit 1
-      fi
-
-      echo "${name}: latest-lock build failed; trying the store-pinned fallback" >&2
-      if ! build_candidate "$fallback_flake" false; then
+      ${
+      if updateFlakeLocks then
+        ''
+      echo "${name}: lock-updated build failed; trying the switch-pinned flake.lock" >&2
+      if ! build_candidate "$source_flake"; then
         echo "${name}: fallback build failed and no cached image exists" >&2
         exit 1
       fi
+    ''
+      else
+        ''
+        echo "${name}: store-pinned image update failed and no cached fallback exists" >&2
+        exit 1
+      ''
+    }
     fi
 
     new_image="$(readlink -f "$candidate_link")"
@@ -461,10 +495,10 @@ in
       buildIntervalSec
       imageServiceBefore
       imageUpdateTimer
-      rebuildFromLatestLocks
       registerImage
       restartVmAfterImageUpdate
       safeRestart
+      updateFlakeLocks
       updateImageBeforeStart
       updateOnGuestShutdown
       ;
@@ -483,8 +517,8 @@ in
   systemd.services.${imageServiceName} = lib.mkIf registerImage {
     description = "VM image manager (nixos-shell) for ${name}";
     wantedBy = [ "nixos-shell-images.target" ];
-    after = [ "nix-daemon.service" ] ++ lib.optional rebuildFromLatestLocks "network-online.target";
-    wants = lib.optional rebuildFromLatestLocks "network-online.target";
+    after = [ "nix-daemon.service" ] ++ lib.optional updateFlakeLocks "network-online.target";
+    wants = lib.optional updateFlakeLocks "network-online.target";
     before = imageServiceBefore;
     restartIfChanged = true;
     restartTriggers = [ self.outPath ];

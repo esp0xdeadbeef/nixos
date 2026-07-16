@@ -101,10 +101,10 @@ let
       }
       {
         assertion =
-          !instance.rebuildFromLatestLocks
+          !instance.updateFlakeLocks
           || !instance.registerImage
           || lib.hasInfix "update-image-${name} --force" (imageService.script or "");
-        message = "${name}: latest-lock image updates must force a refreshed flake resolution";
+        message = "${name}: flake-lock updates must force a fresh input resolution";
       }
       {
         assertion =
@@ -124,7 +124,7 @@ let
         instance = instances.${name};
       in
       instance.registerImage
-      && instance.rebuildFromLatestLocks
+      && instance.updateFlakeLocks
       && instance.updateOnGuestShutdown)
     instanceNames;
 

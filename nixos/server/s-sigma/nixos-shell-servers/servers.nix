@@ -48,7 +48,6 @@ let
           "s-router-test-clients-image.service"
         ];
         imageUpdateTimer = true;
-        rebuildFromLatestLocks = true;
         registerImage = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
         restartVmAfterImageUpdate = true;
@@ -105,7 +104,7 @@ let
       args = {
         description = "s-router-clab VM (nixos-shell)";
         registerImage = true;
-        rebuildFromLatestLocks = true;
+        updateFlakeLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
       };
     }
@@ -114,7 +113,7 @@ let
       args = {
         description = "s-router-nixos VM (nixos-shell)";
         registerImage = true;
-        rebuildFromLatestLocks = true;
+        updateFlakeLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-nixos"}";
       };
     }
@@ -123,7 +122,7 @@ let
       args = {
         description = "s-router-test-clients VM (nixos-shell)";
         registerImage = true;
-        rebuildFromLatestLocks = true;
+        updateFlakeLocks = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-test-clients"}";
       };
     }

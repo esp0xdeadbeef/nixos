@@ -28,7 +28,7 @@ in
         registerImage = lib.mkOption {
           type = lib.types.bool;
         };
-        rebuildFromLatestLocks = lib.mkOption {
+        updateFlakeLocks = lib.mkOption {
           type = lib.types.bool;
         };
         updateOnGuestShutdown = lib.mkOption {

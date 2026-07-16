@@ -20,24 +20,35 @@ export NIXOS_SHELL_NIX_BIN="$test_dir/fake-nix"
 export NIXOS_SHELL_NIX_STORE_BIN="$test_dir/fake-nix-store"
 export NIXOS_SHELL_FLOCK_BIN="$(command -v flock)"
 export NIXOS_SHELL_GLOBAL_UPDATE_LOCK="$work/global.lock"
-export NIXOS_SHELL_PRIMARY_REFRESH=true
 export NIXOS_SHELL_UPDATE_GENERATION=generation-1
+
+source_flake="$work/switch-source"
+mkdir -p "$source_flake"
+printf '%s\n' switch-flake >"$source_flake/flake.nix"
+printf '%s\n' switch-lock >"$source_flake/flake.lock"
+printf '%s\n' switch-source >"$source_flake/source-marker"
+export NIXOS_SHELL_SOURCE_FLAKE="path:$source_flake"
+export FAKE_NIX_EXPECT_UPDATED_LOCK=true
 
 chmod +x "$NIXOS_SHELL_NIX_BIN" "$NIXOS_SHELL_NIX_STORE_BIN"
 
 root_success="$work/root-success"
 export NIXOS_SHELL_IMAGE_ROOT="$root_success"
-export NIXOS_SHELL_PRIMARY_FLAKE=good:primary
-export NIXOS_SHELL_FALLBACK_FLAKE=good:fallback
 export FAKE_NIX_MODE=success
 "$updater" --force
 success_image="$(readlink -f "$root_success/current")"
 test -x "$success_image/bin/run-$host-vm"
-grep -q -- '--refresh' "$FAKE_NIX_LOG"
-if grep -q -- '--no-update-lock-file' "$FAKE_NIX_LOG"; then
-  echo "updater unexpectedly passed --no-update-lock-file" >&2
+sed -n '1p' "$FAKE_NIX_LOG" | grep -Eq \
+  '^flake update --refresh --flake path:.*/root-success/\.flake-update\.'
+sed -n '2p' "$FAKE_NIX_LOG" | grep -Eq \
+  '^build path:.*/root-success/\.flake-update\..*#nixosConfigurations\.'
+if grep -q 'github:esp0xdeadbeef/nixos' "$FAKE_NIX_LOG"; then
+  echo "updater unexpectedly replaced the switch source with GitHub" >&2
   exit 1
 fi
+test "$(cat "$source_flake/flake.lock")" = switch-lock
+test "$(cat "$source_flake/source-marker")" = switch-source
+test -z "$(find "$root_success" -maxdepth 1 -name '.flake-update.*' -print -quit)"
 
 export FAKE_NIX_MODE=fail
 if "$updater" --force; then
@@ -48,19 +59,18 @@ test "$(readlink -f "$root_success/current")" = "$success_image"
 
 root_fallback="$work/root-fallback"
 export NIXOS_SHELL_IMAGE_ROOT="$root_fallback"
-export NIXOS_SHELL_PRIMARY_FLAKE=bad:primary
-export NIXOS_SHELL_FALLBACK_FLAKE=good:fallback
-export FAKE_NIX_MODE=fail-primary
+export FAKE_NIX_MODE=fail-lock-update
+export FAKE_NIX_EXPECT_UPDATED_LOCK=false
 "$updater" --force
 fallback_image="$(readlink -f "$root_fallback/current")"
 test -x "$fallback_image/bin/run-$host-vm"
+tail -n 1 "$FAKE_NIX_LOG" | grep -Fq \
+  "build path:$source_flake#nixosConfigurations.$host.config.system.build.nixos-shell"
 
 root_stale="$work/root-stale"
 mkdir -p "$root_stale"
 ln -s "$success_image" "$root_stale/current"
 export NIXOS_SHELL_IMAGE_ROOT="$root_stale"
-export NIXOS_SHELL_PRIMARY_FLAKE=bad:primary
-export NIXOS_SHELL_FALLBACK_FLAKE=good:fallback
 export FAKE_NIX_MODE=fail
 before_attempts="$(wc -l <"$FAKE_NIX_LOG")"
 if "$updater" --if-stale; then
@@ -73,9 +83,8 @@ test "$after_attempts" -eq "$((before_attempts + 1))"
 
 root_serial_a="$work/root-serial-a"
 root_serial_b="$work/root-serial-b"
-export NIXOS_SHELL_PRIMARY_FLAKE=good:primary
-export NIXOS_SHELL_FALLBACK_FLAKE=good:fallback
 export FAKE_NIX_MODE=success
+export FAKE_NIX_EXPECT_UPDATED_LOCK=true
 export FAKE_NIX_SLEEP=1
 export FAKE_NIX_CRITICAL_DIR="$work/critical"
 export FAKE_NIX_OVERLAP_FAILURE="$work/overlap"
@@ -110,16 +119,17 @@ test ! -e "$FAKE_NIX_OVERLAP_FAILURE"
 if [ -n "$shutdown_hook" ]; then
   root_shutdown="$work/root-shutdown"
   export NIXOS_SHELL_IMAGE_ROOT="$root_shutdown"
-  export NIXOS_SHELL_PRIMARY_FLAKE=good:primary
-  export NIXOS_SHELL_FALLBACK_FLAKE=good:fallback
   export FAKE_NIX_MODE=success
   unset FAKE_NIX_SLEEP FAKE_NIX_CRITICAL_DIR FAKE_NIX_OVERLAP_FAILURE
 
   before_shutdown_attempts="$(wc -l <"$FAKE_NIX_LOG")"
   SERVICE_RESULT=exit-code "$shutdown_hook"
   after_shutdown_attempts="$(wc -l <"$FAKE_NIX_LOG")"
-  test "$after_shutdown_attempts" -eq "$((before_shutdown_attempts + 1))"
-  sed -n "${after_shutdown_attempts}p" "$FAKE_NIX_LOG" | grep -q -- '--refresh'
+  test "$after_shutdown_attempts" -eq "$((before_shutdown_attempts + 2))"
+  sed -n "$((before_shutdown_attempts + 1))p" "$FAKE_NIX_LOG" \
+    | grep -q '^flake update --refresh --flake path:'
+  sed -n "${after_shutdown_attempts}p" "$FAKE_NIX_LOG" \
+    | grep -q '#nixosConfigurations\.'
   test -x "$(readlink -f "$root_shutdown/current")/bin/run-$host-vm"
 
   SERVICE_RESULT=success "$shutdown_hook"

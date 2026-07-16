@@ -8,6 +8,43 @@ set -euo pipefail
 
 printf '%s\n' "$*" >>"$FAKE_NIX_LOG"
 
+if [ "${1:-}" = flake ] && [ "${2:-}" = update ]; then
+  lock_flake=
+  shift 2
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --flake)
+        shift
+        lock_flake="$1"
+        ;;
+    esac
+    shift
+  done
+
+  case "${FAKE_NIX_MODE:-success}" in
+    fail|fail-lock-update)
+      exit 1
+      ;;
+    success)
+      ;;
+    *)
+      echo "unknown FAKE_NIX_MODE=${FAKE_NIX_MODE}" >&2
+      exit 64
+      ;;
+  esac
+
+  case "$lock_flake" in
+    path:*)
+      printf '%s\n' updated-lock >"${lock_flake#path:}/flake.lock"
+      ;;
+    *)
+      echo "flake update did not use a path: source: $lock_flake" >&2
+      exit 64
+      ;;
+  esac
+  exit 0
+fi
+
 out_link=
 flake_attr=
 while [ "$#" -gt 0 ]; do
@@ -36,21 +73,29 @@ if [ "${FAKE_NIX_SLEEP:-0}" != 0 ]; then
 fi
 
 case "${FAKE_NIX_MODE:-success}" in
-  success)
+  success|fail-lock-update)
     ;;
   fail)
     exit 1
-    ;;
-  fail-primary)
-    if [[ "$flake_attr" == bad:* ]]; then
-      exit 1
-    fi
     ;;
   *)
     echo "unknown FAKE_NIX_MODE=${FAKE_NIX_MODE}" >&2
     exit 64
     ;;
 esac
+
+if [ "${FAKE_NIX_EXPECT_UPDATED_LOCK:-false}" = true ]; then
+  flake_ref="${flake_attr%%#*}"
+  case "$flake_ref" in
+    path:*)
+      grep -qx updated-lock "${flake_ref#path:}/flake.lock"
+      ;;
+    *)
+      echo "updated-lock build did not use a path: source: $flake_ref" >&2
+      exit 64
+      ;;
+  esac
+fi
 
 test -n "$out_link"
 image="$FAKE_NIX_IMAGE_BASE/$(basename "$NIXOS_SHELL_IMAGE_ROOT")"

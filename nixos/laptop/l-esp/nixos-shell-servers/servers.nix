@@ -16,7 +16,6 @@ in
       description = "l-esp test VM (nixos-shell)";
       nixBuildFlags = [ "--impure" ];
       persistDir = "/persist/vm-persists";
-      rebuildFromLatestLocks = true;
       repository = "path:${self.lib.vmSourceForHost "s-test-l-esp"}";
       restartTime = 30;
       stateDiskSize = "20G";
