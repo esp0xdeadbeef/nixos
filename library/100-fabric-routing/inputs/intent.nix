@@ -151,6 +151,7 @@
           };
           trafficType = "any";
           action = "allow";
+          returnBehavior = "one-way";
         }
 
         {
@@ -167,6 +168,7 @@
           to = "any";
           trafficType = "icmp";
           action = "allow";
+          returnBehavior = "symmetric";
         }
 
         {
@@ -186,6 +188,7 @@
           };
           trafficType = "dns";
           action = "allow";
+          returnBehavior = "symmetric";
         }
 
         {
@@ -205,6 +208,7 @@
           };
           trafficType = "any";
           action = "allow";
+          returnBehavior = "symmetric";
         }
 
         {
@@ -220,6 +224,7 @@
           };
           trafficType = "ssh";
           action = "allow";
+          returnBehavior = "symmetric";
         }
 
         {
@@ -235,6 +240,7 @@
           };
           trafficType = "icmp";
           action = "allow";
+          returnBehavior = "symmetric";
         }
 
         {
@@ -250,6 +256,7 @@
           };
           trafficType = "web";
           action = "allow";
+          returnBehavior = "symmetric";
         }
       ];
 

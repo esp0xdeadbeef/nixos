@@ -94,6 +94,7 @@ let
       };
       trafficType = "any";
       action = "allow";
+      returnBehavior = "symmetric";
     };
 in
 {
@@ -201,6 +202,7 @@ in
           };
           trafficType = "dns";
           action = "allow";
+          returnBehavior = "symmetric";
         }
         {
           id = "allow-vlan7-to-vlan7-dns";
@@ -215,6 +217,7 @@ in
           };
           trafficType = "dns";
           action = "allow";
+          returnBehavior = "symmetric";
         }
         {
           id = "allow-vlan3-to-vlan3-dns";
@@ -229,6 +232,7 @@ in
           };
           trafficType = "dns";
           action = "allow";
+          returnBehavior = "symmetric";
         }
         {
           id = "deny-vlan3-to-vlan2";
@@ -309,6 +313,7 @@ in
           };
           trafficType = "dns";
           action = "allow";
+          returnBehavior = "symmetric";
         }
         {
           id = "allow-vlan7-dns-to-wan";
@@ -324,6 +329,7 @@ in
           };
           trafficType = "dns";
           action = "allow";
+          returnBehavior = "symmetric";
         }
         (allowTenantToWan "vlan2" 100)
         (allowTenantToWan "vlan7" 110)
