@@ -8,10 +8,10 @@ This document is scoped to the production replacement path. Lab, HAT, SIT, and s
 
 ## Current Baseline
 
-The current router-chain lock baseline is the NixOS repository commit:
+The router-chain lock baseline was advanced from the NixOS repository commit:
 
 ```text
-7f9066af bump lock
+a4a2eb1d feat(s-sigma): add nebula mesh credentials
 ```
 
 The relevant production root input pins are declared explicitly in `flake.nix`.
@@ -19,11 +19,11 @@ They currently match the upstream `origin/main` heads of the production
 router-chain repositories:
 
 ```text
-network-compiler-prod             5be5672c3530d4ce213f805361afd6bc1dea8a5c
-network-forwarding-model-prod     b3012dd59509cb3658666a6137f1fc4cfb1fb09b
-network-control-plane-model-prod  c1137cdf6e94de22853d7aeac1e4b9bf254457d6
-nixos-network-compiler-prod       5be5672c3530d4ce213f805361afd6bc1dea8a5c
-network-renderer-nixos-prod       295f84dff85308761d5ce63e7822cdfb9d0aa58a
+network-compiler-prod             e2da177f747d295b2616ae26285a0c74aa568772
+network-forwarding-model-prod     8894c5413f81d04d1c111e65581eecbe3f804423
+network-control-plane-model-prod  15f8190ebf1ec7319301dbb64ee580539326acb4
+nixos-network-compiler-prod       e2da177f747d295b2616ae26285a0c74aa568772
+network-renderer-nixos-prod       ebbb3b0fea48f31ed2f16cd0b3a5cab70001f7e1
 ```
 
 No lab repository is part of the production chain for this plan as long as `s-router-prod` consumes model source from `prod-network/s-router-prod`.
@@ -52,6 +52,30 @@ The deployment gate should fail when:
 - The freeze pins are changed without an explicit router-chain bump commit.
 
 After the legacy replacement is stable, advance these pins only through an explicit router-chain bump.
+
+## VM Image Update Ordering
+
+The VM host treats the production gateway differently from disposable router
+test VMs:
+
+- `s-router-prod-image.service` builds and atomically selects the candidate
+  image before `s-router-prod-vm.service` may start.
+- `s-router-prod-image.timer` refreshes against the latest committed NixOS
+  repository locks six hours after the previous refresh completed. A long build
+  therefore cannot cause an immediate rebuild loop.
+- The production image service is ordered before the clab, NixOS, and client
+  test-router image services, so those builds cannot hold the global image lock
+  while the gateway candidate is waiting.
+- The timer only updates the cached image. It never restarts a running gateway.
+  A controlled production restart first waits for the image service and only
+  then restarts the VM, retaining the previous image as a rollback root.
+- An unexpected production guest shutdown restarts from the last complete
+  cached image; it never starts a network build in the gateway service cgroup.
+
+The registered test routers use a different shutdown contract. A guest shutdown
+runs the latest-lock image updater before systemd restarts the VM. The stop
+transaction has a two-hour timeout and control-group kill semantics so a failed
+or timed-out build cannot survive as an orphaned updater or lock holder.
 
 ## Target Boundaries
 
@@ -135,6 +159,19 @@ Current reservation source handling:
 This should be removed once the `network-*` pipeline supports DHCP reservations
 with runtime secret-backed identity fields, for example a renderer-native
 `macSecretFile`/reservation `sourceFile` contract.
+
+Other reviewed compatibility exceptions:
+
+- `kea-legacy-lease-paths.nix` keeps the existing lease databases directly
+  below `/var/lib/kea`; removing it still makes Kea use an invalid nested
+  memfile path with the current renderer.
+- `nebula-public-ingress-hotpatch.nix` owns the scoped TCP/UDP 4242
+  DNAT/SNAT/forwarding and return routes. Even at the pinned upstream heads,
+  removing it drops public Nebula ingress entirely.
+- `vlan2-vlan3-stateful-return-hotpatch.nix` keeps the explicit main-table
+  policy rule. The latest renderer emits a stateful firewall return and a
+  usable fallback route, but this rule remains until a packet-forwarding test
+  proves that removing it cannot change gateway behavior.
 
 PPPoE is modeled in `inventory.nix` as a `core` PPPoE client on `wan` with
 runtime interface `ppp0`. The current control-plane PPPoE service validates

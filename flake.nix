@@ -48,29 +48,29 @@
     };
 
     network-compiler-prod = {
-      url = "github:esp0xdeadbeef/network-compiler/0745f6ebc3e86c0970f74bd52fb209d9fdd8e27d";
+      url = "github:esp0xdeadbeef/network-compiler/e2da177f747d295b2616ae26285a0c74aa568772";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-forwarding-model-prod = {
-      url = "github:esp0xdeadbeef/network-forwarding-model/2f92f74bec0e8e9a03f840dc73a304b963894638";
+      url = "github:esp0xdeadbeef/network-forwarding-model/8894c5413f81d04d1c111e65581eecbe3f804423";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-prod";
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/2d827d75c490f6649449e2eb30f792c8dae379ce";
+      url = "github:esp0xdeadbeef/network-control-plane-model/15f8190ebf1ec7319301dbb64ee580539326acb4";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
     };
 
     nixos-network-compiler-prod = {
-      url = "github:esp0xdeadbeef/nixos-network-compiler/0745f6ebc3e86c0970f74bd52fb209d9fdd8e27d";
+      url = "github:esp0xdeadbeef/nixos-network-compiler/e2da177f747d295b2616ae26285a0c74aa568772";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-renderer-nixos-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/1ba04f812125a906ae92fc538775c7aaceab0360";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/ebbb3b0fea48f31ed2f16cd0b3a5cab70001f7e1";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
@@ -185,12 +185,6 @@
 
       profiles = import ./profiles;
 
-      sRouterVlan2RuntimeHosts = [
-        "s-router-clab"
-        "s-router-nixos"
-        "s-router-test-clients"
-      ];
-
       # Host architecture overrides.
       #
       # Most hosts are x86_64. The ThinkPad X13s is Qualcomm ARM64, so evaluating
@@ -255,120 +249,11 @@
               !(inOther || inGit);
         };
 
-      sRouterVlan2RuntimeValidation =
-        hostName: config:
-        let
-          network = config.systemd.network;
-          netdevs = builtins.attrValues (network.netdevs or { });
-          networks = builtins.attrValues (network.networks or { });
-          networkEntries =
-            map
-              (name: {
-                inherit name;
-                value = network.networks.${name};
-              })
-              (builtins.attrNames (network.networks or { }));
-
-          count = pred: values: lib.length (lib.filter pred values);
-          has = value: values: builtins.elem value values;
-          atLeastOne = pred: values: count pred values > 0;
-          firstNetwork = pred: entries: lib.findFirst (entry: pred entry.value) null entries;
-
-          isDisabled = value: value == false || value == "no" || value == "false";
-          isIpv4Dhcp = value: value == true || value == "yes" || value == "ipv4";
-
-          vlanIf = "eth0.2";
-          vlanId = 2;
-          bridge = "vlan2";
-
-          vlanNetdev = dev:
-            (dev.netdevConfig.Kind or null) == "vlan"
-            && (dev.netdevConfig.Name or null) == vlanIf
-            && (dev.vlanConfig.Id or null) == vlanId;
-
-          bridgeNetdev = dev:
-            (dev.netdevConfig.Kind or null) == "bridge"
-            && (dev.netdevConfig.Name or null) == bridge;
-
-          parentNetwork = net:
-            (net.matchConfig.Name or null) == "eth0"
-            && has vlanIf (net.networkConfig.VLAN or [ ])
-            && isDisabled (net.networkConfig.DHCP or "no");
-
-          vlanNetwork = net:
-            (net.matchConfig.Name or null) == vlanIf
-            && (net.networkConfig.Bridge or null) == bridge
-            && isDisabled (net.networkConfig.DHCP or "no");
-
-          effectiveBridgeNetwork = firstNetwork (net: (net.matchConfig.Name or null) == bridge) networkEntries;
-          effectiveBridgeNetworkHasIpv4Dhcp =
-            effectiveBridgeNetwork != null && isIpv4Dhcp (effectiveBridgeNetwork.value.networkConfig.DHCP or null);
-        in
-        {
-          errors =
-            lib.optionals (!atLeastOne vlanNetdev netdevs) [
-              "${hostName}: runtime must define at least one VLAN netdev eth0.2 with vlanConfig.Id = 2"
-            ]
-            ++ lib.optionals (!atLeastOne bridgeNetdev netdevs) [
-              "${hostName}: runtime must define at least one bridge netdev vlan2"
-            ]
-            ++ lib.optionals (!atLeastOne parentNetwork networks) [
-              "${hostName}: runtime must define at least one eth0 network that attaches eth0.2 and disables DHCP"
-            ]
-            ++ lib.optionals (!atLeastOne vlanNetwork networks) [
-              "${hostName}: runtime must define at least one eth0.2 network enslaved into vlan2 with DHCP disabled"
-            ]
-            ++ lib.optionals (!effectiveBridgeNetworkHasIpv4Dhcp) [
-              "${hostName}: runtime first matching vlan2 network must use IPv4 DHCP with optional IPv6 SLAAC/RA client"
-            ];
-        };
-
-      sRouterVlan2RuntimeGate =
-        hostName:
-        { config, ... }:
-        let
-          validation = sRouterVlan2RuntimeValidation hostName config;
-        in
-        {
-          assertions = [
-            {
-              assertion = validation.errors == [ ];
-              message = builtins.concatStringsSep "; " validation.errors;
-            }
-          ];
-        };
-
     in
     {
       lib = repoLib // {
         inherit vmSourceForHost hosts;
       };
-
-      checks.x86_64-linux =
-        let
-          pkgs = nixpkgs.legacyPackages.x86_64-linux;
-
-          mkSRouterVlan2OutputCheck =
-            hostName:
-            let
-              require = cond: message: if cond then true else throw message;
-              validation = sRouterVlan2RuntimeValidation hostName self.nixosConfigurations.${hostName}.config;
-
-              validated =
-                require
-                  (validation.errors == [ ])
-                  (builtins.concatStringsSep "; " validation.errors);
-            in
-            pkgs.runCommand (if validated then "${hostName}-vlan2-output-check" else "unreachable") { } ''
-              printf '%s\n' '${hostName}: VLAN2 output check passed' > "$out"
-            '';
-        in
-        lib.listToAttrs (map
-          (hostName: {
-            name = "${hostName}-vlan2-output";
-            value = mkSRouterVlan2OutputCheck hostName;
-          })
-          sRouterVlan2RuntimeHosts);
 
       packages =
         if builtins.pathExists ./pkgs then
@@ -464,9 +349,6 @@
               modules = [
                 outputs.nixosModules.pythonPycachePrefix
                 (./. + "/${path}")
-              ]
-              ++ lib.optionals (builtins.elem name sRouterVlan2RuntimeHosts) [
-                (sRouterVlan2RuntimeGate name)
               ];
             }
         )

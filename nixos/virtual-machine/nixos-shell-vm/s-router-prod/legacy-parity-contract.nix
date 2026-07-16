@@ -149,6 +149,50 @@ let
     && builtins.any
       (hook: lib.hasInfix "apply-s-router-prod-vlan3-kea-reservation" (toString hook))
       postHooks;
+
+  coreNftables = config.containers.core.config.networking.nftables.ruleset;
+  policyNftables = config.containers.policy.config.networking.nftables.ruleset;
+
+  hasNebulaPublicIngressRules =
+    builtins.all (fragment: lib.hasInfix fragment coreNftables) [
+      ''iifname "ppp0" udp dport 4242 counter dnat to 192.168.3.10:4242''
+      ''iifname "ppp0" tcp dport 4242 counter dnat to 192.168.3.10:4242''
+      ''ct status dnat ip daddr 192.168.3.10 udp dport 4242 counter snat to 10.19.0.3''
+      ''ct status dnat ip daddr 192.168.3.10 tcp dport 4242 counter snat to 10.19.0.3''
+      ''ct status dnat ip daddr 192.168.3.10 udp dport 4242 counter accept''
+      ''ct status dnat ip daddr 192.168.3.10 tcp dport 4242 counter accept''
+    ];
+
+  hasStatefulVlan3Return =
+    lib.hasInfix
+      ''iifname "down-vlan3" oifname "down-vlan2" ct state established,related accept comment "allow-vlan2-to-vlan3"''
+      policyNftables;
+
+  hasRoute =
+    containerName: networkName: destination: gateway:
+    builtins.any
+      (route:
+      (route.Destination or null) == destination
+      && (route.Gateway or null) == gateway)
+      (config.containers.${containerName}.config.systemd.network.networks.${networkName}.routes or [ ]);
+
+  hasNebulaReturnRoutes =
+    hasRoute "core" "10-ens3" "192.168.3.10/32" "10.10.0.7"
+    && hasRoute "policy" "10-upstream-vlan2" "10.19.0.3/32" "10.10.0.15"
+    && hasRoute "downstream-selector" "10-policy-vlan3" "10.19.0.3/32" "10.10.0.11"
+    && hasRoute "access-vlan3" "10-access-vlan3" "10.19.0.3/32" "10.10.0.3";
+
+  hasVlan2Vlan3MainTableReturnRule =
+    builtins.any
+      (rule:
+        (rule.Family or null) == "ipv4"
+        && (rule.IncomingInterface or null) == "access-vlan3"
+        && (rule.Priority or null) == 900
+        && (rule.Table or null) == 254
+        && (rule.To or null) == "192.168.1.0/24")
+      (
+        config.containers.downstream-selector.config.systemd.network.networks."10-access-vlan3".routingPolicyRules or [ ]
+      );
 in
 {
   assertions = [
@@ -293,6 +337,23 @@ in
         Kea's memfile path security only allows lease database files directly
         under /var/lib/kea; nested rendered paths under /var/lib/kea/dhcp4/...
         make kea-dhcp4 fail before serving DHCP.
+      '';
+    }
+    {
+      assertion = hasNebulaPublicIngressRules && hasNebulaReturnRoutes;
+      message = ''
+        s-router-prod must retain scoped Nebula TCP/UDP 4242 DNAT, SNAT,
+        forwarding, and return routes until the upstream CPM/renderer chain
+        materializes the public-ingress tuple authority without a hotpatch.
+      '';
+    }
+    {
+      assertion = hasStatefulVlan3Return && hasVlan2Vlan3MainTableReturnRule;
+      message = ''
+        s-router-prod VLAN 3 to VLAN 2 traffic must remain limited to
+        established/related return traffic and use the explicit main-table
+        return route. Do not remove the compatibility rule without a packet
+        forwarding test that proves the generated policy-routing fallback.
       '';
     }
   ];

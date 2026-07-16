@@ -1,6 +1,7 @@
 { inputs
 , lib
 , outPath
+, profiles
 , ...
 }:
 let
@@ -16,6 +17,7 @@ in
 
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    profiles.nixos.network.router-vlan2-runtime-contract
 
     (import ./renderers.nix {
       inherit inputs lib;

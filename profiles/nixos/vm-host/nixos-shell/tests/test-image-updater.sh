@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: $0 <updater> <hostname>" >&2
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+  echo "usage: $0 <updater> <hostname> [shutdown-hook]" >&2
   exit 64
 fi
 
 updater="$1"
 host="$2"
+shutdown_hook="${3:-}"
 test_dir="$(cd "$(dirname "$0")" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -86,5 +87,43 @@ pid_b=$!
 wait "$pid_a"
 wait "$pid_b"
 test ! -e "$FAKE_NIX_OVERLAP_FAILURE"
+
+root_non_blocking="$work/root-non-blocking"
+export NIXOS_SHELL_IMAGE_ROOT="$root_non_blocking"
+export FAKE_NIX_SLEEP=1
+export FAKE_NIX_CRITICAL_DIR="$work/non-blocking-critical"
+
+"$updater" --force &
+pid_blocking=$!
+for _ in $(seq 1 100); do
+  if [ -d "$FAKE_NIX_CRITICAL_DIR" ]; then
+    break
+  fi
+  sleep 0.01
+done
+test -d "$FAKE_NIX_CRITICAL_DIR"
+"$updater" --force --non-blocking
+kill -0 "$pid_blocking"
+wait "$pid_blocking"
+test ! -e "$FAKE_NIX_OVERLAP_FAILURE"
+
+if [ -n "$shutdown_hook" ]; then
+  root_shutdown="$work/root-shutdown"
+  export NIXOS_SHELL_IMAGE_ROOT="$root_shutdown"
+  export NIXOS_SHELL_PRIMARY_FLAKE=good:primary
+  export NIXOS_SHELL_FALLBACK_FLAKE=good:fallback
+  export FAKE_NIX_MODE=success
+  unset FAKE_NIX_SLEEP FAKE_NIX_CRITICAL_DIR FAKE_NIX_OVERLAP_FAILURE
+
+  before_shutdown_attempts="$(wc -l <"$FAKE_NIX_LOG")"
+  SERVICE_RESULT=exit-code "$shutdown_hook"
+  after_shutdown_attempts="$(wc -l <"$FAKE_NIX_LOG")"
+  test "$after_shutdown_attempts" -eq "$((before_shutdown_attempts + 1))"
+  sed -n "${after_shutdown_attempts}p" "$FAKE_NIX_LOG" | grep -q -- '--refresh'
+  test -x "$(readlink -f "$root_shutdown/current")/bin/run-$host-vm"
+
+  SERVICE_RESULT=success "$shutdown_hook"
+  test "$(wc -l <"$FAKE_NIX_LOG")" -eq "$after_shutdown_attempts"
+fi
 
 printf '%s\n' "image updater tests passed for $host"

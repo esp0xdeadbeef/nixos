@@ -101,8 +101,21 @@ let
       name = "s-router-prod";
       args = {
         autoStart = false;
+        buildDelaySec = 300;
+        buildIntervalSec = 21600;
         description = "Production router canary VM (nixos-shell)";
+        imageServiceBefore = [
+          "s-router-clab-image.service"
+          "s-router-nixos-image.service"
+          "s-router-test-clients-image.service"
+        ];
+        imageUpdateTimer = true;
+        rebuildFromLatestLocks = true;
+        registerImage = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
+        safeRestart = true;
+        updateImageBeforeStart = true;
+        updateOnGuestShutdown = false;
       };
     }
     {

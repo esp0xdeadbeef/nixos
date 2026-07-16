@@ -56,6 +56,7 @@
     network = {
       nebula-mesh = import ./nixos/network/nebula-mesh.nix;
       private = import ./nixos/network/private.nix;
+      router-vlan2-runtime-contract = import ./nixos/network/router-vlan2-runtime-contract.nix;
       workstation = import ./nixos/network/workstation.nix;
     };
     mail = {

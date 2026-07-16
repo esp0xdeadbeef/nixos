@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${FAKE_VM_HOST:?}"
+: "${NIXOS_SHELL_IMAGE_ROOT:?}"
+
+case "$*" in
+  *" has-session "*)
+    exit 0
+    ;;
+  *" display-message "*)
+    candidate="$(readlink -e "${NIXOS_SHELL_IMAGE_ROOT}/current")"
+    printf 'exec %s/bin/run-%s-vm\n' "$candidate" "$FAKE_VM_HOST"
+    ;;
+  *)
+    echo "unexpected fake tmux invocation: $*" >&2
+    exit 64
+    ;;
+esac

@@ -14,6 +14,10 @@ name:
 , rebuildFromLatestLocks ? false
 , latestLocksRepository ? "github:esp0xdeadbeef/nixos"
 , updateOnGuestShutdown ? true
+, updateImageBeforeStart ? false
+, imageUpdateTimer ? false
+, imageServiceBefore ? [ ]
+, safeRestart ? false
 , restartTime ? 5
 , ephemeralRoot ? true
 , buildDelaySec ? 600
@@ -31,9 +35,21 @@ name:
 ,
 }:
 
+assert lib.assertMsg (!updateImageBeforeStart || registerImage)
+  "${name}: updateImageBeforeStart requires registerImage = true";
+assert lib.assertMsg (!imageUpdateTimer || registerImage)
+  "${name}: imageUpdateTimer requires registerImage = true";
+assert lib.assertMsg (!safeRestart || registerImage)
+  "${name}: safeRestart requires registerImage = true";
+
 let
   vmServiceName = "${name}-vm";
   imageServiceName = "${name}-image";
+  automaticUpdateMode =
+    if rebuildFromLatestLocks then
+      "--force"
+    else
+      "--if-stale";
 
   flakeRef =
     if rebuildFromLatestLocks then
@@ -122,7 +138,14 @@ let
     fi
 
     exec 8>"$host_lock"
-    "$flock_bin" 8
+    if [ "$non_blocking" = true ]; then
+      if ! "$flock_bin" -n 8; then
+        echo "${name}: an image update for this VM is already active; keeping the cached image"
+        exit 0
+      fi
+    else
+      "$flock_bin" 8
+    fi
 
     if [ "$mode" = if-stale ]; then
       previous_generation="$(cat "$attempt_file" 2>/dev/null || true)"
@@ -272,7 +295,7 @@ let
         exit 75
       fi
 
-      if ! ${updateImageCli}/bin/update-image --if-stale "$host"; then
+      if ! ${updateImageCli}/bin/update-image --force "$host"; then
         echo "$host: update failed; trying the cached image" >&2
       fi
 
@@ -374,12 +397,28 @@ let
       exit 0
     fi
 
-    if ! ${updateImageProgram}/bin/update-image-${name} --if-stale --non-blocking; then
+    if ! ${updateImageProgram}/bin/update-image-${name} ${automaticUpdateMode}; then
       echo "${name}: guest-shutdown image update failed; the cached image remains active" >&2
     fi
 
     exit 0
   '';
+
+  safeRestartProgram = pkgs.writeShellApplication {
+    name = "restart-${name}";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.nix
+      pkgs.procps
+      pkgs.systemd
+      pkgs.tmux
+      pkgs.util-linux
+    ];
+    text = ''
+      export NIXOS_SHELL_HOST=${lib.escapeShellArg name}
+      ${builtins.readFile ./restart-vm-safely.sh}
+    '';
+  };
 
   stableLauncher = "/run/nixos-shell/${name}.sh";
 in
@@ -389,6 +428,20 @@ in
   system.build."vmLauncher-${name}" = innerStart;
   system.build."updateImageCli-${name}" = updateImageCli;
   system.build."runVmCli-${name}" = runVmCli;
+  system.build."safeRestart-${name}" = lib.mkIf safeRestart safeRestartProgram;
+
+  local.vmHost.nixosShell.instances.${name} = {
+    inherit
+      buildIntervalSec
+      imageServiceBefore
+      imageUpdateTimer
+      rebuildFromLatestLocks
+      registerImage
+      safeRestart
+      updateImageBeforeStart
+      updateOnGuestShutdown
+      ;
+  };
 
   environment.systemPackages = [
     updateImageCli
@@ -405,6 +458,7 @@ in
     wantedBy = [ "nixos-shell-images.target" ];
     after = [ "nix-daemon.service" ] ++ lib.optional rebuildFromLatestLocks "network-online.target";
     wants = lib.optional rebuildFromLatestLocks "network-online.target";
+    before = imageServiceBefore;
     restartIfChanged = true;
     restartTriggers = [ self.outPath ];
     path = [
@@ -413,7 +467,7 @@ in
     ];
     serviceConfig = {
       Type = "oneshot";
-      RemainAfterExit = true;
+      RemainAfterExit = !imageUpdateTimer;
       Restart = "no";
       TimeoutStartSec = "2h";
       User = "root";
@@ -422,7 +476,7 @@ in
     script = ''
       set -euo pipefail
       update_status=0
-      ${updateImageProgram}/bin/update-image-${name} --if-stale || update_status=$?
+      ${updateImageProgram}/bin/update-image-${name} ${automaticUpdateMode} || update_status=$?
       ${lib.optionalString autoStart ''
             if ! systemctl is-active --quiet "${vmServiceName}.service"; then
               systemctl start --no-block "${vmServiceName}.service" || true
@@ -432,15 +486,15 @@ in
     '';
   };
 
-  # old configuration, based on time:
-  #systemd.timers.${imageServiceName} = {
-  #  wantedBy = [ "timers.target" ];
-  #  timerConfig = {
-  #    OnBootSec = "${toString buildDelaySec}s";
-  #    OnUnitActiveSec = "${toString buildIntervalSec}s";
-  #    Unit = "${imageServiceName}.service";
-  #  };
-  #};
+  systemd.timers.${imageServiceName} = lib.mkIf (registerImage && imageUpdateTimer) {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "${toString buildDelaySec}s";
+      OnUnitInactiveSec = "${toString buildIntervalSec}s";
+      Persistent = true;
+      Unit = "${imageServiceName}.service";
+    };
+  };
 
   systemd.services.${vmServiceName} = {
     inherit description;
@@ -455,8 +509,8 @@ in
       ConditionPathExists = currentLink;
     };
 
-    after = lib.mkForce [ ];
-    wants = lib.mkForce [ ];
+    after = lib.mkForce (lib.optional updateImageBeforeStart "${imageServiceName}.service");
+    wants = lib.mkForce (lib.optional updateImageBeforeStart "${imageServiceName}.service");
     requires = lib.mkForce [ ];
     bindsTo = lib.mkForce [ ];
     partOf = lib.mkForce [ ];
@@ -476,8 +530,16 @@ in
         Restart = "always";
         RestartSec = restartTime;
         User = "root";
-        KillMode = "process";
-        TimeoutStopSec = "2min";
+        KillMode =
+          if registerImage && updateOnGuestShutdown then
+            "control-group"
+          else
+            "process";
+        TimeoutStopSec =
+          if registerImage && updateOnGuestShutdown then
+            "2h"
+          else
+            "2min";
         WorkingDirectory = workingDir;
         ExecStart = stableLauncher;
 
@@ -518,6 +580,7 @@ in
     "d ${runImgBase} 0755 root root -"
     "d ${tmuxDir} 0755 root root -"
     (lib.optionalString pinned "f ${pinLock}  0644 root root - -")
+    (lib.optionalString safeRestart "L+ /root/${name}.sh - - - - ${lib.getExe safeRestartProgram}")
   ]
   ++ extraTmpfiles;
 }

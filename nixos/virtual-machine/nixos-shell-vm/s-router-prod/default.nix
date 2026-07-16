@@ -23,7 +23,7 @@ in
     productionSelector = hostName;
   };
 
-  networking.hostName = lib.mkForce hostName;
+  networking.hostName = hostName;
 
   sops.secrets.pppoe-username = { };
   sops.secrets.pppoe-password = { };

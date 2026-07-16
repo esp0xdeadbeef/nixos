@@ -10,10 +10,48 @@ let
   escapedRouterVmUnits = lib.concatMapStringsSep " " lib.escapeShellArg routerVmUnits;
 in
 {
+  imports = [
+    ./checks.nix
+  ];
+
   options.local.vmHost.nixosShell.autoStart = lib.mkOption {
     type = lib.types.bool;
     default = true;
     description = "Whether nixos-shell VMs should start from their generated systemd timers.";
+  };
+
+  options.local.vmHost.nixosShell.instances = lib.mkOption {
+    internal = true;
+    default = { };
+    type = lib.types.attrsOf (lib.types.submodule {
+      options = {
+        registerImage = lib.mkOption {
+          type = lib.types.bool;
+        };
+        rebuildFromLatestLocks = lib.mkOption {
+          type = lib.types.bool;
+        };
+        updateOnGuestShutdown = lib.mkOption {
+          type = lib.types.bool;
+        };
+        updateImageBeforeStart = lib.mkOption {
+          type = lib.types.bool;
+        };
+        imageUpdateTimer = lib.mkOption {
+          type = lib.types.bool;
+        };
+        imageServiceBefore = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+        };
+        buildIntervalSec = lib.mkOption {
+          type = lib.types.ints.positive;
+        };
+        safeRestart = lib.mkOption {
+          type = lib.types.bool;
+        };
+      };
+    });
+    description = "Internal lifecycle contracts registered by mk-vm.nix.";
   };
 
   options.local.vmHost.nixosShell.eno1RouterVms = {

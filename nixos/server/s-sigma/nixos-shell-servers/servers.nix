@@ -39,8 +39,21 @@ let
       name = "s-router-prod";
       args = {
         autoStart = false;
+        buildDelaySec = 300;
+        buildIntervalSec = 21600;
         description = "Production router canary VM (nixos-shell)";
+        imageServiceBefore = [
+          "s-router-clab-image.service"
+          "s-router-nixos-image.service"
+          "s-router-test-clients-image.service"
+        ];
+        imageUpdateTimer = true;
+        rebuildFromLatestLocks = true;
+        registerImage = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
+        safeRestart = true;
+        updateImageBeforeStart = true;
+        updateOnGuestShutdown = false;
       };
     }
     {
@@ -147,22 +160,6 @@ let
     exec /run/current-system/sw/bin/run-vm ${lib.escapeShellArg host} "$@"
   '';
 
-  prodRunner = pkgs.writeShellApplication {
-    name = "restart-s-router-prod";
-    runtimeInputs = [
-      pkgs.coreutils
-      pkgs.nix
-      pkgs.procps
-      pkgs.systemd
-      pkgs.tmux
-      pkgs.util-linux
-    ];
-    text = ''
-      export S_ROUTER_PROD_FLAKE=${lib.escapeShellArg "path:${self.lib.vmSourceForHost "s-router-prod"}"}
-      ${builtins.readFile ./restart-s-router-prod.sh}
-    '';
-  };
-
   mkImage = vm: {
     inherit (vm) name;
     value = self.nixosConfigurations.${vm.name}.config.system.build.nixos-shell;
@@ -177,13 +174,10 @@ in
   config = lib.mkMerge (
     [
       {
-        system.build.restartSRouterProd = prodRunner;
         system.build.vmImages = lib.listToAttrs (map mkImage vms);
-        systemd.tmpfiles.rules =
-          (map
-            (host: "L+ /root/${host}.sh - - - - ${runnerWrapper host}")
-            managedRunnerHosts)
-          ++ [ "L+ /root/s-router-prod.sh - - - - ${lib.getExe prodRunner}" ];
+        systemd.tmpfiles.rules = map
+          (host: "L+ /root/${host}.sh - - - - ${runnerWrapper host}")
+          managedRunnerHosts;
       }
     ]
     ++ map mkService vms
