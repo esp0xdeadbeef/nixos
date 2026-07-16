@@ -114,7 +114,6 @@ let
         registerImage = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
         safeRestart = true;
-        updateImageBeforeStart = true;
         updateOnGuestShutdown = false;
       };
     }

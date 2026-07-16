@@ -58,17 +58,18 @@ After the legacy replacement is stable, advance these pins only through an expli
 The VM host treats the production gateway differently from disposable router
 test VMs:
 
-- `s-router-prod-image.service` builds and atomically selects the candidate
-  image before `s-router-prod-vm.service` may start.
+- `s-router-prod-vm.service` starts immediately from the last complete cached
+  image; a network image build must never block gateway startup.
 - `s-router-prod-image.timer` refreshes against the latest committed NixOS
   repository locks six hours after the previous refresh completed. A long build
   therefore cannot cause an immediate rebuild loop.
 - The production image service is ordered before the clab, NixOS, and client
   test-router image services, so those builds cannot hold the global image lock
   while the gateway candidate is waiting.
-- The timer only updates the cached image. It never restarts a running gateway.
-  A controlled production restart first waits for the image service and only
-  then restarts the VM, retaining the previous image as a rollback root.
+- The timer only updates the cached image. Until automatic rollout is validated
+  separately, a controlled production restart uses `/root/s-router-prod.sh` to
+  build first and only then restart the VM while retaining the previous image
+  as a rollback root.
 - An unexpected production guest shutdown restarts from the last complete
   cached image; it never starts a network build in the gateway service cgroup.
 
