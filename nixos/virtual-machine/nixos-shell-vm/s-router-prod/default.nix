@@ -25,14 +25,33 @@ in
 
   networking.hostName = hostName;
 
-  sops.secrets.pppoe-username = { };
-  sops.secrets.pppoe-password = { };
-  sops.secrets.s-nebula-container-mac = { };
+  sops.secrets =
+    {
+      pppoe-username = { };
+      pppoe-password = { };
+      s-nebula-container-mac = { };
+      subnet-ipv6-vlan2 = {
+        key = "subnet-ipv6";
+        owner = "root";
+        mode = "0400";
+      };
+      subnet-ipv6-vlan3 = {
+        key = "subnet-ipv6";
+        owner = "root";
+        mode = "0400";
+      };
+      subnet-ipv6-vlan7 = {
+        key = "subnet-ipv6";
+        owner = "root";
+        mode = "0400";
+      };
+    };
 
   imports = [
     "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
     ./kea-legacy-lease-paths.nix
     nebulaPublicIngressHotpatch.nixosModule
+    ./ipv6.nix
     ./vlan2-vlan3-stateful-return-hotpatch.nix
     ./vlan2-kea-reservations-override.nix
     ./vlan3-kea-reservations-override.nix

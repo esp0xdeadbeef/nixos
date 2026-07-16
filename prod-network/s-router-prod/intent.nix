@@ -96,6 +96,16 @@ let
       action = "allow";
       returnBehavior = "symmetric";
     };
+
+  runtimeIpv6Prefix = tenant: slot: {
+    allocation = "runtime";
+    family = "ipv6";
+    name = "${tenant}-public";
+    delegatedPrefixLength = 48;
+    perTenantPrefixLength = 64;
+    inherit slot;
+    sourceFile = "/run/secrets/subnet-ipv6-${tenant}";
+  };
 in
 {
   esp0xdeadbeef.site-a = {
@@ -118,17 +128,27 @@ in
           name = "vlan2";
           ipv4 = "192.168.1.0/24";
           ipv6 = "fd42:1::/64";
+          routedPrefixes = [
+            (runtimeIpv6Prefix "vlan2" 2)
+          ];
         }
         {
           kind = "tenant";
           name = "vlan3";
           ipv4 = "192.168.3.0/24";
+          ipv6 = "fd42:dead:beef:3::/64";
+          routedPrefixes = [
+            (runtimeIpv6Prefix "vlan3" 3)
+          ];
         }
         {
           kind = "tenant";
           name = "vlan7";
           ipv4 = "192.168.2.0/24";
           ipv6 = "fd42:dead:beef:7::/64";
+          routedPrefixes = [
+            (runtimeIpv6Prefix "vlan7" 7)
+          ];
         }
       ];
 
@@ -145,14 +165,14 @@ in
           name = "vlan3-dns";
           tenant = "vlan3";
           ipv4 = [ "192.168.3.1" ];
-          ipv6 = [ ];
+          ipv6 = [ "fd42:dead:beef:3::1" ];
         }
         {
           kind = "host";
           name = "s-nebula-container";
           tenant = "vlan3";
           ipv4 = [ "192.168.3.10" ];
-          ipv6 = [ ];
+          ipv6 = [ "fd42:dead:beef:3::1337:dead:beef" ];
         }
         {
           kind = "host";
@@ -355,7 +375,7 @@ in
           uplinks = {
             wan = {
               ipv4 = [ "0.0.0.0/0" ];
-              ipv6 = [ ];
+              ipv6 = [ "::/0" ];
             };
           };
         };

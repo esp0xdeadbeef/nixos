@@ -65,8 +65,17 @@ in
       matchConfig.Name = "veth0";
 
       networkConfig = {
-        DHCP = "yes"; # v4 + v6
+        DHCP = "ipv4";
         IPv6AcceptRA = "yes";
+      };
+
+      # Apply the same stable host identifier to every prefix announced on
+      # VLAN 3. This yields fixed ULA and GUA addresses without knowing the
+      # protected public prefix during Nix evaluation.
+      ipv6AcceptRAConfig = {
+        Token = "::1337:dead:beef";
+        UseDNS = true;
+        UseDomains = true;
       };
 
       dhcpV4Config = {
@@ -74,9 +83,6 @@ in
         UseDomains = "yes";
       };
 
-      dhcpV6Config = {
-        UseDNS = "yes";
-      };
     };
   };
 

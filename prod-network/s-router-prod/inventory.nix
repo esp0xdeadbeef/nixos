@@ -133,9 +133,15 @@ let
       domain = "lan.";
     };
 
-  disabledRa = interface: {
-    enabled = false;
+  slaacRa = interface: {
+    enabled = true;
     inherit interface;
+    rdnss = [ "router-self" ];
+    dnssl = [ "lan." ];
+    managed = false;
+    otherConfig = false;
+    onLink = true;
+    autonomous = true;
   };
 
   pppoeCredentials = {
@@ -153,6 +159,7 @@ let
   downstreamAccessVlan3Link = "p2p-access-vlan3-downstream-selector";
   downstreamAccessVlan7Link = "p2p-access-vlan7-downstream-selector";
   sNebulaContainerAddress = "192.168.3.10";
+  sNebulaContainerAddress6 = "fd42:dead:beef:3::1337:dead:beef";
 
   core =
     (mkNode "core" {
@@ -356,7 +363,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-vlan2 = disabledRa "tenant-vlan2";
+          tenant-vlan2 = slaacRa "tenant-vlan2";
         };
       };
     };
@@ -386,6 +393,7 @@ let
           {
             name = "s-nebula-container.lan.";
             a = [ sNebulaContainerAddress ];
+            aaaa = [ sNebulaContainerAddress6 ];
           }
         ];
       };
@@ -403,7 +411,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-vlan3 = disabledRa "tenant-vlan3";
+          tenant-vlan3 = slaacRa "tenant-vlan3";
         };
       };
     };
@@ -445,7 +453,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-vlan7 = disabledRa "tenant-vlan7";
+          tenant-vlan7 = slaacRa "tenant-vlan7";
         };
       };
     };
@@ -461,7 +469,12 @@ in
 
     vlan3-dns = {
       ipv4 = [ "192.168.3.1" ];
-      ipv6 = [ ];
+      ipv6 = [ "fd42:dead:beef:3::1" ];
+    };
+
+    s-nebula-container = {
+      ipv4 = [ sNebulaContainerAddress ];
+      ipv6 = [ sNebulaContainerAddress6 ];
     };
 
     vlan7-dns = {
@@ -489,7 +502,7 @@ in
             };
 
             ipv6 = {
-              method = "none";
+              method = "pppoe";
             };
 
             pppoe = {
