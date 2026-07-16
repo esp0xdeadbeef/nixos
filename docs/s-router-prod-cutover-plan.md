@@ -66,10 +66,10 @@ test VMs:
 - The production image service is ordered before the clab, NixOS, and client
   test-router image services, so those builds cannot hold the global image lock
   while the gateway candidate is waiting.
-- The timer only updates the cached image. Until automatic rollout is validated
-  separately, a controlled production restart uses `/root/s-router-prod.sh` to
-  build first and only then restart the VM while retaining the previous image
-  as a rollback root.
+- A successful build pins the running image, atomically selects the candidate,
+  gracefully restarts the VM, and verifies that QEMU is using the candidate.
+  A failed build never touches the running VM; a failed candidate start restores
+  and restarts the pinned previous image.
 - An unexpected production guest shutdown restarts from the last complete
   cached image; it never starts a network build in the gateway service cgroup.
 

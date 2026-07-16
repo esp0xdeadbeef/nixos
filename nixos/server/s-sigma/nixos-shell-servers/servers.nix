@@ -51,6 +51,7 @@ let
         rebuildFromLatestLocks = true;
         registerImage = true;
         repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
+        restartVmAfterImageUpdate = true;
         safeRestart = true;
         updateOnGuestShutdown = false;
       };

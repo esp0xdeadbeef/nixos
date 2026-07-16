@@ -9,10 +9,52 @@ readonly lock_root="${NIXOS_SHELL_LOCK_ROOT:-/run/lock/nixos-shell}"
 readonly tmux_socket="${NIXOS_SHELL_TMUX_SOCKET:-/run/nixos-shell/${host}.tmux}"
 readonly service="${NIXOS_SHELL_VM_SERVICE:-${host}-vm.service}"
 readonly image_service="${NIXOS_SHELL_IMAGE_SERVICE:-${host}-image.service}"
+readonly image_service_rolls_out="${NIXOS_SHELL_IMAGE_SERVICE_ROLLOUT:-false}"
+readonly rollout_service="${NIXOS_SHELL_ROLLOUT_SERVICE:-${host}-rollout.service}"
 readonly flock_bin="${NIXOS_SHELL_FLOCK_BIN:-flock}"
 readonly nix_store_bin="${NIXOS_SHELL_NIX_STORE_BIN:-nix-store}"
 readonly systemctl_bin="${NIXOS_SHELL_SYSTEMCTL_BIN:-systemctl}"
 readonly tmux_bin="${NIXOS_SHELL_TMUX_BIN:-tmux}"
+
+if [[ "${image_service_rolls_out}" == true ]]; then
+  if ! "${systemctl_bin}" start "${image_service}"; then
+    echo "${host}: image update failed; the running VM is untouched" >&2
+    exit 1
+  fi
+
+  for _ in $(seq 1 300); do
+    if "${systemctl_bin}" is-failed --quiet "${rollout_service}"; then
+      echo "${host}: image rollout failed or was rolled back" >&2
+      exit 1
+    fi
+
+    candidate="$(readlink -e "${current_link}" 2>/dev/null || true)"
+    if [[ ! -e "${previous_link}" ]]; then
+      if ! "${systemctl_bin}" is-active --quiet "${service}"; then
+        echo "${host}: cached the built image ${candidate}; the VM remains stopped"
+        exit 0
+      fi
+
+      pane_command="$(
+        "${tmux_bin}" -S "${tmux_socket}" \
+          display-message -p -t vm '#{pane_start_command}' 2>/dev/null || true
+      )"
+      if [[ -n "${candidate}" && "${pane_command}" == *"${candidate}"* ]]; then
+        if [[ -t 0 && -t 1 ]]; then
+          exec env TMUX= "${tmux_bin}" -S "${tmux_socket}" attach -t vm
+        fi
+
+        echo "${host}: running the built image ${candidate}"
+        exit 0
+      fi
+    fi
+
+    sleep 1
+  done
+
+  echo "${host}: timed out waiting for the image rollout" >&2
+  exit 1
+fi
 
 mkdir -p "${image_root}" "${lock_root}"
 exec 9>"${lock_root}/${host}-restart.lock"

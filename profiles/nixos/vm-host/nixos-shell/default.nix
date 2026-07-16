@@ -37,6 +37,9 @@ in
         updateImageBeforeStart = lib.mkOption {
           type = lib.types.bool;
         };
+        restartVmAfterImageUpdate = lib.mkOption {
+          type = lib.types.bool;
+        };
         imageUpdateTimer = lib.mkOption {
           type = lib.types.bool;
         };

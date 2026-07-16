@@ -6,6 +6,10 @@ set -euo pipefail
 
 case "$*" in
   *" has-session "*)
+    if [ -n "${FAKE_TMUX_FAIL_IMAGE:-}" ] \
+      && [ "$(readlink -e "${NIXOS_SHELL_IMAGE_ROOT}/current")" = "$FAKE_TMUX_FAIL_IMAGE" ]; then
+      exit 1
+    fi
     exit 0
     ;;
   *" display-message "*)

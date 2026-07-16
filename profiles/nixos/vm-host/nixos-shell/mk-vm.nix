@@ -15,6 +15,7 @@ name:
 , latestLocksRepository ? "github:esp0xdeadbeef/nixos"
 , updateOnGuestShutdown ? true
 , updateImageBeforeStart ? false
+, restartVmAfterImageUpdate ? false
 , imageUpdateTimer ? false
 , imageServiceBefore ? [ ]
 , safeRestart ? false
@@ -37,6 +38,12 @@ name:
 
 assert lib.assertMsg (!updateImageBeforeStart || registerImage)
   "${name}: updateImageBeforeStart requires registerImage = true";
+assert lib.assertMsg (!restartVmAfterImageUpdate || registerImage)
+  "${name}: restartVmAfterImageUpdate requires registerImage = true";
+assert lib.assertMsg (!(updateImageBeforeStart && restartVmAfterImageUpdate))
+  "${name}: updateImageBeforeStart and restartVmAfterImageUpdate are mutually exclusive";
+assert lib.assertMsg (!restartVmAfterImageUpdate || !updateOnGuestShutdown)
+  "${name}: restartVmAfterImageUpdate requires updateOnGuestShutdown = false";
 assert lib.assertMsg (!imageUpdateTimer || registerImage)
   "${name}: imageUpdateTimer requires registerImage = true";
 assert lib.assertMsg (!safeRestart || registerImage)
@@ -45,6 +52,7 @@ assert lib.assertMsg (!safeRestart || registerImage)
 let
   vmServiceName = "${name}-vm";
   imageServiceName = "${name}-image";
+  rolloutServiceName = "${name}-rollout";
   automaticUpdateMode =
     if rebuildFromLatestLocks then
       "--force"
@@ -404,6 +412,21 @@ let
     exit 0
   '';
 
+  activateImageProgram = pkgs.writeShellApplication {
+    name = "activate-image-${name}";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.nix
+      pkgs.systemd
+      pkgs.tmux
+      pkgs.util-linux
+    ];
+    text = ''
+      export NIXOS_SHELL_HOST=${lib.escapeShellArg name}
+      ${builtins.readFile ./activate-vm-image-safely.sh}
+    '';
+  };
+
   safeRestartProgram = pkgs.writeShellApplication {
     name = "restart-${name}";
     runtimeInputs = [
@@ -416,6 +439,8 @@ let
     ];
     text = ''
       export NIXOS_SHELL_HOST=${lib.escapeShellArg name}
+      export NIXOS_SHELL_IMAGE_SERVICE_ROLLOUT=${lib.boolToString restartVmAfterImageUpdate}
+      export NIXOS_SHELL_ROLLOUT_SERVICE=${lib.escapeShellArg "${rolloutServiceName}.service"}
       ${builtins.readFile ./restart-vm-safely.sh}
     '';
   };
@@ -428,6 +453,7 @@ in
   system.build."vmLauncher-${name}" = innerStart;
   system.build."updateImageCli-${name}" = updateImageCli;
   system.build."runVmCli-${name}" = runVmCli;
+  system.build."activateVmImage-${name}" = lib.mkIf registerImage activateImageProgram;
   system.build."safeRestart-${name}" = lib.mkIf safeRestart safeRestartProgram;
 
   local.vmHost.nixosShell.instances.${name} = {
@@ -437,6 +463,7 @@ in
       imageUpdateTimer
       rebuildFromLatestLocks
       registerImage
+      restartVmAfterImageUpdate
       safeRestart
       updateImageBeforeStart
       updateOnGuestShutdown
@@ -475,14 +502,55 @@ in
 
     script = ''
       set -euo pipefail
+      image_root="''${NIXOS_SHELL_IMAGE_ROOT:-${imgBase}}"
+      current_link="$image_root/current"
+      previous_link="$image_root/restart-previous"
+      nix_store_bin="''${NIXOS_SHELL_NIX_STORE_BIN:-${pkgs.nix}/bin/nix-store}"
+      previous_image="$(readlink -e "$current_link" 2>/dev/null || true)"
+      ${lib.optionalString restartVmAfterImageUpdate ''
+        if [ -n "$previous_image" ]; then
+          "$nix_store_bin" \
+            --add-root "$previous_link" \
+            --indirect \
+            --realise "$previous_image" >/dev/null
+        fi
+      ''}
       update_status=0
       ${updateImageProgram}/bin/update-image-${name} ${automaticUpdateMode} || update_status=$?
+      ${lib.optionalString restartVmAfterImageUpdate ''
+        candidate="$(readlink -e "$current_link" 2>/dev/null || true)"
+        system_state="$(systemctl is-system-running 2>/dev/null || true)"
+
+        if [ "$update_status" -ne 0 ] || [ "$candidate" = "$previous_image" ]; then
+          rm -f "$previous_link"
+        elif [ "$system_state" = stopping ] \
+          || ! systemctl is-active --quiet "${vmServiceName}.service"; then
+          rm -f "$previous_link"
+        elif ! systemctl start --no-block "${rolloutServiceName}.service"; then
+          echo "${name}: failed to schedule the built image rollout" >&2
+          update_status=1
+        fi
+      ''}
       ${lib.optionalString autoStart ''
             if ! systemctl is-active --quiet "${vmServiceName}.service"; then
               systemctl start --no-block "${vmServiceName}.service" || true
             fi
           ''}
       exit "$update_status"
+    '';
+  };
+
+  systemd.services.${rolloutServiceName} = lib.mkIf (registerImage && restartVmAfterImageUpdate) {
+    description = "Activate the built nixos-shell VM image for ${name}";
+    after = [ "${imageServiceName}.service" ];
+    before = imageServiceBefore;
+    serviceConfig = {
+      Type = "oneshot";
+      TimeoutStartSec = "5min";
+      User = "root";
+    };
+    script = ''
+      exec ${activateImageProgram}/bin/activate-image-${name}
     '';
   };
 

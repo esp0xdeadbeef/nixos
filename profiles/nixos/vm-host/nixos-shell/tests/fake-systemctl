@@ -5,22 +5,64 @@ set -euo pipefail
 : "${FAKE_VM_HOST:?}"
 : "${NIXOS_SHELL_IMAGE_ROOT:?}"
 
-printf '%s\n' "$*" >>"$FAKE_SYSTEMCTL_LOG"
-
 if [ "$1" = start ] && [ "${2:-}" = "${FAKE_VM_HOST}-image.service" ]; then
-    if [ "${FAKE_SYSTEMCTL_FAIL_IMAGE:-false}" = true ]; then
-      exit 1
-    fi
+  printf '%s\n' "$*" >>"$FAKE_SYSTEMCTL_LOG"
+  if [ "${FAKE_SYSTEMCTL_FAIL_IMAGE:-false}" = true ]; then
+    exit 1
+  fi
 
-    candidate="${NIXOS_SHELL_IMAGE_ROOT}/fake-candidate"
-    mkdir -p "$candidate/bin"
-    printf '#!/usr/bin/env bash\nexit 0\n' >"$candidate/bin/run-${FAKE_VM_HOST}-vm"
-    chmod +x "$candidate/bin/run-${FAKE_VM_HOST}-vm"
-    ln -sfn "$candidate" "${NIXOS_SHELL_IMAGE_ROOT}/current"
-elif [ "$1" = restart ] && [ "${2:-}" = "${FAKE_VM_HOST}-vm.service" ]; then
-    if [ "${FAKE_SYSTEMCTL_FAIL_RESTART:-false}" = true ]; then
-      exit 1
+  old_image="$(readlink -e "${NIXOS_SHELL_IMAGE_ROOT}/current" 2>/dev/null || true)"
+  if [ "${FAKE_IMAGE_PIN_PREVIOUS:-false}" = true ] && [ -n "$old_image" ]; then
+    ln -sfn "$old_image" "${NIXOS_SHELL_IMAGE_ROOT}/restart-previous"
+  fi
+
+  candidate="${NIXOS_SHELL_IMAGE_ROOT}/fake-candidate"
+  mkdir -p "$candidate/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$candidate/bin/run-${FAKE_VM_HOST}-vm"
+  chmod +x "$candidate/bin/run-${FAKE_VM_HOST}-vm"
+  ln -sfn "$candidate" "${NIXOS_SHELL_IMAGE_ROOT}/current"
+  if [ "${FAKE_IMAGE_AUTO_ROLLOUT:-false}" = true ]; then
+    printf '%s\n' "start --no-block ${FAKE_VM_HOST}-rollout.service" \
+      >>"$FAKE_SYSTEMCTL_LOG"
+    : "${FAKE_ROLLOUT_PROGRAM:?}"
+    rm -f "${FAKE_ROLLOUT_FAILED_STATE:?}"
+    if ! "$FAKE_ROLLOUT_PROGRAM"; then
+      touch "$FAKE_ROLLOUT_FAILED_STATE"
     fi
+  fi
+elif [ "$1" = start ] \
+  && [ "${2:-}" = --no-block ] \
+  && [ "${3:-}" = "${FAKE_VM_HOST}-rollout.service" ]; then
+  printf '%s\n' "$*" >>"$FAKE_SYSTEMCTL_LOG"
+  : "${FAKE_ROLLOUT_PROGRAM:?}"
+  rm -f "${FAKE_ROLLOUT_FAILED_STATE:?}"
+  if ! "$FAKE_ROLLOUT_PROGRAM"; then
+    touch "$FAKE_ROLLOUT_FAILED_STATE"
+  fi
+elif [ "$1" = start ] && [ "${2:-}" = "${FAKE_VM_HOST}-rollout.service" ]; then
+  printf '%s\n' "$*" >>"$FAKE_SYSTEMCTL_LOG"
+  : "${FAKE_ROLLOUT_PROGRAM:?}"
+  "$FAKE_ROLLOUT_PROGRAM"
+elif [ "$1" = restart ] && [ "${2:-}" = "${FAKE_VM_HOST}-vm.service" ]; then
+  printf '%s\n' "$*" >>"$FAKE_SYSTEMCTL_LOG"
+  if [ "${FAKE_SYSTEMCTL_FAIL_RESTART:-false}" = true ]; then
+    exit 1
+  fi
+  if [ "${FAKE_SYSTEMCTL_FAIL_RESTART_ONCE:-false}" = true ] \
+    && [ ! -e "${FAKE_SYSTEMCTL_RESTART_STATE:?}" ]; then
+    touch "$FAKE_SYSTEMCTL_RESTART_STATE"
+    exit 1
+  fi
+elif [ "$1" = is-active ] \
+  && [ "${2:-}" = --quiet ] \
+  && [ "${3:-}" = "${FAKE_VM_HOST}-vm.service" ]; then
+  [ "${FAKE_VM_INACTIVE:-false}" != true ]
+elif [ "$1" = is-system-running ]; then
+  printf '%s\n' "${FAKE_SYSTEM_STATE:-running}"
+elif [ "$1" = is-failed ] \
+  && [ "${2:-}" = --quiet ] \
+  && [ "${3:-}" = "${FAKE_VM_HOST}-rollout.service" ]; then
+  [ -e "${FAKE_ROLLOUT_FAILED_STATE:?}" ]
 else
   echo "unexpected fake systemctl invocation: $*" >&2
   exit 64

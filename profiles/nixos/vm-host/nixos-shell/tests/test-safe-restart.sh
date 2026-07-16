@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: $0 <restart-program> <hostname>" >&2
+if [ "$#" -ne 3 ]; then
+  echo "usage: $0 <restart-program> <rollout-program> <hostname>" >&2
   exit 64
 fi
 
 restart_script="$1"
-host="$2"
+rollout_script="$2"
+host="$3"
 test_dir="$(cd "$(dirname "$0")" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -28,6 +29,10 @@ export NIXOS_SHELL_NIX_STORE_BIN="$fake_bin/nix-store"
 export NIXOS_SHELL_SYSTEMCTL_BIN="$fake_bin/systemctl"
 export NIXOS_SHELL_TMUX_BIN="$fake_bin/tmux"
 export FAKE_SYSTEMCTL_LOG="$work/systemctl.log"
+export FAKE_IMAGE_AUTO_ROLLOUT=true
+export FAKE_IMAGE_PIN_PREVIOUS=true
+export FAKE_ROLLOUT_PROGRAM="$rollout_script"
+export FAKE_ROLLOUT_FAILED_STATE="$work/rollout-failed"
 
 mkdir -p "$NIXOS_SHELL_IMAGE_ROOT/old/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' \
@@ -38,7 +43,8 @@ ln -s "$NIXOS_SHELL_IMAGE_ROOT/old" "$NIXOS_SHELL_IMAGE_ROOT/current"
 "$restart_script"
 
 test "$(sed -n '1p' "$FAKE_SYSTEMCTL_LOG")" = "start ${host}-image.service"
-test "$(sed -n '2p' "$FAKE_SYSTEMCTL_LOG")" = "restart ${host}-vm.service"
+test "$(sed -n '2p' "$FAKE_SYSTEMCTL_LOG")" = "start --no-block ${host}-rollout.service"
+test "$(sed -n '3p' "$FAKE_SYSTEMCTL_LOG")" = "restart ${host}-vm.service"
 test ! -e "$NIXOS_SHELL_IMAGE_ROOT/restart-previous"
 test "$(readlink -e "$NIXOS_SHELL_IMAGE_ROOT/current")" = \
   "$NIXOS_SHELL_IMAGE_ROOT/fake-candidate"
