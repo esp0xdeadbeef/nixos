@@ -1,0 +1,421 @@
+#!/usr/bin/env python3
+"""Block pushes that expose public addresses or identity-bearing SOPS values."""
+
+from __future__ import annotations
+
+import ipaddress
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ZERO_OID = "0" * 40
+SOPS_SUFFIXES = {".env", ".json", ".yaml", ".yml"}
+MIN_PATTERN_LENGTH = 5
+MAX_FINDINGS = 100
+
+ASSIGNMENT_RE = re.compile(
+    r"^\s*['\"]?([A-Za-z0-9_.-]+)['\"]?\s*(?::|=)\s*(.*?)\s*,?\s*$"
+)
+IDENTITY_KEY_RE = re.compile(
+    r"(?:name|display|localpart|label|domain|email|host|fqdn|user|"
+    r"public.*ip|ip.*address|address)",
+    re.IGNORECASE,
+)
+SECRET_KEY_RE = re.compile(
+    r"(?:pass(?:word)?|token|secret|private.*key|credential|api.*key)",
+    re.IGNORECASE,
+)
+DOMAIN_RE = re.compile(
+    r"(?<![A-Za-z0-9-])(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+    r"[A-Za-z]{2,63}(?![A-Za-z0-9-])"
+)
+EMAIL_RE = re.compile(
+    r"(?<![A-Za-z0-9.!#$%&'*+/=?^_`{|}~-])"
+    r"([A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+)@"
+    r"((?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+    r"[A-Za-z]{2,63})"
+)
+WORD_RE = re.compile(r"[^\W_][\w.@+-]*", re.UNICODE)
+IP_TOKEN_RE = re.compile(r"[0-9A-Fa-f:.%]+")
+IPV6_CANDIDATE_RE = re.compile(
+    r"(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{0,4}:){2,7}"
+    r"[0-9A-Fa-f]{0,4}(?![0-9A-Fa-f:])"
+)
+IGNORED_VALUES = {
+    "abuse",
+    "admin",
+    "client",
+    "contact",
+    "default",
+    "disabled",
+    "enabled",
+    "false",
+    "localhost",
+    "nixos",
+    "no-reply",
+    "none",
+    "null",
+    "postmaster",
+    "root",
+    "server",
+    "true",
+}
+
+
+class PrivacyCheckError(RuntimeError):
+    pass
+
+
+def run(
+    args: list[str],
+    *,
+    cwd: Path,
+    input_data: bytes | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        input=input_data,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
+def require_command(command: str) -> None:
+    if shutil.which(command) is None:
+        raise PrivacyCheckError(f"required command is unavailable: {command}")
+
+
+def git(repo: Path, *args: str) -> bytes:
+    result = run(["git", *args], cwd=repo)
+    if result.returncode != 0:
+        raise PrivacyCheckError(f"git command failed: git {' '.join(args)}")
+    return result.stdout
+
+
+def discover_public_address(repo: Path, version: int) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+    result = run(
+        [
+            "curl",
+            f"-{version}",
+            "-fsS",
+            "--max-time",
+            "15",
+            "https://ifconfig.me",
+        ],
+        cwd=repo,
+    )
+    if result.returncode != 0:
+        raise PrivacyCheckError(f"public IPv{version} discovery failed")
+
+    try:
+        address = ipaddress.ip_address(result.stdout.decode("ascii").strip())
+    except ValueError as error:
+        raise PrivacyCheckError(f"public IPv{version} discovery returned invalid data") from error
+
+    if address.version != version:
+        raise PrivacyCheckError(f"public IPv{version} discovery returned the wrong address family")
+    return address
+
+
+def is_expected_sops_file(path: str) -> bool:
+    candidate = Path(path)
+    return (
+        candidate.parts[:1] == ("secrets",)
+        and candidate.suffix.lower() in SOPS_SUFFIXES
+        and candidate.name != ".sops.yaml"
+        and not candidate.name.endswith(".example")
+    )
+
+
+def is_privacy_source(path: str) -> bool:
+    name = Path(path).name
+    return is_expected_sops_file(path) and (
+        name.startswith("mail-account-")
+        or name.startswith("mailbox-")
+        or name == "s-routers-public-ips.yaml"
+    )
+
+
+def add_pattern(patterns: set[str], value: str, *, split_words: bool = False) -> None:
+    cleaned = value.strip().strip("'\"").strip()
+    folded = cleaned.casefold()
+    if len(folded) >= MIN_PATTERN_LENGTH and folded not in IGNORED_VALUES:
+        patterns.add(folded)
+
+    if split_words:
+        for word in WORD_RE.findall(cleaned):
+            folded_word = word.casefold()
+            if len(folded_word) >= MIN_PATTERN_LENGTH and folded_word not in IGNORED_VALUES:
+                patterns.add(folded_word)
+
+
+def add_ip_candidate(secret_ips: set[ipaddress._BaseAddress], value: str) -> None:
+    for token in IP_TOKEN_RE.findall(value):
+        candidate = token.strip(".:%")
+        if not candidate or ("." not in candidate and ":" not in candidate):
+            continue
+        try:
+            address = ipaddress.ip_address(candidate)
+        except ValueError:
+            continue
+        if address.is_global:
+            secret_ips.add(address)
+
+
+def derive_private_denylist(
+    repo: Path,
+) -> tuple[set[str], set[ipaddress._BaseAddress]]:
+    tracked = git(repo, "ls-files", "-z", "--", "secrets").decode(
+        "utf-8", errors="surrogateescape"
+    )
+    sops_files = sorted(path for path in tracked.split("\0") if path and is_expected_sops_file(path))
+    if not sops_files:
+        raise PrivacyCheckError("no tracked SOPS files were found")
+
+    patterns: set[str] = set()
+    secret_ips: set[ipaddress._BaseAddress] = set()
+
+    for relative_path in sops_files:
+        status = run(["sops", "filestatus", relative_path], cwd=repo)
+        if status.returncode != 0:
+            raise PrivacyCheckError(f"cannot verify SOPS encryption: {relative_path}")
+        try:
+            encrypted = json.loads(status.stdout).get("encrypted") is True
+        except (json.JSONDecodeError, AttributeError) as error:
+            raise PrivacyCheckError(f"invalid SOPS status response: {relative_path}") from error
+        if not encrypted:
+            raise PrivacyCheckError(f"SOPS file is not encrypted: {relative_path}")
+
+    privacy_sources = [path for path in sops_files if is_privacy_source(path)]
+    if not privacy_sources:
+        raise PrivacyCheckError("no SOPS privacy sources were found")
+
+    for relative_path in privacy_sources:
+        decrypted = run(["sops", "decrypt", relative_path], cwd=repo)
+        if decrypted.returncode != 0:
+            raise PrivacyCheckError(f"SOPS privacy-source decryption failed: {relative_path}")
+        plaintext = decrypted.stdout.decode("utf-8", errors="ignore")
+
+        for line in plaintext.splitlines():
+            assignment = ASSIGNMENT_RE.match(line)
+            if assignment is None:
+                continue
+            key, value = assignment.groups()
+            value = value.strip().strip("'\"").strip()
+            if not value or value in {"|", ">", "{}", "[]"}:
+                continue
+
+            add_ip_candidate(secret_ips, value)
+            if IDENTITY_KEY_RE.search(key):
+                add_pattern(patterns, value, split_words=True)
+                for domain in DOMAIN_RE.findall(value):
+                    add_pattern(patterns, domain)
+                for localpart, domain in EMAIL_RE.findall(value):
+                    add_pattern(patterns, localpart)
+                    add_pattern(patterns, domain)
+                    add_pattern(patterns, f"{localpart}@{domain}")
+            if SECRET_KEY_RE.search(key):
+                add_pattern(patterns, value)
+
+    if not patterns:
+        raise PrivacyCheckError("the private denylist is empty")
+    return patterns, secret_ips
+
+
+def line_number(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def scan_blob(
+    data: bytes,
+    location: str,
+    *,
+    patterns: set[str],
+    forbidden_ipv4: ipaddress.IPv4Address,
+    forbidden_ipv6_network: ipaddress.IPv6Network,
+    secret_ips: set[ipaddress._BaseAddress],
+    expected_sops: bool,
+) -> set[tuple[str, int, str]]:
+    findings: set[tuple[str, int, str]] = set()
+    if expected_sops:
+        if not (b"ENC[AES256_GCM" in data and b"sops:" in data):
+            findings.add((location, 1, "unencrypted SOPS data"))
+        return findings
+
+    text = data.decode("utf-8", errors="ignore")
+    folded = text.casefold()
+    fixed_patterns = patterns | {str(forbidden_ipv4).casefold()}
+    for pattern in fixed_patterns:
+        start = 0
+        while len(findings) < MAX_FINDINGS:
+            offset = folded.find(pattern, start)
+            if offset < 0:
+                break
+            findings.add((location, line_number(text, offset), "private value"))
+            start = offset + max(1, len(pattern))
+
+    for match in IPV6_CANDIDATE_RE.finditer(text):
+        try:
+            address = ipaddress.ip_address(match.group(0))
+        except ValueError:
+            continue
+        if address in forbidden_ipv6_network or address in secret_ips:
+            findings.add((location, line_number(text, match.start()), "private address"))
+            if len(findings) >= MAX_FINDINGS:
+                break
+
+    return findings
+
+
+def tree_blobs(repo: Path, commit: str) -> list[tuple[str, str]]:
+    output = git(repo, "ls-tree", "-r", "-z", commit)
+    blobs: list[tuple[str, str]] = []
+    for entry in output.split(b"\0"):
+        if not entry:
+            continue
+        metadata, raw_path = entry.split(b"\t", 1)
+        _mode, object_type, object_id = metadata.decode("ascii").split()
+        if object_type == "blob":
+            blobs.append((object_id, raw_path.decode("utf-8", errors="surrogateescape")))
+    return blobs
+
+
+def index_blobs(repo: Path) -> list[tuple[str, str]]:
+    changed = git(repo, "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
+    blobs: list[tuple[str, str]] = []
+    for raw_path in changed.split(b"\0"):
+        if not raw_path:
+            continue
+        path = raw_path.decode("utf-8", errors="surrogateescape")
+        staged = git(repo, "ls-files", "--stage", "-z", "--", path)
+        for entry in staged.split(b"\0"):
+            if not entry:
+                continue
+            metadata, _listed_path = entry.split(b"\t", 1)
+            _mode, object_id, stage = metadata.decode("ascii").split()
+            if stage == "0":
+                blobs.append((object_id, path))
+                break
+    return blobs
+
+
+def commit_oid(repo: Path, object_id: str) -> str:
+    result = run(["git", "rev-parse", f"{object_id}^{{commit}}"], cwd=repo)
+    if result.returncode != 0:
+        raise PrivacyCheckError("a pushed object is not a commit")
+    return result.stdout.decode("ascii").strip()
+
+
+def commits_to_scan(repo: Path, updates: list[tuple[str, str, str, str]]) -> set[str]:
+    commits: set[str] = set()
+    for _local_ref, local_oid, _remote_ref, remote_oid in updates:
+        if local_oid == ZERO_OID:
+            continue
+        local_commit = commit_oid(repo, local_oid)
+        commits.add(local_commit)
+        if remote_oid != ZERO_OID:
+            remote_commit = commit_oid(repo, remote_oid)
+            revisions = git(repo, "rev-list", local_commit, f"^{remote_commit}")
+        else:
+            revisions = git(repo, "rev-list", local_commit, "--not", "--remotes")
+        commits.update(revisions.decode("ascii").split())
+
+    if not commits:
+        commits.add(commit_oid(repo, "HEAD"))
+    return commits
+
+
+def parse_updates() -> list[tuple[str, str, str, str]]:
+    updates: list[tuple[str, str, str, str]] = []
+    for line in sys.stdin:
+        fields = line.split()
+        if len(fields) != 4:
+            raise PrivacyCheckError("invalid pre-push ref update data")
+        updates.append((fields[0], fields[1], fields[2], fields[3]))
+    return updates
+
+
+def main() -> int:
+    try:
+        for command in ("curl", "git", "sops"):
+            require_command(command)
+
+        repo_result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if repo_result.returncode != 0:
+            raise PrivacyCheckError("cannot locate the Git repository")
+        repo = Path(repo_result.stdout.decode("utf-8").strip())
+
+        updates = parse_updates()
+        public_ipv4 = discover_public_address(repo, 4)
+        public_ipv6 = discover_public_address(repo, 6)
+        public_ipv6_network = ipaddress.ip_network(f"{public_ipv6}/64", strict=False)
+        patterns, secret_ips = derive_private_denylist(repo)
+        commits = commits_to_scan(repo, updates)
+
+        findings: set[tuple[str, int, str]] = set()
+        scanned_blobs: set[str] = set()
+        for commit in sorted(commits):
+            for object_id, path in tree_blobs(repo, commit):
+                if object_id in scanned_blobs:
+                    continue
+                scanned_blobs.add(object_id)
+                data = git(repo, "cat-file", "blob", object_id)
+                findings.update(
+                    scan_blob(
+                        data,
+                        f"{commit[:12]}:{path}",
+                        patterns=patterns,
+                        forbidden_ipv4=public_ipv4,
+                        forbidden_ipv6_network=public_ipv6_network,
+                        secret_ips=secret_ips,
+                        expected_sops=is_expected_sops_file(path),
+                    )
+                )
+
+        for object_id, path in index_blobs(repo):
+            cache_key = f"index:{object_id}"
+            if cache_key in scanned_blobs:
+                continue
+            scanned_blobs.add(cache_key)
+            data = git(repo, "cat-file", "blob", object_id)
+            findings.update(
+                scan_blob(
+                    data,
+                    f"index:{path}",
+                    patterns=patterns,
+                    forbidden_ipv4=public_ipv4,
+                    forbidden_ipv6_network=public_ipv6_network,
+                    secret_ips=secret_ips,
+                    expected_sops=is_expected_sops_file(path),
+                )
+            )
+
+        if findings:
+            print("pre-push privacy scan blocked the push:", file=sys.stderr)
+            for location, number, kind in sorted(findings)[:MAX_FINDINGS]:
+                print(f"  {location}:{number}: [REDACTED {kind}]", file=sys.stderr)
+            if len(findings) > MAX_FINDINGS:
+                print("  additional findings omitted", file=sys.stderr)
+            return 1
+
+        print("pre-push privacy scan passed (case-insensitive; values redacted)")
+        return 0
+    except PrivacyCheckError as error:
+        print(f"pre-push privacy scan could not complete: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

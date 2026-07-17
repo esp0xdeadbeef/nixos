@@ -69,6 +69,36 @@ Conventional commits: `type(scope): description`
   the values. For example, check exit statuses and compare byte counts or hashes
   (`wc`, `sha256sum`) while keeping secret-bearing output out of context.
 
+## Pre-push Privacy Checks
+
+- **Never** commit or publish an unredacted public IPv4 address or an IPv6
+  address from the current public subnet.
+- RFC1918 IPv4 addresses and IPv6 ULA addresses are private infrastructure and
+  are allowed; do not treat them as public-address findings.
+- Before every push, discover the current public addresses without printing them
+  (`curl -4 -fsS https://ifconfig.me` and
+  `curl -6 -fsS https://ifconfig.me`). Check the exact IPv4 address and derive
+  the IPv6 network using the known delegated prefix, or conservatively `/64`
+  when the delegated prefix is unknown. Normalize candidate IPv6 addresses and
+  test subnet membership; a textual prefix grep alone is insufficient.
+- Build a private denylist through pipes from the relevant decrypted SOPS files.
+  Include personal names, account and email local parts, domains, email
+  addresses, hostnames, public IP addresses, and other identity-bearing values.
+  Do not hardcode that denylist in this file or expose its values in
+  model-visible output, process arguments, command history, or insecure temporary
+  files.
+- Before every push, scan case-insensitively across the complete candidate tree,
+  every outgoing commit, and staged changes for the public addresses and private
+  denylist. Report only redacted file and line locations; never print the matched
+  value.
+- The versioned `.githooks/pre-push` performs this scan. Keep
+  `core.hooksPath = .githooks`, do not bypass the hook, and treat an incomplete
+  scan as a failed push.
+- Verify that SOPS files being pushed remain encrypted and that no derived secret
+  value occurs in plaintext outside encrypted SOPS data. If address discovery,
+  SOPS decryption, or any scan is incomplete, fails, or finds a match, stop and
+  do not push.
+
 ## Checking
 
 - Format touched Nix files with `nix fmt -- <files>`.
