@@ -213,6 +213,11 @@ in
           providers = [ "s-nebula-container" ];
           trafficType = "nebula";
         }
+        {
+          name = "s-nebula-container-icmp";
+          providers = [ "s-nebula-container" ];
+          trafficType = "icmp";
+        }
       ];
       relations = [
         {
@@ -257,6 +262,21 @@ in
             name = "vlan3-dns";
           };
           trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan2-to-s-nebula-container-icmp";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "service";
+            name = "s-nebula-container-icmp";
+          };
+          trafficType = "icmp";
           action = "allow";
           returnBehavior = "symmetric";
         }
