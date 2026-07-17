@@ -4,71 +4,7 @@
 , ...
 }:
 let
-  delegatedPrefixes = {
-    vlan2 = {
-      sourceFile = config.sops.secrets.subnet-ipv6-vlan2.path;
-      slot = 2;
-    };
-    vlan3 = {
-      sourceFile = config.sops.secrets.subnet-ipv6-vlan3.path;
-      slot = 3;
-    };
-    vlan7 = {
-      sourceFile = config.sops.secrets.subnet-ipv6-vlan7.path;
-      slot = 7;
-    };
-  };
-  delegatedPrefixFile = delegatedPrefixes.vlan3.sourceFile;
-
-  derivePrefix = pkgs.writeShellScript "s-router-prod-derive-ipv6-prefix" ''
-    set -euo pipefail
-
-    ${pkgs.python3}/bin/python3 - "$1" "$2" <<'PY'
-    import ipaddress
-    import pathlib
-    import sys
-
-    delegated = ipaddress.IPv6Network(pathlib.Path(sys.argv[1]).read_text().strip(), strict=True)
-    if delegated.prefixlen != 48:
-        raise ValueError(f"expected IPv6 /48, got {delegated}")
-
-    slot = int(sys.argv[2])
-    print(ipaddress.IPv6Network((int(delegated.network_address) + (slot << 64), 64)))
-    PY
-  '';
-
-  routeCommand = route: table:
-    let
-      prefix = delegatedPrefixes.${route.tenant};
-      tableArgument = lib.optionalString (table != null) "table ${toString table} ";
-    in
-    ''
-      prefix="$(${derivePrefix} ${lib.escapeShellArg prefix.sourceFile} ${toString prefix.slot})"
-      ${pkgs.iproute2}/bin/ip -6 route replace ${tableArgument}"$prefix" \
-        via ${lib.escapeShellArg route.gateway} \
-        dev ${lib.escapeShellArg route.interface} \
-        proto static onlink
-    '';
-
-  exactRouteService = routes: {
-    description = "Install exact routed IPv6 tenant prefixes";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-networkd.service" ];
-    wants = [ "systemd-networkd.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      Restart = "on-failure";
-      RestartSec = "1s";
-    };
-    script = ''
-      set -euo pipefail
-
-      ${lib.concatMapStringsSep "\n" (route:
-        lib.concatMapStringsSep "\n" (routeCommand route) route.tables
-      ) routes}
-    '';
-  };
-
+  delegatedPrefixFile = config.sops.secrets.subnet-ipv6-vlan3.path;
   nebulaIpv6SetName = "s_router_prod_nebula6";
   loadNebulaIpv6Set = pkgs.writeShellScript "s-router-prod-load-nebula-ipv6-set" ''
     set -euo pipefail
@@ -141,27 +77,6 @@ in
         };
       };
 
-      s-router-prod-ipv6-routes = exactRouteService [
-        {
-          tenant = "vlan2";
-          interface = "ens3";
-          gateway = "fd42:dead:beef:1000::7";
-          tables = [ null ];
-        }
-        {
-          tenant = "vlan3";
-          interface = "ens3";
-          gateway = "fd42:dead:beef:1000::7";
-          tables = [ null ];
-        }
-        {
-          tenant = "vlan7";
-          interface = "ens3";
-          gateway = "fd42:dead:beef:1000::7";
-          tables = [ null ];
-        }
-      ];
-
       s-router-prod-nebula-ipv6-firewall = nebulaIpv6SetService;
     };
 
@@ -174,30 +89,7 @@ in
   };
 
   containers.upstream-selector.config = {
-    systemd.services = {
-      s-router-prod-ipv6-routes = exactRouteService [
-        {
-          tenant = "vlan2";
-          interface = "policy-vlan2";
-          gateway = "fd42:dead:beef:1000::e";
-          tables = [ null 1001 1003 ];
-        }
-        {
-          tenant = "vlan3";
-          interface = "policy-vlan2";
-          gateway = "fd42:dead:beef:1000::e";
-          tables = [ null ];
-        }
-        {
-          tenant = "vlan7";
-          interface = "policy";
-          gateway = "fd42:dead:beef:1000::10";
-          tables = [ null 1001 1002 ];
-        }
-      ];
-
-      s-router-prod-nebula-ipv6-firewall = nebulaIpv6SetService;
-    };
+    systemd.services.s-router-prod-nebula-ipv6-firewall = nebulaIpv6SetService;
 
     networking.nftables.ruleset = lib.mkAfter ''
       add set inet router ${nebulaIpv6SetName} { type ipv6_addr; }
@@ -207,47 +99,4 @@ in
       add rule inet router forward iifname "core" oifname "policy-vlan2" ip6 daddr @${nebulaIpv6SetName} tcp dport 4242 counter accept comment "s-router-prod-nebula6-forward-tcp"
     '';
   };
-
-  containers.policy.config.systemd.services.s-router-prod-ipv6-routes = exactRouteService [
-    {
-      tenant = "vlan2";
-      interface = "down-vlan2";
-      gateway = "fd42:dead:beef:1000::8";
-      tables = [ null 1001 1002 1004 ];
-    }
-    {
-      tenant = "vlan3";
-      interface = "down-vlan3";
-      gateway = "fd42:dead:beef:1000::a";
-      tables = [ null 1003 ];
-    }
-    {
-      tenant = "vlan7";
-      interface = "downstr-vlan7";
-      gateway = "fd42:dead:beef:1000::c";
-      tables = [ null 1001 1002 1005 ];
-    }
-  ];
-
-  containers.downstream-selector.config.systemd.services.s-router-prod-ipv6-routes =
-    exactRouteService [
-      {
-        tenant = "vlan2";
-        interface = "access-vlan2";
-        gateway = "fd42:dead:beef:1000::";
-        tables = [ null 1001 1002 1004 ];
-      }
-      {
-        tenant = "vlan3";
-        interface = "access-vlan3";
-        gateway = "fd42:dead:beef:1000::2";
-        tables = [ null 1002 1005 ];
-      }
-      {
-        tenant = "vlan7";
-        interface = "access-vlan7";
-        gateway = "fd42:dead:beef:1000::4";
-        tables = [ null 1003 1006 ];
-      }
-    ];
 }

@@ -1,5 +1,4 @@
-{ config
-, inputs
+{ inputs
 , lib
 , outPath
 , ...
@@ -23,7 +22,16 @@ in
     productionSelector = hostName;
   };
 
-  networking.hostName = hostName;
+  networking.hostName = lib.mkForce hostName;
+
+  warnings = map (reason: "s-router-prod compatibility override: ${reason}") [
+    "QEMU NICs override the generic VM definition to preserve the production vmbr4/vmbr1 handoff and both legacy MAC addresses"
+    "Kea lease paths stay directly below /var/lib/kea because the pinned renderer emits nested memfile paths that Kea rejects"
+    "Nebula public ingress remains patched because the pinned control plane emits unscoped WAN accepts and no scoped TCP/UDP 4242 DNAT/SNAT"
+    "IPv6 keeps only DHCPv6-PD acquisition, defaultroute6, and runtime Nebula ingress glue; delegated-prefix routes now come from the pinned renderer"
+    "VLAN 2 reservations use the existing aggregate private runtime secret, which cannot enter the per-reservation renderer contract without a secret migration"
+    "the VLAN 3 reservation uses the existing raw MAC secret, while the renderer-native runtime source expects a complete JSON reservation"
+  ];
 
   sops.secrets =
     {
@@ -52,7 +60,6 @@ in
     ./kea-legacy-lease-paths.nix
     nebulaPublicIngressHotpatch.nixosModule
     ./ipv6.nix
-    ./vlan2-vlan3-stateful-return-hotpatch.nix
     ./vlan2-kea-reservations-override.nix
     ./vlan3-kea-reservations-override.nix
     ./legacy-parity-contract.nix
@@ -61,7 +68,6 @@ in
       inherit
         inputs
         lib
-        outPath
         hostName
         modelSource
         ;

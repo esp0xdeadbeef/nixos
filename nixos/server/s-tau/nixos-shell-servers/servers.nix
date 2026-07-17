@@ -114,6 +114,7 @@ let
         repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
         restartVmAfterImageUpdate = true;
         safeRestart = true;
+        updateFlakeLocks = false;
         updateOnGuestShutdown = false;
       };
     }

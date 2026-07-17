@@ -1,6 +1,5 @@
 { inputs
 , lib
-, outPath
 , modelSource
 , selectorFile
 , system

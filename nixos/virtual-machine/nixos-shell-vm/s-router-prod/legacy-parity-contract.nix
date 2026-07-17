@@ -39,6 +39,73 @@ let
     builtins.all (name: builtins.elem name containerNames) expectedContainers
     && !(builtins.hasAttr "external-isp" (config.containers or { }));
 
+  servicesFor =
+    containerName:
+      config.containers.${containerName}.config.systemd.services or { };
+
+  hasRenderedService =
+    containerName: stem:
+    builtins.any
+      (name: builtins.match "${stem}-[0-9]+" name != null)
+      (builtins.attrNames (servicesFor containerName));
+
+  requiredRendererIpv6ServiceStems = {
+    core = [
+      "s88-delegated-prefix-route-ens3"
+    ];
+    upstream-selector = [
+      "s88-delegated-prefix-route-policy"
+      "s88-delegated-prefix-route-policy-vlan2"
+      "s88-delegated-prefix-policy-route-policy-1001"
+      "s88-delegated-prefix-policy-route-policy-1002"
+      "s88-delegated-prefix-policy-route-policy-vlan2-1001"
+      "s88-delegated-prefix-policy-route-policy-vlan2-1003"
+    ];
+    policy = [
+      "s88-delegated-prefix-route-down-vlan2"
+      "s88-delegated-prefix-route-down-vlan3"
+      "s88-delegated-prefix-route-downstr-vlan7"
+      "s88-delegated-prefix-policy-route-down-vlan2-1001"
+      "s88-delegated-prefix-policy-route-down-vlan2-1002"
+      "s88-delegated-prefix-policy-route-down-vlan2-1004"
+      "s88-delegated-prefix-policy-route-down-vlan3-1003"
+      "s88-delegated-prefix-policy-route-downstr-vlan7-1001"
+      "s88-delegated-prefix-policy-route-downstr-vlan7-1002"
+      "s88-delegated-prefix-policy-route-downstr-vlan7-1005"
+    ];
+    downstream-selector = [
+      "s88-delegated-prefix-route-access-vlan2"
+      "s88-delegated-prefix-route-access-vlan3"
+      "s88-delegated-prefix-route-access-vlan7"
+      "s88-delegated-prefix-policy-route-access-vlan2-1001"
+      "s88-delegated-prefix-policy-route-access-vlan2-1002"
+      "s88-delegated-prefix-policy-route-access-vlan2-1004"
+      "s88-delegated-prefix-policy-route-access-vlan3-1002"
+      "s88-delegated-prefix-policy-route-access-vlan3-1005"
+      "s88-delegated-prefix-policy-route-access-vlan7-1003"
+      "s88-delegated-prefix-policy-route-access-vlan7-1006"
+    ];
+  };
+
+  hasRendererNativeIpv6Routes =
+    builtins.all
+      (containerName:
+        builtins.all
+          (hasRenderedService containerName)
+          requiredRendererIpv6ServiceStems.${containerName})
+      (builtins.attrNames requiredRendererIpv6ServiceStems)
+    && builtins.all
+      (containerName:
+        builtins.any
+          (lib.hasPrefix "s88-delegated-prefix-route-")
+          (builtins.attrNames (servicesFor containerName)))
+      expectedContainers;
+
+  hasNoLegacyIpv6RouteServices =
+    builtins.all
+      (containerName: !(builtins.hasAttr "s-router-prod-ipv6-routes" (servicesFor containerName)))
+      expectedContainers;
+
   expectedDnsForwarders = [
     "1.1.1.1"
     "9.9.9.9"
@@ -152,6 +219,8 @@ let
 
   coreNftables = config.containers.core.config.networking.nftables.ruleset;
   policyNftables = config.containers.policy.config.networking.nftables.ruleset;
+  upstreamSelectorNftables =
+    config.containers.upstream-selector.config.networking.nftables.ruleset;
 
   hasNebulaPublicIngressRules =
     builtins.all (fragment: lib.hasInfix fragment coreNftables) [
@@ -168,6 +237,22 @@ let
       ''iifname "down-vlan3" oifname "down-vlan2" ct state established,related accept comment "allow-vlan2-to-vlan3"''
       policyNftables;
 
+  hasIpv6CompatibilityGlue =
+    builtins.hasAttr "dhcpcd-ipv6" (servicesFor "core")
+    && builtins.hasAttr "s-router-prod-nebula-ipv6-firewall" (servicesFor "core")
+    && builtins.hasAttr "s-router-prod-nebula-ipv6-firewall" (servicesFor "upstream-selector")
+    && builtins.all (fragment: lib.hasInfix fragment coreNftables) [
+      "s-router-prod-dhcpv6-replies"
+      "s-router-prod-nebula6-forward-udp"
+      "s-router-prod-nebula6-forward-tcp"
+    ]
+    && builtins.all (fragment: lib.hasInfix fragment upstreamSelectorNftables) [
+      "s-router-prod-nebula4-forward-udp"
+      "s-router-prod-nebula4-forward-tcp"
+      "s-router-prod-nebula6-forward-udp"
+      "s-router-prod-nebula6-forward-tcp"
+    ];
+
   hasRoute =
     containerName: networkName: destination: gateway:
     builtins.any
@@ -182,8 +267,8 @@ let
     && hasRoute "downstream-selector" "10-policy-vlan3" "10.19.0.3/32" "10.10.0.11"
     && hasRoute "access-vlan3" "10-access-vlan3" "10.19.0.3/32" "10.10.0.3";
 
-  hasVlan2Vlan3MainTableReturnRule =
-    builtins.any
+  hasNoVlan2Vlan3MainTableOverride =
+    !(builtins.any
       (rule:
         (rule.Family or null) == "ipv4"
         && (rule.IncomingInterface or null) == "access-vlan3"
@@ -192,7 +277,27 @@ let
         && (rule.To or null) == "192.168.1.0/24")
       (
         config.containers.downstream-selector.config.systemd.network.networks."10-access-vlan3".routingPolicyRules or [ ]
-      );
+      ));
+
+  hasRendererNativeVlan3Fallback =
+    let
+      downstreamNetworks = config.containers.downstream-selector.config.systemd.network.networks;
+    in
+    builtins.any
+      (rule:
+        (rule.Family or null) == "ipv4"
+        && (rule.From or null) == "192.168.3.0/24"
+        && (rule.IncomingInterface or null) == "access-vlan3"
+        && (rule.Priority or null) == 11002
+        && (rule.Table or null) == 254
+        && (rule.SuppressPrefixLength or null) == 0)
+      (downstreamNetworks."10-access-vlan3".routingPolicyRules or [ ])
+    && builtins.any
+      (route:
+        (route.Destination or null) == "192.168.1.0/24"
+        && (route.Gateway or null) == "10.10.0.0"
+        && (route.Table or 254) == 254)
+      (downstreamNetworks."10-access-vlan2".routes or [ ]);
 in
 {
   assertions = [
@@ -348,12 +453,28 @@ in
       '';
     }
     {
-      assertion = hasStatefulVlan3Return && hasVlan2Vlan3MainTableReturnRule;
+      assertion = hasRendererNativeIpv6Routes && hasNoLegacyIpv6RouteServices;
+      message = ''
+        s-router-prod must use the pinned renderer's delegated-prefix route
+        services instead of duplicating the complete IPv6 route graph locally.
+      '';
+    }
+    {
+      assertion = hasIpv6CompatibilityGlue;
+      message = ''
+        s-router-prod must retain DHCPv6-PD acquisition and scoped Nebula IPv4/
+        IPv6 ingress glue until those behaviors are modeled by the renderer.
+      '';
+    }
+    {
+      assertion =
+        hasStatefulVlan3Return
+        && hasNoVlan2Vlan3MainTableOverride
+        && hasRendererNativeVlan3Fallback;
       message = ''
         s-router-prod VLAN 3 to VLAN 2 traffic must remain limited to
-        established/related return traffic and use the explicit main-table
-        return route. Do not remove the compatibility rule without a packet
-        forwarding test that proves the generated policy-routing fallback.
+        established/related return traffic and use the renderer-native
+        policy-routing fallback. Do not restore a local priority-900 override.
       '';
     }
   ];

@@ -142,13 +142,12 @@ reviewed, and temporary.
 Current reservation source handling:
 
 - VLAN 2 DHCP reservations are a temporary, explicit exception.
-- The current CPM and `network-renderer-nixos` DHCP reservation contract requires
-  a concrete `mac` in inventory and renders that value directly into Kea.
-- `secretRef` on reservation identity is classification/audit metadata only; it
-  is not a runtime secret lookup for `mac` or `hostname`.
+- The pinned CPM and renderer support a runtime `identitySource.sourceFile`, but
+  require one modeled reservation per known identity/address and a complete JSON
+  reservation record in each source file.
 - Because the real MAC addresses and `hostname` values must not be published in
-  inventory, flake eval output, or the Nix store, `s-router-prod` leaves VLAN 2
-  reservations out of inventory.
+  inventory, flake eval output, or the Nix store, the existing aggregate VLAN 2
+  reservation source cannot use that contract without a secret migration.
 - `vlan2-kea-reservations-override.nix` mounts the existing encrypted legacy
   VLAN 2 reservation source at runtime and overwrites only
   `.Dhcp4.subnet4[0].reservations` in the renderer-generated
@@ -156,10 +155,12 @@ Current reservation source handling:
 - The override treats reservation `hostname` as private by default. Only
   explicitly allowlisted public hostnames are copied into the runtime Kea file;
   all other reservations keep only `hw-address` and `ip-address`.
+- `vlan3-kea-reservations-override.nix` remains because its existing secret is
+  a raw MAC address, not the complete JSON reservation expected by the native
+  runtime source contract.
 
-This should be removed once the `network-*` pipeline supports DHCP reservations
-with runtime secret-backed identity fields, for example a renderer-native
-`macSecretFile`/reservation `sourceFile` contract.
+These overrides can be removed after migrating the secrets to the renderer's
+per-reservation runtime source contract without exposing private identities.
 
 Other reviewed compatibility exceptions:
 
@@ -169,10 +170,17 @@ Other reviewed compatibility exceptions:
 - `nebula-public-ingress-hotpatch.nix` owns the scoped TCP/UDP 4242
   DNAT/SNAT/forwarding and return routes. Even at the pinned upstream heads,
   removing it drops public Nebula ingress entirely.
-- `vlan2-vlan3-stateful-return-hotpatch.nix` keeps the explicit main-table
-  policy rule. The latest renderer emits a stateful firewall return and a
-  usable fallback route, but this rule remains until a packet-forwarding test
-  proves that removing it cannot change gateway behavior.
+- `ipv6.nix` now owns only DHCPv6-PD acquisition, PPPoE `defaultroute6`, and
+  runtime Nebula ingress rules. Delegated-prefix routes and router
+  advertisements come from the pinned renderer.
+
+The former VLAN 3 to VLAN 2 priority-900 return override has been removed. The
+pinned renderer already emits the stateful firewall return, source policy rule,
+main-table fallback, and VLAN 2 route; the parity contract asserts those native
+outputs and rejects reintroducing the local rule.
+
+Every active compatibility exception emits a NixOS evaluation warning with its
+reason and removal condition.
 
 PPPoE is modeled in `inventory.nix` as a `core` PPPoE client on `wan` with
 runtime interface `ppp0`. The current control-plane PPPoE service validates
@@ -258,11 +266,10 @@ The static gate should compare attrsets and rendered artifacts, not just boot su
 
 The comparison is allowed to differ structurally because `s-router-prod` should be one generated production target instead of two legacy routers. It is not allowed to differ on the ISP handoff contract, PPPoE lower interface, client gateway behavior, NAT44 behavior, or duplicate/changed MAC behavior unless the difference is explicitly intentional and tested.
 
-## Initial Functional Scope
+## Current Functional Scope
 
-The first production cutover should be IPv4-only.
-
-Model only what is required to replace the current legacy IPv4 behavior:
+The production target models the IPv4 behavior required to replace the legacy
+routers:
 
 - WAN PPPoE on the WAN handoff via `eth1`.
 - The correct ISP VLAN on the WAN side, based on the legacy configuration.
@@ -274,7 +281,10 @@ Model only what is required to replace the current legacy IPv4 behavior:
 - Firewall default-deny with explicit allows.
 - Management reachability for recovery and debugging.
 
-IPv6 should be explicitly out of scope for the first cutover unless it is required for basic reachability. The first production target should either not model IPv6 or should render it disabled in a way that is easy to audit.
+Routed IPv6 is now part of the production target. The pinned renderer owns the
+delegated-prefix route graph and router advertisements. The local compatibility
+module only acquires the delegated prefix over PPPoE and admits the scoped
+Nebula ingress that the renderer does not yet materialize.
 
 ## Static Verification Gate
 
@@ -299,7 +309,8 @@ Required checks:
   documented runtime override. The override must keep masking deny-by-default
   and allow only explicitly public hostnames.
 - Rendered NAT44 is source-scoped and points at the intended egress interface.
-- No unexpected IPv6 router advertisements, DHCPv6-PD, NAT66, or routed-GUA behavior is rendered.
+- Renderer-native delegated-prefix routes and router advertisements match the
+  production intent; DHCPv6-PD and Nebula ingress are the only local IPv6 glue.
 - No unexpected hand-written nftables, routes, DHCP, DNS, or PPPoE logic is
   added in NixOS outside the renderer path.
 
