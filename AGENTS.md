@@ -62,7 +62,12 @@ Conventional commits: `type(scope): description`
   - `hosts/common/secrets.yaml` -- shared across hosts, encrypted to all host age keys.
   - `hosts/{hostname}/secrets.yaml` -- per-host, encrypted to that host only.
 - Both are also encrypted to the PGP key `7088C7421873E0DB97FF17C2245CAB70B4C225E9`. It lives on misterio's yubikey.
-- **Never** read secrets into context. Ask the user to do it.
+- **Never** read secret values into context. Ask the user to read them, or use
+  pipes and redirection so they do not appear in model-visible output, process
+  arguments, or command history.
+- When writing SOPS secrets through a pipeline, verify success without revealing
+  the values. For example, check exit statuses and compare byte counts or hashes
+  (`wc`, `sha256sum`) while keeping secret-bearing output out of context.
 
 ## Checking
 
