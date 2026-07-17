@@ -184,6 +184,12 @@ in
       ];
     };
 
+    hostManagement = {
+      required = true;
+      interface = "vlan2";
+      purpose = "hardware-management";
+    };
+
     communicationContract = {
       inherit trafficTypes;
       services = [

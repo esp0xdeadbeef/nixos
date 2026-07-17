@@ -315,6 +315,26 @@ let
         && (route.Gateway or null) == "10.10.0.0"
         && (route.Table or 254) == 254)
       (downstreamNetworks."10-access-vlan2".routes or [ ]);
+
+  hasTemporaryVlan2ManagementPolicySelector =
+    builtins.any
+      (rule:
+        (rule.Family or null) == "ipv4"
+        && (rule.From or null) == "192.168.1.0/24"
+        && (rule.To or null) == "192.168.3.0/24"
+        && (rule.IncomingInterface or null) == "access-vlan2"
+        && (rule.Priority or null) == 900
+        && (rule.Table or null) == 1004)
+      (
+        config.containers.downstream-selector.config.systemd.network.networks."10-access-vlan2".routingPolicyRules or [ ]
+      );
+
+  hasTemporaryVlan2HostManagement =
+    let
+      lan2Network = config.systemd.network.networks."50-lan2";
+    in
+    (lan2Network.networkConfig.DHCP or null) == "ipv4"
+    && (lan2Network.dhcpV4Config.UseDNS or null) == false;
 in
 {
   assertions = [
@@ -490,11 +510,17 @@ in
       assertion =
         hasStatefulVlan3Return
         && hasNoVlan2Vlan3MainTableOverride
-        && hasRendererNativeVlan3Fallback;
+        && hasRendererNativeVlan3Fallback
+        && hasTemporaryVlan2ManagementPolicySelector
+        && hasTemporaryVlan2HostManagement;
       message = ''
         s-router-prod VLAN 3 to VLAN 2 traffic must remain limited to
-        established/related return traffic and use the renderer-native
-        policy-routing fallback. Do not restore a local priority-900 override.
+        established/related return traffic. VLAN 2 management traffic to VLAN 3
+        must temporarily select the existing policy table before renderer-native
+        destination routing can bypass policy, and the s-router-prod lan2 host
+        bridge must acquire its management IPv4 address using DHCP without
+        replacing host DNS. Do not restore the old priority-900 main-table
+        return-path override.
       '';
     }
   ];
