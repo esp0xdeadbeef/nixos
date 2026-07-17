@@ -321,8 +321,12 @@ def commits_to_scan(repo: Path, updates: list[tuple[str, str, str, str]]) -> set
         local_commit = commit_oid(repo, local_oid)
         commits.add(local_commit)
         if remote_oid != ZERO_OID:
-            remote_commit = commit_oid(repo, remote_oid)
-            revisions = git(repo, "rev-list", local_commit, f"^{remote_commit}")
+            try:
+                remote_commit = commit_oid(repo, remote_oid)
+            except PrivacyCheckError:
+                revisions = git(repo, "rev-list", local_commit)
+            else:
+                revisions = git(repo, "rev-list", local_commit, f"^{remote_commit}")
         else:
             revisions = git(repo, "rev-list", local_commit, "--not", "--remotes")
         commits.update(revisions.decode("ascii").split())
