@@ -1,4 +1,4 @@
-{ config, lib, outPath, ... }:
+{ config, lib, outPath, sRouterProdRendererCapabilities, ... }:
 
 let
   expectedQemuNetworkingOptions = [
@@ -101,10 +101,26 @@ let
           (builtins.attrNames (servicesFor containerName)))
       expectedContainers;
 
-  hasNoLegacyIpv6RouteServices =
+  rendererHasTenantIpv6Routes =
+    sRouterProdRendererCapabilities.delegatedPrefixTenantRoutes or false;
+
+  tenantIpv6RouteContainers = [
+    "core"
+    "upstream-selector"
+    "policy"
+    "downstream-selector"
+  ];
+
+  hasExactTenantIpv6RouteCompatibility =
+    builtins.all
+      (containerName:
+        builtins.hasAttr "s-router-prod-ipv6-routes" (servicesFor containerName))
+      tenantIpv6RouteContainers;
+
+  hasNoExactTenantIpv6RouteCompatibility =
     builtins.all
       (containerName: !(builtins.hasAttr "s-router-prod-ipv6-routes" (servicesFor containerName)))
-      expectedContainers;
+      tenantIpv6RouteContainers;
 
   expectedDnsForwarders = [
     "1.1.1.1"
@@ -453,10 +469,18 @@ in
       '';
     }
     {
-      assertion = hasRendererNativeIpv6Routes && hasNoLegacyIpv6RouteServices;
+      assertion =
+        hasRendererNativeIpv6Routes
+        && (
+          if rendererHasTenantIpv6Routes
+          then hasNoExactTenantIpv6RouteCompatibility
+          else hasExactTenantIpv6RouteCompatibility
+        );
       message = ''
-        s-router-prod must use the pinned renderer's delegated-prefix route
-        services instead of duplicating the complete IPv6 route graph locally.
+        s-router-prod must retain exact slot-derived tenant IPv6 routes while
+        the pinned renderer routes the delegated /48 directly. Once the
+        renderer declares or implements that /64 derivation itself, the local
+        compatibility services must disappear.
       '';
     }
     {

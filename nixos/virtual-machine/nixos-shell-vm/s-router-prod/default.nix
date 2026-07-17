@@ -5,7 +5,30 @@
 }:
 let
   hostName = "s-router-prod";
+  system = "x86_64-linux";
   modelSource = "${outPath}/prod-network/s-router-prod";
+  rendererDelegatedRoutesModule =
+    "${inputs.network-renderer-nixos-prod}/s88/ControlModule/render/containers/module/delegated-routes.nix";
+  rendererDelegatedRoutesSource =
+    if builtins.pathExists rendererDelegatedRoutesModule
+    then builtins.readFile rendererDelegatedRoutesModule
+    else "";
+  rendererDeclaresTenantIpv6Routes =
+    lib.attrByPath
+      [ "libBySystem" system "capabilities" "delegatedPrefixTenantRoutes" ]
+      false
+      inputs.network-renderer-nixos-prod;
+  rendererImplementsTenantIpv6Routes =
+    builtins.all
+      (fragment: lib.hasInfix fragment rendererDelegatedRoutesSource)
+      [
+        "delegatedPrefixLength"
+        "perTenantPrefixLength"
+        "slot"
+        "ipaddress.IPv6Network"
+      ];
+  rendererHasTenantIpv6Routes =
+    rendererDeclaresTenantIpv6Routes || rendererImplementsTenantIpv6Routes;
   qemuNetworkingOptions = [
     "-nic none"
     "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
@@ -21,6 +44,8 @@ in
     labSelector = null;
     productionSelector = hostName;
   };
+  _module.args.sRouterProdRendererCapabilities.delegatedPrefixTenantRoutes =
+    rendererHasTenantIpv6Routes;
 
   networking.hostName = lib.mkForce hostName;
 
@@ -28,7 +53,6 @@ in
     "QEMU NICs override the generic VM definition to preserve the production vmbr4/vmbr1 handoff and both legacy MAC addresses"
     "Kea lease paths stay directly below /var/lib/kea because the pinned renderer emits nested memfile paths that Kea rejects"
     "Nebula public ingress remains patched because the pinned control plane emits unscoped WAN accepts and no scoped TCP/UDP 4242 DNAT/SNAT"
-    "IPv6 keeps only DHCPv6-PD acquisition, defaultroute6, and runtime Nebula ingress glue; delegated-prefix routes now come from the pinned renderer"
     "VLAN 2 reservations use the existing aggregate private runtime secret, which cannot enter the per-reservation renderer contract without a secret migration"
     "the VLAN 3 reservation uses the existing raw MAC secret, while the renderer-native runtime source expects a complete JSON reservation"
   ];
@@ -75,7 +99,7 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
       controlPlaneTransform = nebulaPublicIngressHotpatch.patchControlPlane;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
-      system = "x86_64-linux";
+      inherit system;
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
     })
   ];

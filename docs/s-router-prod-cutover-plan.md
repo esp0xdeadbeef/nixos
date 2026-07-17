@@ -170,9 +170,12 @@ Other reviewed compatibility exceptions:
 - `nebula-public-ingress-hotpatch.nix` owns the scoped TCP/UDP 4242
   DNAT/SNAT/forwarding and return routes. Even at the pinned upstream heads,
   removing it drops public Nebula ingress entirely.
-- `ipv6.nix` now owns only DHCPv6-PD acquisition, PPPoE `defaultroute6`, and
-  runtime Nebula ingress rules. Delegated-prefix routes and router
-  advertisements come from the pinned renderer.
+- `ipv6.nix` owns DHCPv6-PD acquisition, PPPoE `defaultroute6`, runtime Nebula
+  ingress rules, and a conditional exact-route compatibility layer. The pinned
+  renderer currently installs the delegated `/48` directly instead of deriving
+  the tenant `/64` from its slot. The local `/64` route services and their
+  warning disappear automatically once the renderer declares or implements
+  that derivation; router advertisements already come from the renderer.
 
 The former VLAN 3 to VLAN 2 priority-900 return override has been removed. The
 pinned renderer already emits the stateful firewall return, source policy rule,
@@ -281,10 +284,13 @@ routers:
 - Firewall default-deny with explicit allows.
 - Management reachability for recovery and debugging.
 
-Routed IPv6 is now part of the production target. The pinned renderer owns the
-delegated-prefix route graph and router advertisements. The local compatibility
-module only acquires the delegated prefix over PPPoE and admits the scoped
-Nebula ingress that the renderer does not yet materialize.
+Routed IPv6 is now part of the production target. The pinned renderer owns
+router advertisements and emits delegated-prefix route services, but those
+services currently route the complete `/48`. The local compatibility module
+therefore installs the more-specific slot-derived tenant `/64` routes in
+addition to acquiring the prefix over PPPoE and admitting scoped Nebula
+ingress. Its route services are disabled when the renderer gains equivalent
+output.
 
 ## Static Verification Gate
 
@@ -309,8 +315,10 @@ Required checks:
   documented runtime override. The override must keep masking deny-by-default
   and allow only explicitly public hostnames.
 - Rendered NAT44 is source-scoped and points at the intended egress interface.
-- Renderer-native delegated-prefix routes and router advertisements match the
-  production intent; DHCPv6-PD and Nebula ingress are the only local IPv6 glue.
+- Renderer-native router advertisements match the production intent. Until its
+  delegated-prefix routes derive tenant `/64`s, the conditional exact-route
+  compatibility services must remain present together with DHCPv6-PD and
+  Nebula ingress glue.
 - No unexpected hand-written nftables, routes, DHCP, DNS, or PPPoE logic is
   added in NixOS outside the renderer path.
 
