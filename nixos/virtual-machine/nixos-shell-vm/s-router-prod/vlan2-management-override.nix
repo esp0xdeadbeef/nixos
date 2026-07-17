@@ -32,4 +32,10 @@
   containers.downstream-selector.config.networking.nftables.ruleset = lib.mkAfter ''
     add rule inet router forward iifname "policy-vlan3" oifname "access-vlan3" ip saddr 192.168.1.0/24 ip daddr 192.168.3.10 ip protocol icmp counter accept comment "s-router-prod-vlan2-nebula-icmp-post-policy"
   '';
+
+  # The access edge sees the packet arrive from the policy-side link instead
+  # of the renderer's direct service path. Keep this exception just as narrow.
+  containers.access-vlan3.config.networking.nftables.ruleset = lib.mkAfter ''
+    add rule inet router forward iifname "access-vlan3" oifname "lan3" ip saddr 192.168.1.0/24 ip daddr 192.168.3.10 ip protocol icmp counter accept comment "s-router-prod-vlan2-nebula-icmp-access-edge"
+  '';
 }

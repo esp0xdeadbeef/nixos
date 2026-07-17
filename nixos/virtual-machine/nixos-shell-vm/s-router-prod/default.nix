@@ -27,7 +27,7 @@ in
     "Kea lease paths stay directly below /var/lib/kea because the pinned renderer emits nested memfile paths that Kea rejects"
     "VLAN 2 reservations use the existing aggregate private runtime secret, which must be migrated to the renderer protected reservation-set schema"
     "the VLAN 3 reservation uses an existing raw MAC secret, which must be migrated to the renderer protected reservation-set schema"
-    "TEMPORARY: VLAN 2 host management DHCPv4, the priority-900 VLAN 2 to VLAN 3 policy selector, and its scoped post-policy ICMP handoff are local compatibility fixes; remove vlan2-management-override.nix once the pinned network-* stack materializes hostManagement and emits the symmetric service path end to end"
+    "TEMPORARY: VLAN 2 host management DHCPv4, the priority-900 VLAN 2 to VLAN 3 policy selector, and its scoped post-policy and access-edge ICMP handoffs are local compatibility fixes; remove vlan2-management-override.nix once the pinned network-* stack materializes hostManagement and emits the symmetric service path end to end"
   ];
 
   sops.secrets =
