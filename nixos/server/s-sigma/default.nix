@@ -9,6 +9,7 @@
     ./nixos-shell-servers
     ./hardware
     ./connect-nas
+    ./github-token.nix
   ];
 
   system.stateVersion = "25.11";
