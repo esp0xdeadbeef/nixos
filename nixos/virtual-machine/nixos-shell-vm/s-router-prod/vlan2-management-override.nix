@@ -24,4 +24,12 @@
         Table = 1004;
       }
     ];
+
+  # The policy selector above deliberately sends VLAN 2 -> VLAN 3 through the
+  # policy router. The renderer still emits the service allow only for the
+  # direct access-vlan2 -> access-vlan3 path, so permit the narrowly scoped
+  # post-policy handoff until network-* models this traversal end to end.
+  containers.downstream-selector.config.networking.nftables.ruleset = lib.mkAfter ''
+    add rule inet router forward iifname "policy-vlan3" oifname "access-vlan3" ip saddr 192.168.1.0/24 ip daddr 192.168.3.10 ip protocol icmp counter accept comment "s-router-prod-vlan2-nebula-icmp-post-policy"
+  '';
 }
