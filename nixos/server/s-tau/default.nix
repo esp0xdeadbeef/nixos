@@ -2,6 +2,7 @@
 {
   imports = [
     profiles.nixos.server.dell-vm-host
+    profiles.nixos.server.no-sleep
     profiles.nixos.llm-clients.agents
 
     ./libvirt.nix

@@ -70,6 +70,7 @@
     server = {
       dell = import ./nixos/server/dell.nix;
       dell-vm-host = import ./nixos/server/dell-vm-host.nix;
+      no-sleep = import ./nixos/server/no-sleep.nix;
     };
     sops = {
       persist-root-age-key-file = import ./nixos/sops/persist-root-age-key-file.nix;
