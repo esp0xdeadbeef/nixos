@@ -1,4 +1,4 @@
-{ config, lib, outPath, sRouterProdRendererCapabilities, ... }:
+{ config, lib, outPath, ... }:
 
 let
   expectedQemuNetworkingOptions = [
@@ -56,10 +56,13 @@ let
     upstream-selector = [
       "s88-delegated-prefix-route-policy"
       "s88-delegated-prefix-route-policy-vlan2"
+      "s88-delegated-prefix-route-policy-vlan3"
       "s88-delegated-prefix-policy-route-policy-1001"
       "s88-delegated-prefix-policy-route-policy-1002"
       "s88-delegated-prefix-policy-route-policy-vlan2-1001"
       "s88-delegated-prefix-policy-route-policy-vlan2-1003"
+      "s88-delegated-prefix-policy-route-policy-vlan3-1001"
+      "s88-delegated-prefix-policy-route-policy-vlan3-1004"
     ];
     policy = [
       "s88-delegated-prefix-route-down-vlan2"
@@ -68,10 +71,13 @@ let
       "s88-delegated-prefix-policy-route-down-vlan2-1001"
       "s88-delegated-prefix-policy-route-down-vlan2-1002"
       "s88-delegated-prefix-policy-route-down-vlan2-1004"
+      "s88-delegated-prefix-policy-route-down-vlan3-1001"
+      "s88-delegated-prefix-policy-route-down-vlan3-1002"
       "s88-delegated-prefix-policy-route-down-vlan3-1003"
+      "s88-delegated-prefix-policy-route-down-vlan3-1005"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1001"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1002"
-      "s88-delegated-prefix-policy-route-downstr-vlan7-1005"
+      "s88-delegated-prefix-policy-route-downstr-vlan7-1006"
     ];
     downstream-selector = [
       "s88-delegated-prefix-route-access-vlan2"
@@ -101,21 +107,12 @@ let
           (builtins.attrNames (servicesFor containerName)))
       expectedContainers;
 
-  rendererHasTenantIpv6Routes =
-    sRouterProdRendererCapabilities.delegatedPrefixTenantRoutes or false;
-
   tenantIpv6RouteContainers = [
     "core"
     "upstream-selector"
     "policy"
     "downstream-selector"
   ];
-
-  hasExactTenantIpv6RouteCompatibility =
-    builtins.all
-      (containerName:
-        builtins.hasAttr "s-router-prod-ipv6-routes" (servicesFor containerName))
-      tenantIpv6RouteContainers;
 
   hasNoExactTenantIpv6RouteCompatibility =
     builtins.all
@@ -240,12 +237,12 @@ let
 
   hasNebulaPublicIngressRules =
     builtins.all (fragment: lib.hasInfix fragment coreNftables) [
-      ''iifname "ppp0" udp dport 4242 counter dnat to 192.168.3.10:4242''
-      ''iifname "ppp0" tcp dport 4242 counter dnat to 192.168.3.10:4242''
-      ''ct status dnat ip daddr 192.168.3.10 udp dport 4242 counter snat to 10.19.0.3''
-      ''ct status dnat ip daddr 192.168.3.10 tcp dport 4242 counter snat to 10.19.0.3''
-      ''ct status dnat ip daddr 192.168.3.10 udp dport 4242 counter accept''
-      ''ct status dnat ip daddr 192.168.3.10 tcp dport 4242 counter accept''
+      ''iifname "ppp0" oifname "ens3" ct status dnat meta nfproto ipv4 ip daddr 192.168.3.10 meta l4proto udp udp dport 4242 accept comment "allow-wan-to-s-nebula-container"''
+      ''iifname "ppp0" oifname "ens3" ct status dnat meta nfproto ipv4 ip daddr 192.168.3.10 meta l4proto tcp tcp dport 4242 accept comment "allow-wan-to-s-nebula-container"''
+      ''iifname "ppp0" meta l4proto udp udp dport 4242 dnat to 192.168.3.10:4242 comment "allow-wan-to-s-nebula-container"''
+      ''iifname "ppp0" meta l4proto tcp tcp dport 4242 dnat to 192.168.3.10:4242 comment "allow-wan-to-s-nebula-container"''
+      ''oifname "ens3" ip daddr 192.168.3.10 meta l4proto udp udp dport 4242 snat to 10.19.0.3 comment "allow-wan-to-s-nebula-container-source-translation"''
+      ''oifname "ens3" ip daddr 192.168.3.10 meta l4proto tcp tcp dport 4242 snat to 10.19.0.3 comment "allow-wan-to-s-nebula-container-source-translation"''
     ];
 
   hasStatefulVlan3Return =
@@ -277,11 +274,15 @@ let
       && (route.Gateway or null) == gateway)
       (config.containers.${containerName}.config.systemd.network.networks.${networkName}.routes or [ ]);
 
-  hasNebulaReturnRoutes =
+  hasRendererNativeNebulaRoutes =
     hasRoute "core" "10-ens3" "192.168.3.10/32" "10.10.0.7"
-    && hasRoute "policy" "10-upstream-vlan2" "10.19.0.3/32" "10.10.0.15"
+    && hasRoute "upstream-selector" "10-policy-vlan3" "192.168.3.10/32" "10.10.0.16"
+    && hasRoute "policy" "10-down-vlan3" "192.168.3.10/32" "10.10.0.10"
+    && hasRoute "downstream-selector" "10-access-vlan3" "192.168.3.10/32" "10.10.0.2"
+    && hasRoute "access-vlan3" "10-access-vlan3" "10.19.0.3/32" "10.10.0.3"
     && hasRoute "downstream-selector" "10-policy-vlan3" "10.19.0.3/32" "10.10.0.11"
-    && hasRoute "access-vlan3" "10-access-vlan3" "10.19.0.3/32" "10.10.0.3";
+    && hasRoute "policy" "10-upstream-vlan3" "10.19.0.3/32" "10.10.0.17"
+    && hasRoute "upstream-selector" "10-core" "10.19.0.3/32" "10.10.0.6";
 
   hasNoVlan2Vlan3MainTableOverride =
     !(builtins.any
@@ -461,26 +462,21 @@ in
       '';
     }
     {
-      assertion = hasNebulaPublicIngressRules && hasNebulaReturnRoutes;
+      assertion = hasNebulaPublicIngressRules && hasRendererNativeNebulaRoutes;
       message = ''
-        s-router-prod must retain scoped Nebula TCP/UDP 4242 DNAT, SNAT,
-        forwarding, and return routes until the upstream CPM/renderer chain
-        materializes the public-ingress tuple authority without a hotpatch.
+        s-router-prod must receive scoped Nebula TCP/UDP 4242 DNAT, SNAT,
+        forwarding, and dedicated VLAN 3 forward/return routes from the
+        upstream CPM/renderer chain.
       '';
     }
     {
       assertion =
         hasRendererNativeIpv6Routes
-        && (
-          if rendererHasTenantIpv6Routes
-          then hasNoExactTenantIpv6RouteCompatibility
-          else hasExactTenantIpv6RouteCompatibility
-        );
+        && hasNoExactTenantIpv6RouteCompatibility;
       message = ''
-        s-router-prod must retain exact slot-derived tenant IPv6 routes while
-        the pinned renderer routes the delegated /48 directly. Once the
-        renderer declares or implements that /64 derivation itself, the local
-        compatibility services must disappear.
+        s-router-prod must receive exact slot-derived tenant IPv6 routes from
+        the renderer, without local s-router-prod-ipv6-routes compatibility
+        services.
       '';
     }
     {

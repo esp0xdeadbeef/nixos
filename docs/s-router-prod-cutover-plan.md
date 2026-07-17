@@ -8,25 +8,21 @@ This document is scoped to the production replacement path. Lab, HAT, SIT, and s
 
 ## Current Baseline
 
-The router-chain lock baseline was advanced from the NixOS repository commit:
-
-```text
-a4a2eb1d feat(s-sigma): add nebula mesh credentials
-```
-
 The relevant production root input pins are declared explicitly in `flake.nix`.
 They currently match the upstream `origin/main` heads of the production
 router-chain repositories:
 
 ```text
-network-compiler-prod             e2da177f747d295b2616ae26285a0c74aa568772
-network-forwarding-model-prod     8894c5413f81d04d1c111e65581eecbe3f804423
-network-control-plane-model-prod  15f8190ebf1ec7319301dbb64ee580539326acb4
-nixos-network-compiler-prod       e2da177f747d295b2616ae26285a0c74aa568772
-network-renderer-nixos-prod       ebbb3b0fea48f31ed2f16cd0b3a5cab70001f7e1
+network-compiler-prod             f267ab67b86641bfed59f4a5fe6d4c92b7535773
+network-forwarding-model-prod     d1290e8606f434569b33e85efefe5582c9a57e9e
+network-control-plane-model-prod  9e78e2ca078e38802ecdb3130d77286197c13882
+nixos-network-compiler-prod       f267ab67b86641bfed59f4a5fe6d4c92b7535773
+network-renderer-nixos-prod       85d433856bc601a91d0e007ebf095eda41ab624a
 ```
 
-No lab repository is part of the production chain for this plan as long as `s-router-prod` consumes model source from `prod-network/s-router-prod`.
+`network-labs` provides migration and conformance material, but is not
+production model-source authority. `s-router-prod` consumes model source only
+from `prod-network/s-router-prod` and does not select a lab topology.
 
 `network-renderer-nixos-prod` follows the prod-pinned control-plane,
 forwarding-model, and NixOS compiler inputs. `network-control-plane-model-prod`
@@ -34,6 +30,21 @@ follows the prod-pinned forwarding-model input, and
 `network-forwarding-model-prod` follows the prod-pinned compiler input. This
 keeps `s-router-prod` on one explicit production graph without making any lab
 source a production input.
+
+The latest reviewed migration plan is
+`GAMP/SMT/FS-970-HDS-010-SDS-020-SMS-040/s-router-prod-migration.md` from the
+`network-labs` revision `e6a757284aad58d4a13c4ff517107a0ab74b5bd7`. Its
+renderer-owned public-ingress and delegated tenant-route migrations are
+implemented here. Protected DHCP reservation migration remains intentionally
+deferred until the runtime secrets have been converted to the renderer schema.
+
+The generic top-level `network-labs` input remains locked at
+`86acf90844e4c46379948ace16621eb44c4a9504`. At the reviewed newer revision,
+the active-lab Hetzner inventory remaps the FS-970 client edge to
+`s-router-hetz` without declaring its `rsv970` bridge on that deployment host,
+which makes the unrelated `s-router-hetz` flake configuration fail validation.
+The latest production compiler and forwarding-model locks still carry the
+newer migration contracts used by `s-router-prod`.
 
 ## Production Origin Pins
 
@@ -142,12 +153,13 @@ reviewed, and temporary.
 Current reservation source handling:
 
 - VLAN 2 DHCP reservations are a temporary, explicit exception.
-- The pinned CPM and renderer support a runtime `identitySource.sourceFile`, but
-  require one modeled reservation per known identity/address and a complete JSON
-  reservation record in each source file.
+- The pinned CPM and renderer support a scope-level protected reservation source
+  using schema `gamp-protected-reservation-set-v1`, source class `protected`,
+  and a runtime source file.
 - Because the real MAC addresses and `hostname` values must not be published in
   inventory, flake eval output, or the Nix store, the existing aggregate VLAN 2
-  reservation source cannot use that contract without a secret migration.
+  secret must be migrated and validated against that schema before the native
+  contract can replace the override.
 - `vlan2-kea-reservations-override.nix` mounts the existing encrypted legacy
   VLAN 2 reservation source at runtime and overwrites only
   `.Dhcp4.subnet4[0].reservations` in the renderer-generated
@@ -156,34 +168,32 @@ Current reservation source handling:
   explicitly allowlisted public hostnames are copied into the runtime Kea file;
   all other reservations keep only `hw-address` and `ip-address`.
 - `vlan3-kea-reservations-override.nix` remains because its existing secret is
-  a raw MAC address, not the complete JSON reservation expected by the native
-  runtime source contract.
+  a raw MAC address, not a protected reservation-set document.
 
 These overrides can be removed after migrating the secrets to the renderer's
-per-reservation runtime source contract without exposing private identities.
+protected reservation-set contract without exposing private identities.
 
 Other reviewed compatibility exceptions:
 
 - `kea-legacy-lease-paths.nix` keeps the existing lease databases directly
   below `/var/lib/kea`; removing it still makes Kea use an invalid nested
   memfile path with the current renderer.
-- `nebula-public-ingress-hotpatch.nix` owns the scoped TCP/UDP 4242
-  DNAT/SNAT/forwarding and return routes. Even at the pinned upstream heads,
-  removing it drops public Nebula ingress entirely.
 - `ipv6.nix` owns DHCPv6-PD acquisition, PPPoE `defaultroute6`, runtime Nebula
-  ingress rules, and a conditional exact-route compatibility layer. The pinned
-  renderer currently installs the delegated `/48` directly instead of deriving
-  the tenant `/64` from its slot. The local `/64` route services and their
-  warning disappear automatically once the renderer declares or implements
-  that derivation; router advertisements already come from the renderer.
+  ingress rules, and no tenant-route compatibility layer. The pinned renderer
+  derives each tenant `/64` from its delegated prefix and slot and owns those
+  routes together with router advertisements.
+
+The former Nebula public-ingress hotpatch has also been removed. The production
+inventory models a dedicated VLAN 3 policy transit and the CPM/renderer chain
+now emits scoped TCP/UDP 4242 DNAT, SNAT, forwarding, and forward/return routes.
 
 The former VLAN 3 to VLAN 2 priority-900 return override has been removed. The
 pinned renderer already emits the stateful firewall return, source policy rule,
 main-table fallback, and VLAN 2 route; the parity contract asserts those native
 outputs and rejects reintroducing the local rule.
 
-Every active compatibility exception emits a NixOS evaluation warning with its
-reason and removal condition.
+Every active compatibility override listed by the production module emits a
+NixOS evaluation warning with its reason and removal condition.
 
 PPPoE is modeled in `inventory.nix` as a `core` PPPoE client on `wan` with
 runtime interface `ppp0`. The current control-plane PPPoE service validates
@@ -197,6 +207,7 @@ The production logical units should describe the replacement router functions di
 - `policy`
 - `downstream-selector`
 - `access-vlan2`
+- `access-vlan3`
 - `access-vlan7`
 
 Do not keep lab-style access units in the production render. `access-vlan2` replaces the legacy VLAN 2 LAN at `192.168.1.1/24`; `access-vlan7` replaces the legacy VLAN 7 LAN at `192.168.2.1/24`.
@@ -285,12 +296,9 @@ routers:
 - Management reachability for recovery and debugging.
 
 Routed IPv6 is now part of the production target. The pinned renderer owns
-router advertisements and emits delegated-prefix route services, but those
-services currently route the complete `/48`. The local compatibility module
-therefore installs the more-specific slot-derived tenant `/64` routes in
-addition to acquiring the prefix over PPPoE and admitting scoped Nebula
-ingress. Its route services are disabled when the renderer gains equivalent
-output.
+router advertisements and the slot-derived delegated-prefix `/64` routes. The
+local IPv6 module is limited to acquiring the prefix over PPPoE, enabling the
+IPv6 default route, and admitting scoped Nebula ingress.
 
 ## Static Verification Gate
 
@@ -315,10 +323,12 @@ Required checks:
   documented runtime override. The override must keep masking deny-by-default
   and allow only explicitly public hostnames.
 - Rendered NAT44 is source-scoped and points at the intended egress interface.
-- Renderer-native router advertisements match the production intent. Until its
-  delegated-prefix routes derive tenant `/64`s, the conditional exact-route
-  compatibility services must remain present together with DHCPv6-PD and
-  Nebula ingress glue.
+- Renderer-native router advertisements and delegated tenant `/64` routes match
+  the production intent. No local `s-router-prod-ipv6-routes` compatibility
+  services may be present; DHCPv6-PD and Nebula ingress glue remain local.
+- Renderer-native public ingress includes scoped TCP/UDP 4242 DNAT, SNAT,
+  forwarding, and dedicated VLAN 3 forward/return routes. No local public
+  ingress hotpatch may be present.
 - No unexpected hand-written nftables, routes, DHCP, DNS, or PPPoE logic is
   added in NixOS outside the renderer path.
 
@@ -369,11 +379,12 @@ Stop and fix the owning layer if any of these happen:
 
 - Production output consumes lab/HAT source unexpectedly.
 - `s-router-prod` references lab/HAT/SIT source paths.
-- Renderer output requires hand-written NixOS routing, firewall, DHCP, or NAT glue to work.
+- Renderer output requires additional hand-written NixOS routing, firewall,
+  DHCP, or NAT glue beyond the reviewed DHCPv6-PD and Nebula IPv6 ingress
+  integration.
 - WAN and LAN NIC order is ambiguous.
 - The production router does not pin the legacy WAN MAC.
 - Legacy and production routers would be live on the same L2 domain with the same MAC.
-- IPv6 behavior appears in the IPv4-only cutover output unexpectedly.
 - Legacy and production routers would both serve the same client VLAN.
 - Runtime behavior differs from the model and the difference cannot be explained from generated artifacts.
 - The PPPoE client is rendered but not enabled in the boot transaction. In that
