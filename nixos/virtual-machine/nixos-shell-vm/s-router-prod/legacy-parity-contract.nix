@@ -1,6 +1,14 @@
 { config, lib, outPath, ... }:
 
 let
+  dnsRuntime = import "${outPath}/prod-network/s-router-prod/dns-runtime-addresses.nix";
+  prodIntent = import "${outPath}/prod-network/s-router-prod/intent.nix";
+  prodSite = prodIntent.esp0xdeadbeef.site-a;
+  dnsResolver = dnsRuntime.resolver;
+  vlan2Dns = dnsRuntime.requesters.access-vlan2;
+  vlan3Dns = dnsRuntime.requesters.access-vlan3;
+  vlan7Dns = dnsRuntime.requesters.access-vlan7;
+
   expectedQemuNetworkingOptions = [
     "-nic none"
     "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
@@ -84,7 +92,6 @@ let
       "s88-delegated-prefix-route-access-vlan3"
       "s88-delegated-prefix-route-access-vlan7"
       "s88-delegated-prefix-policy-route-access-vlan2-1001"
-      "s88-delegated-prefix-policy-route-access-vlan2-1002"
       "s88-delegated-prefix-policy-route-access-vlan2-1004"
       "s88-delegated-prefix-policy-route-access-vlan3-1002"
       "s88-delegated-prefix-policy-route-access-vlan3-1005"
@@ -120,8 +127,8 @@ let
       tenantIpv6RouteContainers;
 
   expectedDnsForwarders = [
-    "1.1.1.1"
-    "9.9.9.9"
+    dnsResolver.ipv4
+    dnsResolver.ipv6
   ];
 
   unboundForwardersFor =
@@ -131,6 +138,10 @@ let
       forwardZones = settings."forward-zone" or [ ];
     in
     lib.unique (lib.flatten (map (zone: zone."forward-addr" or [ ]) forwardZones));
+
+  unboundForwardZonesFor =
+    containerName:
+      config.containers.${containerName}.config.services.unbound.settings."forward-zone" or [ ];
 
   unboundServerFor =
     containerName:
@@ -143,46 +154,262 @@ let
     builtins.elem "lan. static" (server.local-zone or [ ])
     && builtins.elem "1.168.192.in-addr.arpa. static" (server.local-zone or [ ])
     && builtins.elem "/run/unbound/s-router-prod-vlan2-local.conf" (server.include or [ ])
+    && builtins.elem ''"s-nebula-container.lan. IN A 192.168.3.10"'' (server."local-data" or [ ])
+    && builtins.elem
+      ''"s-nebula-container.lan. IN AAAA fd42:dead:beef:3::1337:dead:beef"''
+      (server."local-data" or [ ])
     && builtins.hasAttr "gen-s-router-prod-vlan2-unbound-local-data"
       config.containers.access-vlan2.config.systemd.services;
 
-  hasVlan3LocalDns =
+  hasVlan3LocalSharingDns =
     let
       server = unboundServerFor "access-vlan3";
+      forwardZones = unboundForwardZonesFor "access-vlan3";
+      zoneByName = builtins.listToAttrs (
+        map
+          (zone: {
+            name = zone.name;
+            value = zone;
+          })
+          forwardZones
+      );
     in
-    builtins.elem "lan. static" (server."local-zone" or [ ])
-    && builtins.elem ''"s-nebula-container.lan. IN A 192.168.3.10"'' (server."local-data" or [ ]);
+    (server.interface or [ ]) == [
+      "127.0.0.1"
+      "::1"
+      vlan3Dns.ipv4
+      vlan3Dns.ipv6
+    ]
+    && (server."local-zone" or [ ]) == [
+      ". static"
+      "lan. transparent"
+      "1.168.192.in-addr.arpa. transparent"
+    ]
+    && (server."access-control" or [ ]) == [
+      "127.0.0.0/8 allow"
+      "::1/128 allow"
+      "${vlan3Dns.clientIpv4} allow"
+      "${vlan3Dns.clientIpv6} allow"
+      "${vlan2Dns.clientIpv4} refuse_non_local"
+      "${vlan2Dns.clientIpv6} refuse_non_local"
+    ]
+    && builtins.elem ''"s-nebula-container.lan. IN A 192.168.3.10"'' (server."local-data" or [ ])
+    && builtins.elem
+      ''"s-nebula-container.lan. IN AAAA fd42:dead:beef:3::1337:dead:beef"''
+      (server."local-data" or [ ])
+    && builtins.length forwardZones == 2
+    && (zoneByName."lan."."forward-addr" or [ ]) == [
+      vlan2Dns.ipv4
+      vlan2Dns.ipv6
+    ]
+    && (zoneByName."lan."."forward-first" or true) == false
+    && (zoneByName."1.168.192.in-addr.arpa."."forward-addr" or [ ]) == [
+      vlan2Dns.ipv4
+      vlan2Dns.ipv6
+    ]
+    && (zoneByName."1.168.192.in-addr.arpa."."forward-first" or true) == false
+    && (server."outgoing-interface" or [ ]) == [
+      vlan3Dns.ipv4
+      vlan3Dns.ipv6
+    ];
 
-  hasNoVlan3DnsUpstream =
-    unboundForwardersFor "access-vlan3" == [ ]
-    && !(lib.hasInfix "nft add rule inet router output" (dnsNftScriptFor "access-vlan3"));
+  hasVlan2LocalOnlyPeerAcl =
+    let
+      server = unboundServerFor "access-vlan2";
+    in
+    (server."access-control" or [ ]) == [
+      "127.0.0.0/8 allow"
+      "::1/128 allow"
+      "${vlan2Dns.clientIpv4} allow"
+      "${vlan2Dns.clientIpv6} allow"
+      "${vlan3Dns.ipv4}/32 refuse_non_local"
+      "${vlan3Dns.ipv6}/128 refuse_non_local"
+    ];
 
   dnsNftScriptFor =
     containerName:
       config.containers.${containerName}.config.systemd.services.nft-allow-dns-service.script or "";
 
+  dnsNftSurfaceFor =
+    containerName:
+    dnsNftScriptFor containerName
+    + (config.containers.${containerName}.config.networking.nftables.ruleset or "");
+
+  hasStatelessRuleLine =
+    ruleset: fragments:
+    builtins.any
+      (line:
+      builtins.all (fragment: lib.hasInfix fragment line) fragments
+      && !(lib.hasInfix "ct state" line))
+      (lib.splitString "\n" ruleset);
+
   dnsEgressFragments = {
     access-vlan2 = [
-      "ip saddr 192.168.1.1 ip daddr 1.1.1.1 udp dport 53"
-      "ip saddr 192.168.1.1 ip daddr 9.9.9.9 udp dport 53"
-      "ip saddr 192.168.1.1 ip daddr 1.1.1.1 tcp dport 53"
-      "ip saddr 192.168.1.1 ip daddr 9.9.9.9 tcp dport 53"
+      "ip saddr ${vlan2Dns.ipv4} ip daddr ${dnsResolver.ipv4} udp dport 53"
+      "ip saddr ${vlan2Dns.ipv4} ip daddr ${dnsResolver.ipv4} tcp dport 53"
+      "ip6 saddr ${vlan2Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} udp dport 53"
+      "ip6 saddr ${vlan2Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} tcp dport 53"
     ];
 
     access-vlan7 = [
-      "ip saddr 192.168.2.1 ip daddr 1.1.1.1 udp dport 53"
-      "ip saddr 192.168.2.1 ip daddr 9.9.9.9 udp dport 53"
-      "ip saddr 192.168.2.1 ip daddr 1.1.1.1 tcp dport 53"
-      "ip saddr 192.168.2.1 ip daddr 9.9.9.9 tcp dport 53"
+      "ip saddr ${vlan7Dns.ipv4} ip daddr ${dnsResolver.ipv4} udp dport 53"
+      "ip saddr ${vlan7Dns.ipv4} ip daddr ${dnsResolver.ipv4} tcp dport 53"
+      "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} udp dport 53"
+      "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} tcp dport 53"
     ];
   };
 
   hasDnsEgressRules =
     containerName:
     let
-      script = dnsNftScriptFor containerName;
+      script = dnsNftSurfaceFor containerName;
     in
     builtins.all (fragment: lib.hasInfix fragment script) dnsEgressFragments.${containerName};
+
+  hasCoreRecursiveDns =
+    let
+      server = unboundServerFor "core";
+      forwarders = unboundForwardersFor "core";
+    in
+    (server.interface or [ ]) == [
+      "127.0.0.1"
+      "::1"
+      dnsResolver.ipv4
+      dnsResolver.ipv6
+    ]
+    && (server."access-control" or [ ]) == [
+      "127.0.0.0/8 allow"
+      "::1/128 allow"
+      "${vlan2Dns.clientIpv4} allow"
+      "${vlan2Dns.clientIpv6} allow"
+      "${vlan7Dns.ipv4}/32 allow"
+      "${vlan7Dns.ipv6}/128 allow"
+    ]
+    && !(server ? "outgoing-interface")
+    && forwarders == [ ];
+
+  hasCoreDnsInputRules =
+    let
+      ruleset = dnsNftSurfaceFor "core";
+    in
+    builtins.all (fragment: lib.hasInfix fragment ruleset) [
+      "ip daddr ${dnsResolver.ipv4} udp dport 53"
+      "ip daddr ${dnsResolver.ipv4} tcp dport 53"
+      "ip6 daddr ${dnsResolver.ipv6} udp dport 53"
+      "ip6 daddr ${dnsResolver.ipv6} tcp dport 53"
+    ];
+
+  desiredDnsIntent = prodSite.recursiveDnsIntent;
+  desiredLocalDnsIntent = prodSite.localDnsSharingIntent;
+  activeDnsServicesByName = builtins.listToAttrs (
+    map
+      (service: {
+        name = service.name;
+        value = service;
+      })
+      prodSite.communicationContract.services
+  );
+  activeDnsRelationsById = builtins.listToAttrs (
+    map
+      (relation: {
+        name = relation.id;
+        value = relation;
+      })
+      prodSite.communicationContract.relations
+  );
+  desiredDnsRelationsById = builtins.listToAttrs (
+    map
+      (relation: {
+        name = relation.id;
+        value = relation;
+      })
+      desiredDnsIntent.relations
+  );
+
+  hasCoreDnsIntent =
+    activeDnsServicesByName.vlan2-dns.providers == [ "vlan2-dns" ]
+    && activeDnsServicesByName.vlan7-dns.providers == [ "vlan7-dns" ]
+    && (activeDnsRelationsById.allow-vlan2-dns-to-wan.from or { }) == {
+      kind = "service";
+      name = "vlan2-dns";
+    }
+    && (activeDnsRelationsById.allow-vlan7-dns-to-wan.from or { }) == {
+      kind = "service";
+      name = "vlan7-dns";
+    }
+    && builtins.any
+      (service:
+        service.name == "core-dns"
+        && service.providerNode == "core"
+        && service.addressAuthority == "model-allocated-service-prefix")
+      desiredDnsIntent.services
+    && (desiredDnsRelationsById.allow-vlan2-dns-to-core-dns.from or { }) == {
+      kind = "service";
+      name = "vlan2-dns";
+    }
+    && (desiredDnsRelationsById.allow-vlan2-to-core-dns.from or { }) == {
+      kind = "tenant";
+      name = "vlan2";
+    }
+    && (desiredDnsRelationsById.allow-vlan2-to-core-dns.to or { }) == {
+      kind = "service";
+      name = "core-dns";
+    }
+    && (desiredDnsRelationsById.allow-vlan2-dns-to-core-dns.to or { }) == {
+      kind = "service";
+      name = "core-dns";
+    }
+    && (desiredDnsRelationsById.allow-vlan7-dns-to-core-dns.to or { }) == {
+      kind = "service";
+      name = "core-dns";
+    }
+    && (desiredDnsRelationsById.allow-core-dns-to-wan.from or { }) == {
+      kind = "service";
+      name = "core-dns";
+    }
+    && (desiredDnsRelationsById.deny-vlan2-dns-to-wan.action or null) == "deny"
+    && (desiredDnsRelationsById.deny-vlan7-dns-to-wan.action or null) == "deny"
+    && builtins.all
+      (binding:
+        binding.upstreamResolver.name == "core-dns"
+        && binding.upstreamResolver.node == "core"
+        && binding.allowedAddressFamilies == [
+          "ipv4"
+          "ipv6"
+        ]
+        && binding.directPublicFallback == false)
+      desiredDnsIntent.bindings;
+
+  hasLocalDnsSharingIntent =
+    let
+      activeRelation = activeDnsRelationsById.allow-vlan3-dns-to-vlan2-dns;
+      desiredRelation = desiredLocalDnsIntent.relation;
+    in
+    activeRelation.priority < activeDnsRelationsById.deny-vlan3-to-vlan2.priority
+    && activeRelation.from == desiredRelation.from
+    && activeRelation.to == desiredRelation.to
+    && activeRelation.trafficType == "dns"
+    && activeRelation.returnBehavior == "symmetric"
+    && desiredLocalDnsIntent.namespace == "lan."
+    && desiredLocalDnsIntent.requester.service == "vlan3-dns"
+    && desiredLocalDnsIntent.requester.recursion == false
+    && desiredLocalDnsIntent.requester.publicFallback == false
+    && desiredLocalDnsIntent.requester.allowedNamespaces == [
+      "lan."
+      "1.168.192.in-addr.arpa."
+    ]
+    && desiredLocalDnsIntent.providerPolicy == {
+      source = "vlan3-dns";
+      action = "refuse_non_local";
+    }
+    && desiredLocalDnsIntent.lateralPolicy == {
+      source = "vlan2";
+      target = "vlan3-dns";
+      localData = true;
+      recursion = false;
+      transitiveEgress = false;
+      action = "refuse_non_local";
+    };
 
   keaServiceFor =
     containerName: vlanName:
@@ -201,7 +428,7 @@ let
     else
       [ value ];
 
-  hasLegacyKeaLeasePaths =
+  hasNativeKeaLeaseState =
     let
       hasContainer =
         containerName: vlanName:
@@ -211,8 +438,8 @@ let
           postHooks = execStartPostList (genService.serviceConfig.ExecStartPost or null);
         in
         (keaService.serviceConfig.StateDirectory or null) == "kea"
-        && builtins.any
-          (hook: lib.hasInfix "rewrite-kea-${vlanName}-lease-path" (toString hook))
+        && builtins.all
+          (hook: !(lib.hasInfix "rewrite-kea-${vlanName}-lease-path" (toString hook)))
           postHooks;
     in
     hasContainer "access-vlan2" "vlan2"
@@ -273,6 +500,145 @@ let
       (route.Destination or null) == destination
       && (route.Gateway or null) == gateway)
       (config.containers.${containerName}.config.systemd.network.networks.${networkName}.routes or [ ]);
+
+  hasSourcePolicyRule =
+    accessName: networkName: family: source:
+    builtins.any
+      (rule:
+      (rule.Family or null) == family
+      && (rule.From or null) == source
+      && (rule.Table or null) == 1002
+      && (rule.IncomingInterface or null) == null)
+      (
+        config.containers.${accessName}.config.systemd.network.networks.${networkName}.routingPolicyRules or [ ]
+      );
+
+  hasTableRoute =
+    containerName: networkName: destination: gateway: table:
+    builtins.any
+      (route:
+      (route.Destination or null) == destination
+      && (route.Gateway or null) == gateway
+      && (route.Table or null) == table)
+      (config.containers.${containerName}.config.systemd.network.networks.${networkName}.routes or [ ]);
+
+  hasCoreDnsRequesterRoutes =
+    hasRoute "access-vlan2" "10-access-vlan2" "10.19.0.2/31" "10.10.0.1"
+    && hasRoute
+      "access-vlan2"
+      "10-access-vlan2"
+      "fd42:dead:beef:1900:0000:0000:0000:0002/127"
+      "fd42:dead:beef:1000:0:0:0:1"
+    && hasSourcePolicyRule "access-vlan2" "10-access-vlan2" "ipv4" "${vlan2Dns.ipv4}/32"
+    && hasSourcePolicyRule "access-vlan2" "10-access-vlan2" "ipv6" "${vlan2Dns.ipv6}/128"
+    && hasRoute "access-vlan7" "10-access-vlan7" "10.19.0.3/32" "10.10.0.5"
+    && hasRoute
+      "access-vlan7"
+      "10-access-vlan7"
+      "fd42:dead:beef:1900:0000:0000:0000:0003/128"
+      "fd42:dead:beef:1000:0:0:0:5"
+    && hasSourcePolicyRule "access-vlan7" "10-access-vlan7" "ipv4" "${vlan7Dns.ipv4}/32"
+    && hasSourcePolicyRule "access-vlan7" "10-access-vlan7" "ipv6" "${vlan7Dns.ipv6}/128";
+
+  hasCoreDnsTraversalRules =
+    let
+      coreRules = dnsNftSurfaceFor "core";
+      downstreamRules = dnsNftSurfaceFor "downstream-selector";
+      policyRules = dnsNftSurfaceFor "policy";
+      upstreamRules = dnsNftSurfaceFor "upstream-selector";
+    in
+    lib.hasInfix "type filter hook output priority filter; policy accept;" coreRules
+    && builtins.all (fragment: lib.hasInfix fragment downstreamRules) [
+      "selector-handoff-forward-runtime-origin--access-vlan2"
+      "selector-handoff-forward-runtime-origin--access-vlan7"
+      "selector-handoff-reverse-runtime-origin--access-vlan2"
+      "selector-handoff-reverse-runtime-origin--access-vlan7"
+    ]
+    && builtins.all (fragment: lib.hasInfix fragment policyRules) [
+      ''iifname "down-vlan2" oifname "upstream-vlan2" accept comment "allow-vlan2-to-wan"''
+      ''iifname "downstr-vlan7" oifname "upstream-vlan7" accept comment "allow-vlan7-to-wan"''
+    ]
+    && builtins.all (fragment: lib.hasInfix fragment upstreamRules) [
+      "selector-handoff-forward--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"
+      "selector-handoff-forward--access-vlan7--selector-policy-uplink-to-selector-policy-uplink--wan"
+      "selector-handoff-reverse--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"
+      "selector-handoff-reverse--access-vlan7--selector-policy-uplink-to-selector-policy-uplink--wan"
+    ];
+
+  hasVlan3ToVlan2DnsPath =
+    let
+      downstreamRules = dnsNftSurfaceFor "downstream-selector";
+      policyRules = dnsNftSurfaceFor "policy";
+      accessVlan2Input = dnsNftSurfaceFor "access-vlan2";
+      accessVlan3Rules = dnsNftSurfaceFor "access-vlan3";
+    in
+    hasSourcePolicyRule "access-vlan3" "10-access-vlan3" "ipv4" "${vlan3Dns.ipv4}/32"
+    && hasSourcePolicyRule "access-vlan3" "10-access-vlan3" "ipv6" "${vlan3Dns.ipv6}/128"
+    && hasTableRoute
+      "access-vlan3"
+      "10-access-vlan3"
+      "192.168.1.0/24"
+      "10.10.0.3"
+      1002
+    && hasTableRoute
+      "access-vlan3"
+      "10-access-vlan3"
+      "fd42:0001:0000:0000:0000:0000:0000:0000/64"
+      "fd42:dead:beef:1000:0:0:0:3"
+      1002
+    && builtins.all
+      (protocol:
+        hasStatelessRuleLine downstreamRules [
+          ''iifname "policy-vlan2"''
+          ''oifname "access-vlan2"''
+          "meta l4proto ${protocol}"
+          "${protocol} dport { 53 }"
+          ''accept comment "allow-vlan3-dns-to-vlan2-dns"''
+        ])
+      [
+        "udp"
+        "tcp"
+      ]
+    && builtins.all
+      (spec:
+        hasStatelessRuleLine policyRules [
+          ''iifname "down-vlan3"''
+          ''oifname "down-vlan2"''
+          "${spec.family} saddr ${spec.source}"
+          "meta l4proto ${spec.protocol}"
+          "${spec.protocol} dport { 53 }"
+          ''accept comment "allow-vlan3-dns-to-vlan2-dns"''
+        ])
+      [
+        {
+          family = "ip";
+          source = vlan3Dns.ipv4;
+          protocol = "udp";
+        }
+        {
+          family = "ip";
+          source = vlan3Dns.ipv4;
+          protocol = "tcp";
+        }
+        {
+          family = "ip6";
+          source = vlan3Dns.ipv6;
+          protocol = "udp";
+        }
+        {
+          family = "ip6";
+          source = vlan3Dns.ipv6;
+          protocol = "tcp";
+        }
+      ]
+    && lib.hasInfix "ct state established,related accept" downstreamRules
+    && builtins.all (fragment: lib.hasInfix fragment accessVlan2Input) [
+      "ip daddr ${vlan2Dns.ipv4} udp dport 53"
+      "ip daddr ${vlan2Dns.ipv4} tcp dport 53"
+      "ip6 daddr ${vlan2Dns.ipv6} udp dport 53"
+      "ip6 daddr ${vlan2Dns.ipv6} tcp dport 53"
+    ]
+    && lib.hasInfix "type filter hook output priority filter; policy accept;" accessVlan3Rules;
 
   hasRendererNativeNebulaRoutes =
     hasRoute "core" "10-ens3" "192.168.3.10/32" "10.10.0.7"
@@ -436,22 +802,39 @@ in
         unboundForwardersFor "access-vlan2" == expectedDnsForwarders
         && unboundForwardersFor "access-vlan7" == expectedDnsForwarders;
       message = ''
-        s-router-prod must render explicit prod-like recursive DNS forwarders for
-        both client VLAN access containers.
+        s-router-prod VLAN 2 and VLAN 7 access resolvers must forward only to the
+        core recursive resolver service over its internal IPv4 and IPv6
+        endpoints.
       '';
     }
     {
-      assertion = hasDnsEgressRules "access-vlan2" && hasDnsEgressRules "access-vlan7";
+      assertion =
+        hasCoreDnsIntent
+        && hasCoreRecursiveDns
+        && hasCoreDnsInputRules
+        && hasCoreDnsRequesterRoutes
+        && hasCoreDnsTraversalRules
+        && hasDnsEgressRules "access-vlan2"
+        && hasDnsEgressRules "access-vlan7";
       message = ''
-        s-router-prod must render DNS service egress from the local gateway source
-        addresses, matching the FS-540-HDS-010-SDS-010-SMS-045 intent pattern.
+        s-router-prod must preserve the address-free access-dns -> core-dns
+        target intent and materialize its temporary inventory projection with
+        native dual-stack source policy, routes, and firewall traversal. Only
+        the core recursive resolver compatibility override may remain while
+        recursiveDnsIntent documents the unfinished SMS row.
       '';
     }
     {
-      assertion = hasVlan3LocalDns && hasNoVlan3DnsUpstream;
+      assertion =
+        hasLocalDnsSharingIntent
+        && hasVlan3LocalSharingDns
+        && hasVlan2LocalOnlyPeerAcl
+        && hasVlan3ToVlan2DnsPath;
       message = ''
-        s-router-prod VLAN 3 must expose only local DMZ DNS data for
-        s-nebula-container and must not render DNS upstream egress.
+        s-router-prod VLAN 3 DNS must resolve its own local data and VLAN 2's
+        Kea-backed lan. data over the renderer-native access-to-access path.
+        Every other namespace must terminate locally, while VLAN 2 must apply
+        refuse_non_local to VLAN 3 so the peer can never borrow recursion.
       '';
     }
     {
@@ -471,14 +854,12 @@ in
       '';
     }
     {
-      assertion = hasLegacyKeaLeasePaths;
+      assertion = hasNativeKeaLeaseState;
       message = ''
-        s-router-prod Kea lease databases must stay legacy-compatible at
-        /var/lib/kea/<vlan>.leases with StateDirectory=kea.
+        s-router-prod Kea lease databases must consume the inventory-owned
+        /var/lib/kea/<vlan>.leases bindings with renderer-owned StateDirectory=kea.
 
-        Kea's memfile path security only allows lease database files directly
-        under /var/lib/kea; nested rendered paths under /var/lib/kea/dhcp4/...
-        make kea-dhcp4 fail before serving DHCP.
+        No host-profile post-render lease-path rewrite may remain.
       '';
     }
     {

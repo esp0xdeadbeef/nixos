@@ -53,13 +53,13 @@
     };
 
     network-forwarding-model-prod = {
-      url = "github:esp0xdeadbeef/network-forwarding-model/d1290e8606f434569b33e85efefe5582c9a57e9e";
+      url = "github:esp0xdeadbeef/network-forwarding-model/97fa4f97681827c9848bb79e6b32a19c1756498f";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-prod";
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/9e78e2ca078e38802ecdb3130d77286197c13882";
+      url = "github:esp0xdeadbeef/network-control-plane-model/5029a38f9feed2f97d855a7425e66b797787824e";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
     };

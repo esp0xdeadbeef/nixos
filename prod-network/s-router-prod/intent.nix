@@ -5,7 +5,7 @@ let
       match = [
         {
           proto = "icmp";
-          family = "any";
+          family = "ipv4";
         }
       ];
     }
@@ -266,6 +266,25 @@ in
           returnBehavior = "symmetric";
         }
         {
+          # VLAN 3's local resolver may query only VLAN 2's DNS service. The
+          # resolver runtime narrows this further to the lan. namespaces, and
+          # VLAN 2 serves this source with refuse_non_local so it cannot borrow
+          # VLAN 2's recursive path to core/the Internet.
+          id = "allow-vlan3-dns-to-vlan2-dns";
+          priority = 79;
+          from = {
+            kind = "service";
+            name = "vlan3-dns";
+          };
+          to = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-vlan2-to-s-nebula-container-icmp";
           priority = 83;
           from = {
@@ -346,6 +365,10 @@ in
           };
         }
         {
+          # TEMPORARY compiler projection: keep this legacy relation until the
+          # address-free recursiveDnsIntent can materialize the same fabric
+          # lane without removing unrelated IPv6 policy-route units. Access
+          # Unbound does not use public forwarders; inventory pins it to core.
           id = "allow-vlan2-dns-to-wan";
           priority = 90;
           from = {
@@ -362,6 +385,8 @@ in
           returnBehavior = "symmetric";
         }
         {
+          # See allow-vlan2-dns-to-wan: this preserves the compiler's VLAN 7
+          # route projection only; the rendered resolver points solely to core.
           id = "allow-vlan7-dns-to-wan";
           priority = 91;
           from = {
@@ -390,6 +415,239 @@ in
         service-vlan2-dns = "vlan2-dns";
         service-vlan3-dns = "vlan3-dns";
         service-vlan7-dns = "vlan7-dns";
+      };
+    };
+
+    # Desired FS-540 recursive DNS contract. The active communication contract
+    # temporarily retains its legacy service-to-WAN relations because removing
+    # them also removes unrelated IPv6 policy-route units. Inventory points the
+    # access resolvers only at core; preserve these explicit service-origin
+    # relations as the address-free target contract for the future SMS closure.
+    recursiveDnsIntent = {
+      services = [
+        {
+          name = "core-dns";
+          providerNode = "core";
+          addressAuthority = "model-allocated-service-prefix";
+          trafficType = "dns";
+        }
+      ];
+
+      relations = [
+        {
+          # VLAN 2 clients may query the internal core resolver directly. This
+          # is a normal supported path: core remains bound only to its
+          # upstream-selector-facing service surface, and VLAN 3 deliberately
+          # has no equivalent relation.
+          id = "allow-vlan2-to-core-dns";
+          priority = 87;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan2-dns-to-core-dns";
+          priority = 88;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan7-dns-to-core-dns";
+          priority = 89;
+          from = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-core-dns-to-wan";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "core-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "deny-vlan2-dns-to-wan";
+          priority = 92;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+        {
+          id = "deny-vlan7-dns-to-wan";
+          priority = 93;
+          from = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+      ];
+
+      bindings = [
+        {
+          requesterScope = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-vlan2"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-vlan7"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
+      ];
+    };
+
+    # Desired local namespace-sharing contract. The active relation above
+    # materializes the access-to-access route and firewall path; the pinned SMS
+    # schema cannot yet express per-zone forwarding or non-recursive ACL actions.
+    localDnsSharingIntent = {
+      namespace = "lan.";
+      authority = {
+        service = "vlan2-dns";
+        records = [
+          "vlan2-kea-local-data"
+          "vlan3-static-local-data"
+        ];
+      };
+      requester = {
+        service = "vlan3-dns";
+        allowedNamespaces = [
+          "lan."
+          "1.168.192.in-addr.arpa."
+        ];
+        recursion = false;
+        publicFallback = false;
+      };
+      relation = {
+        id = "allow-vlan3-dns-to-vlan2-dns";
+        from = {
+          kind = "service";
+          name = "vlan3-dns";
+        };
+        to = {
+          kind = "service";
+          name = "vlan2-dns";
+        };
+        trafficType = "dns";
+        returnBehavior = "symmetric";
+        resolverPath = [
+          "access-vlan3"
+          "downstream-selector"
+          "access-vlan2"
+        ];
+      };
+      providerPolicy = {
+        source = "vlan3-dns";
+        action = "refuse_non_local";
+      };
+      lateralPolicy = {
+        source = "vlan2";
+        target = "vlan3-dns";
+        localData = true;
+        recursion = false;
+        transitiveEgress = false;
+        action = "refuse_non_local";
       };
     };
 

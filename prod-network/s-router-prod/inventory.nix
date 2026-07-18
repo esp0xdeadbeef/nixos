@@ -1,6 +1,7 @@
 let
   prodHost = "s-router-prod";
   externalIspHost = "external-isp";
+  dnsRuntime = import ./dns-runtime-addresses.nix;
   nodeName = shortName: "esp0xdeadbeef-site-a-${shortName}";
 
   logicalNode = name: {
@@ -82,19 +83,29 @@ let
     };
   };
 
-  recursiveDns = address: {
-    forwarders = [
-      "1.1.1.1"
-      "9.9.9.9"
-    ];
-    outgoingInterfaces = [ address ];
-    roles.recursion.outgoingInterfaces = [ address ];
-  };
+  accessDns =
+    { addresses
+    , localRecords ? [ ]
+    ,
+    }:
+    {
+      # TEMPORARY FS-540 SMS projection: the target intent is address-free, but
+      # the pinned compiler cannot consume its service-to-service relation
+      # without changing unrelated route materialization. Keep the core service
+      # endpoint explicit here until that SMS row is fixed upstream.
+      forwarders = [
+        dnsRuntime.resolver.ipv4
+        dnsRuntime.resolver.ipv6
+      ];
+      outgoingInterfaces = addresses;
+      roles.recursion.outgoingInterfaces = addresses;
+      inherit localRecords;
+    };
 
-  localDns = records: {
+  localDns = addresses: records: {
     forwarders = [ ];
-    outgoingInterfaces = [ ];
-    roles.recursion.outgoingInterfaces = [ ];
+    outgoingInterfaces = addresses;
+    roles.recursion.outgoingInterfaces = addresses;
     localZones = [
       {
         name = "lan.";
@@ -118,6 +129,7 @@ let
     , poolStart
     , poolEnd
     , router
+    , leaseStatePath
     ,
     }:
     {
@@ -131,6 +143,7 @@ let
       inherit router;
       dnsServers = [ router ];
       domain = "lan.";
+      leaseState.path = leaseStatePath;
     };
 
   slaacRa = interface: {
@@ -179,6 +192,19 @@ let
     })
     // {
       services = {
+        dns = {
+          listen = [
+            dnsRuntime.resolver.ipv4
+            dnsRuntime.resolver.ipv6
+          ];
+          allowFrom = [
+            dnsRuntime.requesters.access-vlan2.clientIpv4
+            dnsRuntime.requesters.access-vlan2.clientIpv6
+            "${dnsRuntime.requesters.access-vlan7.ipv4}/32"
+            "${dnsRuntime.requesters.access-vlan7.ipv6}/128"
+          ];
+        };
+
         pppoe = {
           client = {
             interface = "wan";
@@ -362,7 +388,19 @@ let
       statePolicy = persistentDhcpState;
 
       services = {
-        dns = recursiveDns "192.168.1.1";
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-vlan2.ipv4
+            dnsRuntime.requesters.access-vlan2.ipv6
+          ];
+          localRecords = [
+            {
+              name = "s-nebula-container.lan.";
+              a = [ sNebulaContainerAddress ];
+              aaaa = [ sNebulaContainerAddress6 ];
+            }
+          ];
+        };
       };
 
       advertisements = {
@@ -374,6 +412,7 @@ let
             poolStart = "192.168.1.100";
             poolEnd = "192.168.1.200";
             router = "192.168.1.1";
+            leaseStatePath = "/var/lib/kea/vlan2.leases";
           };
         };
 
@@ -404,13 +443,19 @@ let
       statePolicy = persistentDhcpState;
 
       services = {
-        dns = localDns [
-          {
-            name = "s-nebula-container.lan.";
-            a = [ sNebulaContainerAddress ];
-            aaaa = [ sNebulaContainerAddress6 ];
-          }
-        ];
+        dns =
+          localDns
+            [
+              dnsRuntime.requesters.access-vlan3.ipv4
+              dnsRuntime.requesters.access-vlan3.ipv6
+            ]
+            [
+              {
+                name = "s-nebula-container.lan.";
+                a = [ sNebulaContainerAddress ];
+                aaaa = [ sNebulaContainerAddress6 ];
+              }
+            ];
       };
 
       advertisements = {
@@ -422,6 +467,7 @@ let
             poolStart = "192.168.3.100";
             poolEnd = "192.168.3.200";
             router = "192.168.3.1";
+            leaseStatePath = "/var/lib/kea/vlan3.leases";
           };
         };
 
@@ -452,7 +498,12 @@ let
       statePolicy = persistentDhcpState;
 
       services = {
-        dns = recursiveDns "192.168.2.1";
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-vlan7.ipv4
+            dnsRuntime.requesters.access-vlan7.ipv6
+          ];
+        };
       };
 
       advertisements = {
@@ -464,6 +515,7 @@ let
             poolStart = "192.168.2.100";
             poolEnd = "192.168.2.200";
             router = "192.168.2.1";
+            leaseStatePath = "/var/lib/kea/vlan7.leases";
           };
         };
 
@@ -477,14 +529,19 @@ in
   schemaVersion = 1;
 
   endpoints = {
+    core-dns = {
+      ipv4 = [ dnsRuntime.resolver.ipv4 ];
+      ipv6 = [ dnsRuntime.resolver.ipv6 ];
+    };
+
     vlan2-dns = {
-      ipv4 = [ "192.168.1.1" ];
-      ipv6 = [ "fd42:1::1" ];
+      ipv4 = [ dnsRuntime.requesters.access-vlan2.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan2.ipv6 ];
     };
 
     vlan3-dns = {
-      ipv4 = [ "192.168.3.1" ];
-      ipv6 = [ "fd42:dead:beef:3::1" ];
+      ipv4 = [ dnsRuntime.requesters.access-vlan3.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan3.ipv6 ];
     };
 
     s-nebula-container = {
@@ -493,8 +550,8 @@ in
     };
 
     vlan7-dns = {
-      ipv4 = [ "192.168.2.1" ];
-      ipv6 = [ "fd42:dead:beef:7::1" ];
+      ipv4 = [ dnsRuntime.requesters.access-vlan7.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan7.ipv6 ];
     };
   };
 
