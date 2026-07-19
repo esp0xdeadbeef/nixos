@@ -119,6 +119,14 @@ let
       };
     }
     {
+      name = "s-router-legacy-prod";
+      args = {
+        autoStart = false;
+        description = "Legacy production router fallback VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-legacy-prod"}";
+      };
+    }
+    {
       name = "s-router-test-clients";
       args = {
         description = "s-router-test-clients VM (nixos-shell)";

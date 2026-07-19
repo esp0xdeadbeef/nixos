@@ -1,7 +1,7 @@
 { lib, outPath, ... }:
 
 let
-  dns = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/dns-runtime-addresses.nix";
+  dns = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/dns-runtime-addresses.nix";
   vlan2 = dns.requesters.access-vlan2;
   vlan3 = dns.requesters.access-vlan3;
 in

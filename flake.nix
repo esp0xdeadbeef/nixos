@@ -77,6 +77,36 @@
       inputs.nixos-network-compiler.follows = "nixos-network-compiler-prod";
     };
 
+    network-compiler-legacy-prod = {
+      url = "github:esp0xdeadbeef/network-compiler/f267ab67b86641bfed59f4a5fe6d4c92b7535773";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    network-forwarding-model-legacy-prod = {
+      url = "github:esp0xdeadbeef/network-forwarding-model/97fa4f97681827c9848bb79e6b32a19c1756498f";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-compiler.follows = "network-compiler-legacy-prod";
+    };
+
+    network-control-plane-model-legacy-prod = {
+      url = "github:esp0xdeadbeef/network-control-plane-model/5029a38f9feed2f97d855a7425e66b797787824e";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-forwarding-model.follows = "network-forwarding-model-legacy-prod";
+    };
+
+    nixos-network-compiler-legacy-prod = {
+      url = "github:esp0xdeadbeef/nixos-network-compiler/f267ab67b86641bfed59f4a5fe6d4c92b7535773";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    network-renderer-nixos-legacy-prod = {
+      url = "github:esp0xdeadbeef/network-renderer-nixos/85d433856bc601a91d0e007ebf095eda41ab624a";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-control-plane-model.follows = "network-control-plane-model-legacy-prod";
+      inputs.network-forwarding-model.follows = "network-forwarding-model-legacy-prod";
+      inputs.nixos-network-compiler.follows = "nixos-network-compiler-legacy-prod";
+    };
+
     network-renderer-containerlab-linux-backend = {
       url = "github:esp0xdeadbeef/network-renderer-containerlab-linux-backend";
     };

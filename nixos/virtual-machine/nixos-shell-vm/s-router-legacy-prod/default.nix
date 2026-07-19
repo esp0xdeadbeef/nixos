@@ -6,7 +6,7 @@
 let
   hostName = "s-router-prod";
   system = "x86_64-linux";
-  modelSource = "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod";
+  modelSource = "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod";
   qemuNetworkingOptions = [
     "-nic none"
     "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
@@ -71,10 +71,10 @@ in
         modelSource
         ;
 
-      controlPlaneModelInput = inputs.network-control-plane-model-prod;
-      nixosRendererInput = inputs.network-renderer-nixos-prod;
+      controlPlaneModelInput = inputs.network-control-plane-model-legacy-prod;
+      nixosRendererInput = inputs.network-renderer-nixos-legacy-prod;
       inherit system;
-      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
+      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/default.nix";
     })
   ];
 

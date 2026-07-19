@@ -57,6 +57,14 @@ let
       };
     }
     {
+      name = "s-router-legacy-prod";
+      args = {
+        autoStart = false;
+        description = "Legacy production router fallback VM (nixos-shell)";
+        repository = "path:${self.lib.vmSourceForHost "s-router-legacy-prod"}";
+      };
+    }
+    {
       name = "s-router-legacy-edge";
       args = {
         autoStart = false;

@@ -1,8 +1,8 @@
 { config, lib, outPath, ... }:
 
 let
-  dnsRuntime = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/dns-runtime-addresses.nix";
-  prodIntent = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/intent.nix";
+  dnsRuntime = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/dns-runtime-addresses.nix";
+  prodIntent = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/intent.nix";
   prodSite = prodIntent.esp0xdeadbeef.site-a;
   dnsResolver = dnsRuntime.resolver;
   vlan2Dns = dnsRuntime.requesters.access-vlan2;
@@ -736,7 +736,7 @@ in
       message = ''
         s-router-prod must not use the legacy global DHCP generator.
 
-        Host interface behavior must come from nixos/virtual-machine/nixos-shell-vm/s-router-prod/inventory.nix
+        Host interface behavior must come from nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/inventory.nix
         through the network-* render pipeline.
       '';
     }
@@ -790,9 +790,9 @@ in
     {
       assertion =
         (config._module.args.sRouterProdModelSource.intentPath or null)
-        == "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/intent.nix"
+        == "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/intent.nix"
         && (config._module.args.sRouterProdModelSource.inventoryPath or null)
-        == "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/inventory.nix";
+        == "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/inventory.nix";
       message = ''
         s-router-prod must consume the production intent.nix and inventory.nix directly.
       '';
