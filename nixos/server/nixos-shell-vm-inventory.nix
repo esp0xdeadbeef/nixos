@@ -7,8 +7,24 @@
 , ...
 }:
 let
-  routerGuestAgentHealth =
+  guestAgentHealth =
     inputs.nixos-shell-vm-manager.packages.${pkgs.stdenv.hostPlatform.system}."qga-systemd-health";
+
+  qgaSocketFor = vmName: "/run/nixos-shell-vm-manager/${vmName}/qga.sock";
+
+  qgaHealthCommandFor =
+    vmName:
+    lib.escapeShellArgs [
+      (lib.getExe guestAgentHealth)
+      (qgaSocketFor vmName)
+    ];
+
+  qgaArgumentsFor = vmName: [
+    "-chardev"
+    "socket,id=qga0,path=${qgaSocketFor vmName},server=on,wait=off"
+    "-device"
+    "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+  ];
 
   routerCriticalUnits = [
     "systemd-networkd.service"
@@ -72,8 +88,8 @@ let
       healthCheck = {
         command = lib.escapeShellArgs (
           [
-            (lib.getExe routerGuestAgentHealth)
-            "/run/nixos-shell-vm-manager/s-router-prod/qga.sock"
+            (lib.getExe guestAgentHealth)
+            (qgaSocketFor "s-router-prod")
             "/run/current-system/sw/bin/bash"
             "-c"
             routerUnitHealthCommand
@@ -85,12 +101,6 @@ let
         retries = 60;
         intervalSeconds = 3;
       };
-      qemuArguments = [
-        "-chardev"
-        "socket,id=qga0,path=/run/nixos-shell-vm-manager/s-router-prod/qga.sock,server=on,wait=off"
-        "-device"
-        "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
-      ];
     }
     {
       name = "s-router-legacy-prod";
@@ -129,9 +139,9 @@ let
       }
       // (vm.activation or { });
       healthCheck = vm.healthCheck or {
-        command = "${pkgs.iputils}/bin/ping -c 1 -W 2 ${lib.escapeShellArg vm.name}";
-        timeoutSeconds = 5;
-        retries = 30;
+        command = qgaHealthCommandFor vm.name;
+        timeoutSeconds = 10;
+        retries = 60;
         intervalSeconds = 2;
       };
       storage.persistentDisk = {
@@ -141,13 +151,12 @@ let
       };
       runner = {
         stopGraceSeconds = 60;
+        qemuArguments = qgaArgumentsFor vm.name ++ (vm.qemuArguments or [ ]);
       }
-      // lib.optionalAttrs (vm ? runnerRelativePath) {
-        relativePath = vm.runnerRelativePath;
-      }
-      // lib.optionalAttrs (vm ? qemuArguments) {
-        qemuArguments = vm.qemuArguments;
-      };
+      // lib.optionalAttrs (vm ? runnerRelativePath)
+        {
+          relativePath = vm.runnerRelativePath;
+        };
     }
     // lib.optionalAttrs (vm.activation.refreshPins or false) {
       pinRefresh = {

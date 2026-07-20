@@ -1889,11 +1889,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784587731,
-        "narHash": "sha256-Gt9iJV7Cz5Qq7AnvPtcqi890tmXanHFI5/vBqf4ab/M=",
+        "lastModified": 1784589268,
+        "narHash": "sha256-ro0vXL8DxzpqVzczlz86ta4v51NKF+KPVI0RWDGrAic=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-shell-vm-manager",
-        "rev": "ed832e081b8163a2927bfc9259224ad58cebd383",
+        "rev": "9a653b26cadddbe8ecf52e6a486af6d416da5f06",
         "type": "github"
       },
       "original": {

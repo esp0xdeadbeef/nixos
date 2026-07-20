@@ -43,6 +43,15 @@ eligible start, the manager runs `nix flake update --refresh` against an
 isolated copy of the configured `pinRefresh.flake`, builds the configured
 attribute, and admits the result transactionally. Refresh failure leaves image
 slots unchanged and falls back to the already available host-pinned image.
+Host-flake instances use the default `pinRefresh.lockScope = "host"`, so every
+refresh starts from the last lock successfully published by any VM on that
+host. A custom flake repository must use its own stable `lockScope`.
+
+The shared server inventory uses a unique QEMU Guest Agent socket per VM for
+default health checks. Promotion requires that the exact guest responds and
+that `systemctl list-units --state=failed` is empty; it does not require guest
+networking, DNS, or a fixed IP address. VM-specific checks such as the
+production router's critical-unit check may be stricter.
 
 The manager exposes an offline tmux console by default at
 `/run/nixos-shell/<vm>.tmux`, session `vm`. For example:
