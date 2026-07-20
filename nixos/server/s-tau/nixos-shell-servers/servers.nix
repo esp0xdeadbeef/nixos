@@ -21,6 +21,19 @@ let
     "container@upstream-selector.service"
   ];
 
+  routerUnitHealthCommand = ''
+    status=0
+    for unit in "$@"; do
+      if state=$(/run/current-system/sw/bin/systemctl is-active "$unit" 2>&1); then
+        :
+      else
+        status=1
+      fi
+      printf '%s=%s\n' "$unit" "$state"
+    done
+    exit "$status"
+  '';
+
   vms = [
     {
       name = "s-infra";
@@ -61,9 +74,10 @@ let
           [
             (lib.getExe routerGuestAgentHealth)
             "/run/nixos-shell-vm-manager/s-router-prod/qga.sock"
-            "/run/current-system/sw/bin/systemctl"
-            "is-active"
-            "--quiet"
+            "/run/current-system/sw/bin/bash"
+            "-c"
+            routerUnitHealthCommand
+            "qga-systemd-health"
           ]
           ++ routerCriticalUnits
         );
