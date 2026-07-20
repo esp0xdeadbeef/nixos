@@ -123,13 +123,13 @@ in
 
         [[block]]
         block = "custom"
+        format = " $text"
         cycle = [
-            "(echo -n '🏠 '; ip a s $(ip a | grep wlp | cut -d ' ' -f 2 | cut -d ':' -f 1) | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n2 | head -n1)",
-            "(echo -n '🏠 '; ip a s $(ip a | grep wlp | cut -d ' ' -f 2 | cut -d ':' -f 1) | grep inet | grep dynamic | grep -v temp | awk '{print $2}' | sed 's|/.*||g' | tail -n1 | head -n1)",
+            "(echo -n '🏠 '; ip -4 -o address show up scope global | awk '$2 ~ /^wl/ {split($4, address, \"/\"); print address[1]; exit}')",
+            "(echo -n '🏠 '; ip -6 -o address show up scope global | awk '$2 ~ /^wl/ {split($4, address, \"/\"); print address[1]; exit}')",
             "(echo -n '🌍 '; ${pkgs.curl}/bin/curl -s ifconfig.me -4)",
             "(echo -n '🌍 '; ${pkgs.curl}/bin/curl -s ifconfig.me -6)",
         ]
-
         interval = 60
 
         [[block]]
