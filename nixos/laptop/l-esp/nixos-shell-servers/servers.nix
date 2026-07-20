@@ -1,13 +1,8 @@
 { pkgs
-, profiles
 , self
 , ...
 }:
 {
-  imports = [
-    profiles.nixos.vm-host.nixos-shell-v2
-  ];
-
   services.nixosShellVmManager = {
     enable = true;
     maxConcurrentBuilds = 1;

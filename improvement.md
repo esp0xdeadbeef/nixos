@@ -432,160 +432,31 @@ and keep the system integration in a profile or module.
 
 ## NixOS-Shell VM Host Profile
 
-The `s-sigma` nixos-shell setup is useful enough that it should probably become
-a reusable host profile, but it does not need to be fixed immediately. Time is a
-constraint, and the current implementation works.
+The VM host interface is now `profiles.nixos.vm-host.nixos-shell`. This profile
+is intentionally a thin adapter for the external `nixos-shell-vm-manager`
+module; it does not contain lifecycle scripts or a second option schema.
 
-Current shape:
+Host inventories configure `services.nixosShellVmManager` directly. The paired
+`s-sigma` and `s-tau` hosts share their common inventory and health policy in
+`nixos/server/nixos-shell-vm-inventory.nix`, while each host keeps its
+own carrier and start-on-boot authority in its local
+`nixos-shell-servers` directory. `l-esp` keeps its independent test inventory.
 
-- `nixos/server/s-sigma/nixos-shell-servers/default.nix` imports `servers.nix`.
-- `servers.nix` is the inventory: it calls `mkVM "s-infra" { ... }`,
-  `mkVM "s-nebula" { ... }`, etc.
-- `mk-nixos-shell-vm.nix` contains the generic systemd/tmux/QMP/image-management
-  machinery.
-- `self.lib.vmSourceForHost` in `flake.nix` builds a minimal source tree for a
-  selected VM host by excluding the other host directories.
-- `library/10-vms/nixos-shell-vm/1-helpers` contains reusable guest-side helpers
-  for persistence, SSH auth, networkd bridges, and debug packages.
+The host generation contains every assigned immutable VM image. Activation can
+therefore register a candidate without building or downloading anything, and a
+VM can start after a cold offline boot. Only instances with the explicit
+`activation.refreshPins = true` policy may attempt a network-dependent lock
+refresh before an eligible start; failure falls back to the host-pinned image.
 
-That means the implementation is already split into two concepts:
+Generic rollout, rollback, QGA health, persistent-disk, tmux-console, carrier,
+and stop-authority behavior belongs in `nixos-shell-vm-manager`. Consumer host
+files should only assign images and host-specific policy. Guest configuration
+remains under `nixos/virtual-machine/nixos-shell-vm`.
 
-- generic VM-host machinery;
-- `s-sigma`'s chosen VM inventory.
-
-The improvement is to make that boundary explicit.
-
-### Desired Shape
-
-Create a reusable NixOS profile or module for "this machine can host
-nixos-shell VMs":
-
-```nix
-profiles.nixos.vm-host.nixos-shell
-```
-
-or, if it grows options:
-
-```nix
-modules.nixos.nixos-shell-vm-host
-```
-
-Then hosts can opt in explicitly:
-
-```nix
-{
-  imports = [
-    profiles.base
-    profiles.virtualization.libvirt-host
-    profiles.vm-host.nixos-shell
-
-    ./hardware
-    ./vm-inventory.nix
-  ];
-}
-```
-
-The host should still choose its inventory. Do not make every host run every VM
-just because the profile exists.
-
-### Suggested Module Boundary
-
-Long term, wrap `mkVM` behind options:
-
-```nix
-services.local.nixos-shell-vm-host = {
-  enable = true;
-
-  defaults = {
-    workingDir = "/persist/nix-shell-vms";
-    persistDir = "/persist/vm-persists";
-    stateDiskSize = "100G";
-    ephemeralRoot = true;
-  };
-
-  vms = {
-    s-infra = { description = "Infra VM"; };
-    s-nebula = { description = "Nebula VM"; };
-    s-router-legacy-edge = { description = "Legacy edge router"; };
-  };
-};
-```
-
-The module can translate `vms` into the existing `mkVM` calls. That preserves the
-working implementation while making host intent clearer.
-
-### Keep Inventory Separate
-
-The host root should say it is a VM host, but the VM list should remain a local
-file:
-
-```text
-nixos/server/s-sigma/
-  default.nix
-  vm-inventory.nix
-  hardware/
-```
-
-For another host, such as `l-envil` or `l-esp`, enabling the profile later should
-be a small change:
-
-```nix
-imports = [
-  profiles.vm-host.nixos-shell
-  ./vm-inventory.nix
-];
-```
-
-This gives a clear overview:
-
-- `default.nix` says the machine is capable of hosting nixos-shell VMs.
-- `vm-inventory.nix` says which VMs this machine actually hosts.
-- the shared module owns systemd/tmux/image logic.
-
-### What To Avoid
-
-- Do not move all VM definitions into one global file that every host imports.
-  That recreates the current "too broad default" problem.
-- Do not force a fully generic option module before the current setup is stable.
-  A thin profile that imports the existing `mkVM` machinery is enough for a first
-  step.
-- Do not mix guest configuration and host launcher configuration. Guest configs
-  belong under `nixos/virtual-machine/nixos-shell-vm`; host launcher inventory
-  belongs under the host that runs them.
-
-### Practical First Step
-
-The low-effort step still has operational risk. If `s-sigma` VM hosting breaks,
-the impact is high. So the first migration should be copy-first, test-first, and
-easy to roll back.
-
-Safer order:
-
-1. Copy `nixos/server/s-sigma/nixos-shell-servers/mk-nixos-shell-vm.nix` to the
-   future shared location, for example
-   `profiles/nixos/vm-host/nixos-shell/mk-vm.nix` or
-   `modules/nixos/nixos-shell-vm-host/mk-vm.nix`.
-2. Leave `s-sigma` still using its current local
-   `nixos-shell-servers/mk-nixos-shell-vm.nix`.
-3. Add a cheap equivalence check or one-off eval comparing the generated attrs
-   from the local and copied implementations. At minimum, compare generated
-   service names, timer names, and `system.build.vmImages` attrs for a single
-   non-critical VM.
-4. Switch only a non-critical test VM or newly added VM to the shared helper
-   first. Do not start with router/core infrastructure.
-5. Once the shared helper has evaluated cleanly, switch `s-sigma/servers.nix` to
-   import the shared path.
-6. Keep the old local helper for one full rebuild/reboot cycle as a rollback
-   target. Delete it only after the host has proven stable.
-7. Rename `servers.nix` to `vm-inventory.nix` only after the helper move is no
-   longer in question.
-8. Only after that, consider adding proper options.
-
-The rollback path must be: change one import path back. It should not require
-debugging a new generic module while the VMs are down.
-
-That gives reuse without forcing a big refactor and without betting the working
-`s-sigma` VM host on the first cleanup step.
+The former in-repository lifecycle implementation has been retired. Do not add
+host-local image services, update timers, QMP scripts, or another versioned VM
+host profile. Changes to lifecycle behavior require manager construction and
+integration evidence before a consumer pin is advanced.
 
 ## LLM Workstation Profiles
 

@@ -1,15 +1,16 @@
-{ pkgs
-, self
-, ...
-}: {
+{ ... }:
+{
   imports = [
     ./servers.nix
   ];
 
-  local.vmHost.nixosShell.eno1RouterVms = {
-    enable = true;
-    units = [
-      "s-router-prod-vm.service"
+  services.nixosShellVmManager.carrierControls.eno1-router-vms = {
+    interface = "eno1";
+    requiredInterfaces = [
+      "vmbr1"
+      "vmbr4"
     ];
+    instances = [ "s-router-prod" ];
+    description = "Start or stop router nixos-shell VMs from eno1 carrier";
   };
 }

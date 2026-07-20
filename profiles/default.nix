@@ -130,7 +130,6 @@
     };
     vm-host = {
       nixos-shell = import ./nixos/vm-host/nixos-shell;
-      nixos-shell-v2 = import ./nixos/vm-host/nixos-shell-v2;
     };
     nixos-shell-host = {
       common = import ./nixos/nixos-shell-host/common.nix;
