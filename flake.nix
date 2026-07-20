@@ -188,6 +188,11 @@
     nixos-shell = {
       url = "github:Mic92/nixos-shell";
     };
+
+    nixos-shell-vm-manager = {
+      url = "github:esp0xdeadbeef/nixos-shell-vm-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =

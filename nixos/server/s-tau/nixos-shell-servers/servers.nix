@@ -1,181 +1,159 @@
-{ lib
+{ config
+, inputs
+, lib
 , pkgs
+, profiles
 , self
-, config
 , ...
 }:
-# for testing, use:
-# nix run path:/home/deadbeef/github/nixos#nixosConfigurations.<vm-hostname>.config.system.build.nixos-shell
-# or:
-# export HOST="<vm-hostname>" ; nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#$(hostname) && grep build $(systemctl cat $HOST-image.service | grep Exec | cut -d '=' -f 2) | bash && systemctl restart -- $(ls /etc/systemd/system/s-*-image.service 2>/dev/null | xargs -n1 basename)
 let
-  mkVM = import "${self.outPath}/profiles/nixos/vm-host/nixos-shell/mk-vm.nix" {
-    inherit config pkgs lib self;
-  };
+  routerGuestAgentHealth =
+    inputs.nixos-shell-vm-manager.packages.${pkgs.stdenv.hostPlatform.system}."qga-systemd-health";
+
+  routerCriticalUnits = [
+    "systemd-networkd.service"
+    "container@access-vlan2.service"
+    "container@access-vlan3.service"
+    "container@access-vlan7.service"
+    "container@core.service"
+    "container@downstream-selector.service"
+    "container@policy.service"
+    "container@upstream-selector.service"
+  ];
 
   vms = [
     {
       name = "s-infra";
-      args = {
-        description = "Infra VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-infra"}";
-      };
+      description = "Infra VM (nixos-shell)";
     }
     {
       name = "s-nebula";
-      args = {
-        description = "Nebula VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-nebula"}";
-      };
+      description = "Nebula VM (nixos-shell)";
     }
     {
       name = "s-agents";
-      args = {
-        description = "Agent workbench VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-agents"}";
-      };
+      description = "Agent workbench VM (nixos-shell)";
     }
     {
       name = "s-router-legacy-edge";
-      args = {
-        autoStart = false;
-        description = "s-router-legacy-edge VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-router-legacy-edge"}";
-      };
+      description = "s-router-legacy-edge VM (nixos-shell)";
     }
     {
       name = "s-router-legacy-core";
-      args = {
-        autoStart = false;
-        description = "s-router-core VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-router-legacy-core"}";
-      };
+      description = "s-router-core VM (nixos-shell)";
     }
-    # {
-    #   name = "s-router-core";
-    #   args = {
-    #     description = "s-router-core VM (nixos-shell)";
-    #     repository = "path:${self.lib.vmSourceForHost "s-router-core"}";
-    #   };
-    # }
-    # {
-    #   name = "s-router-upstream-selector";
-    #   args = {
-    #     description = "s-router-upstream-selector VM (nixos-shell)";
-    #     repository = "path:${self.lib.vmSourceForHost "s-router-upstream-selector"}";
-    #   };
-    # }
-    # {
-    #   name = "s-router-policy";
-    #   args = {
-    #     description = "s-router-policy VM (nixos-shell)";
-    #     repository = "path:${self.lib.vmSourceForHost "s-router-policy"}";
-    #   };
-    # }
-    # {
-    #   name = "s-router-access";
-    #   args = {
-    #     description = "s-router-access VM (nixos-shell)";
-    #     repository = "path:${self.lib.vmSourceForHost "s-router-access"}";
-    #   };
-    # }
     {
       name = "s-router-clab";
-      args = {
-        description = "s-router-clab VM (nixos-shell)";
-        registerImage = true;
-        updateFlakeLocks = true;
-        repository = "path:${self.lib.vmSourceForHost "s-router-clab"}";
-      };
+      description = "s-router-clab VM (nixos-shell)";
+      activation.refreshPins = true;
     }
     {
       name = "s-router-nixos";
-      args = {
-        description = "s-router-nixos VM (nixos-shell)";
-        registerImage = true;
-        updateFlakeLocks = true;
-        repository = "path:${self.lib.vmSourceForHost "s-router-nixos"}";
-      };
+      description = "s-router-nixos VM (nixos-shell)";
+      activation.refreshPins = true;
     }
     {
       name = "s-router-prod";
-      args = {
-        autoStart = false;
-        buildDelaySec = 300;
-        buildIntervalSec = 21600;
-        description = "Production router canary VM (nixos-shell)";
-        imageServiceBefore = [
-          "s-router-clab-image.service"
-          "s-router-nixos-image.service"
-          "s-router-test-clients-image.service"
-        ];
-        imageUpdateTimer = true;
-        registerImage = true;
-        repository = "path:${self.lib.vmSourceForHost "s-router-prod"}";
-        restartVmAfterImageUpdate = true;
-        safeRestart = true;
-        updateFlakeLocks = false;
-        updateOnGuestShutdown = false;
+      description = "Production router canary VM (nixos-shell)";
+      activation.rolloutCandidateOnGuestShutdown = false;
+      healthCheck = {
+        command = lib.escapeShellArgs (
+          [
+            (lib.getExe routerGuestAgentHealth)
+            "/run/nixos-shell-vm-manager/s-router-prod/qga.sock"
+            "/run/current-system/sw/bin/systemctl"
+            "is-active"
+            "--quiet"
+          ]
+          ++ routerCriticalUnits
+        );
+        timeoutSeconds = 120;
+        retries = 60;
+        intervalSeconds = 3;
       };
+      qemuArguments = [
+        "-chardev"
+        "socket,id=qga0,path=/run/nixos-shell-vm-manager/s-router-prod/qga.sock,server=on,wait=off"
+        "-device"
+        "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+      ];
     }
     {
       name = "s-router-legacy-prod";
-      args = {
-        autoStart = false;
-        description = "Legacy production router fallback VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-router-legacy-prod"}";
-      };
+      description = "Legacy production router fallback VM (nixos-shell)";
+      runnerRelativePath = "bin/run-s-router-prod-vm";
     }
     {
       name = "s-router-test-clients";
-      args = {
-        description = "s-router-test-clients VM (nixos-shell)";
-        registerImage = true;
-        updateFlakeLocks = true;
-        repository = "path:${self.lib.vmSourceForHost "s-router-test-clients"}";
-      };
+      description = "s-router-test-clients VM (nixos-shell)";
+      activation.refreshPins = true;
     }
     {
       name = "s-router-vpn-egress";
-      args = {
-        description = "VPN-egress VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-router-vpn-egress"}";
-      };
+      description = "VPN-egress VM (nixos-shell)";
     }
     {
       name = "s-gameserver";
-      args = {
-        description = "Gameserver VM (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-gameserver"}";
-      };
+      description = "Gameserver VM (nixos-shell)";
     }
     {
       name = "s-test";
-      args = {
-        autoStart = true;
-        description = "s-test (nixos-shell)";
-        repository = "path:${self.lib.vmSourceForHost "s-test"}";
-      };
+      description = "s-test (nixos-shell)";
+      startOnBoot = true;
     }
   ];
 
-  mkImage = vm: {
+  mkInstance = vm: {
     inherit (vm) name;
-    value = self.nixosConfigurations.${vm.name}.config.system.build.nixos-shell;
+    value = {
+      inherit (vm) description;
+      image = self.nixosConfigurations.${vm.name}.config.system.build.nixos-shell;
+      activation = {
+        startOnBoot = vm.startOnBoot or false;
+      }
+      // (vm.activation or { });
+      healthCheck = vm.healthCheck or {
+        command = "${pkgs.iputils}/bin/ping -c 1 -W 2 ${lib.escapeShellArg vm.name}";
+        timeoutSeconds = 5;
+        retries = 30;
+        intervalSeconds = 2;
+      };
+      storage.persistentDisk = {
+        enable = true;
+        fileName = "state.qcow2";
+        size = "100G";
+      };
+      runner = {
+        stopGraceSeconds = 60;
+      }
+      // lib.optionalAttrs (vm ? runnerRelativePath) {
+        relativePath = vm.runnerRelativePath;
+      }
+      // lib.optionalAttrs (vm ? qemuArguments) {
+        qemuArguments = vm.qemuArguments;
+      };
+    }
+    // lib.optionalAttrs (vm.activation.refreshPins or false) {
+      pinRefresh = {
+        flake = self.outPath;
+        flakeAttribute = "nixosConfigurations.${vm.name}.config.system.build.nixos-shell";
+      };
+    };
   };
-
-  mkService = vm:
-    mkVM vm.name (vm.args // {
-      registerImage = vm.args.registerImage or false;
-    });
 in
 {
-  config = lib.mkMerge (
-    [
-      {
-        system.build.vmImages = lib.listToAttrs (map mkImage vms);
-      }
-    ]
-    ++ map mkService vms
+  imports = [
+    profiles.nixos.vm-host.nixos-shell-v2
+  ];
+
+  services.nixosShellVmManager = {
+    enable = true;
+    maxConcurrentBuilds = 1;
+    persistentDirectory = "/persist/vm-persists";
+    instances = lib.listToAttrs (map mkInstance vms);
+  };
+
+  system.build.vmImages = lib.mapAttrs (_: instance: instance.image) (
+    lib.filterAttrs (_: instance: instance.enable) config.services.nixosShellVmManager.instances
   );
 }

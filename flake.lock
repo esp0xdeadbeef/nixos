@@ -1882,6 +1882,26 @@
         "type": "github"
       }
     },
+    "nixos-shell-vm-manager": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1784570689,
+        "narHash": "sha256-QGG2DdAvdTfWZdSNfKhC4vWqJK5yNExuOmA8sQIp/Mo=",
+        "owner": "esp0xdeadbeef",
+        "repo": "nixos-shell-vm-manager",
+        "rev": "01e1cd01c8ee7a3f6c463472be8a6815c7497e5d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esp0xdeadbeef",
+        "repo": "nixos-shell-vm-manager",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1767892417,
@@ -2694,6 +2714,7 @@
         "nixos-network-compiler-prod": "nixos-network-compiler-prod",
         "nixos-router-vpn-gateway": "nixos-router-vpn-gateway",
         "nixos-shell": "nixos-shell",
+        "nixos-shell-vm-manager": "nixos-shell-vm-manager",
         "nixpkgs": "nixpkgs_14",
         "nixpkgs-stable": "nixpkgs-stable",
         "nixpkgs-unstable": "nixpkgs-unstable",

@@ -21,9 +21,5 @@
     '';
   };
 
-  # Keep the same VM declarations as s-sigma, but do not start them on tau
-  # until the active/standby router plan is explicit.
-  local.vmHost.nixosShell.autoStart = false;
-
   system.stateVersion = "25.11";
 }
