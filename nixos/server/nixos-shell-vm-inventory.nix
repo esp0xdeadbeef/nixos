@@ -54,6 +54,9 @@ let
 
     ip=/run/current-system/sw/bin/ip
     bash=/run/current-system/sw/bin/bash
+    ping=/run/current-system/sw/bin/ping
+    sleep=/run/current-system/sw/bin/sleep
+    sysctl=/run/current-system/sw/bin/sysctl
     namespace=gamp-vlan2-health
     host_interface=gamp-v2-host
     client_interface=gamp-v2-client
@@ -78,15 +81,46 @@ let
     cleanup_vlan2_health
 
     "$ip" netns add "$namespace"
+    "$ip" netns exec "$namespace" "$sysctl" -q -w \
+      net.ipv6.conf.all.disable_ipv6=0 \
+      net.ipv6.conf.default.disable_ipv6=0 \
+      net.ipv6.conf.all.forwarding=0 \
+      net.ipv6.conf.default.accept_ra=2 \
+      net.ipv6.conf.default.accept_ra_mtu=1
     "$ip" link add "$host_interface" type veth peer name "$client_interface"
     "$ip" link set "$host_interface" master lan2
     "$ip" link set "$host_interface" up
     "$ip" link set "$client_interface" netns "$namespace"
     "$ip" -n "$namespace" link set lo up
+    "$ip" netns exec "$namespace" "$sysctl" -q -w \
+      "net.ipv6.conf.$client_interface.disable_ipv6=0" \
+      "net.ipv6.conf.$client_interface.accept_ra=2" \
+      "net.ipv6.conf.$client_interface.accept_ra_mtu=1" \
+      "net.ipv6.conf.$client_interface.autoconf=1"
     "$ip" -n "$namespace" link set "$client_interface" address 02:00:00:02:fe:01
     "$ip" -n "$namespace" link set "$client_interface" up
     "$ip" -n "$namespace" address add 192.168.1.254/24 dev "$client_interface"
     "$ip" -n "$namespace" route add default via 192.168.1.1
+
+    vlan2_ipv6_ready=false
+    for _ in {1..30}; do
+      ipv6_mtu=$(
+        "$ip" netns exec "$namespace" "$sysctl" -n \
+          "net.ipv6.conf.$client_interface.mtu"
+      )
+      if [[ "$ipv6_mtu" == 1492 ]] \
+        && "$ip" -n "$namespace" -6 route show default proto ra \
+          | /run/current-system/sw/bin/grep -q '^default' \
+        && "$ip" -n "$namespace" -6 address show \
+          dev "$client_interface" scope global -tentative \
+          | /run/current-system/sw/bin/grep -q 'inet6 '; then
+        vlan2_ipv6_ready=true
+        break
+      fi
+      "$sleep" 0.5
+    done
+
+    [[ "$vlan2_ipv6_ready" == true ]]
 
     "$mkdir_bin" -p "/etc/netns/$namespace"
     printf 'nameserver 192.168.1.1\noptions timeout:2 attempts:2\n' \
@@ -98,6 +132,10 @@ let
       IFS= read -r -t 10 status <&3 || exit 1
       [[ "$status" == HTTP/* ]]
     ' >/dev/null 2>&1
+
+    "$ip" netns exec "$namespace" "$ping" -6 -n -q \
+      -c 3 -W 2 -M do -s 1444 2606:4700:4700::1111 \
+      >/dev/null 2>&1
 
     cleanup_vlan2_health
     trap - EXIT HUP INT TERM

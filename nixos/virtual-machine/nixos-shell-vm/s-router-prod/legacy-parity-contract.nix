@@ -650,6 +650,24 @@ let
     && (starterTimer.timerConfig.OnBootSec or null) == "10s"
     && (starterTimer.timerConfig.Unit or null) == "s88-start-s88-pppoe-client-wan.service";
 
+  hasRendererNativePppoeMssClamp =
+    hasStatelessRuleLine coreNftables [
+      ''oifname { "ppp0", "wan" }''
+      "tcp flags syn"
+      "tcp option maxseg size set rt mtu"
+    ];
+
+  hasVlan2AdvertisedPppoePathMtu =
+    let
+      generator = (servicesFor "access-vlan2")."radvd-generate-lan2" or { };
+      postStart = generator.postStart or "";
+    in
+    builtins.all (fragment: lib.hasInfix fragment postStart) [
+      "AdvLinkMTU"
+      "1492"
+      "radvd --configtest"
+    ];
+
   hasCoreDnsRequesterRoutes =
     hasRoute "access-vlan2" "10-access-vlan2" "10.19.0.2/31" "10.10.0.1"
     && hasRoute
@@ -692,6 +710,25 @@ let
       "selector-handoff-reverse--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"
       "selector-handoff-reverse--access-vlan7--selector-policy-uplink-to-selector-policy-uplink--wan"
     ];
+
+  hasCoreDnsPathReconciliation =
+    let
+      service = (servicesFor "policy").s-router-prod-core-dns-path-reconcile or { };
+      timer = config.containers.policy.config.systemd.timers.s-router-prod-core-dns-path-reconcile or { };
+      script = service.script or "";
+    in
+    builtins.all (fragment: lib.hasInfix fragment script) [
+      ''route del table "$table" "$prefix"''
+      "${dnsResolver.ipv4}/32"
+      "${dnsResolver.ipv4}/31"
+      "${dnsResolver.ipv6}/128"
+      "${dnsResolver.ipv6}/127"
+      "down-vlan2 1004 upstream-vlan2"
+      "downstr-vlan7 1006 upstream-vlan7"
+    ]
+    && (service.serviceConfig.Type or null) == "oneshot"
+    && (timer.timerConfig.OnBootSec or null) == "1s"
+    && (timer.timerConfig.OnUnitActiveSec or null) == "5s";
 
   hasVlan3ToVlan2DnsPath =
     let
@@ -940,12 +977,16 @@ in
       assertion =
         hasVlan2InternetRoutes
         && hasVlan2InternetFirewallAndNat
-        && hasVlan2PppoeBootPath;
+        && hasVlan2PppoeBootPath
+        && hasRendererNativePppoeMssClamp
+        && hasVlan2AdvertisedPppoePathMtu;
       message = ''
         s-router-prod VLAN 2 must retain its complete Internet path: source
         selection and default routes through access, downstream, policy,
         upstream, and core; stateful forwarding on every hop; masquerade of
-        192.168.1.0/24 to ppp0; and the boot-triggered persistent PPPoE client.
+        192.168.1.0/24 to ppp0; the boot-triggered persistent PPPoE client;
+        renderer-native IPv4/IPv6 TCP MSS clamping; and an IPv6 router
+        advertisement matching the 1492-byte PPPoE path MTU.
       '';
     }
     {
@@ -965,13 +1006,17 @@ in
         && hasCoreDnsInputRules
         && hasCoreDnsRequesterRoutes
         && hasCoreDnsTraversalRules
+        && hasCoreDnsPathReconciliation
         && hasDnsEgressRules "access-vlan2"
         && hasDnsEgressRules "access-vlan7";
       message = ''
         s-router-prod must preserve the address-free access-dns -> core-dns
         target intent and materialize its temporary inventory projection with
         native dual-stack source policy, routes, firewall traversal, recursive
-        core resolver isolation, and no invented public core forwarders.
+        core resolver isolation, and no invented public core forwarders. Until
+        the network-* service-route closure stops leaking equal-prefix core
+        routes across tenant tables, the explicit reconciliation override must
+        keep VLAN 2 and VLAN 7 on their relation-bound upstream lanes.
       '';
     }
     {

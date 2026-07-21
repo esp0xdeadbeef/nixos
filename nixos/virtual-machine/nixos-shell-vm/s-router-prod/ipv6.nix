@@ -46,6 +46,11 @@ let
   };
 in
 {
+  # TEMPORARY NETWORK-* COMPATIBILITY OVERRIDE.
+  #
+  # Remove the local DHCPv6-PD service, runtime Nebula address set, and scoped
+  # nftables additions once the intent/compiler/renderer natively model prefix
+  # delegation and explicit protected IPv6 public ingress.
   containers.core.config = {
     environment.etc."s-router-prod/dhcpcd-ipv6.conf".text = ''
       duid

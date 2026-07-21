@@ -5,6 +5,12 @@ let
   runtimeUnboundLocalFile = "/run/unbound/s-router-prod-vlan2-local.conf";
 in
 {
+  # TEMPORARY NETWORK-* COMPATIBILITY OVERRIDE.
+  #
+  # Remove this file, its import, warning, and parity assertion once protected
+  # reservation name publication accepts intentional multi-address hostnames
+  # and renders the runtime A/PTR data without exposing the protected source in
+  # evaluation output or the Nix store.
   containers.access-vlan2.config =
     { pkgs, ... }:
     let
