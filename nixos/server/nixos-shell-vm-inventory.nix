@@ -37,7 +37,7 @@ let
     "container@upstream-selector.service"
   ];
 
-  routerUnitHealthCommand = ''
+  routerHealthCommand = ''
     status=0
     for unit in "$@"; do
       if state=$(/run/current-system/sw/bin/systemctl is-active "$unit" 2>&1); then
@@ -47,7 +47,68 @@ let
       fi
       printf '%s=%s\n' "$unit" "$state"
     done
-    exit "$status"
+
+    if [[ "$status" -ne 0 ]]; then
+      exit "$status"
+    fi
+
+    ip=/run/current-system/sw/bin/ip
+    bash=/run/current-system/sw/bin/bash
+    namespace=gamp-vlan2-health
+    host_interface=gamp-v2-host
+    client_interface=gamp-v2-client
+
+    shopt -s nullglob
+    mkdir_candidates=(/nix/store/*-coreutils-*/bin/mkdir)
+    rm_candidates=(/nix/store/*-coreutils-*/bin/rm)
+    mkdir_bin=''${mkdir_candidates[0]:-}
+    rm_bin=''${rm_candidates[0]:-}
+
+    [[ -x "$mkdir_bin" && -x "$rm_bin" ]]
+
+    cleanup_vlan2_health() (
+      set +e
+      "$ip" netns del "$namespace" >/dev/null 2>&1
+      "$ip" link del "$host_interface" >/dev/null 2>&1
+      "$rm_bin" -rf -- "/etc/netns/$namespace"
+    )
+
+    trap cleanup_vlan2_health EXIT
+    trap 'exit 1' HUP INT TERM
+    cleanup_vlan2_health
+
+    "$ip" netns add "$namespace"
+    "$ip" link add "$host_interface" type veth peer name "$client_interface"
+    "$ip" link set "$host_interface" master lan2
+    "$ip" link set "$host_interface" up
+    "$ip" link set "$client_interface" netns "$namespace"
+    "$ip" -n "$namespace" link set lo up
+    "$ip" -n "$namespace" link set "$client_interface" address 02:00:00:02:fe:01
+    "$ip" -n "$namespace" link set "$client_interface" up
+    "$ip" -n "$namespace" address add 192.168.1.254/24 dev "$client_interface"
+    "$ip" -n "$namespace" route add default via 192.168.1.1
+
+    "$mkdir_bin" -p "/etc/netns/$namespace"
+    printf 'nameserver 192.168.1.1\noptions timeout:2 attempts:2\n' \
+      >"/etc/netns/$namespace/resolv.conf"
+
+    "$ip" netns exec "$namespace" "$bash" -c '
+      exec 3<>/dev/tcp/example.com/80 2>/dev/null || exit 1
+      printf "HEAD / HTTP/1.0\r\nHost: example.com\r\nConnection: close\r\n\r\n" >&3
+      IFS= read -r -t 10 status <&3 || exit 1
+      [[ "$status" == HTTP/* ]]
+    ' >/dev/null 2>&1
+
+    cleanup_vlan2_health
+    trap - EXIT HUP INT TERM
+
+    if "$ip" link show "$host_interface" >/dev/null 2>&1 \
+      || "$ip" netns exec "$namespace" "$bash" -c : >/dev/null 2>&1 \
+      || [[ -e "/etc/netns/$namespace" ]]; then
+      exit 1
+    fi
+
+    printf 'vlan2-client=healthy\n'
   '';
 
   vms = [
@@ -84,7 +145,7 @@ let
     {
       name = "s-router-prod";
       description = "Production router canary VM (nixos-shell)";
-      activation.rolloutCandidateOnGuestShutdown = false;
+      activation.rolloutCandidateOnGuestShutdown = true;
       healthCheck = {
         command = lib.escapeShellArgs (
           [
@@ -92,7 +153,7 @@ let
             (qgaSocketFor "s-router-prod")
             "/run/current-system/sw/bin/bash"
             "-c"
-            routerUnitHealthCommand
+            routerHealthCommand
             "qga-systemd-health"
           ]
           ++ routerCriticalUnits

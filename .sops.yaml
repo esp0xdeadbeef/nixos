@@ -236,6 +236,34 @@ creation_rules:
           - *s-router-legacy-edge
           - *s-router-prod
 
+  - path_regex: '^prod-network/current/secrets/(vlan[23]-reservations|vlan2-reservation-names)\.json\.age$'
+    input_type: binary
+    output_type: binary
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-prod
+
+  - path_regex: '^prod-network/legacy/secrets/vlan2-hostnames-servers\.json\.age$'
+    input_type: binary
+    output_type: binary
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-edge
+          - *s-router-legacy-edge
+          - *s-router-prod
+
+  - path_regex: '^prod-network/(current|legacy)/secrets/runtime\.yaml$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-prod
+
   - path_regex: '^(secrets/)*s-router-legacy-edge.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:

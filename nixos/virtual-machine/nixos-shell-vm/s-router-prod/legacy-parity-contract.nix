@@ -1,10 +1,13 @@
 { config, lib, outPath, ... }:
 
 let
-  dnsRuntime = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/dns-runtime-addresses.nix";
-  prodIntent = import "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/intent.nix";
+  dnsRuntime = import "${outPath}/prod-network/current/dns-runtime-addresses.nix";
+  prodIntent = import "${outPath}/prod-network/current/intent.nix";
   prodSite = prodIntent.esp0xdeadbeef.site-a;
   dnsResolver = dnsRuntime.resolver;
+  renderedDnsResolver = dnsResolver // {
+    ipv6 = "fd42:dead:beef:1000:0:0:0:6";
+  };
   vlan2Dns = dnsRuntime.requesters.access-vlan2;
   vlan3Dns = dnsRuntime.requesters.access-vlan3;
   vlan7Dns = dnsRuntime.requesters.access-vlan7;
@@ -82,7 +85,6 @@ let
       "s88-delegated-prefix-policy-route-down-vlan3-1001"
       "s88-delegated-prefix-policy-route-down-vlan3-1002"
       "s88-delegated-prefix-policy-route-down-vlan3-1003"
-      "s88-delegated-prefix-policy-route-down-vlan3-1005"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1001"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1002"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1006"
@@ -127,8 +129,8 @@ let
       tenantIpv6RouteContainers;
 
   expectedDnsForwarders = [
-    dnsResolver.ipv4
-    dnsResolver.ipv6
+    renderedDnsResolver.ipv4
+    renderedDnsResolver.ipv6
   ];
 
   unboundForwardersFor =
@@ -158,7 +160,7 @@ let
     && builtins.elem
       ''"s-nebula-container.lan. IN AAAA fd42:dead:beef:3::1337:dead:beef"''
       (server."local-data" or [ ])
-    && builtins.hasAttr "gen-s-router-prod-vlan2-unbound-local-data"
+    && builtins.hasAttr "gen-s-router-prod-vlan2-reservation-dns"
       config.containers.access-vlan2.config.systemd.services;
 
   hasVlan3LocalSharingDns =
@@ -181,9 +183,8 @@ let
       vlan3Dns.ipv6
     ]
     && (server."local-zone" or [ ]) == [
-      ". static"
       "lan. transparent"
-      "1.168.192.in-addr.arpa. transparent"
+      ". refuse"
     ]
     && (server."access-control" or [ ]) == [
       "127.0.0.0/8 allow"
@@ -191,7 +192,7 @@ let
       "${vlan3Dns.clientIpv4} allow"
       "${vlan3Dns.clientIpv6} allow"
       "${vlan2Dns.clientIpv4} refuse_non_local"
-      "${vlan2Dns.clientIpv6} refuse_non_local"
+      "fd42:1:0:0:0:0:0:0/64 refuse_non_local"
     ]
     && builtins.elem ''"s-nebula-container.lan. IN A 192.168.3.10"'' (server."local-data" or [ ])
     && builtins.elem
@@ -247,15 +248,15 @@ let
     access-vlan2 = [
       "ip saddr ${vlan2Dns.ipv4} ip daddr ${dnsResolver.ipv4} udp dport 53"
       "ip saddr ${vlan2Dns.ipv4} ip daddr ${dnsResolver.ipv4} tcp dport 53"
-      "ip6 saddr ${vlan2Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} udp dport 53"
-      "ip6 saddr ${vlan2Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} tcp dport 53"
+      "ip6 saddr ${vlan2Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} udp dport 53"
+      "ip6 saddr ${vlan2Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} tcp dport 53"
     ];
 
     access-vlan7 = [
       "ip saddr ${vlan7Dns.ipv4} ip daddr ${dnsResolver.ipv4} udp dport 53"
       "ip saddr ${vlan7Dns.ipv4} ip daddr ${dnsResolver.ipv4} tcp dport 53"
-      "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} udp dport 53"
-      "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${dnsResolver.ipv6} tcp dport 53"
+      "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} udp dport 53"
+      "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} tcp dport 53"
     ];
   };
 
@@ -274,15 +275,17 @@ let
     (server.interface or [ ]) == [
       "127.0.0.1"
       "::1"
-      dnsResolver.ipv4
-      dnsResolver.ipv6
+      renderedDnsResolver.ipv4
+      renderedDnsResolver.ipv6
     ]
     && (server."access-control" or [ ]) == [
       "127.0.0.0/8 allow"
       "::1/128 allow"
       "${vlan2Dns.clientIpv4} allow"
-      "${vlan2Dns.clientIpv6} allow"
+      "${vlan2Dns.ipv4}/32 allow"
       "${vlan7Dns.ipv4}/32 allow"
+      "fd42:1:0:0:0:0:0:0/64 allow"
+      "${vlan2Dns.ipv6}/128 allow"
       "${vlan7Dns.ipv6}/128 allow"
     ]
     && !(server ? "outgoing-interface")
@@ -295,8 +298,8 @@ let
     builtins.all (fragment: lib.hasInfix fragment ruleset) [
       "ip daddr ${dnsResolver.ipv4} udp dport 53"
       "ip daddr ${dnsResolver.ipv4} tcp dport 53"
-      "ip6 daddr ${dnsResolver.ipv6} udp dport 53"
-      "ip6 daddr ${dnsResolver.ipv6} tcp dport 53"
+      "ip6 daddr ${renderedDnsResolver.ipv6} udp dport 53"
+      "ip6 daddr ${renderedDnsResolver.ipv6} tcp dport 53"
     ];
 
   desiredDnsIntent = prodSite.recursiveDnsIntent;
@@ -446,18 +449,40 @@ let
     && hasContainer "access-vlan3" "vlan3"
     && hasContainer "access-vlan7" "vlan7";
 
-  hasVlan3SecretReservation =
+  hasNativeProtectedReservations =
     let
-      postHooks = execStartPostList (
-        (keaGenServiceFor "access-vlan3" "vlan3").serviceConfig.ExecStartPost or null
-      );
+      hasContainer =
+        containerName: vlanName: secretName: sourceFile:
+        let
+          genService = keaGenServiceFor containerName vlanName;
+          execStart = toString (genService.serviceConfig.ExecStart or "");
+          postHooks = execStartPostList (genService.serviceConfig.ExecStartPost or null);
+          bindMounts = config.containers.${containerName}.bindMounts or { };
+        in
+        builtins.hasAttr secretName config.sops.secrets
+        && builtins.hasAttr sourceFile bindMounts
+        && lib.hasInfix "runtime-reservation-materializer.py" execStart
+        && lib.hasInfix "--source ${sourceFile}" execStart
+        && builtins.all
+          (hook: !(lib.hasInfix "apply-s-router-prod-${vlanName}-kea-reservation" (toString hook)))
+          postHooks;
     in
-    config.sops.secrets ? s-nebula-container-mac
-    && builtins.any
-      (hook: lib.hasInfix "apply-s-router-prod-vlan3-kea-reservation" (toString hook))
-      postHooks;
+    hasContainer
+      "access-vlan2"
+      "vlan2"
+      "s-router-prod-vlan2-reservations-json"
+      "/run/secrets/s-router-prod-vlan2-reservations.json"
+    && hasContainer
+      "access-vlan3"
+      "vlan3"
+      "s-router-prod-vlan3-reservations-json"
+      "/run/secrets/s-router-prod-vlan3-reservations.json";
 
   coreNftables = config.containers.core.config.networking.nftables.ruleset;
+  accessVlan2Nftables = config.containers.access-vlan2.config.networking.nftables.ruleset;
+  accessVlan3Nftables = config.containers.access-vlan3.config.networking.nftables.ruleset;
+  downstreamSelectorNftables =
+    config.containers.downstream-selector.config.networking.nftables.ruleset;
   policyNftables = config.containers.policy.config.networking.nftables.ruleset;
   upstreamSelectorNftables =
     config.containers.upstream-selector.config.networking.nftables.ruleset;
@@ -521,6 +546,109 @@ let
       && (route.Gateway or null) == gateway
       && (route.Table or null) == table)
       (config.containers.${containerName}.config.systemd.network.networks.${networkName}.routes or [ ]);
+
+  hasRoutingPolicyRule =
+    containerName: networkName: expected:
+    builtins.any
+      (rule:
+      builtins.all
+        (name: (rule.${name} or null) == expected.${name})
+        (builtins.attrNames expected))
+      (
+        config.containers.${containerName}.config.systemd.network.networks.${networkName}.routingPolicyRules or [ ]
+      );
+
+  hasVlan2InternetRoutes =
+    hasTableRoute "access-vlan2" "10-access-vlan2" "0.0.0.0/0" "10.10.0.1" 1002
+    && hasRoutingPolicyRule "access-vlan2" "10-access-vlan2" {
+      Family = "ipv4";
+      From = "192.168.1.0/24";
+      IncomingInterface = "lan2";
+      Priority = 1002;
+      Table = 1002;
+    }
+    && hasTableRoute "downstream-selector" "10-policy-vlan2" "0.0.0.0/0" "10.10.0.9" 1004
+    && hasRoutingPolicyRule "downstream-selector" "10-policy-vlan2" {
+      Family = "ipv4";
+      From = "192.168.1.0/24";
+      IncomingInterface = "access-vlan2";
+      Priority = 1004;
+      Table = 1004;
+    }
+    && hasTableRoute "policy" "10-upstream-vlan2" "0.0.0.0/0" "10.10.0.15" 1004
+    && hasRoutingPolicyRule "policy" "10-upstream-vlan2" {
+      Family = "ipv4";
+      From = "192.168.1.0/24";
+      IncomingInterface = "down-vlan2";
+      Priority = 1004;
+      Table = 1004;
+    }
+    && hasTableRoute "upstream-selector" "10-core" "0.0.0.0/0" "10.10.0.6" 1001
+    && hasRoutingPolicyRule "upstream-selector" "10-core" {
+      Family = "ipv4";
+      From = "192.168.1.0/24";
+      IncomingInterface = "policy-vlan2";
+      Priority = 1001;
+      Table = 1001;
+    }
+    && hasRoute "core" "10-ens3" "192.168.1.0/24" "10.10.0.7";
+
+  hasVlan2InternetFirewallAndNat =
+    builtins.all (fragment: lib.hasInfix fragment accessVlan2Nftables) [
+      ''iifname "lan2" oifname "access-vlan2" accept comment "selector-handoff-forward--access-vlan2--selector-transport-to-access-to-selector--fabric"''
+      ''iifname "access-vlan2" oifname "lan2" ct state established,related accept comment "selector-handoff-reverse--access-vlan2--access-to-selector-to-selector-transport--fabric"''
+    ]
+    && builtins.all (fragment: lib.hasInfix fragment downstreamSelectorNftables) [
+      ''iifname "access-vlan2" oifname "policy-vlan2" accept comment "selector-handoff-forward--access-vlan2--access-to-selector-to-selector-to-policy--fabric"''
+      ''iifname "policy-vlan2" oifname "access-vlan2" ct state established,related accept comment "selector-handoff-reverse--access-vlan2--selector-to-policy-to-access-to-selector--fabric"''
+    ]
+    && builtins.all (fragment: lib.hasInfix fragment policyNftables) [
+      ''iifname "down-vlan2" oifname "upstream-vlan2" accept comment "allow-vlan2-to-wan"''
+      ''iifname "upstream-vlan2" oifname "down-vlan2" ct state established,related accept comment "allow-vlan2-to-wan"''
+    ]
+    && builtins.all (fragment: lib.hasInfix fragment upstreamSelectorNftables) [
+      ''iifname "policy-vlan2" oifname "core" accept comment "selector-handoff-forward--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"''
+      ''iifname "core" oifname "policy-vlan2" ct state established,related accept comment "selector-handoff-reverse--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"''
+    ]
+    && hasStatelessRuleLine coreNftables [
+      ''iifname "ens3"''
+      ''oifname { "ppp0", "wan" }''
+      ''accept comment "selector-handoff-forward--no-access--selector-policy-uplink-to-selector-transport--wan"''
+    ]
+    && hasStatelessRuleLine coreNftables [
+      ''oifname { "ppp0", "wan" }''
+      "ip saddr {"
+      "192.168.1.0/24"
+      "masquerade"
+    ];
+
+  hasVlan2PppoeBootPath =
+    let
+      pppService = (servicesFor "core")."pppd-s88-pppoe-client-wan" or { };
+      starterService = (servicesFor "core")."s88-start-s88-pppoe-client-wan" or { };
+      starterTimer =
+        config.containers.core.config.systemd.timers."s88-start-s88-pppoe-client-wan" or { };
+      pppPreStart = pppService.preStart or "";
+      starterExec = toString (starterService.serviceConfig.ExecStart or "");
+    in
+    builtins.all (fragment: lib.hasInfix fragment pppPreStart) [
+      "nic-br-wan6"
+      "ifname ppp0"
+      "defaultroute"
+      "persist"
+      "maxfail 0"
+      "+ipv6"
+      "defaultroute6"
+      "mtu 1492"
+      "mru 1492"
+    ]
+    && (pppService.serviceConfig.Restart or null) == "always"
+    && (pppService.serviceConfig.RestartSec or null) == 5
+    && (starterService.wantedBy or [ ]) == [ "multi-user.target" ]
+    && lib.hasInfix "start pppd-s88-pppoe-client-wan.service" starterExec
+    && (starterTimer.wantedBy or [ ]) == [ "timers.target" ]
+    && (starterTimer.timerConfig.OnBootSec or null) == "10s"
+    && (starterTimer.timerConfig.Unit or null) == "s88-start-s88-pppoe-client-wan.service";
 
   hasCoreDnsRequesterRoutes =
     hasRoute "access-vlan2" "10-access-vlan2" "10.19.0.2/31" "10.10.0.1"
@@ -682,18 +810,28 @@ let
         && (route.Table or 254) == 254)
       (downstreamNetworks."10-access-vlan2".routes or [ ]);
 
-  hasTemporaryVlan2ManagementPolicySelector =
+  hasRendererNativeVlan2ManagementPolicySelector =
     builtins.any
       (rule:
         (rule.Family or null) == "ipv4"
         && (rule.From or null) == "192.168.1.0/24"
         && (rule.To or null) == "192.168.3.0/24"
         && (rule.IncomingInterface or null) == "access-vlan2"
-        && (rule.Priority or null) == 900
+        && (rule.Priority or null) == 1000
         && (rule.Table or null) == 1004)
       (
         config.containers.downstream-selector.config.systemd.network.networks."10-access-vlan2".routingPolicyRules or [ ]
       );
+
+  hasRendererNativeVlan2NebulaIcmp =
+    lib.hasInfix
+      ''iifname "policy-vlan3" oifname "access-vlan3" meta nfproto ipv4 ip protocol icmp accept comment "allow-vlan2-to-s-nebula-container-icmp"''
+      downstreamSelectorNftables
+    && lib.hasInfix
+      ''iifname "access-vlan3" oifname "lan3" ip saddr 192.168.1.0/24 meta nfproto ipv4 ip protocol icmp accept comment "allow-vlan2-to-s-nebula-container-icmp"''
+      accessVlan3Nftables
+    && !(lib.hasInfix "s-router-prod-vlan2-nebula-icmp" downstreamSelectorNftables)
+    && !(lib.hasInfix "s-router-prod-vlan2-nebula-icmp" accessVlan3Nftables);
 
   hasTemporaryVlan2HostManagement =
     let
@@ -736,7 +874,7 @@ in
       message = ''
         s-router-prod must not use the legacy global DHCP generator.
 
-        Host interface behavior must come from nixos/virtual-machine/nixos-shell-vm/s-router-prod/inventory.nix
+        Host interface behavior must come from prod-network/current/inventory.nix
         through the network-* render pipeline.
       '';
     }
@@ -781,20 +919,33 @@ in
         config.sops.secrets ? pppoe-username
         && config.sops.secrets ? pppoe-password
         && config.sops.secrets ? s-router-prod-vlan2-reservations-json
-        && config.sops.secrets ? s-nebula-container-mac;
+        && config.sops.secrets ? s-router-prod-vlan2-reservation-names-json
+        && config.sops.secrets ? s-router-prod-vlan3-reservations-json;
       message = ''
-        s-router-prod must keep PPPoE credentials, VLAN 2 reservations, and the
-        s-nebula-container MAC wired as runtime secrets, not rendered model data.
+        s-router-prod must keep PPPoE credentials and protected VLAN 2/VLAN 3
+        reservation sources wired as runtime secrets, not rendered model data.
       '';
     }
     {
       assertion =
         (config._module.args.sRouterProdModelSource.intentPath or null)
-        == "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/intent.nix"
+        == "${outPath}/prod-network/current/intent.nix"
         && (config._module.args.sRouterProdModelSource.inventoryPath or null)
-        == "${outPath}/nixos/virtual-machine/nixos-shell-vm/s-router-prod/inventory.nix";
+        == "${outPath}/prod-network/current/inventory.nix";
       message = ''
         s-router-prod must consume the production intent.nix and inventory.nix directly.
+      '';
+    }
+    {
+      assertion =
+        hasVlan2InternetRoutes
+        && hasVlan2InternetFirewallAndNat
+        && hasVlan2PppoeBootPath;
+      message = ''
+        s-router-prod VLAN 2 must retain its complete Internet path: source
+        selection and default routes through access, downstream, policy,
+        upstream, and core; stateful forwarding on every hop; masquerade of
+        192.168.1.0/24 to ppp0; and the boot-triggered persistent PPPoE client.
       '';
     }
     {
@@ -819,9 +970,8 @@ in
       message = ''
         s-router-prod must preserve the address-free access-dns -> core-dns
         target intent and materialize its temporary inventory projection with
-        native dual-stack source policy, routes, and firewall traversal. Only
-        the core recursive resolver compatibility override may remain while
-        recursiveDnsIntent documents the unfinished SMS row.
+        native dual-stack source policy, routes, firewall traversal, recursive
+        core resolver isolation, and no invented public core forwarders.
       '';
     }
     {
@@ -838,11 +988,11 @@ in
       '';
     }
     {
-      assertion = hasVlan3SecretReservation;
+      assertion = hasNativeProtectedReservations;
       message = ''
-        s-router-prod VLAN 3 must apply the s-nebula-container DHCP reservation
-        from a runtime MAC secret instead of rendering the MAC into inventory or
-        the Nix store.
+        s-router-prod VLAN 2 and VLAN 3 must materialize their protected runtime
+        reservation sets through the renderer-native source contract. No local
+        post-render Kea reservation rewrite may remain.
       '';
     }
     {
@@ -850,7 +1000,9 @@ in
       message = ''
         s-router-prod must publish VLAN 2 runtime reservation hostnames through
         an Unbound lan. local-zone without leaking the private hostname source
-        into inventory, flake eval output, or the Nix store.
+        into inventory, flake eval output, or the Nix store. The protected local
+        publisher must preserve intentional multi-address hostnames that the
+        native unique-name publication contract cannot represent.
       '';
     }
     {
@@ -892,16 +1044,17 @@ in
         hasStatefulVlan3Return
         && hasNoVlan2Vlan3MainTableOverride
         && hasRendererNativeVlan3Fallback
-        && hasTemporaryVlan2ManagementPolicySelector
+        && hasRendererNativeVlan2ManagementPolicySelector
+        && hasRendererNativeVlan2NebulaIcmp
         && hasTemporaryVlan2HostManagement;
       message = ''
         s-router-prod VLAN 3 to VLAN 2 traffic must remain limited to
         established/related return traffic. VLAN 2 management traffic to VLAN 3
-        must temporarily select the existing policy table before renderer-native
-        destination routing can bypass policy, and the s-router-prod lan2 host
-        bridge must acquire its management IPv4 address using DHCP without
-        replacing host DNS. Do not restore the old priority-900 main-table
-        return-path override.
+        must use the renderer-native priority-1000 policy selector and native
+        scoped ICMP handoffs, without the old local nftables additions. The
+        s-router-prod lan2 host bridge must still acquire its management IPv4
+        address using DHCP without replacing host DNS. Do not restore either
+        old priority-900 override.
       '';
     }
   ];

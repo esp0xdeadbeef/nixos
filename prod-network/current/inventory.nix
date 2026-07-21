@@ -130,6 +130,7 @@ let
     , poolEnd
     , router
     , leaseStatePath
+    , reservationSource ? null
     ,
     }:
     {
@@ -144,7 +145,14 @@ let
       dnsServers = [ router ];
       domain = "lan.";
       leaseState.path = leaseStatePath;
-    };
+    }
+    // (if reservationSource == null then { } else { inherit reservationSource; });
+
+  protectedReservationSource = sourceFile: {
+    schema = "gamp-protected-reservation-set-v1";
+    sourceClass = "protected";
+    inherit sourceFile;
+  };
 
   slaacRa = interface: {
     enabled = true;
@@ -413,6 +421,7 @@ let
             poolEnd = "192.168.1.200";
             router = "192.168.1.1";
             leaseStatePath = "/var/lib/kea/vlan2.leases";
+            reservationSource = protectedReservationSource "/run/secrets/s-router-prod-vlan2-reservations.json";
           };
         };
 
@@ -468,6 +477,7 @@ let
             poolEnd = "192.168.3.200";
             router = "192.168.3.1";
             leaseStatePath = "/var/lib/kea/vlan3.leases";
+            reservationSource = protectedReservationSource "/run/secrets/s-router-prod-vlan3-reservations.json";
           };
         };
 
