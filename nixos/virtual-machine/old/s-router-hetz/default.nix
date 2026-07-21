@@ -53,7 +53,7 @@ in
       inherit inputs lib labSource system;
       inherit hostName;
 
-      selectorFile = "nixos/virtual-machine/nixos-anywhere/s-router-hetz/default.nix";
+      selectorFile = "nixos/virtual-machine/old/s-router-hetz/default.nix";
     })
   ];
 }
