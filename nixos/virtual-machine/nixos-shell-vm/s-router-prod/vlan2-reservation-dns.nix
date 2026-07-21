@@ -1,6 +1,10 @@
-{ lib, ... }:
+{ lib, outPath, ... }:
 
 let
+  prodInventory = import "${outPath}/prod-network/current/inventory.nix";
+  vlan3AuthorityRecords =
+    prodInventory.realization.nodes."esp0xdeadbeef-site-a-access-vlan3".services.dns.localRecords;
+  vlan3AuthorityNames = map (record: record.name) vlan3AuthorityRecords;
   runtimeReservationNamesFile = "/run/secrets/s-router-prod-vlan2-reservation-names.json";
   runtimeUnboundLocalFile = "/run/unbound/s-router-prod-vlan2-local.conf";
 in
@@ -28,7 +32,9 @@ in
         mkdir -p "$(${pkgs.coreutils}/bin/dirname "$out")"
         tmp="$(${pkgs.coreutils}/bin/mktemp "$out.XXXXXX")"
 
-        ${pkgs.jq}/bin/jq -r '
+        ${pkgs.jq}/bin/jq \
+          --argjson vlan3AuthorityNames ${lib.escapeShellArg (builtins.toJSON vlan3AuthorityNames)} \
+          -r '
           def safe_hostname:
             type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_-]*$");
 
@@ -49,7 +55,15 @@ in
           | sort_by(.hostname, .address)
           | .[]
           | . as $record
-          | "local-data: \"" + $record.hostname + ".lan. A " + $record.address + "\"",
+          # Provider-owned forward records must reach their authoritative
+          # resolver. Preserve the reservation PTR, but do not let a VLAN 2 A
+          # record shadow the exact peer forward-zone.
+          | (
+              if ($vlan3AuthorityNames | index($record.hostname + ".lan.")) == null
+              then "local-data: \"" + $record.hostname + ".lan. A " + $record.address + "\""
+              else empty
+              end
+            ),
             "local-data-ptr: \"" + $record.address + " " + $record.hostname + ".lan.\""
         ' "$secret" > "$tmp"
 

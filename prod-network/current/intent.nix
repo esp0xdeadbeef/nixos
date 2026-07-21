@@ -221,6 +221,24 @@ in
       ];
       relations = [
         {
+          # VLAN 2's resolver asks VLAN 3's resolver only for VLAN 3-owned
+          # local data. The provider ACL remains refuse_non_local, so this
+          # relation cannot expose VLAN 3 recursion or transitive egress.
+          id = "allow-vlan2-dns-to-vlan3-dns";
+          priority = 78;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "service";
+            name = "vlan3-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-vlan2-to-vlan2-dns";
           priority = 80;
           from = {
@@ -600,7 +618,9 @@ in
 
     # Desired local namespace-sharing contract. The active relation above
     # materializes the access-to-access route and firewall path; the pinned SMS
-    # schema cannot yet express per-zone forwarding or non-recursive ACL actions.
+    # schema models only one requester/authority pair. VLAN 3 therefore queries
+    # VLAN 2 for the shared lan. namespace here, while a temporary NixOS override
+    # expresses the reverse, exact-name VLAN 2 -> VLAN 3 authority lookup.
     localDnsSharingIntent = {
       namespace = "lan.";
       authority = {

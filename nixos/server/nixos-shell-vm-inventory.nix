@@ -7,6 +7,13 @@
 , ...
 }:
 let
+  prodInventory = import "${self.outPath}/prod-network/current/inventory.nix";
+  prodVlan3DnsRecords =
+    prodInventory.realization.nodes."esp0xdeadbeef-site-a-access-vlan3".services.dns.localRecords;
+  prodVlan3DnsRecord = builtins.head prodVlan3DnsRecords;
+  prodVlan3DnsName = lib.removeSuffix "." prodVlan3DnsRecord.name;
+  prodVlan3DnsIpv4 = builtins.head prodVlan3DnsRecord.a;
+
   guestAgentHealth =
     inputs.nixos-shell-vm-manager.packages.${pkgs.stdenv.hostPlatform.system}."qga-systemd-health";
 
@@ -127,6 +134,14 @@ let
       >"/etc/netns/$namespace/resolv.conf"
 
     "$ip" netns exec "$namespace" "$bash" -c '
+      vlan3_dns_seen=false
+      while read -r address _; do
+        [[ "$address" == ${prodVlan3DnsIpv4} ]] || exit 1
+        vlan3_dns_seen=true
+      done < <(
+        /run/current-system/sw/bin/getent ahostsv4 ${prodVlan3DnsName}
+      )
+      [[ "$vlan3_dns_seen" == true ]]
       exec 3<>/dev/tcp/example.com/80 2>/dev/null || exit 1
       printf "HEAD / HTTP/1.0\r\nHost: example.com\r\nConnection: close\r\n\r\n" >&3
       IFS= read -r -t 10 status <&3 || exit 1

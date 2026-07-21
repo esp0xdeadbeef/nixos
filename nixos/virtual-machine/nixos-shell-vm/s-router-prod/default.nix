@@ -23,6 +23,7 @@ in
   warnings = map (reason: "s-router-prod compatibility override: ${reason}") [
     "QEMU NICs override the generic VM definition to preserve the production vmbr4/vmbr1 handoff and both legacy MAC addresses"
     "TEMPORARY NETWORK-RENDERER PROTECTED NAME-PUBLICATION OVERRIDE (vlan2-reservation-dns.nix): the native reservation name-publication contract rejects intentional multi-address hostnames; remove this file when network-* accepts that cardinality and renders protected runtime A/PTR data without exposing names through evaluation or the Nix store"
+    "TEMPORARY NETWORK-* VLAN 3 DNS AUTHORITY OVERRIDE (vlan3-dns-authority-override.nix plus vlan2-reservation-dns.nix filtering): VLAN 2 must query VLAN 3 Unbound for VLAN 3-owned names instead of duplicating their A/AAAA records locally; the protected VLAN 2 publisher must suppress those A records while retaining DHCP and PTR data. Remove both pieces when network-* supports multiple directional, relation-bound local namespace authorities, derives local publication from modeled provider endpoints, and prevents requester-side reservation publication from shadowing the authority"
     "TEMPORARY NETWORK-RENDERER HOST MANAGEMENT OVERRIDE (vlan2-management-override.nix): VLAN 2 host management DHCPv4 remains local because hostManagement is not yet materialized by the pinned network-* stack; remove this file when network-* renders host DHCPv4 with UseDNS=false, while retaining the renderer-native VLAN 2 to VLAN 3 policy and ICMP path"
     "TEMPORARY NETWORK-RENDERER CORE DNS PATH OVERRIDE (dns-core-path-route-override.nix): the rendered policy tables copy equal-prefix core service routes across VLAN 2, VLAN 3, and VLAN 7, so DNS can leave through the wrong tenant lane and be dropped; remove this file when the network-* service-route closure keeps core DNS on each requester's relation-bound upstream lane"
     "TEMPORARY NETWORK-RENDERER IPv6 PATH-MTU OVERRIDE (vlan2-ipv6-path-mtu-override.nix): VLAN 2 advertises the core PPPoE MTU of 1492 because network-renderer-nixos does not yet propagate uplink path MTU into access router advertisements; remove this file when the rendered RA owns AdvLinkMTU, while retaining the renderer-native inet-family TCP MSS clamp"
@@ -36,6 +37,7 @@ in
     ./dns-core-path-route-override.nix
     ./vlan2-ipv6-path-mtu-override.nix
     ./vlan2-reservation-dns.nix
+    ./vlan3-dns-authority-override.nix
     ./vlan2-management-override.nix
     ./legacy-parity-contract.nix
 

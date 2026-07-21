@@ -401,13 +401,10 @@ let
             dnsRuntime.requesters.access-vlan2.ipv4
             dnsRuntime.requesters.access-vlan2.ipv6
           ];
-          localRecords = [
-            {
-              name = "s-nebula-container.lan.";
-              a = [ sNebulaContainerAddress ];
-              aaaa = [ sNebulaContainerAddress6 ];
-            }
-          ];
+          # VLAN 3 owns the Nebula endpoint and publishes its local DNS data.
+          # VLAN 2 reaches that authority through the temporary exact-name
+          # forwarding compatibility module instead of duplicating the record.
+          localRecords = [ ];
         };
       };
 
@@ -460,6 +457,9 @@ let
             ]
             [
               {
+                # This is the single authority copy. Do not duplicate it into
+                # VLAN 2; network-* must eventually derive this publication
+                # from the modeled endpoint itself.
                 name = "s-nebula-container.lan.";
                 a = [ sNebulaContainerAddress ];
                 aaaa = [ sNebulaContainerAddress6 ];

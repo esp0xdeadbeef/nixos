@@ -3,7 +3,11 @@
 let
   dnsRuntime = import "${outPath}/prod-network/current/dns-runtime-addresses.nix";
   prodIntent = import "${outPath}/prod-network/current/intent.nix";
+  prodInventory = import "${outPath}/prod-network/current/inventory.nix";
   prodSite = prodIntent.esp0xdeadbeef.site-a;
+  vlan3AuthorityRecords =
+    prodInventory.realization.nodes."esp0xdeadbeef-site-a-access-vlan3".services.dns.localRecords;
+  vlan3AuthorityNames = map (record: record.name) vlan3AuthorityRecords;
   dnsResolver = dnsRuntime.resolver;
   renderedDnsResolver = dnsResolver // {
     ipv6 = "fd42:dead:beef:1000:0:0:0:6";
@@ -139,7 +143,13 @@ let
       settings = config.containers.${containerName}.config.services.unbound.settings or { };
       forwardZones = settings."forward-zone" or [ ];
     in
-    lib.unique (lib.flatten (map (zone: zone."forward-addr" or [ ]) forwardZones));
+    lib.unique (
+      lib.flatten (
+        map (zone: zone."forward-addr" or [ ]) (
+          builtins.filter (zone: (zone.name or null) == ".") forwardZones
+        )
+      )
+    );
 
   unboundForwardZonesFor =
     containerName:
@@ -152,14 +162,33 @@ let
   hasVlan2RuntimeLocalDns =
     let
       server = unboundServerFor "access-vlan2";
+      forwardZones = unboundForwardZonesFor "access-vlan2";
+      zoneByName = builtins.listToAttrs (
+        map
+          (zone: {
+            name = zone.name;
+            value = zone;
+          })
+          forwardZones
+      );
+      localData = server."local-data" or [ ];
     in
-    builtins.elem "lan. static" (server.local-zone or [ ])
+    vlan3AuthorityNames != [ ]
+    && builtins.elem "lan. static" (server.local-zone or [ ])
     && builtins.elem "1.168.192.in-addr.arpa. static" (server.local-zone or [ ])
+    && builtins.all
+      (name: builtins.elem "${name} transparent" (server.local-zone or [ ]))
+      vlan3AuthorityNames
     && builtins.elem "/run/unbound/s-router-prod-vlan2-local.conf" (server.include or [ ])
-    && builtins.elem ''"s-nebula-container.lan. IN A 192.168.3.10"'' (server."local-data" or [ ])
-    && builtins.elem
-      ''"s-nebula-container.lan. IN AAAA fd42:dead:beef:3::1337:dead:beef"''
-      (server."local-data" or [ ])
+    && builtins.all
+      (name:
+        !(builtins.any (record: lib.hasInfix name record) localData)
+        && (zoneByName.${name}."forward-addr" or [ ]) == [
+          vlan3Dns.ipv4
+          vlan3Dns.ipv6
+        ]
+        && (zoneByName.${name}."forward-first" or true) == false)
+      vlan3AuthorityNames
     && builtins.hasAttr "gen-s-router-prod-vlan2-reservation-dns"
       config.containers.access-vlan2.config.systemd.services;
 
@@ -386,9 +415,25 @@ let
   hasLocalDnsSharingIntent =
     let
       activeRelation = activeDnsRelationsById.allow-vlan3-dns-to-vlan2-dns;
+      vlan2RequesterRelation = activeDnsRelationsById.allow-vlan2-dns-to-vlan3-dns;
       desiredRelation = desiredLocalDnsIntent.relation;
     in
-    activeRelation.priority < activeDnsRelationsById.deny-vlan3-to-vlan2.priority
+    vlan2RequesterRelation == {
+      id = "allow-vlan2-dns-to-vlan3-dns";
+      priority = 78;
+      from = {
+        kind = "service";
+        name = "vlan2-dns";
+      };
+      to = {
+        kind = "service";
+        name = "vlan3-dns";
+      };
+      trafficType = "dns";
+      action = "allow";
+      returnBehavior = "symmetric";
+    }
+    && activeRelation.priority < activeDnsRelationsById.deny-vlan3-to-vlan2.priority
     && activeRelation.from == desiredRelation.from
     && activeRelation.to == desiredRelation.to
     && activeRelation.trafficType == "dns"
@@ -805,6 +850,74 @@ let
     ]
     && lib.hasInfix "type filter hook output priority filter; policy accept;" accessVlan3Rules;
 
+  hasVlan2ToVlan3DnsPath =
+    let
+      downstreamRules = dnsNftSurfaceFor "downstream-selector";
+      policyRules = dnsNftSurfaceFor "policy";
+      accessVlan3Input = dnsNftSurfaceFor "access-vlan3";
+    in
+    hasSourcePolicyRule "access-vlan2" "10-access-vlan2" "ipv4" "${vlan2Dns.ipv4}/32"
+    && hasSourcePolicyRule "access-vlan2" "10-access-vlan2" "ipv6" "${vlan2Dns.ipv6}/128"
+    && hasTableRoute "access-vlan2" "10-access-vlan2" "0.0.0.0/0" "10.10.0.1" 1002
+    && hasTableRoute
+      "access-vlan2"
+      "10-access-vlan2"
+      "::/0"
+      "fd42:dead:beef:1000:0:0:0:1"
+      1002
+    && builtins.all
+      (spec:
+        hasStatelessRuleLine policyRules [
+          ''iifname "down-vlan2"''
+          ''oifname "down-vlan3"''
+          "${spec.family} saddr ${spec.source}"
+          "meta l4proto ${spec.protocol}"
+          "${spec.protocol} dport { 53 }"
+          ''accept comment "allow-vlan2-dns-to-vlan3-dns"''
+        ])
+      [
+        {
+          family = "ip";
+          source = vlan2Dns.ipv4;
+          protocol = "udp";
+        }
+        {
+          family = "ip";
+          source = vlan2Dns.ipv4;
+          protocol = "tcp";
+        }
+        {
+          family = "ip6";
+          source = vlan2Dns.ipv6;
+          protocol = "udp";
+        }
+        {
+          family = "ip6";
+          source = vlan2Dns.ipv6;
+          protocol = "tcp";
+        }
+      ]
+    && builtins.all
+      (protocol:
+        hasStatelessRuleLine downstreamRules [
+          ''iifname "policy-vlan3"''
+          ''oifname "access-vlan3"''
+          "meta l4proto ${protocol}"
+          "${protocol} dport { 53 }"
+          ''accept comment "allow-vlan2-dns-to-vlan3-dns"''
+        ])
+      [
+        "udp"
+        "tcp"
+      ]
+    && builtins.all (fragment: lib.hasInfix fragment accessVlan3Input) [
+      "ip daddr ${vlan3Dns.ipv4} udp dport 53"
+      "ip daddr ${vlan3Dns.ipv4} tcp dport 53"
+      "ip6 daddr ${vlan3Dns.ipv6} udp dport 53"
+      "ip6 daddr ${vlan3Dns.ipv6} tcp dport 53"
+    ]
+    && lib.hasInfix "ct state established,related accept" policyRules;
+
   hasRendererNativeNebulaRoutes =
     hasRoute "core" "10-ens3" "192.168.3.10/32" "10.10.0.7"
     && hasRoute "upstream-selector" "10-policy-vlan3" "192.168.3.10/32" "10.10.0.16"
@@ -1024,12 +1137,15 @@ in
         hasLocalDnsSharingIntent
         && hasVlan3LocalSharingDns
         && hasVlan2LocalOnlyPeerAcl
-        && hasVlan3ToVlan2DnsPath;
+        && hasVlan3ToVlan2DnsPath
+        && hasVlan2ToVlan3DnsPath;
       message = ''
         s-router-prod VLAN 3 DNS must resolve its own local data and VLAN 2's
         Kea-backed lan. data over the renderer-native access-to-access path.
-        Every other namespace must terminate locally, while VLAN 2 must apply
-        refuse_non_local to VLAN 3 so the peer can never borrow recursion.
+        VLAN 2 DNS must query VLAN 3 for VLAN 3-owned local data instead of
+        duplicating it. Every other namespace must terminate locally, and both
+        peer directions must apply refuse_non_local so neither can borrow the
+        other's recursion.
       '';
     }
     {
@@ -1045,9 +1161,11 @@ in
       message = ''
         s-router-prod must publish VLAN 2 runtime reservation hostnames through
         an Unbound lan. local-zone without leaking the private hostname source
-        into inventory, flake eval output, or the Nix store. The protected local
-        publisher must preserve intentional multi-address hostnames that the
-        native unique-name publication contract cannot represent.
+        into inventory, flake eval output, or the Nix store. VLAN 3-owned names
+        must not be duplicated there: the exact protected namespace must be
+        forwarded to VLAN 3 Unbound without recursive fallback. The protected
+        local publisher must preserve intentional multi-address hostnames that
+        the native unique-name publication contract cannot represent.
       '';
     }
     {
