@@ -1,6 +1,6 @@
-{ outPath, ... }:
+{ relativeRepo, ... }:
 {
   imports = [
-    "${outPath}/library/03-window-manager-sway/default.nix"
+    (relativeRepo.module "library/03-window-manager-sway/default.nix")
   ];
 }

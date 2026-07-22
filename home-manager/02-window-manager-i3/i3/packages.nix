@@ -1,5 +1,5 @@
 { config
-, outPath
+, relativeRepo
 , pkgs
 , ...
 }:
@@ -14,7 +14,7 @@ let
 in
 {
   imports = [
-    "${outPath}/profiles/home-manager/desktop/window-manager.nix"
+    (relativeRepo.module "profiles/home-manager/desktop/window-manager.nix")
   ];
 
   config = {

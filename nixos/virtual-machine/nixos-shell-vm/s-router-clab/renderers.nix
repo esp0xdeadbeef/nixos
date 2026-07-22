@@ -50,7 +50,10 @@ let
           "cpm-${rendererInput.hostName}.json"
           (builtins.toJSON rendererInput.cpm);
       _module.args.clabRendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath;
-      _module.args.containerlabLinuxRendererSelf = inputs.network-renderer-containerlab-linux-backend.outPath;
+      _module.args.containerlabLinuxRendererSelf = builtins.path {
+        path = inputs.network-renderer-containerlab-linux-backend;
+        name = "network-renderer-containerlab-linux-backend";
+      };
       _module.args.containerlabLinuxGenerateClabConfig =
         inputs.network-renderer-containerlab-linux-backend.packages.${pkgs.stdenv.hostPlatform.system}.generate-clab-config;
       _module.args.containerlabLinuxRendererInput =

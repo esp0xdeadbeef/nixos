@@ -1,4 +1,4 @@
-{ config, lib, mailboxSets ? null, outPath, profiles, ... }:
+{ config, lib, mailboxSets ? null, profiles, relativeRepo, ... }:
 
 let
   hasMultipleMailboxSets =
@@ -12,7 +12,7 @@ in
 
   profiles.mail.server = {
     enable = true;
-    sopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
+    sopsFile = relativeRepo.sourcePath "secrets/s-gamma-runtime.yaml";
     sharedNamespacePrefix = "s";
     sharedNamespaceIncludeDomain = hasMultipleMailboxSets;
     sharedExplicitInbox = true;

@@ -1,7 +1,7 @@
-{ lib, outPath, ... }:
+{ lib, relativeRepo, ... }:
 
 let
-  dns = import "${outPath}/prod-network/legacy/dns-runtime-addresses.nix";
+  dns = import (relativeRepo.module "prod-network/legacy/dns-runtime-addresses.nix");
   vlan2 = dns.requesters.access-vlan2;
   vlan3 = dns.requesters.access-vlan3;
 in

@@ -1,6 +1,6 @@
-{ outPath, pkgs, ... }:
+{ pkgs, relativeRepo, ... }:
 let
-  dns = import "${outPath}/prod-network/current/dns-runtime-addresses.nix";
+  dns = import (relativeRepo.module "prod-network/current/dns-runtime-addresses.nix");
   ip = "${pkgs.iproute2}/bin/ip";
 in
 {

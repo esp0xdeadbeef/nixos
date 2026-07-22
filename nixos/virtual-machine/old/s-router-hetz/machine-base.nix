@@ -1,19 +1,19 @@
 { lib
-, outPath
+, relativeRepo
 , pkgs
 , hostName
 , installDisk
 , ...
 }:
 let
-  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
+  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
 in
 {
   networking.hostName = lib.mkForce hostName;
 
   imports = [
-    "${outPath}/profiles/nixos/base/common.nix"
-    "${outPath}/profiles/nixos/nixpkgs/allow-unfree.nix"
+    (relativeRepo.module "profiles/nixos/base/common.nix")
+    (relativeRepo.module "profiles/nixos/nixpkgs/allow-unfree.nix")
   ];
 
   fileSystems."/boot".neededForBoot = true;

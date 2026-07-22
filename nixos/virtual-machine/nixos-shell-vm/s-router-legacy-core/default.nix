@@ -1,9 +1,8 @@
-{
-  outPath,
-  lib,
-  config,
-  vmRoot,
-  ...
+{ relativeRepo
+, lib
+, config
+, vmRoot
+, ...
 }:
 let
   vmRoot =

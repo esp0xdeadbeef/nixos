@@ -1,7 +1,7 @@
-{ lib, outPath, ... }:
+{ lib, relativeRepo, ... }:
 
 let
-  prodInventory = import "${outPath}/prod-network/current/inventory.nix";
+  prodInventory = import (relativeRepo.module "prod-network/current/inventory.nix");
   vlan3AuthorityRecords =
     prodInventory.realization.nodes."esp0xdeadbeef-site-a-access-vlan3".services.dns.localRecords;
   vlan3AuthorityNames = map (record: record.name) vlan3AuthorityRecords;

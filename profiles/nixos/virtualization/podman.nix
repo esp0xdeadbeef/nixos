@@ -1,6 +1,6 @@
-{ outPath, ... }:
+{ relativeRepo, ... }:
 {
   imports = [
-    "${outPath}/library/01-general/virtualization-as-host/podman.nix"
+    (relativeRepo.module "library/01-general/virtualization-as-host/podman.nix")
   ];
 }

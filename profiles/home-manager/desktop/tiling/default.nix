@@ -1,4 +1,4 @@
-{ outPath, pkgs, ... }:
+{ pkgs, ... }:
 {
   imports = [
     ./options.nix

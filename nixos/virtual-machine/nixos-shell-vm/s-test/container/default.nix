@@ -1,10 +1,9 @@
-{
-  config,
-  pkgs,
-  lib,
-  vmRoot,
-  outPath,
-  ...
+{ config
+, pkgs
+, lib
+, vmRoot
+, relativeRepo
+, ...
 }:
 {
   containers."${config.networking.hostName}-container" = {
@@ -37,13 +36,13 @@
       isReadOnly = false;
     };
     specialArgs = {
-      inherit outPath;
+      inherit relativeRepo;
       # you can also pass inputs/self/outputs/etc if you want
       # inherit inputs self outputs;
     };
 
     config =
-      { outPath, ... }:
+      { ... }:
       {
         imports = [
           ./container-default.nix

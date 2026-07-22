@@ -1,6 +1,6 @@
 { inputs
 , lib
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
@@ -16,7 +16,7 @@ in
   networking.hostName = lib.mkForce "s-router-clab";
 
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     profiles.nixos.network.router-vlan2-runtime-contract
 
     (import ./renderers.nix {

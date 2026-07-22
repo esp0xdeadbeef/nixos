@@ -2,13 +2,13 @@
 , lib
 , config
 , name
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
 
 let
-  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
+  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
 in
 {
   imports = [
@@ -17,9 +17,9 @@ in
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.nixpkgs.local-overlays
 
-    "${outPath}/library/10-vms/default.nix"
-    "${outPath}/library/01-general/desktop/shell-env.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
+    (relativeRepo.module "library/10-vms/default.nix")
+    (relativeRepo.module "library/01-general/desktop/shell-env.nix")
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix")
   ];
 
   networking.hostName = name;

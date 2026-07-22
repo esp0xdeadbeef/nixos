@@ -1,19 +1,18 @@
-{
-  outPath,
-  lib,
-  pkgs,
-  ...
+{ relativeRepo
+, lib
+, pkgs
+, ...
 }:
 
 let
-  mkMgmt = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-management-networkd.nix" {
+  mkMgmt = import (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/mk-management-networkd.nix") {
     inherit lib pkgs;
   };
-  mkBridge = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix" {
+  mkBridge = import (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix") {
     inherit lib pkgs;
   };
   mkBridgeTrunk =
-    import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-trunk-networkd.nix"
+    import (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-trunk-networkd.nix")
       {
         inherit lib pkgs;
       };

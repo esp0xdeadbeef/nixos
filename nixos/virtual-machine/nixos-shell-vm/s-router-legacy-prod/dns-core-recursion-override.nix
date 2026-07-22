@@ -1,7 +1,7 @@
-{ lib, outPath, ... }:
+{ lib, relativeRepo, ... }:
 
 let
-  dns = import "${outPath}/prod-network/legacy/dns-runtime-addresses.nix";
+  dns = import (relativeRepo.module "prod-network/legacy/dns-runtime-addresses.nix");
 in
 {
   # TEMPORARY FS-540 SMS OVERRIDE:

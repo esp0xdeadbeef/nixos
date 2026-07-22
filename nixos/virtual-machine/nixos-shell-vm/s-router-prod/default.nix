@@ -1,12 +1,12 @@
 { inputs
 , lib
-, outPath
+, relativeRepo
 , ...
 }:
 let
   hostName = "s-router-prod";
   system = "x86_64-linux";
-  modelSource = "${outPath}/prod-network/current";
+  modelSource = relativeRepo.sourcePath "prod-network/current";
   qemuNetworkingOptions = [
     "-nic none"
     "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
@@ -31,7 +31,7 @@ in
   ];
 
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     "${modelSource}/runtime-secrets.nix"
     ./ipv6.nix
     ./dns-core-path-route-override.nix

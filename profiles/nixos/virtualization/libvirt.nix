@@ -1,7 +1,7 @@
-{ outPath, ... }:
+{ relativeRepo, ... }:
 {
   imports = [
-    "${outPath}/library/01-general/virtualization-as-host/libvirt.nix"
+    (relativeRepo.module "library/01-general/virtualization-as-host/libvirt.nix")
   ];
 
   programs.virt-manager.enable = true;

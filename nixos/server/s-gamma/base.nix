@@ -1,4 +1,4 @@
-{ lib, name, outPath, profiles, ... }:
+{ lib, name, profiles, relativeRepo, ... }:
 
 {
   imports = [
@@ -7,7 +7,7 @@
     profiles.nixos.nixpkgs.allow-unfree
     profiles.nixos.shell.zsh-prompt
 
-    "${outPath}/modules/nixos/local-users.nix"
+    (relativeRepo.module "modules/nixos/local-users.nix")
   ];
 
   networking.hostName = lib.mkForce name;

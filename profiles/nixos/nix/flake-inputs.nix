@@ -4,7 +4,7 @@
 , ...
 }:
 let
-  flakeInputs = lib.filterAttrs (_: lib.isType "flake") inputs;
+  flakeInputs = lib.filterAttrs (inputName: input: inputName != "self" && lib.isType "flake" input) inputs;
 in
 {
   nix = {

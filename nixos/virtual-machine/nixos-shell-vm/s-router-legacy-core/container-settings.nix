@@ -1,9 +1,8 @@
-{
-  config,
-  outPath,
-  pkgs,
-  lib,
-  ...
+{ config
+, relativeRepo
+, pkgs
+, lib
+, ...
 }:
 
 let
@@ -47,7 +46,7 @@ in
       }
     ];
     specialArgs = {
-      inherit outPath;
+      inherit relativeRepo;
     };
 
     bindMounts = {

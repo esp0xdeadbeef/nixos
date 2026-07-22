@@ -6727,11 +6727,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784591870,
-        "narHash": "sha256-lI7y532YD+BSRoqxZeLv16ptV24TBqLm0Ta2o73uVcA=",
+        "lastModified": 1784680364,
+        "narHash": "sha256-kZPdgOMv3z9r6eS6qmW4HYJqzNsHvWN8fwyu4KDAo40=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-shell-vm-manager",
-        "rev": "6d87c5e1cdcdc174ba1190d3e0bc4fae7c372440",
+        "rev": "95723425b95b3b4996b8f76726b0c3ed21957e5d",
         "type": "github"
       },
       "original": {
@@ -8617,6 +8617,22 @@
         "type": "github"
       }
     },
+    "pin-refresh-source": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784672618,
+        "narHash": "sha256-qSq6+Xh36WLU9ENN8dH7islfkM7M1pCQyMytZ/aMu0k=",
+        "owner": "esp0xdeadbeef",
+        "repo": "nixos",
+        "rev": "220bb64000135fc05036558afc219d259ef21186",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esp0xdeadbeef",
+        "repo": "nixos",
+        "type": "github"
+      }
+    },
     "pre-commit": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -8676,6 +8692,7 @@
         "nixpkgs": "nixpkgs_34",
         "nixpkgs-stable": "nixpkgs-stable",
         "nixpkgs-unstable": "nixpkgs-unstable",
+        "pin-refresh-source": "pin-refresh-source",
         "sops-nix": "sops-nix"
       }
     },

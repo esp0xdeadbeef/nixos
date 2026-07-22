@@ -1,8 +1,7 @@
-{
-  outPath,
-  lib,
-  config,
-  ...
+{ relativeRepo
+, lib
+, config
+, ...
 }:
 let
   vmRoot =
@@ -15,7 +14,7 @@ in
   _module.args.vmRoot = vmRoot;
 
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config"
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config")
     ./overwrites.nix
     ./container-settings.nix
   ];

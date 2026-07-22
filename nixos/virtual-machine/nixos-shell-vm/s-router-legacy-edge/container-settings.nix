@@ -1,10 +1,9 @@
-{
-  config,
-  pkgs,
-  lib,
-  vmRoot,
-  outPath,
-  ...
+{ config
+, pkgs
+, lib
+, vmRoot
+, relativeRepo
+, ...
 }:
 {
   containers."${config.networking.hostName}-container" = {
@@ -34,11 +33,11 @@
     };
 
     specialArgs = {
-      inherit outPath;
+      inherit relativeRepo;
     };
 
     config =
-      { outPath, ... }:
+      { ... }:
       {
         imports = [
           ./container
@@ -55,7 +54,7 @@
   };
   sops.secrets.subnet-ipv6 = { };
   sops.secrets.vlan2-hostnames-servers-json = {
-    sopsFile = "${outPath}/secrets/vlan2-hostnames-servers.json.age";
+    sopsFile = relativeRepo.sourcePath "secrets/vlan2-hostnames-servers.json.age";
     format = "binary";
     path = "/run/secrets/vlan2-hostnames-servers.json";
   };

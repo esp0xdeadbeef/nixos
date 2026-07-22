@@ -1,6 +1,6 @@
 { inputs
 , name
-, outPath
+, relativeRepo
 , pkgs
 , profiles
 , ...
@@ -35,7 +35,7 @@
 
   security.pam.services.login.enableGnomeKeyring = true;
 
-  sops.defaultSopsFile = "${outPath}/secrets/${name}-default.yaml";
+  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${name}-default.yaml";
 
   local.workstation.android.enable = true;
 

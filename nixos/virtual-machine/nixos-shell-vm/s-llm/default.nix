@@ -1,4 +1,4 @@
-{ outPath
+{ relativeRepo
 , lib
 , config
 , inputs
@@ -14,7 +14,7 @@ in
 
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
-    "${outPath}/library/10-vms/nixos-shell-vm/l-envil-host-config-nixos-shell-vm"
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/l-envil-host-config-nixos-shell-vm")
     inputs.nixos-shell.nixosModules.nixos-shell
     ./gnome.nix
 

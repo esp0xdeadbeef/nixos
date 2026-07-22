@@ -3,7 +3,7 @@
 , lib
 , config
 , pkgs
-, outPath
+, relativeRepo
 , profiles
 , primaryUser
 , primaryUserHome
@@ -39,7 +39,7 @@ in
   # programs.zen-browser.enable = true;
 
   sops = {
-    defaultSopsFile = "${outPath}/secrets/l-esp-default-${primaryUser}.yaml";
+    defaultSopsFile = relativeRepo.sourcePath "secrets/l-esp-default-${primaryUser}.yaml";
     age = {
       sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
       generateKey = true;

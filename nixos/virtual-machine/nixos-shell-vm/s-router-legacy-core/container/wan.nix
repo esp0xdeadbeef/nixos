@@ -1,12 +1,11 @@
-{
-  outPath,
-  lib,
-  pkgs,
-  ...
+{ relativeRepo
+, lib
+, pkgs
+, ...
 }:
 
 let
-  mkBridge = import "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix" {
+  mkBridge = import (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/mk-bridge-networkd.nix") {
     inherit lib pkgs;
   };
 

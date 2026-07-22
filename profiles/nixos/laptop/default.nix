@@ -1,4 +1,4 @@
-{ outPath
+{ relativeRepo
 , profiles
 , ...
 }:
@@ -10,7 +10,7 @@
     profiles.nixos.laptop.power
     profiles.nixos.laptop.xlayoutdisplay-hotplug
     profiles.nixos.llm-clients.agents
-    "${outPath}/library/01-general/packages/password-managers/1password.nix"
+    (relativeRepo.module "library/01-general/packages/password-managers/1password.nix")
   ];
 
   local.shell.zshPrompt = {

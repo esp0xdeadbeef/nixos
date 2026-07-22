@@ -4,7 +4,7 @@
 , config
 , pkgs
 , name
-, outPath
+, relativeRepo
 , modulesPath
 , profiles
 , ...
@@ -12,7 +12,7 @@
 
 let
   codexUser = "deadbeef";
-  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
+  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
 in
 {
   imports = [
@@ -23,8 +23,8 @@ in
     inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops
 
-    "${outPath}/library/01-general/system/garbage-collection.nix"
-    "${outPath}/library/01-general/system/autoupdate.nix"
+    (relativeRepo.module "library/01-general/system/garbage-collection.nix")
+    (relativeRepo.module "library/01-general/system/autoupdate.nix")
 
     ./codex
     ./disko.nix
@@ -107,7 +107,7 @@ in
   ];
 
   sops = {
-    defaultSopsFile = "${outPath}/secrets/${name}.yaml";
+    defaultSopsFile = relativeRepo.sourcePath "secrets/${name}.yaml";
 
     age.sshKeyPaths = [
       "/persist/etc/ssh/ssh_host_ed25519_key"

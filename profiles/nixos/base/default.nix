@@ -1,7 +1,6 @@
-{
-  outPath,
-  profiles,
-  ...
+{ relativeRepo
+, profiles
+, ...
 }:
 {
   imports = [
@@ -13,7 +12,7 @@
     profiles.nixos.shell.fish
     profiles.nixos.shell.zsh-prompt
 
-    "${outPath}/modules/nixos/cuda-cache.nix"
-    "${outPath}/modules/nixos/local-users.nix"
+    (relativeRepo.module "modules/nixos/cuda-cache.nix")
+    (relativeRepo.module "modules/nixos/local-users.nix")
   ];
 }

@@ -1,8 +1,7 @@
-{
-  inputs,
-  lib,
-  outPath,
-  ...
+{ inputs
+, lib
+, relativeRepo
+, ...
 }:
 
 let
@@ -10,8 +9,8 @@ let
   hostName = "s-router-core";
 
   fabric = {
-    intentPath = "${outPath}/library/100-fabric-routing/inputs/intent.nix";
-    inventoryPath = "${outPath}/nixos/virtual-machine/nixos-shell-vm/inventory.nix";
+    intentPath = relativeRepo.sourcePath "library/100-fabric-routing/inputs/intent.nix";
+    inventoryPath = relativeRepo.sourcePath "nixos/virtual-machine/nixos-shell-vm/inventory.nix";
   };
 
   cpmBuilt = inputs.network-control-plane-model.libBySystem.${system}.compileAndBuildFromPaths {
@@ -42,7 +41,7 @@ let
 in
 {
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config-routers-without-network"
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     builtHost.artifactModule
     ./mount-utils.nix
     ./sops.nix

@@ -193,6 +193,11 @@
       url = "github:esp0xdeadbeef/nixos-shell-vm-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    pin-refresh-source = {
+      url = "github:esp0xdeadbeef/nixos";
+      flake = false;
+    };
   };
 
   outputs =
@@ -214,9 +219,10 @@
 
       forAllSystems = lib.genAttrs systems;
 
-      root = self.outPath;
+      root = ./.;
 
       repoLib = import ./library/imports.nix { inherit lib; };
+      relativeRepo = import ./library/relative-repo.nix { inherit lib root; };
 
       profiles = import ./profiles;
 
@@ -245,7 +251,7 @@
       listDirs =
         path:
         let
-          abs = "${root}/${path}";
+          abs = root + "/${path}";
         in
         if builtins.pathExists abs then
           lib.filterAttrs (_: v: v == "directory") (builtins.readDir abs)
@@ -260,34 +266,10 @@
         { }
         hostRoots;
 
-      allHostAbs = lib.mapAttrsToList (_: v: "${root}/${v}") hosts;
-
-      # ------------------------------------------------------------
-      # MINIMAL SOURCE PER HOST
-      # ------------------------------------------------------------
-      vmSourceForHost =
-        name:
-        let
-          mine = "${root}/${hosts.${name}}";
-          others = lib.filter (p: p != mine) allHostAbs;
-        in
-        builtins.path {
-          name = "esp0xdeadbeef-vm-src-${name}";
-          path = root;
-          filter =
-            p: _:
-            let
-              inOther = lib.any (o: lib.hasPrefix o p) others;
-              inGit = lib.hasPrefix "${root}/.git" p;
-            in
-            # include everything EXCEPT other hosts and .git
-              !(inOther || inGit);
-        };
-
     in
     {
       lib = repoLib // {
-        inherit vmSourceForHost hosts;
+        inherit hosts;
       };
 
       packages =
@@ -346,8 +328,7 @@
         if builtins.pathExists ./overlays then
           import ./overlays
             {
-              inherit inputs;
-              outPath = root;
+              inherit inputs relativeRepo;
             }
         else
           { };
@@ -355,7 +336,7 @@
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
       homeManagerModules =
         if builtins.pathExists ./modules/home-manager then
-          import ./modules/home-manager { outPath = root; }
+          import ./modules/home-manager { inherit relativeRepo; }
         else
           { };
 
@@ -375,10 +356,10 @@
                   inputs
                   outputs
                   profiles
+                  relativeRepo
                   self
                   name
                   ;
-                outPath = self.outPath;
               };
 
               modules = [

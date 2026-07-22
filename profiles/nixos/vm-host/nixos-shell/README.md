@@ -40,9 +40,10 @@ access. An explicit development update remains
 
 Per-VM `activation.refreshPins = true` is an explicit exception: before an
 eligible start, the manager runs `nix flake update --refresh` against an
-isolated copy of the configured `pinRefresh.flake`, builds the configured
-attribute, and admits the result transactionally. Refresh failure leaves image
-slots unchanged and falls back to the already available host-pinned image.
+immutable runtime archive of the configured `pinRefresh.flakeRef`, builds the
+configured attribute, and admits the result transactionally. Refresh failure
+leaves image slots unchanged and falls back to the already available host-pinned
+image.
 Host-flake instances use the default `pinRefresh.lockScope = "host"`, so every
 refresh starts from the last lock successfully published by any VM on that
 host. A custom flake repository must use its own stable `lockScope`.

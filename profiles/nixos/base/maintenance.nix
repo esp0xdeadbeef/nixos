@@ -1,7 +1,7 @@
-{ outPath, ... }:
+{ relativeRepo, ... }:
 {
   imports = [
-    "${outPath}/library/01-general/system/autoupdate.nix"
-    "${outPath}/library/01-general/system/garbage-collection.nix"
+    (relativeRepo.module "library/01-general/system/autoupdate.nix")
+    (relativeRepo.module "library/01-general/system/garbage-collection.nix")
   ];
 }

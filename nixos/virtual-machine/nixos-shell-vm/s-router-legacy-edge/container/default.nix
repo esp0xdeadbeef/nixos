@@ -1,9 +1,8 @@
-{
-  pkgs,
-  lib,
-  config,
-  outPath,
-  ...
+{ pkgs
+, lib
+, config
+, relativeRepo
+, ...
 }:
 
 let

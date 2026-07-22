@@ -1,6 +1,6 @@
-{ outPath, ... }:
+{ relativeRepo, ... }:
 {
   imports = [
-    "${outPath}/library/01-general/network/default.nix"
+    (relativeRepo.module "library/01-general/network/default.nix")
   ];
 }

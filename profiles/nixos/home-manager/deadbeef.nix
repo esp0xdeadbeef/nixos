@@ -1,7 +1,7 @@
 { config
 , inputs
 , name
-, outPath
+, relativeRepo
 , outputs
 , profiles
 , ...
@@ -21,7 +21,7 @@
     extraSpecialArgs = {
       inherit
         inputs
-        outPath
+        relativeRepo
         outputs
         profiles
         ;
@@ -30,6 +30,6 @@
       primaryUserHome = config.local.users.primary.homeDirectory;
     };
 
-    users.deadbeef = import "${outPath}/home-manager/${name}/home.nix";
+    users.deadbeef = import (relativeRepo.module "home-manager/${name}/home.nix");
   };
 }

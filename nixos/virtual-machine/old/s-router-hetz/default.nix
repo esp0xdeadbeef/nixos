@@ -1,6 +1,6 @@
 { inputs
 , lib
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
@@ -44,7 +44,7 @@ in
     })
 
     (import ./machine-base.nix {
-      inherit lib outPath;
+      inherit lib relativeRepo;
       pkgs = inputs.nixpkgs.legacyPackages.${system};
       inherit hostName installDisk;
     })

@@ -1,14 +1,13 @@
 # /home/deadbeef/github/nixos/nixos/virtual-machine/nixos-shell-vm/s-router-access/host-config/network-tenant-vlans.nix
 # FILE: s-router-access/host-config/network-tenant-vlans.nix
-{
-  outPath,
-  lib,
-  pkgs,
-  ...
+{ relativeRepo
+, lib
+, pkgs
+, ...
 }:
 
 let
-  cfg = import "${outPath}/library/100-fabric-routing/inputs";
+  cfg = import (relativeRepo.module "library/100-fabric-routing/inputs");
 
   tenantVlans = cfg.tenantVlans;
   policyBase = cfg.policyAccessTransitBase or 100;
@@ -35,23 +34,27 @@ in
       }
     ]
     # per-tenant transit bridges
-    ++ map (vid: {
-      "20-tr${toString (transitVidFor vid)}".netdevConfig = {
-        Name = "tr${toString (transitVidFor vid)}";
-        Kind = "bridge";
-      };
-    }) tenantVlans
+    ++ map
+      (vid: {
+        "20-tr${toString (transitVidFor vid)}".netdevConfig = {
+          Name = "tr${toString (transitVidFor vid)}";
+          Kind = "bridge";
+        };
+      })
+      tenantVlans
 
     # VLAN subinterfaces on top of trunk bridge for each transit VLAN
-    ++ map (vid: {
-      "21-${trunkTransitVlanIf (transitVidFor vid)}" = {
-        netdevConfig = {
-          Name = trunkTransitVlanIf (transitVidFor vid);
-          Kind = "vlan";
+    ++ map
+      (vid: {
+        "21-${trunkTransitVlanIf (transitVidFor vid)}" = {
+          netdevConfig = {
+            Name = trunkTransitVlanIf (transitVidFor vid);
+            Kind = "vlan";
+          };
+          vlanConfig.Id = transitVidFor vid;
         };
-        vlanConfig.Id = transitVidFor vid;
-      };
-    }) tenantVlans
+      })
+      tenantVlans
   );
 
   systemd.network.networks = lib.mkMerge (
@@ -77,34 +80,38 @@ in
     ]
 
     # transit bridges up
-    ++ map (vid: {
-      "30-tr${toString (transitVidFor vid)}" = {
-        matchConfig.Name = "tr${toString (transitVidFor vid)}";
-        networkConfig.ConfigureWithoutCarrier = true;
-      };
-    }) tenantVlans
+    ++ map
+      (vid: {
+        "30-tr${toString (transitVidFor vid)}" = {
+          matchConfig.Name = "tr${toString (transitVidFor vid)}";
+          networkConfig.ConfigureWithoutCarrier = true;
+        };
+      })
+      tenantVlans
 
     # trunk bridge spawns VLAN netdevs; each VLAN netdev is bridged into tr<VID>
-    ++ map (vid: {
-      "40-${trunkBridge}-vlan-${toString (transitVidFor vid)}" = {
-        matchConfig.Name = trunkBridge;
-        networkConfig = {
-          VLAN = [ (trunkTransitVlanIf (transitVidFor vid)) ];
-          DHCP = "no";
-          IPv6AcceptRA = false;
-          ConfigureWithoutCarrier = true;
+    ++ map
+      (vid: {
+        "40-${trunkBridge}-vlan-${toString (transitVidFor vid)}" = {
+          matchConfig.Name = trunkBridge;
+          networkConfig = {
+            VLAN = [ (trunkTransitVlanIf (transitVidFor vid)) ];
+            DHCP = "no";
+            IPv6AcceptRA = false;
+            ConfigureWithoutCarrier = true;
+          };
         };
-      };
 
-      "41-port-${trunkTransitVlanIf (transitVidFor vid)}" = {
-        matchConfig.Name = trunkTransitVlanIf (transitVidFor vid);
-        networkConfig = {
-          Bridge = "tr${toString (transitVidFor vid)}";
-          DHCP = "no";
-          IPv6AcceptRA = false;
-          ConfigureWithoutCarrier = true;
+        "41-port-${trunkTransitVlanIf (transitVidFor vid)}" = {
+          matchConfig.Name = trunkTransitVlanIf (transitVidFor vid);
+          networkConfig = {
+            Bridge = "tr${toString (transitVidFor vid)}";
+            DHCP = "no";
+            IPv6AcceptRA = false;
+            ConfigureWithoutCarrier = true;
+          };
         };
-      };
-    }) tenantVlans
+      })
+      tenantVlans
   );
 }

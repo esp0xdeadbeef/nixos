@@ -1,11 +1,11 @@
 # This file defines overlays
 { inputs
-, outPath
+, relativeRepo
 , ...
 }: {
   # This one brings our custom packages from the 'pkgs' directory
   additions = final: prev:
-    import "${outPath}/pkgs" {
+    import (relativeRepo.module "pkgs") {
       pkgs = final;
       inherit (prev) lib;
       system = prev.stdenv.hostPlatform.system;
@@ -54,9 +54,8 @@
           patches =
             (old.patches or [ ])
             ++ [
-              # Keep this as a direct path instead of "${outPath}/...".
-              # Referencing outPath makes the derivation depend on the whole flake
-              # source and can force rebuilds when unrelated repository files change.
+              # Keep patches as narrow source dependencies so unrelated repository
+              # changes do not force this package to rebuild.
               ../patches/xlayoutdisplay-max-resolution.patch
               ../patches/xlayoutdisplay-display-selectors.patch
             ];

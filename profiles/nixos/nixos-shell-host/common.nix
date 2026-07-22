@@ -1,7 +1,7 @@
 { config
 , inputs
 , name
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
@@ -20,18 +20,18 @@
     profiles.nixos.sops.persist-root-ssh
     profiles.nixos.users.deadbeef-sops
 
-    "${outPath}/library/01-general/desktop/shell-env.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
-    "${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
-    "${outPath}/modules/nixos/local-users.nix"
+    (relativeRepo.module "library/01-general/desktop/shell-env.nix")
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix")
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix")
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix")
+    (relativeRepo.module "modules/nixos/local-users.nix")
   ];
 
   home-manager.backupFileExtension = "hm-backup";
 
   networking.hostName = name;
 
-  sops.defaultSopsFile = "${outPath}/secrets/${config.networking.hostName}.yaml";
+  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${config.networking.hostName}.yaml";
 
   time.timeZone = "Europe/Amsterdam";
 

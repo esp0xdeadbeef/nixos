@@ -1,9 +1,10 @@
-{ config, lib, outPath, ... }:
+{ config, lib, relativeRepo, ... }:
 
 let
-  dnsRuntime = import "${outPath}/prod-network/current/dns-runtime-addresses.nix";
-  prodIntent = import "${outPath}/prod-network/current/intent.nix";
-  prodInventory = import "${outPath}/prod-network/current/inventory.nix";
+  modelSource = relativeRepo.sourcePath "prod-network/current";
+  dnsRuntime = import "${modelSource}/dns-runtime-addresses.nix";
+  prodIntent = import "${modelSource}/intent.nix";
+  prodInventory = import "${modelSource}/inventory.nix";
   prodSite = prodIntent.esp0xdeadbeef.site-a;
   vlan3AuthorityRecords =
     prodInventory.realization.nodes."esp0xdeadbeef-site-a-access-vlan3".services.dns.localRecords;
@@ -1079,9 +1080,9 @@ in
     {
       assertion =
         (config._module.args.sRouterProdModelSource.intentPath or null)
-        == "${outPath}/prod-network/current/intent.nix"
+        == "${modelSource}/intent.nix"
         && (config._module.args.sRouterProdModelSource.inventoryPath or null)
-        == "${outPath}/prod-network/current/inventory.nix";
+        == "${modelSource}/inventory.nix";
       message = ''
         s-router-prod must consume the production intent.nix and inventory.nix directly.
       '';

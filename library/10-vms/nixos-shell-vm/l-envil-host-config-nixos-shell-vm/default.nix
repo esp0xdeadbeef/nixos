@@ -6,7 +6,7 @@
 , config
 , pkgs
 , name
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
@@ -21,13 +21,13 @@
     profiles.nixos.core
     profiles.nixos.shell.zsh-prompt
     profiles.nixos.nixpkgs.allow-unfree
-    "${outPath}/modules/nixos/local-users.nix"
+    (relativeRepo.module "modules/nixos/local-users.nix")
     # inputs.nvf.nixosModules.default
     # inputs.nixvim.nixosModules.nixvim
-    #"${outPath}/library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix"
-    #"${outPath}/library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix"
-    #"${outPath}/library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix"
-    #"${outPath}/library/01-general/desktop/shell-env.nix"
+    #(relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix")
+    #(relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/debug-packages.nix")
+    #(relativeRepo.module "library/10-vms/nixos-shell-vm/1-helpers/ssh-auth.nix")
+    #(relativeRepo.module "library/01-general/desktop/shell-env.nix")
     #./vm-settings.nix
     #./restart-container.nix
     #./network.nix
@@ -40,7 +40,7 @@
 
   networking.hostName = name;
 
-  sops.defaultSopsFile = "${outPath}/secrets/${config.networking.hostName}.yaml";
+  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${config.networking.hostName}.yaml";
   # This will automatically import SSH keys as age keys
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
   # This is using an age key that is expected to already be in the filesystem

@@ -1,11 +1,11 @@
-{ lib, outPath, ... }:
+{ lib, relativeRepo, ... }:
 
 let
   githubTokenPath = "/run/secrets/gh-token";
 in
 {
   sops.secrets.gh-token = {
-    sopsFile = "${outPath}/secrets/s-gamma.yaml";
+    sopsFile = relativeRepo.sourcePath "secrets/s-gamma.yaml";
     owner = "root";
     group = "root";
     mode = "0400";

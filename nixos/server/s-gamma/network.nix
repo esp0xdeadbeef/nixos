@@ -1,9 +1,9 @@
-{ config, lib, name, outPath, pkgs, ... }:
+{ config, lib, name, pkgs, relativeRepo, ... }:
 let
   hostName = name;
   networkAddressesService = "${hostName}-network-addresses";
   networkAddressesUnit = "${networkAddressesService}.service";
-  runtimeSopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
+  runtimeSopsFile = relativeRepo.sourcePath "secrets/s-gamma-runtime.yaml";
 
   networkAddressEnvPath = config.sops.secrets."network/address_env".path;
 

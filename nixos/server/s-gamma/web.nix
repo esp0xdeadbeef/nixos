@@ -1,4 +1,4 @@
-{ config, outPath, profiles, ... }:
+{ config, profiles, relativeRepo, ... }:
 
 {
   imports = [
@@ -7,7 +7,7 @@
 
   profiles.web.server = {
     enable = true;
-    sopsFile = outPath + "/secrets/s-gamma-runtime.yaml";
+    sopsFile = relativeRepo.sourcePath "secrets/s-gamma-runtime.yaml";
     githubTokenSecretName = "gh-token";
 
     source = {

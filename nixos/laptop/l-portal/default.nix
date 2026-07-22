@@ -2,12 +2,12 @@
 , lib
 , pkgs
 , profiles
-, outPath
+, relativeRepo
 , ...
 }:
 let
   hostName = builtins.baseNameOf (builtins.dirOf __curPos.file);
-  keyFor = host: lib.fileContents "${outPath}/ssh-keys/deadbeef/${host}.pub";
+  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
 in
 {
   imports = [
@@ -40,12 +40,12 @@ in
 
     profiles.nixos.impermanence.module
 
-    "${outPath}/library/01-general/desktop/fonts.nix"
+    (relativeRepo.module "library/01-general/desktop/fonts.nix")
 
-    #"${outPath}/library/01-general/desktop/shell-env.nix"
+    #(relativeRepo.module "library/01-general/desktop/shell-env.nix")
   ];
 
-  sops.defaultSopsFile = "${outPath}/secrets/${hostName}-default.yaml";
+  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${hostName}-default.yaml";
 
   time.timeZone = "Europe/Amsterdam";
 

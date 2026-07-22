@@ -1,6 +1,6 @@
 { config
 , lib
-, outPath
+, relativeRepo
 , pkgs
 , profiles
 , ...
@@ -9,7 +9,7 @@ let
   mailboxSetNames = profiles.mail.inventory.hostedMailboxSets;
   mailboxSets = profiles.mail.mailbox-sets {
     inherit mailboxSetNames;
-    secretsRoot = outPath + "/secrets";
+    secretsRoot = relativeRepo.sourcePath "secrets";
   };
   mailboxSetEnvPaths = mailboxSets.mkEnvPaths {
     inherit config lib pkgs;

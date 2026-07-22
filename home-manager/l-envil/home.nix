@@ -1,7 +1,7 @@
 args@{ inputs
 , outputs
 , config
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
@@ -32,7 +32,7 @@ in
   ];
 
   sops = {
-    defaultSopsFile = "${outPath}/secrets/${hostName}-default-${config.home.username}.yaml";
+    defaultSopsFile = relativeRepo.sourcePath "secrets/${hostName}-default-${config.home.username}.yaml";
 
     age = {
       sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];

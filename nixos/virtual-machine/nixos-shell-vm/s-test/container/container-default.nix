@@ -1,13 +1,12 @@
 # ./container/default.nix
-{
-  lib,
-  outPath,
-  config,
-  ...
+{ lib
+, relativeRepo
+, config
+, ...
 }:
 {
   imports = [
-    "${outPath}/library/11-containers/nixos-container"
+    (relativeRepo.module "library/11-containers/nixos-container")
     ./containerlab.nix
     ./podman-hello-world.nix
     ./network.nix

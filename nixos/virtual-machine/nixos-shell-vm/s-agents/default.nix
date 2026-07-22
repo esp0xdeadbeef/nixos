@@ -1,17 +1,17 @@
 { lib
-, outPath
+, relativeRepo
 , pkgs
 , profiles
 , ...
 }:
 {
   imports = [
-    "${outPath}/library/10-vms/nixos-shell-vm/host-config"
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config")
     profiles.nixos.llm-clients.agents
     profiles.nixos.impermanence.default
   ];
 
-  sops.defaultSopsFile = "${outPath}/secrets/s-agents.yaml";
+  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/s-agents.yaml";
   sops.age.sshKeyPaths = [ "/persist/etc/ssh/ssh_host_ed25519_key" ];
   sops.age.keyFile = "/persist/root/.config/sops/age/keys.txt";
 

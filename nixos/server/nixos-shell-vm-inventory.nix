@@ -3,11 +3,12 @@
 , inputs
 , lib
 , pkgs
+, relativeRepo
 , self
 , ...
 }:
 let
-  prodInventory = import "${self.outPath}/prod-network/current/inventory.nix";
+  prodInventory = import (relativeRepo.module "prod-network/current/inventory.nix");
   prodVlan3DnsRecords =
     prodInventory.realization.nodes."esp0xdeadbeef-site-a-access-vlan3".services.dns.localRecords;
   prodVlan3DnsRecord = builtins.head prodVlan3DnsRecords;
@@ -32,6 +33,8 @@ let
     "-device"
     "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
   ];
+
+  pinRefreshFlakeRef = "path:${inputs.pin-refresh-source}";
 
   routerCriticalUnits = [
     "systemd-networkd.service"
@@ -274,7 +277,7 @@ let
     }
     // lib.optionalAttrs (vm.activation.refreshPins or false) {
       pinRefresh = {
-        flake = self.outPath;
+        flakeRef = pinRefreshFlakeRef;
         flakeAttribute = "nixosConfigurations.${vm.name}.config.system.build.nixos-shell";
       };
     };

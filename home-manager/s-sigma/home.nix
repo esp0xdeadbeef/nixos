@@ -7,11 +7,11 @@
 , pkgs
 , profiles
 , hostName
-, outPath
+, relativeRepo
 , ...
 }:
 let
-  sopsFile = "${outPath}/secrets/${hostName}-root.yaml";
+  sopsFileRel = "secrets/${hostName}-root.yaml";
 in
 {
   # You can import other home-manager modules here
@@ -25,7 +25,7 @@ in
     # You can also split up your configuration and import pieces of it here:
     # ./nvim.nix
     profiles.home-manager.desktop.i3
-    "${outPath}/profiles/home-manager/nix/github-access-token.nix"
+    (relativeRepo.module "profiles/home-manager/nix/github-access-token.nix")
   ];
   nixpkgs = {
     # You can add overlays here
@@ -75,7 +75,7 @@ in
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "26.05";
 
-} // lib.optionalAttrs (builtins.pathExists sopsFile) {
-  sops.defaultSopsFile = sopsFile;
+} // lib.optionalAttrs (relativeRepo.exists sopsFileRel) {
+  sops.defaultSopsFile = relativeRepo.sourcePath sopsFileRel;
   sops.age.sshKeyPaths = [ "/persist/root/.ssh/id_ed25519" ];
 }

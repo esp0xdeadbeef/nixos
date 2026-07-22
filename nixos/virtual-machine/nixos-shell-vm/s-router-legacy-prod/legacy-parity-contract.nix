@@ -1,8 +1,9 @@
-{ config, lib, outPath, ... }:
+{ config, lib, relativeRepo, ... }:
 
 let
-  dnsRuntime = import "${outPath}/prod-network/legacy/dns-runtime-addresses.nix";
-  prodIntent = import "${outPath}/prod-network/legacy/intent.nix";
+  modelSource = relativeRepo.sourcePath "prod-network/legacy";
+  dnsRuntime = import "${modelSource}/dns-runtime-addresses.nix";
+  prodIntent = import "${modelSource}/intent.nix";
   prodSite = prodIntent.esp0xdeadbeef.site-a;
   dnsResolver = dnsRuntime.resolver;
   vlan2Dns = dnsRuntime.requesters.access-vlan2;
@@ -790,9 +791,9 @@ in
     {
       assertion =
         (config._module.args.sRouterProdModelSource.intentPath or null)
-        == "${outPath}/prod-network/legacy/intent.nix"
+        == "${modelSource}/intent.nix"
         && (config._module.args.sRouterProdModelSource.inventoryPath or null)
-        == "${outPath}/prod-network/legacy/inventory.nix";
+        == "${modelSource}/inventory.nix";
       message = ''
         s-router-prod must consume the production intent.nix and inventory.nix directly.
       '';

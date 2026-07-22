@@ -2,14 +2,14 @@
 , config
 , lib
 , name
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
 let
   hostName = name;
   installDisk = "/dev/vda";
-  nebulaSopsFile = outPath + "/secrets/s-gamma.yaml";
+  nebulaSopsFile = relativeRepo.sourcePath "secrets/s-gamma.yaml";
 in
 {
   networking.hostName = lib.mkForce hostName;

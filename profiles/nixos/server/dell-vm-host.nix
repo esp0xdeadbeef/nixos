@@ -1,7 +1,7 @@
 { inputs
 , lib
 , name
-, outPath
+, relativeRepo
 , pkgs
 , profiles
 , ...
@@ -34,8 +34,8 @@
     profiles.nixos.virtualization.podman
     profiles.nixos.vm-host.nixos-shell
 
-    "${outPath}/library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix"
-    "${outPath}/modules/nixos/local-users.nix"
+    (relativeRepo.module "library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix")
+    (relativeRepo.module "modules/nixos/local-users.nix")
   ];
 
   boot.loader.systemd-boot.configurationLimit = 12;
@@ -70,7 +70,7 @@
 
   nixpkgs.hostPlatform = "x86_64-linux";
 
-  sops.defaultSopsFile = "${outPath}/secrets/${name}-root.yaml";
+  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${name}-root.yaml";
 
   time.timeZone = "Europe/Amsterdam";
 

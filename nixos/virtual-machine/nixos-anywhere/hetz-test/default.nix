@@ -2,7 +2,7 @@
 # Self-contained: all files copied here so sat.sh/s-router-hetz changes don't affect it.
 { inputs
 , lib
-, outPath
+, relativeRepo
 , profiles
 , ...
 }:
@@ -26,7 +26,7 @@ in
     })
 
     (import ./machine-base.nix {
-      inherit lib outPath;
+      inherit lib relativeRepo;
       pkgs = inputs.nixpkgs.legacyPackages.${system};
       inherit hostName installDisk;
     })

@@ -1,7 +1,7 @@
-{ lib, outPath, ... }:
+{ lib, relativeRepo, ... }:
 
 let
-  laptopHibernateSwapSize = import "${outPath}/library/disko/laptop-hibernate-swap-size.nix";
+  laptopHibernateSwapSize = import (relativeRepo.module "library/disko/laptop-hibernate-swap-size.nix");
 in
 {
   boot.initrd.luks.devices = {

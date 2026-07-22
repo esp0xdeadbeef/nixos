@@ -1,6 +1,6 @@
 { config
 , lib
-, outPath
+, relativeRepo
 , ...
 }:
 let
@@ -35,7 +35,7 @@ in
 
     secretsRoot = lib.mkOption {
       type = lib.types.path;
-      default = outPath + "/secrets";
+      default = relativeRepo.sourcePath "secrets";
       description = "Repository secrets directory containing mailbox-*.yaml files.";
     };
   };

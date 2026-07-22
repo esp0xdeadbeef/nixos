@@ -1,15 +1,15 @@
 { config
 , lib
 , pkgs
-, outPath
+, relativeRepo
 , ...
 }:
 
 let
   cfg = config.local.network.private;
   hostName = config.networking.hostName;
-  sopsFile = "${outPath}/secrets/${hostName}-default.yaml";
-  sopsFileExists = builtins.pathExists sopsFile;
+  sopsFileRel = "secrets/${hostName}-default.yaml";
+  sopsFileExists = relativeRepo.exists sopsFileRel;
   networkManagerEnabled = config.networking.networkmanager.enable;
   networkdEnabled = config.systemd.network.enable;
 
@@ -22,9 +22,10 @@ let
 
   sopsKeys =
     if sopsFileExists then
-      lib.filter (key: key != null) (
-        map keyFromLine (lib.splitString "\n" (builtins.readFile sopsFile))
-      )
+      lib.filter (key: key != null)
+        (
+          map keyFromLine (lib.splitString "\n" (builtins.readFile (relativeRepo.module sopsFileRel)))
+        )
     else
       [ ];
 
@@ -52,35 +53,37 @@ let
 
   wifiSecretNames =
     lib.unique (
-      lib.flatten (
-        map
-          (
-            prefix:
-            [
-              "${prefix}-ssid"
-              "${prefix}-password"
-            ]
-            ++ lib.optional (hasSecret "${prefix}-key-mgmt") "${prefix}-key-mgmt"
-          )
-          wifiPrefixes
-      )
+      lib.flatten
+        (
+          map
+            (
+              prefix:
+              [
+                "${prefix}-ssid"
+                "${prefix}-password"
+              ]
+              ++ lib.optional (hasSecret "${prefix}-key-mgmt") "${prefix}-key-mgmt"
+            )
+            wifiPrefixes
+        )
       ++ lib.optional cfg.clonedMac.enable "wifi-mac"
     );
 
   envLines =
-    lib.flatten (
-      map
-        (
-          prefix:
-          [
-            "${envName "${prefix}-ssid"}=${placeholder "${prefix}-ssid"}"
-            "${envName "${prefix}-password"}=${placeholder "${prefix}-password"}"
-          ]
-          ++ lib.optional (hasSecret "${prefix}-key-mgmt")
-            "${envName "${prefix}-key-mgmt"}=${placeholder "${prefix}-key-mgmt"}"
-        )
-        wifiPrefixes
-    )
+    lib.flatten
+      (
+        map
+          (
+            prefix:
+            [
+              "${envName "${prefix}-ssid"}=${placeholder "${prefix}-ssid"}"
+              "${envName "${prefix}-password"}=${placeholder "${prefix}-password"}"
+            ]
+            ++ lib.optional (hasSecret "${prefix}-key-mgmt")
+              "${envName "${prefix}-key-mgmt"}=${placeholder "${prefix}-key-mgmt"}"
+          )
+          wifiPrefixes
+      )
     ++ lib.optional cfg.clonedMac.enable "${envName "wifi-mac"}=${placeholder "wifi-mac"}";
 
   mkProfile =
@@ -141,7 +144,7 @@ in
       assertions = [
         {
           assertion = !cfg.enable || !hasWifiProfiles || networkManagerEnabled || networkdEnabled;
-          message = "Private Wi-Fi secrets exist in ${sopsFile}, but neither NetworkManager nor systemd-networkd is enabled.";
+          message = "Private Wi-Fi secrets exist in ${sopsFileRel}, but neither NetworkManager nor systemd-networkd is enabled.";
         }
         {
           assertion = !cfg.enable || !hasWifiProfiles || networkManagerEnabled;
@@ -149,18 +152,18 @@ in
         }
         {
           assertion = !cfg.enable || !hasWifiProfiles || !cfg.clonedMac.enable || hasWifiMacSecret;
-          message = "Private Wi-Fi profile secrets in ${sopsFile} require wifi-mac because local.network.private.clonedMac.enable is true.";
+          message = "Private Wi-Fi profile secrets in ${sopsFileRel} require wifi-mac because local.network.private.clonedMac.enable is true.";
         }
         {
           assertion = !cfg.enable || !hasWifiMacSecret || cfg.clonedMac.enable;
-          message = "wifi-mac exists in ${sopsFile}, but local.network.private.clonedMac.enable is false. Refusing to clone Wi-Fi MAC on this host.";
+          message = "wifi-mac exists in ${sopsFileRel}, but local.network.private.clonedMac.enable is false. Refusing to clone Wi-Fi MAC on this host.";
         }
       ];
     }
 
     (lib.mkIf enableNetworkManagerProfiles {
       sops.secrets = lib.genAttrs wifiSecretNames (_: {
-        inherit sopsFile;
+        sopsFile = relativeRepo.sourcePath sopsFileRel;
         owner = "root";
         group = "root";
         mode = "0400";
