@@ -8620,11 +8620,11 @@
     "pin-refresh-source": {
       "flake": false,
       "locked": {
-        "lastModified": 1784672618,
-        "narHash": "sha256-qSq6+Xh36WLU9ENN8dH7islfkM7M1pCQyMytZ/aMu0k=",
+        "lastModified": 1784683898,
+        "narHash": "sha256-OhL8JgoJ5jHgmH1EJWRH1Sp43ock8V4C5PpiCnIJhRY=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos",
-        "rev": "220bb64000135fc05036558afc219d259ef21186",
+        "rev": "c213d1fddfe9af4d3d128f70b07729101f3409ad",
         "type": "github"
       },
       "original": {
