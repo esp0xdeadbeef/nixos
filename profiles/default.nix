@@ -96,6 +96,8 @@
     llm = {
       model-sets = import ./nixos/llm/model-sets.nix;
       ollama-base = import ./nixos/llm/ollama-base.nix;
+      ollama-gpu-ready = import ./nixos/llm/ollama-gpu-ready.nix;
+      ollama-smoke-test = import ./nixos/llm/ollama-smoke-test.nix;
       open-webui = import ./nixos/llm/open-webui.nix;
     };
     impermanence = {

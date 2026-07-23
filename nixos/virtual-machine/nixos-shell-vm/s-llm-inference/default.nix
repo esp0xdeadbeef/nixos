@@ -8,18 +8,20 @@
 {
   imports = [
     (relativeRepo.module "library/01-general/password-cracking/default.nix")
-    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config/ssh.nix")
-    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config/vm-settings.nix")
+    (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config/base.nix")
     (relativeRepo.module "modules/nixos/cuda-cache.nix")
     profiles.nixos.impermanence.default
     profiles.nixos.llm-clients.agents
     profiles.nixos.llm.ollama-base
-    profiles.nixos.nixos-shell-host.common
+    profiles.nixos.llm.ollama-gpu-ready
+    profiles.nixos.llm.ollama-smoke-test
+    profiles.nixos.virtualization.pci-passthrough-guest
 
     ./benchmark.nix
-    ./network.nix
+    ./container
     ./nvidia.nix
     ./ollama.nix
+    ./ollama-state.nix
   ];
 
   # The s-llm-inference service VM has no secrets. Interactive access is SSH-key-only, so a
@@ -45,23 +47,17 @@
   local.impermanence = {
     enable = true;
     rotateBtrfsRoot.enable = false;
-    # The existing nixos-shell /persist share is host-backed. Keep Podman's
-    # image store there as well; the Ollama model homes are covered below and
-    # by the shared /var/lib/private/ollama persistence rule.
-    extraSystemDirectories = [ "/var/lib/containers" ];
   };
+
+  local.virtualization.pciPassthroughGuest.enable = true;
 
   virtualisation = {
     cores = lib.mkForce 16;
     memorySize = lib.mkForce (256 * 1024);
-    diskSize = lib.mkForce (40 * 1024);
+    # Keep the replaceable nixos-shell root disk small; durable state lives in
+    # the host-backed /persist mount.
+    diskSize = lib.mkForce (8 * 1024);
 
-    # q35 gives the P100's 16 GiB 64-bit BAR a native PCIe topology. The
-    # nixos-shell runner merges this with its generated acceleration option.
-    qemu.options = lib.mkAfter [
-      "-machine q35"
-      "-cpu host"
-    ];
   };
 
   environment.systemPackages = [

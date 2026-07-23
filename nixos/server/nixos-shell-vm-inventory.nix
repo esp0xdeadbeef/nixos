@@ -39,14 +39,16 @@ let
     /run/current-system/sw/bin/nvidia-smi \
       --query-gpu=name,memory.total,driver_version \
       --format=csv,noheader >/dev/null
+    /run/current-system/sw/bin/systemctl is-active \
+      container@s-llm-inference-container.service \
+      ollama.service >/dev/null
     /run/current-system/sw/bin/curl --fail --silent --show-error \
       http://127.0.0.1:11434/api/version >/dev/null
-    /run/current-system/sw/bin/curl --fail --silent --show-error \
-      http://127.0.0.1:11435/api/version >/dev/null
-    /run/current-system/sw/bin/systemctl is-active \
-      ollama.service \
-      ollama-smoke-test.service \
-      podman-ollama-container.service >/dev/null
+    /run/current-system/sw/bin/nixos-container run s-llm-inference-container -- \
+      /run/current-system/sw/bin/systemctl is-active ollama.service >/dev/null
+    /run/current-system/sw/bin/nixos-container run s-llm-inference-container -- \
+      /run/current-system/sw/bin/curl --fail --silent --show-error \
+      http://127.0.0.1:11434/api/version >/dev/null
   '';
 
   pinRefreshFlakeRef = "path:${inputs.pin-refresh-source}";
