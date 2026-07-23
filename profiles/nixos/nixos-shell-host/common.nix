@@ -1,10 +1,14 @@
 { config
 , inputs
+, lib
 , name
 , relativeRepo
 , profiles
 , ...
 }:
+let
+  cfg = config.local.nixosShellHost;
+in
 {
   imports = [
     inputs.home-manager.nixosModules.home-manager
@@ -27,19 +31,33 @@
     (relativeRepo.module "modules/nixos/local-users.nix")
   ];
 
-  home-manager.backupFileExtension = "hm-backup";
+  options.local.nixosShellHost.secrets.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = "Use the per-VM sops file and SOPS-backed deadbeef password.";
+  };
 
-  networking.hostName = name;
+  config = lib.mkMerge [
+    {
+      home-manager.backupFileExtension = "hm-backup";
 
-  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${config.networking.hostName}.yaml";
+      local.users.deadbeefSops.enable = lib.mkDefault cfg.secrets.enable;
 
-  time.timeZone = "Europe/Amsterdam";
+      networking.hostName = name;
 
-  security.pam.services.login.enableGnomeKeyring = true;
+      time.timeZone = "Europe/Amsterdam";
 
-  local.shell.zshPrompt.enable = true;
+      security.pam.services.login.enableGnomeKeyring = true;
 
-  users.users.deadbeef.extraGroups = [ "wheel" ];
+      local.shell.zshPrompt.enable = true;
 
-  system.stateVersion = "24.11";
+      users.users.deadbeef.extraGroups = [ "wheel" ];
+
+      system.stateVersion = "24.11";
+    }
+
+    (lib.mkIf cfg.secrets.enable {
+      sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${config.networking.hostName}.yaml";
+    })
+  ];
 }
