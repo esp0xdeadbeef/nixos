@@ -21,4 +21,14 @@ rec {
 
   sourcePath = rel:
     source [ rel ] + "/${clean rel}";
+
+  # Use for lower-priority module defaults that may be replaced by a
+  # host-specific file before the option is consumed.
+  sourcePathMaybeMissing = rel:
+    lib.fileset.toSource
+      {
+        inherit root;
+        fileset = lib.fileset.maybeMissing (resolve rel);
+      }
+    + "/${clean rel}";
 }

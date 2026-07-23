@@ -57,7 +57,8 @@ in
     }
 
     (lib.mkIf cfg.secrets.enable {
-      sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${config.networking.hostName}.yaml";
+      sops.defaultSopsFile =
+        relativeRepo.sourcePathMaybeMissing "secrets/${config.networking.hostName}.yaml";
     })
   ];
 }

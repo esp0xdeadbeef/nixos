@@ -22,8 +22,115 @@ jobs:
       - name: Update flake.lock
         run: nix flake update
 
-      - name: Check flake
-        run: nix flake check --all-systems
+      - name: Check flake outputs in isolated evaluations
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          list_attrs() {
+            nix eval --raw "$1" \
+              --apply 'attrs: builtins.concatStringsSep "\n" (builtins.attrNames attrs)'
+          }
+
+          check_derivation() {
+            local attribute="$1"
+            echo "::group::Checking ${attribute}"
+            nix derivation show ".#${attribute}" >/dev/null
+            echo "::endgroup::"
+          }
+
+          check_vm_host() {
+            local host="$1"
+
+            echo "::group::Checking ${host} with one embedded VM"
+            # The ${host} below is Nix interpolation, not shell interpolation.
+            # shellcheck disable=SC2016
+            nix derivation show \
+              --impure \
+              --argstr host "${host}" \
+              --expr '
+                { host }:
+                let
+                  flake = builtins.getFlake (toString ./.);
+                  original = flake.nixosConfigurations.${host};
+                  instanceNames =
+                    builtins.attrNames
+                      original.config.services.nixosShellVmManager.instances;
+                  filtered = original.extendModules {
+                    modules = [
+                      ({ lib, ... }: {
+                        services.nixosShellVmManager.instances =
+                          builtins.listToAttrs (
+                            map
+                              (name: {
+                                inherit name;
+                                value.enable = lib.mkForce (name == "s-router-prod");
+                              })
+                              instanceNames
+                          );
+                      })
+                    ];
+                  };
+                in
+                filtered.config.system.build.toplevel
+              ' >/dev/null
+            echo "::endgroup::"
+          }
+
+          configurations="$(list_attrs '.#nixosConfigurations')"
+          while IFS= read -r configuration; do
+            [[ -n "${configuration}" ]] || continue
+            case "${configuration}" in
+              s-sigma | s-tau)
+                # These hosts embed every nixos-shell guest image. Evaluate one
+                # representative embedded VM here; every guest configuration
+                # is evaluated independently by the surrounding loop.
+                check_vm_host "${configuration}"
+                ;;
+              *)
+                check_derivation \
+                  "nixosConfigurations.${configuration}.config.system.build.toplevel"
+                ;;
+            esac
+          done <<<"${configurations}"
+
+          systems="$(list_attrs '.#packages')"
+          while IFS= read -r system; do
+            [[ -n "${system}" ]] || continue
+            packages="$(list_attrs ".#packages.${system}")"
+            while IFS= read -r package; do
+              [[ -n "${package}" ]] || continue
+              check_derivation "packages.${system}.${package}"
+            done <<<"${packages}"
+          done <<<"${systems}"
+
+          formatter_systems="$(list_attrs '.#formatter')"
+          while IFS= read -r system; do
+            [[ -n "${system}" ]] || continue
+            check_derivation "formatter.${system}"
+          done <<<"${formatter_systems}"
+
+          overlays="$(list_attrs '.#overlays')"
+          while IFS= read -r overlay; do
+            [[ -n "${overlay}" ]] || continue
+            nix eval --raw ".#overlays.${overlay}" \
+              --apply 'value:
+                if builtins.isFunction value
+                then "ok"
+                else throw "overlay is not a function"' >/dev/null
+          done <<<"${overlays}"
+
+          nixos_modules="$(list_attrs '.#nixosModules')"
+          while IFS= read -r nixos_module; do
+            [[ -n "${nixos_module}" ]] || continue
+            nix eval --raw ".#nixosModules.${nixos_module}" \
+              --apply 'value:
+                if builtins.isFunction value
+                  || builtins.isAttrs value
+                  || builtins.typeOf value == "path"
+                then "ok"
+                else throw "NixOS module has an invalid type"' >/dev/null
+          done <<<"${nixos_modules}"
 
       - name: Commit and push
         run: |
