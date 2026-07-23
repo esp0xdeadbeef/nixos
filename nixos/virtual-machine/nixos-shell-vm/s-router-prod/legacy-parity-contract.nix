@@ -929,6 +929,30 @@ let
     && hasRoute "policy" "10-upstream-vlan3" "10.19.0.3/32" "10.10.0.17"
     && hasRoute "upstream-selector" "10-core" "10.19.0.3/32" "10.10.0.6";
 
+  hasNebulaIngressPathOverride =
+    let
+      routeTable = 14242;
+      rulePriority = 900;
+    in
+    hasTableRoute "policy" "10-down-vlan3" "192.168.3.10/32" "10.10.0.10" routeTable
+    && hasTableRoute "policy" "10-upstream-vlan3" "10.19.0.3/32" "10.10.0.17" routeTable
+    && hasRoutingPolicyRule "policy" "10-upstream-vlan3" {
+      Family = "ipv4";
+      From = "10.19.0.3/32";
+      IncomingInterface = "upstream-vlan3";
+      Priority = rulePriority;
+      Table = routeTable;
+      To = "192.168.3.10/32";
+    }
+    && hasRoutingPolicyRule "policy" "10-down-vlan3" {
+      Family = "ipv4";
+      From = "192.168.3.10/32";
+      IncomingInterface = "down-vlan3";
+      Priority = rulePriority;
+      Table = routeTable;
+      To = "10.19.0.3/32";
+    };
+
   hasNoVlan2Vlan3MainTableOverride =
     !(builtins.any
       (rule:
@@ -1179,11 +1203,17 @@ in
       '';
     }
     {
-      assertion = hasNebulaPublicIngressRules && hasRendererNativeNebulaRoutes;
+      assertion =
+        hasNebulaPublicIngressRules
+        && hasRendererNativeNebulaRoutes
+        && hasNebulaIngressPathOverride;
       message = ''
         s-router-prod must receive scoped Nebula TCP/UDP 4242 DNAT, SNAT,
         forwarding, and dedicated VLAN 3 forward/return routes from the
-        upstream CPM/renderer chain.
+        upstream CPM/renderer chain. Until network-* stops copying the Nebula
+        SNAT return route across tenant lanes, an exact symmetric policy route
+        must keep this ingress relation on VLAN 3 without moving NAT out of
+        core.
       '';
     }
     {
