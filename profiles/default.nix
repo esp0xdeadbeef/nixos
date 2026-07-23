@@ -86,6 +86,7 @@
       libvirt = import ./nixos/virtualization/libvirt.nix;
       lxc = import ./nixos/virtualization/lxc.nix;
       pci-passthrough = import ./nixos/virtualization/pci-passthrough.nix;
+      pci-passthrough-guest = import ./nixos/virtualization/pci-passthrough-guest.nix;
       podman = import ./nixos/virtualization/podman.nix;
     };
     llm-clients = {

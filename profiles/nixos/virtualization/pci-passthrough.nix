@@ -14,10 +14,21 @@ let
   configuredAddresses = map (name: enabledDevices.${name}.pciAddress) deviceNames;
 
   devicesByVm = lib.groupBy (device: device.vmName) (lib.attrValues enabledDevices);
+  lateHotplugDevicesByVm = lib.filterAttrs
+    (_: devices: devices != [ ])
+    (lib.mapAttrs
+      (_: devices: lib.filter (device: device.lateHotplug.enable) devices)
+      devicesByVm);
 
   duplicateAddresses = lib.filter
     (address: lib.count (candidate: candidate == address) configuredAddresses > 1)
     (lib.unique configuredAddresses);
+
+  rootPortId = device:
+    "pci_hotplug_${lib.replaceStrings [ ":" "." ] [ "_" "_" ] device.pciAddress}";
+
+  deviceId = device:
+    "vfio_device_${lib.replaceStrings [ ":" "." ] [ "_" "_" ] device.pciAddress}";
 
   passthrough = pkgs.writeShellApplication {
     name = "pci-passthrough";
@@ -212,6 +223,90 @@ let
     '';
   };
 
+  qmpHotplug = pkgs.writeShellApplication {
+    name = "pci-passthrough-qmp-hotplug";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.jq
+      pkgs.socat
+    ];
+    text = ''
+      set -euo pipefail
+
+      if [[ $# -ne 4 ]]; then
+        echo "usage: pci-passthrough-qmp-hotplug QMP_SOCKET PCI_ADDRESS ROOT_PORT_ID DEVICE_ID" >&2
+        exit 64
+      fi
+
+      qmp_socket=$1
+      pci_address=$2
+      root_port_id=$3
+      device_id=$4
+
+      [[ -S "$qmp_socket" ]] || {
+        echo "QMP socket does not exist: $qmp_socket" >&2
+        exit 69
+      }
+      [[ "$pci_address" =~ ^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$ ]] || {
+        echo "invalid canonical PCI address: $pci_address" >&2
+        exit 64
+      }
+      [[ "$root_port_id" =~ ^[A-Za-z0-9._-]+$ ]] || {
+        echo "invalid QEMU root port ID: $root_port_id" >&2
+        exit 64
+      }
+      [[ "$device_id" =~ ^[A-Za-z0-9._-]+$ ]] || {
+        echo "invalid QEMU device ID: $device_id" >&2
+        exit 64
+      }
+
+      qmp_exchange() {
+        timeout 15 socat - "UNIX-CONNECT:$qmp_socket"
+      }
+
+      existing_response=$(
+        printf '%s\n%s\n' \
+          '{"execute":"qmp_capabilities"}' \
+          '{"execute":"query-pci"}' \
+          | qmp_exchange
+      )
+
+      if jq -s -e --arg device_id "$device_id" \
+        '[.. | objects | select(.qdev_id? == $device_id)] | length > 0' \
+        <<< "$existing_response" >/dev/null; then
+        exit 0
+      fi
+
+      device_add_request=$(
+        jq -cn \
+          --arg host "$pci_address" \
+          --arg bus "$root_port_id" \
+          --arg id "$device_id" \
+          '{
+            execute: "device_add",
+            arguments: {
+              driver: "vfio-pci",
+              host: $host,
+              bus: $bus,
+              id: $id
+            }
+          }'
+      )
+
+      hotplug_response=$(
+        printf '%s\n%s\n' \
+          '{"execute":"qmp_capabilities"}' \
+          "$device_add_request" \
+          | qmp_exchange
+      )
+
+      if jq -s -e 'any(.[]; has("error"))' <<< "$hotplug_response" >/dev/null; then
+        jq -c 'select(has("error"))' <<< "$hotplug_response" >&2
+        exit 70
+      fi
+    '';
+  };
+
   bindCommand = device:
     lib.escapeShellArgs (
       [
@@ -232,13 +327,122 @@ let
       (lib.boolToString device.restoreDriverOnStop)
     ];
 
-  qemuArgumentsFor = devices:
-    lib.concatMap
-      (device: [
-        "-device"
-        "vfio-pci,host=${device.pciAddress}"
-      ])
-      devices;
+  qemuArgumentsFor =
+    vmName: devices:
+    let
+      hasLateHotplug = lib.any (device: device.lateHotplug.enable) devices;
+      readySocket = "/run/nixos-shell-vm-manager/${vmName}/pci-ready.sock";
+    in
+    lib.optionals hasLateHotplug [
+      "-device"
+      "virtio-serial-pci,id=pci_hotplug_signal_bus"
+      "-chardev"
+      "socket,id=pci_hotplug_signal,path=${readySocket},reconnect-ms=250"
+      "-device"
+      "virtserialport,bus=pci_hotplug_signal_bus.0,chardev=pci_hotplug_signal,name=org.nixos.pci-ready.0"
+    ]
+    ++ lib.concatLists (
+      lib.imap0
+        (index: device:
+        if device.lateHotplug.enable then
+          [
+            "-device"
+            (lib.concatStringsSep "," (
+              [
+                "pcie-root-port"
+                "id=${rootPortId device}"
+                "chassis=${toString (index + 1)}"
+                "slot=${toString (index + 1)}"
+              ]
+              ++ lib.optional (device.lateHotplug.memoryReserve != null)
+                "mem-reserve=${device.lateHotplug.memoryReserve}"
+              ++ lib.optional (device.lateHotplug.prefetchableMemoryReserve != null)
+                "pref64-reserve=${device.lateHotplug.prefetchableMemoryReserve}"
+            ))
+          ]
+        else
+          [
+            "-device"
+            "vfio-pci,host=${device.pciAddress}"
+          ])
+        devices
+    );
+
+  hotplugServiceScript =
+    vmName: devices:
+    let
+      controlDirectory = "/run/nixos-shell-vm-manager/${vmName}";
+      qmpSocket = "${controlDirectory}/qmp.sock";
+      readySocket = "${controlDirectory}/pci-ready.sock";
+      hotplugCommands = lib.concatMapStringsSep "\n"
+        (device:
+          lib.escapeShellArgs [
+            (lib.getExe qmpHotplug)
+            qmpSocket
+            device.pciAddress
+            (rootPortId device)
+            (deviceId device)
+          ])
+        devices;
+    in
+    ''
+      qmp_identity=
+      while [[ -z "$qmp_identity" ]]; do
+        qmp_identity=$(
+          ${pkgs.coreutils}/bin/stat -Lc '%d:%i' ${lib.escapeShellArg qmpSocket} 2>/dev/null \
+            || true
+        )
+        if [[ -z "$qmp_identity" ]]; then
+          ${pkgs.coreutils}/bin/sleep 0.25
+        fi
+      done
+
+      ready_pid=
+      cleanup_ready_listener() {
+        if [[ -n "$ready_pid" ]] && kill -0 "$ready_pid" 2>/dev/null; then
+          kill "$ready_pid"
+          wait "$ready_pid" 2>/dev/null || true
+        fi
+      }
+      trap cleanup_ready_listener EXIT
+
+      ${pkgs.coreutils}/bin/rm -f ${lib.escapeShellArg readySocket}
+      coproc READY_CHANNEL {
+        exec ${pkgs.socat}/bin/socat \
+          UNIX-LISTEN:${lib.escapeShellArg readySocket},unlink-close \
+          -
+      }
+      ready_pid=$READY_CHANNEL_PID
+      ready_fd=''${READY_CHANNEL[0]}
+
+      ready_message=
+      if ! IFS= read -r -t 300 -u "$ready_fd" ready_message; then
+        echo "timed out waiting for guest kernel readiness: ${vmName}" >&2
+        exit 1
+      fi
+      if [[ "$ready_message" != pci-ready ]]; then
+        echo "guest did not signal kernel readiness for PCI hotplug: ${vmName}" >&2
+        exit 1
+      fi
+
+      current_identity=$(
+        ${pkgs.coreutils}/bin/stat -Lc '%d:%i' ${lib.escapeShellArg qmpSocket} 2>/dev/null \
+          || true
+      )
+      if [[ "$current_identity" != "$qmp_identity" ]]; then
+        echo "QMP socket changed while waiting for guest kernel readiness: ${vmName}" >&2
+        exit 1
+      fi
+
+      ${hotplugCommands}
+
+      while [[ "$(
+        ${pkgs.coreutils}/bin/stat -Lc '%d:%i' ${lib.escapeShellArg qmpSocket} 2>/dev/null \
+          || true
+      )" == "$qmp_identity" ]]; do
+        ${pkgs.coreutils}/bin/sleep 0.5
+      done
+    '';
 
 in
 {
@@ -249,6 +453,17 @@ in
       type = lib.types.bool;
       default = true;
       description = "Enable Intel VT-d and passthrough-oriented IOMMU domains.";
+    };
+
+    dmaEntryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.ints.positive;
+      default = null;
+      example = 1048576;
+      description = ''
+        Maximum number of simultaneous VFIO type1 DMA mappings per
+        container. Increase this for guests whose vIOMMU produces many
+        small mappings.
+      '';
     };
 
     devices = lib.mkOption {
@@ -287,9 +502,28 @@ in
             default = false;
             description = "Reprobe the driver that owned the device before the VM started.";
           };
+
+          lateHotplug = {
+            enable = lib.mkEnableOption "QMP hotplug after the guest kernel signals readiness";
+
+            memoryReserve = lib.mkOption {
+              type = lib.types.nullOr (lib.types.strMatching "[0-9]+[KMGT]?");
+              default = null;
+              example = "32M";
+              description = "Non-prefetchable MMIO reserved on the hotplug root port.";
+            };
+
+            prefetchableMemoryReserve = lib.mkOption {
+              type = lib.types.nullOr (lib.types.strMatching "[0-9]+[KMGT]?");
+              default = null;
+              example = "32G";
+              description = "64-bit prefetchable MMIO reserved on the hotplug root port.";
+            };
+          };
         };
       });
     };
+
   };
 
   config = lib.mkIf cfg.enable {
@@ -302,6 +536,12 @@ in
         {
           assertion = duplicateAddresses == [ ];
           message = "PCI passthrough addresses must be unique: ${lib.concatStringsSep ", " duplicateAddresses}";
+        }
+        {
+          assertion = lib.all
+            (devices: lib.length devices <= 255)
+            (lib.attrValues lateHotplugDevicesByVm);
+          message = "A VM cannot have more than 255 late-hotplug PCI root ports.";
         }
       ]
       ++ lib.concatMap
@@ -342,22 +582,60 @@ in
       "iommu=pt"
     ];
 
+    boot.extraModprobeConfig = lib.optionalString (cfg.dmaEntryLimit != null) ''
+      options vfio_iommu_type1 dma_entry_limit=${toString cfg.dmaEntryLimit}
+    '';
+
     environment.systemPackages = [ passthrough ];
 
     services.nixosShellVmManager.instances = lib.mapAttrs
-      (_: devices: {
-        runner.qemuArguments = lib.mkAfter (qemuArgumentsFor devices);
+      (vmName: devices: {
+        runner.qemuArguments = lib.mkAfter (qemuArgumentsFor vmName devices);
       })
       devicesByVm;
 
-    systemd.services = lib.mapAttrs'
-      (vmName: devices:
-        lib.nameValuePair "${vmName}-vm" {
-          preStart = lib.mkBefore (lib.concatMapStringsSep "\n" bindCommand devices);
-          postStop = lib.mkAfter (
-            lib.concatMapStringsSep "\n" releaseCommand (lib.reverseList devices)
-          );
-        })
-      devicesByVm;
+    systemd.services = lib.mkMerge [
+      (lib.mapAttrs'
+        (vmName: devices:
+          lib.nameValuePair "${vmName}-pci-bind" {
+            description = "Bind PCI devices for ${vmName}";
+            wantedBy = [ "multi-user.target" ];
+            before = [ "${vmName}-vm.service" ];
+            partOf = [ "${vmName}-vm.service" ];
+            script = lib.concatMapStringsSep "\n" bindCommand devices;
+            preStop = lib.concatMapStringsSep "\n" releaseCommand (lib.reverseList devices);
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+            };
+          })
+        devicesByVm)
+
+      (lib.mapAttrs'
+        (vmName: _devices:
+          lib.nameValuePair "${vmName}-vm" {
+            after = [ "${vmName}-pci-bind.service" ];
+            requires = [ "${vmName}-pci-bind.service" ];
+            wants = lib.optional (builtins.hasAttr vmName lateHotplugDevicesByVm)
+              "${vmName}-pci-hotplug.service";
+          })
+        devicesByVm)
+
+      (lib.mapAttrs'
+        (vmName: devices:
+          lib.nameValuePair "${vmName}-pci-hotplug" {
+            description = "Late PCI hotplug for ${vmName}";
+            after = [ "${vmName}-vm.service" ];
+            requires = [ "${vmName}-vm.service" ];
+            partOf = [ "${vmName}-vm.service" ];
+            script = hotplugServiceScript vmName devices;
+            serviceConfig = {
+              Type = "simple";
+              Restart = "always";
+              RestartSec = "2s";
+            };
+          })
+        lateHotplugDevicesByVm)
+    ];
   };
 }

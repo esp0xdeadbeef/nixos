@@ -24,9 +24,15 @@
 
   local.virtualization.pciPassthrough = {
     enable = true;
+    dmaEntryLimit = 1048576;
     devices.tesla-p100 = {
       pciAddress = "0000:03:00.0";
       vmName = "s-llm-inference";
+      lateHotplug = {
+        enable = true;
+        memoryReserve = "32M";
+        prefetchableMemoryReserve = "32G";
+      };
     };
   };
 
