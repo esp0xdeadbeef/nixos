@@ -35,6 +35,7 @@
     profiles.nixos.vm-host.nixos-shell
 
     (relativeRepo.module "library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix")
+    (relativeRepo.module "modules/nixos/cuda-cache.nix")
     (relativeRepo.module "modules/nixos/local-users.nix")
   ];
 
@@ -56,6 +57,12 @@
   local.impermanence.extraUserDirectories = [
     "Documents"
   ];
+
+  # The host Nix daemon builds GPU-enabled guest closures even though PCI
+  # passthrough deliberately keeps the Nvidia driver out of the host closure.
+  # Enable cached CUDA dependencies explicitly; guest packages that are not
+  # published by the cache, such as the current Ollama output, still build once.
+  local.nix.cudaCache.enable = true;
 
   local.laptop.xlayoutdisplayHotplug = {
     configLines = [
