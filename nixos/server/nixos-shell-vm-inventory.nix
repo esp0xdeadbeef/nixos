@@ -34,6 +34,21 @@ let
     "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
   ];
 
+  inferenceHealthCommand = ''
+    set -euo pipefail
+    /run/current-system/sw/bin/nvidia-smi \
+      --query-gpu=name,memory.total,driver_version \
+      --format=csv,noheader >/dev/null
+    /run/current-system/sw/bin/curl --fail --silent --show-error \
+      http://127.0.0.1:11434/api/version >/dev/null
+    /run/current-system/sw/bin/curl --fail --silent --show-error \
+      http://127.0.0.1:11435/api/version >/dev/null
+    /run/current-system/sw/bin/systemctl is-active \
+      ollama.service \
+      ollama-smoke-test.service \
+      podman-ollama-container.service >/dev/null
+  '';
+
   pinRefreshFlakeRef = "path:${inputs.pin-refresh-source}";
 
   routerCriticalUnits = [
@@ -181,6 +196,23 @@ let
       description = "Agent workbench VM (nixos-shell)";
     }
     {
+      name = "s-llm-inference";
+      description = "GPU-backed Ollama inference VM (nixos-shell)";
+      persistentDisk = false;
+      healthCheck = {
+        command = lib.escapeShellArgs [
+          (lib.getExe guestAgentHealth)
+          (qgaSocketFor "s-llm-inference")
+          "/run/current-system/sw/bin/bash"
+          "-c"
+          inferenceHealthCommand
+        ];
+        timeoutSeconds = 20;
+        retries = 360;
+        intervalSeconds = 5;
+      };
+    }
+    {
       name = "s-router-legacy-edge";
       description = "s-router-legacy-edge VM (nixos-shell)";
     }
@@ -262,9 +294,9 @@ let
         intervalSeconds = 2;
       };
       storage.persistentDisk = {
-        enable = true;
+        enable = vm.persistentDisk or true;
         fileName = "state.qcow2";
-        size = "100G";
+        size = vm.storageSize or "100G";
       };
       runner = {
         stopGraceSeconds = 60;

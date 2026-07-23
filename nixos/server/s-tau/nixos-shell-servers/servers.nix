@@ -2,7 +2,10 @@
 {
   imports = [
     (import ../../nixos-shell-vm-inventory.nix {
-      startOnBootInstances = [ "s-test" ];
+      startOnBootInstances = [
+        "s-llm-inference"
+        "s-test"
+      ];
     })
   ];
 }
