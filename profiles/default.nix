@@ -92,6 +92,7 @@
       agents = import ./nixos/llm-clients/agents.nix;
     };
     llm = {
+      model-sets = import ./nixos/llm/model-sets.nix;
       ollama-base = import ./nixos/llm/ollama-base.nix;
       open-webui = import ./nixos/llm/open-webui.nix;
     };
