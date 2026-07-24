@@ -307,6 +307,20 @@ def get_json(url: str, timeout: int) -> dict[str, Any]:
         return json.load(response)
 
 
+def require_model(tags: dict[str, Any], required_model: str) -> None:
+    models = tags.get("models")
+    if not isinstance(models, list):
+        raise RuntimeError("Ollama returned an invalid model inventory")
+
+    names = {
+        model.get("name")
+        for model in models
+        if isinstance(model, dict) and isinstance(model.get("name"), str)
+    }
+    if required_model not in names:
+        raise RuntimeError(f"required Ollama model is unavailable: {required_model}")
+
+
 class OllamaClassifier:
     def __init__(self, config: dict[str, Any]) -> None:
         self.base_url = config["ollama"]["baseUrl"].rstrip("/")
@@ -320,9 +334,7 @@ class OllamaClassifier:
 
     def verify_model(self) -> None:
         tags = get_json(f"{self.base_url}/api/tags", self.timeout)
-        names = {model.get("name") for model in tags.get("models", [])}
-        if self.model not in names:
-            raise RuntimeError(f"required Ollama model is unavailable: {self.model}")
+        require_model(tags, self.model)
 
     def classify(self, message: dict[str, str]) -> Classification:
         prompt = {
@@ -781,6 +793,13 @@ def self_test() -> None:
         minimum_confidence=0.62,
         recommended=True,
     )
+    require_model({"models": [{"name": "expected:test"}]}, "expected:test")
+    try:
+        require_model({"models": [{"name": "other:test"}]}, "expected:test")
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("a missing exact Ollama model must fail")
     emit("self_test_passed")
 
 
@@ -789,6 +808,11 @@ def main() -> int:
     parser.add_argument("--config", type=Path)
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--probe", action="store_true")
+    parser.add_argument(
+        "--skip-model-verification",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args()
 
     if args.self_test:
@@ -799,7 +823,21 @@ def main() -> int:
 
     config = json.loads(args.config.read_text())
     classifier = OllamaClassifier(config)
-    classifier.verify_model()
+    if not args.skip_model_verification:
+        try:
+            classifier.verify_model()
+        except (
+            json.JSONDecodeError,
+            OSError,
+            RuntimeError,
+            urllib.error.URLError,
+        ) as error:
+            emit(
+                "ollama_probe_failed",
+                error=type(error).__name__,
+                model=classifier.model,
+            )
+            return 1
     if args.probe:
         emit("ollama_probe_passed", model=classifier.model)
         return 0

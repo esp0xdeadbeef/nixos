@@ -166,6 +166,11 @@ let
       failures=0
       processed_accounts=0
 
+      if ! ${lib.getExe classifier} --config ${lib.escapeShellArg configFile} --probe; then
+        echo "mail-classifier: Ollama preflight failed" >&2
+        exit 1
+      fi
+
       words() {
         local input="''${1:-}"
         printf '%s\n' "$input" | tr ',\t\r\n' ' '
@@ -285,7 +290,9 @@ let
           export MAIL_CLASSIFIER_IMAP_PASSWORD="$password"
           unset_account_vars
 
-          if ${lib.getExe classifier} --config ${lib.escapeShellArg configFile}; then
+          if ${lib.getExe classifier} \
+            --config ${lib.escapeShellArg configFile} \
+            --skip-model-verification; then
             processed_accounts=$((processed_accounts + 1))
           else
             failures=$((failures + 1))
@@ -388,16 +395,30 @@ in
       description = "IMAP connect and operation timeout.";
     };
 
-    schedule = lib.mkOption {
-      type = lib.types.str;
-      default = "*-*-* *:*:00";
-      description = "Systemd calendar expression used to inspect mailboxes.";
-    };
+    timer = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether the periodic mailbox classifier timer is enabled.";
+      };
 
-    timer.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Whether the every-minute mailbox classifier timer is enabled.";
+      onBootSec = lib.mkOption {
+        type = lib.types.str;
+        default = "1min";
+        description = "Delay after boot before the first mailbox classification run.";
+      };
+
+      interval = lib.mkOption {
+        type = lib.types.str;
+        default = "15min";
+        description = "Interval between regular mailbox classification runs.";
+      };
+
+      failureRetrySec = lib.mkOption {
+        type = lib.types.str;
+        default = "1min";
+        description = "Delay before retrying a failed mailbox classification run.";
+      };
     };
 
     ollama = {
@@ -484,19 +505,21 @@ in
         RestrictNamespaces = true;
         RestrictRealtime = true;
         RestrictSUIDSGID = true;
+        Restart = "on-failure";
+        RestartSec = cfg.timer.failureRetrySec;
         SystemCallArchitectures = "native";
         UMask = "0077";
       };
     };
 
     systemd.timers.${serviceName} = lib.mkIf cfg.timer.enable {
-      description = "Inspect hosted IMAP inboxes every minute";
+      description = "Periodically inspect hosted IMAP inboxes";
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = cfg.schedule;
+        OnBootSec = cfg.timer.onBootSec;
+        OnUnitActiveSec = cfg.timer.interval;
         AccuracySec = "1s";
         RandomizedDelaySec = "5s";
-        Persistent = true;
       };
     };
 

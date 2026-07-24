@@ -74,15 +74,23 @@ prevents duplicate traversal by every shared mailbox owner. A mailbox set added
 through the normal secret-and-rebuild workflow is included automatically when
 the host sets `local.mail.mailboxSets.names = null`.
 
-The default timer schedule is once per minute. Runs cannot overlap because the
-classifier is a single systemd oneshot service. Missing secrets fail the
-current run immediately so a later timer invocation can retry; they cannot
-leave an indefinitely blocked service behind.
+The classifier runs one minute after boot and then every fifteen minutes.
+Runs cannot overlap because the classifier is a single systemd oneshot service.
+A failed run is retried after one minute; once a run succeeds, the normal
+fifteen-minute interval resumes. Missing secrets fail the current run
+immediately and therefore follow the same bounded retry path.
 
-Each account verifies the exact Ollama model before opening IMAP. If Ollama
-becomes unreachable after that probe, the current account stops after the first
+Before opening any IMAP account, the runner probes Ollama once and requires an
+exact match for the configured model tag. An unreachable endpoint, timeout,
+invalid model inventory, or missing exact model marks the systemd service as
+failed. Systemd retries that failed run after one minute.
+
+After a successful preflight, the per-account processes reuse that result rather
+than downloading the same model inventory eleven times. If Ollama becomes
+unreachable after the preflight, the current account stops after the first
 failed request instead of retrying every message. No MOVE is attempted for that
-message, and the next timer run starts again from the still-present source UID.
+message, and the failed service follows the same one-minute retry path from the
+still-present source UID.
 
 ## Rollout
 
