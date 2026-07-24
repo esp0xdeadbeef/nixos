@@ -22,14 +22,42 @@ let
     inherit inventoryPath;
   };
 
+  controlPlaneArtifact =
+    let
+      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmBuilt);
+    in
+    {
+      kind = "network-control-plane-artifact";
+      artifactIdentity = artifactDigest;
+      inherit artifactDigest;
+      control_plane_model = cpmBuilt;
+      authorityConflicts = [ ];
+      provenance = {
+        producer = "nixos/${hostName}";
+        source = "network-control-plane-model";
+      };
+    };
+
+  canonicalBundle = inputs.network-realization-model.lib.realize {
+    input = controlPlaneArtifact;
+    requestScope = {
+      kind = "complete-artifact";
+      identity = hostName;
+    };
+    rootLockIdentity = builtins.hashString "sha256" (builtins.readFile ../../../../flake.lock);
+    producerRevision =
+      inputs.network-realization-model.rev
+        or inputs.network-realization-model.dirtyRev
+        or "uncommitted";
+  };
+
   rendererInput = {
     inherit hostName;
-    cpm = cpmBuilt;
-    controlPlane = cpmBuilt;
+    bundle = canonicalBundle;
   };
 
   render-nixos =
-    inputs.network-renderer-nixos.libBySystem.${system}.renderer.hostModule (
+    inputs.network-renderer-nixos.libBySystem.${system}.renderer.canonical.hostModule (
       rendererInput
       // {
         inherit lib selectorFile;
@@ -37,15 +65,22 @@ let
     );
 
   render-nebula =
-    inputs.network-renderer-nebula.libBySystem.${system}.renderer.hostModule
+    inputs.network-renderer-nebula.libBySystem.${system}.renderer.canonical.hostModule
       rendererInput;
 
   render-wireguard =
-    inputs.network-renderer-wireguard.libBySystem.${system}.renderer.hostModule
+    inputs.network-renderer-wireguard.libBySystem.${system}.renderer.canonical.hostModule
       rendererInput;
 
   renderer-contract = {
-    inherit render-nixos render-nebula render-wireguard;
+    inherit
+      canonicalBundle
+      controlPlaneArtifact
+      render-nebula
+      render-nixos
+      render-wireguard
+      ;
+    cpm = cpmBuilt;
     sops-for-renderers = sops;
   };
 in

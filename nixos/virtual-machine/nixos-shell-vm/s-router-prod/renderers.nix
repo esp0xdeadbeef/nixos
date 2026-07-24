@@ -4,6 +4,7 @@
 , selectorFile
 , system
 , controlPlaneModelInput ? inputs.network-control-plane-model
+, networkRealizationModelInput ? inputs.network-realization-model
 , controlPlaneTransform ? cpm: cpm
 , nixosRendererInput ? inputs.network-renderer-nixos
 , hostName ? "s-router-prod"
@@ -24,14 +25,42 @@ let
   };
   cpmForRenderer = controlPlaneTransform cpmBuilt;
 
+  controlPlaneArtifact =
+    let
+      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmForRenderer);
+    in
+    {
+      kind = "network-control-plane-artifact";
+      artifactIdentity = artifactDigest;
+      inherit artifactDigest;
+      control_plane_model = cpmForRenderer;
+      authorityConflicts = [ ];
+      provenance = {
+        producer = "nixos/s-router-prod";
+        source = "network-control-plane-model";
+      };
+    };
+
+  canonicalBundle = networkRealizationModelInput.lib.realize {
+    input = controlPlaneArtifact;
+    requestScope = {
+      kind = "complete-artifact";
+      identity = "s-router-prod";
+    };
+    rootLockIdentity = builtins.hashString "sha256" (builtins.readFile ../../../../flake.lock);
+    producerRevision =
+      networkRealizationModelInput.rev
+        or networkRealizationModelInput.dirtyRev
+        or "uncommitted";
+  };
+
   rendererInput = {
     inherit hostName;
-    cpm = cpmForRenderer;
-    controlPlane = cpmForRenderer;
+    bundle = canonicalBundle;
   };
 
   render-nixos =
-    nixosRendererInput.libBySystem.${system}.renderer.hostModule (
+    nixosRendererInput.libBySystem.${system}.renderer.canonical.hostModule (
       rendererInput
       // {
         inherit lib selectorFile;
@@ -39,7 +68,7 @@ let
     );
 
   renderer-contract = {
-    inherit render-nixos;
+    inherit canonicalBundle controlPlaneArtifact render-nixos;
     cpm = cpmForRenderer;
     inventory = import inventoryPath { };
     inherit intentPath inventoryPath;

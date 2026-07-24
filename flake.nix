@@ -28,14 +28,17 @@
 
     network-renderer-nebula = {
       url = "github:esp0xdeadbeef/network-renderer-nebula";
+      inputs.network-realization-model.follows = "network-realization-model";
     };
 
     network-renderer-wireguard = {
       url = "github:esp0xdeadbeef/network-renderer-wireguard";
+      inputs.network-realization-model.follows = "network-realization-model";
     };
 
     network-renderer-access-endpoint-nixos = {
       url = "github:esp0xdeadbeef/network-renderer-access-endpoint-nixos";
+      inputs.network-realization-model.follows = "network-realization-model";
     };
 
     network-control-plane-model = {
@@ -43,8 +46,20 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    network-realization-schema = {
+      url = "github:esp0xdeadbeef/network-realization-schema";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    network-realization-model = {
+      url = "github:esp0xdeadbeef/network-realization-model";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-realization-schema.follows = "network-realization-schema";
+    };
+
     network-renderer-nixos = {
       url = "github:esp0xdeadbeef/network-renderer-nixos";
+      inputs.network-realization-model.follows = "network-realization-model";
     };
 
     network-compiler-prod = {
@@ -59,9 +74,20 @@
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/efb5687d0f5d4bcb642bc112fe62d5d9851a2fba";
+      url = "github:esp0xdeadbeef/network-control-plane-model/087e15597eb394d7f233809094c1d0850e2115fc";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
+    };
+
+    network-realization-schema-prod = {
+      url = "github:esp0xdeadbeef/network-realization-schema/a033ad80648c64b4c51f1842f3da0c3fc440eeb6";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    network-realization-model-prod = {
+      url = "github:esp0xdeadbeef/network-realization-model/e79a3c1ef0b488dceda37c8755b024875a1e8d1a";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-realization-schema.follows = "network-realization-schema-prod";
     };
 
     nixos-network-compiler-prod = {
@@ -70,10 +96,11 @@
     };
 
     network-renderer-nixos-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/4e30350b1d7f7eb2fc954f19230f44941d21a610";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/35824798681941e93c5fc90fd50be10552ecaf29";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
+      inputs.network-realization-model.follows = "network-realization-model-prod";
       inputs.nixos-network-compiler.follows = "nixos-network-compiler-prod";
     };
 
@@ -109,6 +136,7 @@
 
     network-renderer-containerlab-linux-backend = {
       url = "github:esp0xdeadbeef/network-renderer-containerlab-linux-backend";
+      inputs.network-realization-model.follows = "network-realization-model";
     };
 
     llm-agents = {

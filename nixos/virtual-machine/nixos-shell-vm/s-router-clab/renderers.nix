@@ -22,10 +22,38 @@ let
     inherit inventoryPath;
   };
 
+  controlPlaneArtifact =
+    let
+      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmBuilt);
+    in
+    {
+      kind = "network-control-plane-artifact";
+      artifactIdentity = artifactDigest;
+      inherit artifactDigest;
+      control_plane_model = cpmBuilt;
+      authorityConflicts = [ ];
+      provenance = {
+        producer = "nixos/${hostName}";
+        source = "network-control-plane-model";
+      };
+    };
+
+  canonicalBundle = inputs.network-realization-model.lib.realize {
+    input = controlPlaneArtifact;
+    requestScope = {
+      kind = "complete-artifact";
+      identity = hostName;
+    };
+    rootLockIdentity = builtins.hashString "sha256" (builtins.readFile ../../../../flake.lock);
+    producerRevision =
+      inputs.network-realization-model.rev
+        or inputs.network-realization-model.dirtyRev
+        or "uncommitted";
+  };
+
   rendererInput = {
     inherit hostName;
-    cpm = cpmBuilt;
-    controlPlane = cpmBuilt;
+    bundle = canonicalBundle;
     # Management VLAN from CPM deployment hosts (URS: inventory → CPM → renderer)
     managementVlan =
       let
@@ -42,53 +70,26 @@ let
   };
 
   render-clab =
-    { lib, pkgs, ... }:
-    {
-      _module.args.clabDeploymentHost = rendererInput.hostName;
-      _module.args.clabCpmJsonPath =
-        builtins.toFile
-          "cpm-${rendererInput.hostName}.json"
-          (builtins.toJSON rendererInput.cpm);
-      _module.args.clabRendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath;
-      _module.args.containerlabLinuxRendererSelf = builtins.path {
-        path = inputs.network-renderer-containerlab-linux-backend;
-        name = "network-renderer-containerlab-linux-backend";
-      };
-      _module.args.containerlabLinuxGenerateClabConfig =
-        inputs.network-renderer-containerlab-linux-backend.packages.${pkgs.stdenv.hostPlatform.system}.generate-clab-config;
-      _module.args.containerlabLinuxRendererInput =
-        builtins.removeAttrs rendererInput [
-          "cpm"
-          "controlPlane"
-          "cpmJsonPath"
-          "deploymentHost"
-          "rendererInventoryJsonPath"
-        ];
-
-      assertions = [
-        {
-          assertion = rendererInput ? hostName;
-          message = "containerlab linux renderer input must include hostName";
-        }
-      ];
-
-      networking.hostName = lib.mkDefault rendererInput.hostName;
-
-      imports = [
-        "${inputs.network-renderer-containerlab-linux-backend}/host-module.nix"
-      ];
-    };
+    inputs.network-renderer-containerlab-linux-backend.lib.renderer.canonical.hostModule
+      rendererInput;
 
   render-nebula =
-    inputs.network-renderer-nebula.libBySystem.${system}.renderer.hostModule
+    inputs.network-renderer-nebula.libBySystem.${system}.renderer.canonical.hostModule
       rendererInput;
 
   render-wireguard =
-    inputs.network-renderer-wireguard.libBySystem.${system}.renderer.hostModule
+    inputs.network-renderer-wireguard.libBySystem.${system}.renderer.canonical.hostModule
       rendererInput;
 
   renderer-contract = {
-    inherit render-clab render-nebula render-wireguard;
+    inherit
+      canonicalBundle
+      controlPlaneArtifact
+      render-clab
+      render-nebula
+      render-wireguard
+      ;
+    cpm = cpmBuilt;
     sops-for-renderers = sops;
   };
 in

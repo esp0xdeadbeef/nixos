@@ -36,6 +36,7 @@ in
     "${modelSource}/runtime-secrets.nix"
     ./ipv6.nix
     ./dns-core-path-route-override.nix
+    ./forwarding-invariants.nix
     ./nebula-ingress-path-route-override.nix
     ./vlan2-ipv6-path-mtu-override.nix
     ./vlan2-reservation-dns.nix
@@ -52,6 +53,7 @@ in
         ;
 
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
+      networkRealizationModelInput = inputs.network-realization-model-prod;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
       inherit system;
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
