@@ -1,4 +1,8 @@
-{ pkgs, profiles, ... }:
+{ lib
+, pkgs
+, profiles
+, ...
+}:
 {
   imports = [
     profiles.nixos.server.dell-vm-host
@@ -21,6 +25,13 @@
       PROGRAM ${pkgs.coreutils}/bin/true
     '';
   };
+
+  # Keep large, long-running Android source and build closures available
+  # between sessions. Re-enable automatic GC after the Karen port stabilizes.
+  nix.gc.automatic = lib.mkForce false;
+  warnings = lib.mkAfter [
+    "s-tau: automatic Nix GC is disabled for the Karen LineageOS port. Review and re-enable it no later than 2027-07-25 to prevent unbounded Nix store growth."
+  ];
 
   local.virtualization.pciPassthrough = {
     enable = true;
