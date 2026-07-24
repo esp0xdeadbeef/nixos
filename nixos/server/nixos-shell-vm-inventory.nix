@@ -198,6 +198,11 @@ let
       description = "Agent workbench VM (nixos-shell)";
     }
     {
+      name = "s-mail-classifier";
+      description = "Move-only hosted mailbox classifier VM (nixos-shell)";
+      storageSize = "8G";
+    }
+    {
       name = "s-llm-inference";
       description = "GPU-backed Ollama inference VM (nixos-shell)";
       persistentDisk = false;

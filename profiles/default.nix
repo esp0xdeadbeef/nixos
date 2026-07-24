@@ -60,6 +60,7 @@
       workstation = import ./nixos/network/workstation.nix;
     };
     mail = {
+      classifier = import ./nixos/mail/classifier;
       mailbox-sets = import ./nixos/mail/mailbox-sets.nix;
       server = import ./nixos/mail/server;
     };
