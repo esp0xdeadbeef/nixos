@@ -15,8 +15,8 @@
     ];
     dates = "4:30";
     randomizedDelaySec = "15min";
-    operation = "boot";
-    allowReboot = false;
+    operation = lib.mkDefault "boot";
+    allowReboot = lib.mkDefault false;
   };
 
   systemd.services.nixos-upgrade = {
