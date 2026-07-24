@@ -17,11 +17,7 @@
     sharedInheritInboxAcl = true;
     sharedSubscriptions = {
       service.wantedBy = [ "multi-user.target" ];
-      timer = {
-        enable = true;
-        onBootSec = "2min";
-        onUnitActiveSec = "5min";
-      };
+      timer.enable = false;
     };
 
     networkAddress.unit = "${config.networking.hostName}-network-addresses.service";
