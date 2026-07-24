@@ -107,12 +107,10 @@ in
                 export SAVEHIST=1000000000
                 export EDITOR="''${EDITOR:-vim}"
                 export VISUAL="''${VISUAL:-vim}"
-                if [[ -z "$HISTFILE" ]]; then
-                  if [[ -d "/persist/$HOME" ]]; then
-                    export HISTFILE="/persist/$HOME/.zsh_history"
-                  else
-                    export HISTFILE="$HOME/.zsh_history"
-                  fi
+                if [[ -d "/persist/$HOME" ]]; then
+                  export HISTFILE="/persist/$HOME/.zsh_history"
+                elif [[ -z "$HISTFILE" ]]; then
+                  export HISTFILE="$HOME/.zsh_history"
                 fi
                 if [[ -n "$HISTFILE" ]]; then
                   mkdir -p -- "''${HISTFILE:h}" 2>/dev/null || true
