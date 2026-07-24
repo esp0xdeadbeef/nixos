@@ -30,7 +30,8 @@ pkgs.writeShellApplication {
     shared_inherit_inbox_acl=${lib.escapeShellArg (if cfg.sharedInheritInboxAcl then "1" else "0")}
     vmail_root=/var/vmail
     shared_sender_logins_raw="$shared_sender_logins.raw"
-    trap 'rm -f "$shared_sender_logins_raw"' EXIT
+    desired_subscriptions_dir="$(mktemp -d)"
+    trap 'rm -f "$shared_sender_logins_raw"; rm -rf -- "$desired_subscriptions_dir"' EXIT
 
     words() {
       local input="''${1:-}"
@@ -269,14 +270,31 @@ pkgs.writeShellApplication {
       printf '%s/%s/%s/mail/subscriptions\n' "$vmail_root" "$user_domain" "$user_local"
     }
 
-    remove_managed_subscriptions() {
+    desired_subscriptions_file_for_user() {
+      local user="$1"
+      local user_hash
+
+      user_hash="$(printf '%s' "$user" | sha256sum | awk '{print $1}')"
+      printf '%s/%s\n' "$desired_subscriptions_dir" "$user_hash"
+    }
+
+    record_desired_subscription() {
+      local user="$1"
+      local mailbox="$2"
+      local desired_file
+
+      desired_file="$(desired_subscriptions_file_for_user "$user")"
+      printf '%s\n' "$mailbox" >> "$desired_file"
+    }
+
+    project_managed_subscriptions() {
       local subscriptions_file="$1"
+      local desired_file="$2"
       local managed_domain
       local managed_domains
       local managed_user
+      local subscriptions_dir
       local tmp
-
-      [ -f "$subscriptions_file" ] || return 0
 
       managed_domains="$(
         for managed_user in "''${all_users[@]}"; do
@@ -287,49 +305,76 @@ pkgs.writeShellApplication {
         done | sort -u | tr '\n' ' '
       )"
 
+      subscriptions_dir="$(dirname "$subscriptions_file")"
+      if [ ! -d "$subscriptions_dir" ]; then
+        echo "shared-mail-subscriptions: subscriptions directory is unavailable" >&2
+        return 1
+      fi
+
       tmp="$(mktemp "''${subscriptions_file}.tmp.XXXXXX")"
-      awk -v current="$shared_namespace_prefix" -v managed_domains="$managed_domains" '
-        BEGIN {
-          split(managed_domains, domains, " ")
-        }
-
-        {
-          keep = 1
-          prefixes[1] = "shared"
-          prefixes[2] = "users"
-          prefixes[3] = current
-
-          for (i = 1; i <= 3; i++) {
-            prefix = prefixes[i]
-            if (prefix != "" && ($0 == prefix || index($0, prefix "/") == 1 || index($0, prefix "\t") == 1)) {
-              keep = 0
-              break
+      {
+        if [ -f "$subscriptions_file" ]; then
+          awk -v current="$shared_namespace_prefix" -v managed_domains="$managed_domains" '
+            BEGIN {
+              split(managed_domains, domains, " ")
             }
-          }
 
-          for (i in domains) {
-            domain = domains[i]
-            if (domain != "" && ($0 == domain || index($0, domain "/") == 1 || index($0, domain "\t") == 1)) {
-              keep = 0
-              break
+            {
+              keep = 1
+              prefixes[1] = "shared"
+              prefixes[2] = "users"
+              prefixes[3] = current
+
+              for (i = 1; i <= 3; i++) {
+                prefix = prefixes[i]
+                if (prefix != "" && ($0 == prefix || index($0, prefix "/") == 1 || index($0, prefix "\t") == 1)) {
+                  keep = 0
+                  break
+                }
+              }
+
+              for (i in domains) {
+                domain = domains[i]
+                if (domain != "" && ($0 == domain || index($0, domain "/") == 1 || index($0, domain "\t") == 1)) {
+                  keep = 0
+                  break
+                }
+              }
+
+              if (keep) {
+                print
+              }
             }
-          }
+          ' "$subscriptions_file"
+        fi
 
-          if (keep) {
-            print
-          }
+        if [ -f "$desired_file" ]; then
+          sort -u "$desired_file"
+        fi
+      } | awk '
+        NF != 0 && !seen[$0]++ {
+          print
         }
-      ' "$subscriptions_file" > "$tmp"
-      chown --reference="$subscriptions_file" "$tmp"
-      chmod --reference="$subscriptions_file" "$tmp"
+      ' > "$tmp"
+
+      if [ -f "$subscriptions_file" ]; then
+        chown --reference="$subscriptions_file" "$tmp"
+        chmod --reference="$subscriptions_file" "$tmp"
+      else
+        chown --reference="$subscriptions_dir" "$tmp"
+        chmod 0600 "$tmp"
+      fi
       mv "$tmp" "$subscriptions_file"
     }
 
-    clear_managed_subscriptions() {
+    project_all_managed_subscriptions() {
+      local desired_file
+
       for user in "''${all_users[@]}"; do
         subscriptions_file="$(subscriptions_file_for_user "$user" || true)"
         [ -n "$subscriptions_file" ] || continue
-        remove_managed_subscriptions "$subscriptions_file"
+        desired_file="$(desired_subscriptions_file_for_user "$user")"
+        project_managed_subscriptions "$subscriptions_file" "$desired_file"
       done
     }
 
@@ -561,7 +606,7 @@ pkgs.writeShellApplication {
 
       for attempt in 1 2 3; do
         if doveadm acl debug -u "$user" "$mailbox" >/dev/null 2>&1; then
-          doveadm mailbox subscribe -u "$user" "$mailbox" >/dev/null
+          record_desired_subscription "$user" "$mailbox"
           return 0
         fi
 
@@ -577,7 +622,6 @@ pkgs.writeShellApplication {
     : > "$shared_sender_logins_raw"
 
     load_mailbox_users
-    clear_managed_subscriptions
     sync_automatic_account_mailboxes
     sync_declared_shared_mailboxes
 
@@ -622,6 +666,7 @@ pkgs.writeShellApplication {
       exit 1
     fi
 
+    project_all_managed_subscriptions
     echo "shared-mail-subscriptions: synced $subscribed subscription(s)"
   '';
 }

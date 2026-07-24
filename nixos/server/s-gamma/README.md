@@ -187,13 +187,10 @@ the normal discovered order. On `s-gamma`, that one hosted default mailbox set
 is also the source of truth for the canonical website domain. Activation fails
 when no hosted set, or more than one hosted set, contains a default marker.
 
-Retention is account-driven. Set `MAIL_ACCOUNT_RETENTION_DAYS=30` on
-administrative or shared mailboxes such as contact, no-reply, and postmaster
-accounts. The server-side retention timer caps account-provided values at
-`local.mail.mailboxSets.retention.maxDays`, which defaults to 30 days.
-By default the timer applies to all Dovecot mailboxes for that account. Set
-`MAIL_ACCOUNT_RETENTION_MAILBOXES="INBOX Junk"` when a specific account needs a
-smaller mailbox list.
+The reusable mail-server profile supports account-driven retention, but
+`s-gamma` disables it. No account secret can enable `doveadm expunge` on this
+host. Inbox cleanup is performed only by moving messages to stable destination
+mailboxes; `Junk` is a destination, never a deletion queue.
 
 The network address env secret is a shell env file for provider addresses:
 
@@ -291,9 +288,14 @@ are not needed for normal account-to-client sharing. The
 `<host>-mail-shared-subscriptions` unit refreshes the Dovecot sharing map,
 subscribes users to explicitly managed same-domain shared mailbox folders, and
 rebuilds the Postfix sender-login map for ACL entries with the `post` right. On
-`s-gamma` this unit is started automatically by Dovecot on boot and restart, so
-mailbox subscriptions are projected when the mail runtime is initialized without
-running a periodic refresh timer.
+`s-gamma` it is started by Dovecot, by `multi-user.target`, and by a periodic
+reconciliation timer. Newly declared mailbox sets therefore require no
+client-side subscription settings and converge again after transient failures.
+Reconciliation first builds and validates the complete desired projection. It
+then atomically replaces each user's subscription file while retaining
+unmanaged subscriptions. A failed ACL lookup or incomplete discovery leaves
+all previous subscriptions untouched; clients never observe a global
+clear-and-gradual-rebuild window.
 Set `profiles.mail.server.sharedNamespaceIncludeDomain = true` for deployments
 that need disambiguation across multiple shared domain listings, yielding
 `s/example.com/contact`. Set `profiles.mail.server.sharedExplicitInbox = true`

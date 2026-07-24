@@ -221,10 +221,18 @@ in
       };
     };
 
-    retention.maxDays = lib.mkOption {
-      type = lib.types.ints.positive;
-      default = 30;
-      description = "Maximum number of days any account-provided retention policy may keep messages.";
+    retention = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether account-provided retention policies may permanently expunge messages.";
+      };
+
+      maxDays = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 30;
+        description = "Maximum number of days any account-provided retention policy may keep messages.";
+      };
     };
   };
 
@@ -416,7 +424,7 @@ in
         };
     };
 
-    systemd.services.${mailRetentionService} = {
+    systemd.services.${mailRetentionService} = lib.mkIf cfg.retention.enable {
       description = "Apply Dovecot retention policies from SOPS mail account profiles";
       after = [
         "dovecot.service"
@@ -435,7 +443,7 @@ in
       };
     };
 
-    systemd.timers.${mailRetentionService} = {
+    systemd.timers.${mailRetentionService} = lib.mkIf cfg.retention.enable {
       description = "Run Dovecot mail retention policies";
       wantedBy = [ "timers.target" ];
       timerConfig = {
