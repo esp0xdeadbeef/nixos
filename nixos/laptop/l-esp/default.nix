@@ -36,6 +36,12 @@
 
   environment.etc.hosts.enable = false;
 
+  services.udev.extraRules = ''
+    SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", MODE="0660", GROUP="users", TAG+="uaccess"
+    SUBSYSTEM=="usb", ATTR{idVendor}=="22d9", ATTR{idProduct}=="0006", MODE="0660", GROUP="users", TAG+="uaccess"
+    SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="22d9", ATTRS{idProduct}=="0006", MODE="0660", GROUP="users", TAG+="uaccess"
+  '';
+
   systemd.tmpfiles.rules = [
     "d /home/deadbeef/.quickget/windows-10 0755 deadbeef users -"
     "h /home/deadbeef/.quickget/windows-10 - - - - +C"
