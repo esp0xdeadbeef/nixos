@@ -9,6 +9,10 @@
     enable = true;
     rootMapperName = "crypted";
 
+    extraUserDirectories = [
+      ".android"
+    ];
+
     extraUserFiles = [
       ".xlayoutdisplay"
     ];
