@@ -12,12 +12,18 @@ The host uses:
 - RAID0 across the two NVMe root members.
 - LUKS container name `crypted`.
 - Btrfs subvolumes `/`, `/nix`, `/persist`, and `/vmstore`.
+- A temporary, host-specific Robotnix cache bind at `/var/cache/ccache`, backed
+  by `/persist/var/cache/ccache` and capped at 400 GB.
 - Lanzaboote with `boot.lanzaboote.pkiBundle = "/persist/etc/secureboot"`.
 - Clevis/Tang unlock for the root LUKS device.
 - SOPS for the installed user's password and host secrets.
 
 Do not use `nixos-anywhere` for this host until this manual path has been
 validated again.
+
+The Robotnix cache and its Nix sandbox exception are temporary porting aids.
+The evaluated configuration emits a reminder to review and remove both no
+later than 2027-07-25.
 
 ## Public-repo rules
 

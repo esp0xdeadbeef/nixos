@@ -43,7 +43,7 @@
   warnings = lib.mkAfter [
     "s-tau: automatic Nix GC is disabled for the Karen LineageOS port. Review and re-enable it no later than 2027-07-25 to prevent unbounded Nix store growth."
     "s-tau: failed Nix sandboxes are retained for the Karen LineageOS port. Review /nix/var/nix/builds and disable keep-failed no later than 2027-07-25 to prevent unbounded scratch-space growth."
-    "s-tau: the Robotnix compiler cache may grow to 400 GB. Review /var/cache/ccache and remove its sandbox exception no later than 2027-07-25 when the Karen port stabilizes."
+    "s-tau: the persistent Robotnix compiler cache may grow to 400 GB. Review /persist/var/cache/ccache and remove its persistence and sandbox exception no later than 2027-07-25 when the Karen port stabilizes."
   ];
 
   local.virtualization.pciPassthrough = {

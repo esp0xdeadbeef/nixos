@@ -11,6 +11,12 @@
 
     extraSystemDirectories = [
       "/etc/nebula"
+      {
+        directory = "/var/cache/ccache";
+        user = "root";
+        group = "nixbld";
+        mode = "2770";
+      }
     ];
   };
 }
