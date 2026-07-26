@@ -27,10 +27,15 @@
   };
 
   # Keep large, long-running Android source and build closures available
-  # between sessions. Re-enable automatic GC after the Karen port stabilizes.
+  # between sessions. Keep failed sandboxes for late-stage Android build
+  # diagnosis; unlike store paths, these require explicit manual cleanup.
+  # Re-enable automatic GC and disable failed-build retention after the Karen
+  # port stabilizes.
   nix.gc.automatic = lib.mkForce false;
+  nix.settings.keep-failed = true;
   warnings = lib.mkAfter [
     "s-tau: automatic Nix GC is disabled for the Karen LineageOS port. Review and re-enable it no later than 2027-07-25 to prevent unbounded Nix store growth."
+    "s-tau: failed Nix sandboxes are retained for the Karen LineageOS port. Review /nix/var/nix/builds and disable keep-failed no later than 2027-07-25 to prevent unbounded scratch-space growth."
   ];
 
   local.virtualization.pciPassthrough = {
