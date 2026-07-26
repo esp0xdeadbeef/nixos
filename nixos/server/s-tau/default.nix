@@ -32,10 +32,18 @@
   # Re-enable automatic GC and disable failed-build retention after the Karen
   # port stabilizes.
   nix.gc.automatic = lib.mkForce false;
-  nix.settings.keep-failed = true;
+  nix.settings = {
+    extra-sandbox-paths = [ "/var/cache/ccache" ];
+    keep-failed = true;
+  };
+  systemd.tmpfiles.rules = [
+    "d /var/cache/ccache 2770 root nixbld -"
+    "f+ /var/cache/ccache/ccache.conf 0660 root nixbld - max_size = 400G"
+  ];
   warnings = lib.mkAfter [
     "s-tau: automatic Nix GC is disabled for the Karen LineageOS port. Review and re-enable it no later than 2027-07-25 to prevent unbounded Nix store growth."
     "s-tau: failed Nix sandboxes are retained for the Karen LineageOS port. Review /nix/var/nix/builds and disable keep-failed no later than 2027-07-25 to prevent unbounded scratch-space growth."
+    "s-tau: the Robotnix compiler cache may grow to 400 GB. Review /var/cache/ccache and remove its sandbox exception no later than 2027-07-25 when the Karen port stabilizes."
   ];
 
   local.virtualization.pciPassthrough = {
