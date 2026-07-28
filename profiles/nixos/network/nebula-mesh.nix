@@ -66,7 +66,7 @@ in
         use_relays = true;
       };
       listen = {
-        host = "0.0.0.0";
+        host = "[::]";
         port = 0;
       };
       tun = {
