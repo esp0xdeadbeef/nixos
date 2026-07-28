@@ -94,40 +94,45 @@ nixos-install --no-root-passwd --impure --flake path:/root/github/nixos#l-envil
 
 ## TPM unlock
 
-Enroll both encrypted devices. Root is `p4`, encrypted swap is `p3`.
-`--wipe-slot=tpm2` only wipes TPM2 tokens on the LUKS device being enrolled, so
-it is safe to use once for root and once for swap.
+Enroll only the encrypted root on `p4`:
 
 ```bash
 systemd-cryptenroll --unlock-key-file=/tmp/disk.key --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p4
-systemd-cryptenroll --unlock-key-file=/tmp/disk.key --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p3
 ```
 
 If `/tmp/disk.key` is gone, use the current LUKS passphrase when prompted.
 During this bootstrap that is `nixos`.
 
-The runtime initrd must have no `/tmp/disk.key` dependency. Check:
+Encrypted swap on `p3` is deliberately not enrolled in the TPM and must not
+appear in the runtime initrd crypttab. After root is unlocked, the initrd mounts
+the encrypted `persist` subvolume and uses
+`/persist/etc/diskunlock/cryptswap.key` to open swap. If that key is missing or
+cannot open the swap LUKS volume, initrd replaces only the encrypted swap
+volume, writes a new random key under `persist`, and continues without an old
+hibernate image.
+
+Check the runtime configuration:
 
 ```bash
 nix eval .#nixosConfigurations.l-envil.config.boot.initrd.luks.devices.crypted.keyFile
 nix eval .#nixosConfigurations.l-envil.config.boot.initrd.luks.devices.crypted.crypttabExtraOpts
-nix eval .#nixosConfigurations.l-envil.config.boot.initrd.luks.devices.cryptswap.crypttabExtraOpts
+nix eval .#nixosConfigurations.l-envil.config.boot.initrd.luks.devices \
+  --apply 'devices: builtins.hasAttr "cryptswap" devices'
 ```
 
 Expected:
 
 ```text
 null
-[ "tpm2-device=auto" "tpm2-pcrs=7" ]
-[ "tpm2-device=auto" "tpm2-pcrs=7" ]
+[ "tpm2-device=auto" "tpm2-pcrs=7" "tries=5" "password-cache=yes" ]
+false
 ```
 
 After Secure Boot mode changes, firmware updates, or key enrollment changes,
-re-enroll the TPM token from the installed system:
+re-enroll only the root TPM token from the installed system:
 
 ```bash
 sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p4
-sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 --wipe-slot=tpm2 /dev/nvme0n1p3
 ```
 
 ## Secure Boot
@@ -216,7 +221,8 @@ ssh deadbeef@192.168.1.151
 nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#l-envil
 sbctl status
 systemd-cryptenroll /dev/nvme0n1p4
-systemd-cryptenroll /dev/nvme0n1p3
+sudo test -s /persist/etc/diskunlock/cryptswap.key
+sudo cryptsetup status cryptswap
 ```
 
 Replace the temporary passwords and any placeholder SOPS values immediately.

@@ -39,9 +39,11 @@
     "l-envil: systemd-hibernate.service disables systemd's user.slice freezer because hibernate froze immediately after freezing user.slice; remove this once the upstream/systemd sleep-stack issue is fixed."
   ];
 
-  environment.etc."systemd/sleep.conf.d/10-hibernate-shutdown-mode.conf".text = ''
+  # Use the firmware's ACPI S4 path. The previous shutdown fallback wrote a
+  # valid image, but hung before powering off after the BIOS update.
+  environment.etc."systemd/sleep.conf.d/10-hibernate-platform-mode.conf".text = ''
     [Sleep]
-    HibernateMode=shutdown
+    HibernateMode=platform
   '';
 
   systemd.services.systemd-hibernate.environment.SYSTEMD_SLEEP_FREEZE_USER_SESSIONS = "false";
