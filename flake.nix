@@ -156,6 +156,10 @@
       url = "github:nix-community/lanzaboote";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    luz-nvim = {
+      url = "github:miniluz/luz-nvim";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
 
     # Home manager
     #home-manager = {
