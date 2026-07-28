@@ -598,57 +598,202 @@ in
     ];
 
     boot.initrd.systemd.services.rotateBtrfsRoot = lib.mkIf cfg.rotateBtrfsRoot.enable {
-      description = "Rotate /root Btrfs subvolume and prune old roots";
+      description = "Safely rotate the ephemeral /root Btrfs subvolume";
       wantedBy = [ "initrd.target" ];
       after = [
         "systemd-cryptsetup@${cfg.rootMapperName}.service"
         "systemd-hibernate-resume.service"
       ];
+      requires = [ "systemd-cryptsetup@${cfg.rootMapperName}.service" ];
       before = [ "sysroot.mount" ];
-      unitConfig.DefaultDependencies = false;
+      unitConfig = {
+        ConditionPathExists = "/dev/mapper/${cfg.rootMapperName}";
+        DefaultDependencies = false;
+      };
       serviceConfig.Type = "oneshot";
       script = ''
-        #!${pkgs.bash}/bin/bash -euo pipefail
+        #!${pkgs.bash}/bin/bash
+        set -Eeuo pipefail
 
-        mkdir /btrfs_tmp
-        mount /dev/mapper/${cfg.rootMapperName} /btrfs_tmp
+        top=/btrfs_tmp
+        device=/dev/mapper/${cfg.rootMapperName}
+        root="$top/root"
+        old_roots="$top/persist/old_roots"
+        new_root="$top/.root.new.$$"
+        new_root_created=0
+        rotated_root=
 
-        if [[ -e /btrfs_tmp/root ]]; then
-            mkdir -p /btrfs_tmp/persist/old_roots
+        finish() {
+          rc=$?
+          trap - EXIT
 
-            timestamp=$(date --date="@$(stat -c %Y /btrfs_tmp/root)" "+%Y-%m-%-d_%H:%M:%S")
-            old_root="/btrfs_tmp/persist/old_roots/$timestamp"
-            suffix=0
+          if (( rc != 0 )); then
+            if [[ ! -e "$root" ]]; then
+              if [[ -n "$rotated_root" && -e "$rotated_root" ]]; then
+                echo "Restoring previous root after rotation failure" >&2
+                mv -- "$rotated_root" "$root" || true
+              fi
 
-            while [[ -e "$old_root" ]]; do
-                suffix=$((suffix + 1))
-                old_root="/btrfs_tmp/persist/old_roots/''${timestamp}_$suffix"
-            done
+              if [[ ! -e "$root" && "$new_root_created" == 1 && -e "$new_root" ]]; then
+                echo "Installing prepared root after rotation failure" >&2
+                mv -- "$new_root" "$root" || true
+              fi
+            fi
 
-            mv /btrfs_tmp/root "$old_root"
-        fi
+            if [[ -e "$root" && "$new_root_created" == 1 && -e "$new_root" ]]; then
+              btrfs subvolume delete -- "$new_root" || true
+            fi
+          fi
 
-        delete_subvolume_recursively() {
-            IFS=$'\n'
-            for i in $(btrfs subvolume list -o "$1" | cut -f 9- -d ' '); do
-                delete_subvolume_recursively "/btrfs_tmp/$i"
-            done
-            btrfs subvolume delete "$1"
+          if mountpoint -q "$top"; then
+            umount "$top" || true
+          fi
+
+          exit "$rc"
         }
 
-        if [[ -d /btrfs_tmp/persist/old_roots ]]; then
-            for i in $(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
-                delete_subvolume_recursively "$i"
-            done
+        trap finish EXIT
 
-            while read -r i; do
-                delete_subvolume_recursively "/btrfs_tmp/persist/old_roots/$i"
-            done < <(find /btrfs_tmp/persist/old_roots/ -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -r | tail -n +31)
+        mkdir -p "$top"
+        mount -o subvolid=5 "$device" "$top"
+        mkdir -p "$old_roots"
+
+        if [[ -e "$root" ]]; then
+          if [[ -L "$root" ]] \
+            || [[ ! -d "$root" ]] \
+            || [[ "$(stat -c %i -- "$root")" != 256 ]] \
+            || ! btrfs subvolume show "$root" >/dev/null 2>&1
+          then
+            echo "Refusing to rotate non-subvolume root: $root" >&2
+            exit 1
+          fi
         fi
 
-        btrfs subvolume create /btrfs_tmp/root
-        umount /btrfs_tmp
+        btrfs subvolume create "$new_root"
+        new_root_created=1
+
+        if [[ -e "$root" ]]; then
+          timestamp="$(date -u '+%Y-%m-%d_%H-%M-%S')"
+          rotated_root="$old_roots/$timestamp"
+          suffix=0
+
+          while [[ -e "$rotated_root" ]]; do
+            suffix=$((suffix + 1))
+            rotated_root="$old_roots/''${timestamp}-$suffix"
+          done
+
+          mv -- "$root" "$rotated_root"
+          touch -- "$rotated_root"
+        fi
+
+        mv -- "$new_root" "$root"
+        new_root_created=0
+        btrfs filesystem sync "$top"
+
+        umount "$top"
+        trap - EXIT
       '';
+    };
+
+    systemd.services.pruneBtrfsRoots = lib.mkIf cfg.rotateBtrfsRoot.enable {
+      description = "Prune old ephemeral Btrfs root subvolumes";
+      after = [ "local-fs.target" ];
+      unitConfig = {
+        ConditionPathIsDirectory = "${cfg.persistPath}/old_roots";
+        RequiresMountsFor = cfg.persistPath;
+      };
+      path = with pkgs; [
+        btrfs-progs
+        coreutils
+        findutils
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        IOSchedulingClass = "idle";
+      };
+      script = ''
+        set -u
+
+        old_roots=${lib.escapeShellArg "${cfg.persistPath}/old_roots"}
+        max_age_days=30
+        max_roots=30
+
+        is_subvolume() {
+          local path="$1"
+
+          [[ -d "$path" ]] \
+            && [[ ! -L "$path" ]] \
+            && [[ "$(stat -c %i -- "$path")" == 256 ]] \
+            && btrfs subvolume show "$path" >/dev/null 2>&1
+        }
+
+        delete_old_root() {
+          local candidate="$1"
+
+          case "$candidate" in
+            "$old_roots"/*) ;;
+            *)
+              echo "Refusing path outside old_roots: $candidate" >&2
+              return 0
+              ;;
+          esac
+
+          if ! is_subvolume "$candidate"; then
+            echo "Skipping non-subvolume: $candidate" >&2
+            return 0
+          fi
+
+          if ! btrfs subvolume delete \
+            --recursive \
+            --commit-after \
+            -- "$candidate"
+          then
+            echo "Could not delete old root: $candidate" >&2
+          fi
+
+          return 0
+        }
+
+        while IFS= read -r -d "" candidate; do
+          delete_old_root "$candidate"
+        done < <(
+          find "$old_roots" \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -mtime "+$max_age_days" \
+            -print0
+        )
+
+        kept=0
+        while IFS= read -r -d "" entry; do
+          candidate="''${entry#* }"
+
+          if ! is_subvolume "$candidate"; then
+            continue
+          fi
+
+          if (( kept < max_roots )); then
+            kept=$((kept + 1))
+          else
+            delete_old_root "$candidate"
+          fi
+        done < <(
+          find "$old_roots" \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -printf '%T@ %p\0' \
+            | sort -z -nr
+        )
+      '';
+    };
+
+    systemd.timers.pruneBtrfsRoots = lib.mkIf cfg.rotateBtrfsRoot.enable {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "15min";
+        OnUnitActiveSec = "1d";
+        RandomizedDelaySec = "30min";
+      };
     };
 
     programs.fuse.userAllowOther = true;
