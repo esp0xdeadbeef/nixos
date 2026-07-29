@@ -360,4 +360,14 @@
         ];
       };
     };
+
+  # When applied, the release-25.11 nixpkgs set will be accessible through
+  # 'pkgs.nixpkgs-25_11'. This provides evil-winrm with Ruby 3.3 (Ruby 3.4
+  # removed the csv gem from stdlib, breaking the evil-winrm gem deps).
+  nixpkgs-25_11-packages = final: _prev: {
+    nixpkgs-25_11 = import inputs.nixpkgs-25_11 {
+      system = final.stdenv.hostPlatform.system;
+      config = final.config // { allowUnfree = true; };
+    };
+  };
 }
