@@ -126,6 +126,7 @@ in
 
     environment.systemPackages = cfg.packages ++ [
       pkgs.psmisc
+      pkgs.bubblewrap
     ];
   };
 }
