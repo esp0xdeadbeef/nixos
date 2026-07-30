@@ -10,8 +10,8 @@ let
 in
 {
   imports = [
-    inputs.hardware.nixosModules.common-pc
-    inputs.hardware.nixosModules.common-pc-ssd
+    inputs.nixos-hardware.nixosModules.common-pc
+    inputs.nixos-hardware.nixosModules.common-pc-ssd
   ];
 
   options.local.server.dell.idrac.sops = {
