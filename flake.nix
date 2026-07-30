@@ -2,18 +2,12 @@
   description = "esp0xdeadbeef nix config";
 
   inputs = {
-    nixpkgs-stable = {
-      url = "github:nixos/nixpkgs/nixos-26.05";
-    };
-
     nixpkgs-unstable = {
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
 
     nixpkgs = {
-      # url = "github:nixos/nixpkgs/nixos-24.11";
       url = "github:nixos/nixpkgs/nixos-26.05";
-      #url = "github:nixos/nixpkgs/nixos-unstable";
     };
 
     nixpkgs-25_11 = {
@@ -166,11 +160,6 @@
     };
 
     # Home manager
-    #home-manager = {
-    #  url = "github:nix-community/home-manager";
-    #  inputs.nixpkgs.follows = "nixpkgs";
-    #};
-
     home-manager = {
       url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -183,19 +172,8 @@
     };
 
     # hardware:
-    hardware = {
-      url = "github:nixos/nixos-hardware";
-      # inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     nixos-hardware = {
       url = "github:nixos/nixos-hardware";
-      # inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    nixos-hardware-x13s = {
-      url = "github:NixOS/nixos-hardware";
-      # inputs.nixpkgs.follows = "nixpkgs";
     };
 
     impermanence = {
@@ -216,7 +194,7 @@
     # To get spotify / widevine working on a x13s laptop:
     nixos-aarch64-widevine = {
       url = "github:epetousis/nixos-aarch64-widevine";
-      inputs.nixpkgs.follows = "nixpkgs-stable";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # integrated:
@@ -302,6 +280,17 @@
         { }
         hostRoots;
 
+      repoOverlays =
+        if builtins.pathExists ./overlays then
+          import ./overlays
+            {
+              inherit inputs relativeRepo;
+            }
+        else
+          { };
+
+      overlaysList = builtins.attrValues (builtins.removeAttrs repoOverlays [ "impermanence-module" ]);
+
     in
     {
       lib = repoLib // {
@@ -320,6 +309,7 @@
                     allowUnfree = true;
                     android_sdk.accept_license = true;
                   };
+                  overlays = overlaysList;
                 };
               in
               import ./pkgs {
@@ -360,14 +350,7 @@
         }
       );
 
-      overlays =
-        if builtins.pathExists ./overlays then
-          import ./overlays
-            {
-              inherit inputs relativeRepo;
-            }
-        else
-          { };
+      overlays = repoOverlays;
 
       nixosModules = if builtins.pathExists ./modules/nixos then import ./modules/nixos else { };
       homeManagerModules =
