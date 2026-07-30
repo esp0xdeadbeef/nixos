@@ -6,47 +6,61 @@ Conventional commits: `type(scope): description`
 
 - `type`: `feat`, `fix`, `refactor`, `chore`, `WIP`
 - `scope`: path-based, reflecting what part of the config changed. Examples:
-  - `home/{feature}` for home-manager features: `home/calendar`, `home/opencode`, `home/helix`
-  - `{host}` or `{host}/{service}` for host-specific: `pleione`, `alcyone/firefly`, `merope/recyclarr`
-  - Just the component for shared/global: `grafana`, `minecraft`, `recyclarr`
+  - `home-manager/{feature}` for home-manager features
+  - `{host}` or `{host}/{service}` for host-specific: `l-envil`, `l-esp/ollama`, `s-tau/disko`
+  - Just the component for shared/global: `overlays`, `impermanence`, `nebula`
 - Message is lowercase, no period at end.
+
 ## Directory Structure
 
 ```
 .
-├── home/gabriel/          # Home Manager user config
-│   ├── features/          #   Feature modules (cli/, desktop/, productivity/, helix/, etc.)
-│   │   └── {feature}/
-│   │       ├── default.nix  # Feature flag + imports
-│   │       └── *.nix        # Specific tool configs
-│   ├── global/            #   Always-imported config (xdg, etc.)
-│   ├── {hostname}.nix     #   Per-host home-manager config
-│   └── generic.nix        #   Non-impermanence fallback
-├── hosts/                 # NixOS host configs
-│   ├── common/            #   Shared across hosts
-│   │   ├── global/        #     Always-imported
-│   │   ├── optional/      #     Opt-in modules
-│   │   └── secrets.yaml   #     SOPS-encrypted shared secrets
-│   └── {hostname}/        #   Per-host (atlas, maia, alcyone, celaeno, merope, pleione, taygeta)
-│       ├── default.nix    #     NixOS module
-│       ├── hardware-configuration.nix
-│       └── secrets.yaml   #     Host-specific secrets (optional)
-├── modules/               # Custom NixOS & HM modules
-│   ├── nixos/
-│   └── home-manager/
-├── overlays/              # Package overlays and patches
-│   └── default.nix
-├── pkgs/                  # Custom packages
-│   └── default.nix
-├── templates/             # Project templates
-├── flake.nix              # Flake entry point
-├── deploy.sh              # nixos-rebuild wrapper
-└── .sops.yaml             # SOPS encryption keys
+├── home-manager/           # Home Manager user config per host
+│   ├── 01-general/         #   Shared feature modules (desktop, editors, etc.)
+│   ├── 02-window-manager-i3/
+│   ├── 03-window-manager-sway/
+│   ├── {hostname}/         #   Per-host config
+│   │   ├── home.nix        #     Entry point
+│   │   └── ...
+├── nixos/                  # NixOS host configs
+│   ├── laptop/             #   {l-hostname} hosts
+│   │   └── {hostname}/
+│   │       ├── default.nix
+│   │       └── hardware/
+│   ├── server/             #   {s-hostname} hosts
+│   │   └── {hostname}/
+│   └── virtual-machine/    #   VM hosts (nixos-shell-vm/, dedicated-vm/, etc.)
+│       └── {vm-name}/
+├── library/                # Importable NixOS modules
+│   └── 01-general/         #   Feature modules (packages/, network/, desktop/, etc.)
+├── modules/                # Custom NixOS & HM modules (unused if using library/)
+├── overlays/               # Package overlays and patches
+│   ├── default.nix         #   Aggregates all overlays
+│   ├── additions.nix       #   Custom packages from ./pkgs
+│   ├── modifications.nix   #   Patched packages (xlayoutdisplay, libvirt, etc.)
+│   ├── unstable-packages.nix  # pkgs.unstable with ollama/python workarounds
+│   ├── nixpkgs-25_11-packages.nix  # pkgs.nixpkgs-25_11 for ruby 3.3 compat
+│   ├── impermanence-module.nix     # Patched impermanence NixOS module wrapper
+│   └── legcord-unstable-overwrite.nix  # legcord from unstable
+├── pkgs/                   # Custom package derivations
+├── patches/                # Patch files referenced by overlays
+├── profiles/               # Composable config profiles
+│   ├── default.nix         #   Registry of all profiles
+│   ├── nixos/              #   NixOS profiles
+│   └── home-manager/       #   HM profiles
+├── secrets/                # SOPS-encrypted secrets
+│   ├── hosts/              #   Host-specific secrets
+│   └── common/             #   Shared secrets
+├── prod-network/           # Network prod-pin scripts
+├── .github/workflows/      # CI workflows
+├── flake.nix               # Flake entry point
+├── deploy.sh               # nixos-rebuild wrapper
+└── .sops.yaml              # SOPS encryption keys
 ```
 
 ## Code Style
 
-- **Formatter**: Alejandra (`nix fmt <file>`). ALWAYS format after edits. Never format unmodified files.
+- **Formatter**: nixpkgs-fmt (`nix fmt` to run). ALWAYS format after edits. Never format unmodified files.
 - **Indentation**: 2 spaces, no tabs.
 - **Line endings**: LF, final newline, trimmed trailing whitespace.
 - **Nix conventions**:
@@ -54,13 +68,15 @@ Conventional commits: `type(scope): description`
   - Use `lib` from `nixpkgs.lib // home-manager.lib` (merged, already in `outputs.lib`).
   - Feature-flag modules use a `default.nix` with a boolean `enable` option gating imports.
   - Prefer `lib.mkOption` / `lib.mkEnableOption` for new options.
+  - Overlays with external dependencies (inputs, relativeRepo) use a context wrapper: `{ inputs }: final: prev: { ... }`.
+  - Plain overlays (no deps) are bare `final: prev: { ... }`.
 
 ## Secrets
 
 - Managed with **sops-nix**, keys defined in `.sops.yaml`.
 - Two types of secret files:
-  - `hosts/common/secrets.yaml` -- shared across hosts, encrypted to all host age keys.
-  - `hosts/{hostname}/secrets.yaml` -- per-host, encrypted to that host only.
+  - `secrets/common/` -- shared across hosts, encrypted to all host age keys.
+  - `secrets/hosts/{hostname}/` -- per-host, encrypted to that host only.
 - Both are also encrypted to the PGP key `7088C7421873E0DB97FF17C2245CAB70B4C225E9`. It lives on misterio's yubikey.
 - **Never** read secret values into context. Ask the user to read them, or use
   pipes and redirection so they do not appear in model-visible output, process
@@ -101,19 +117,11 @@ Conventional commits: `type(scope): description`
 
 ## Checking
 
-- Format touched Nix files with `nix fmt -- <files>`.
+- Format touched Nix files with `nix fmt` (runs nixpkgs-fmt on all .nix files, or on explicit file args).
 - Run `nix flake check --all-systems` after meaningful Nix changes.
 
 Do not run `nixos-rebuild switch`, deploy scripts, or other apply/deploy commands
 unless the user explicitly asks for that.
-
-## Vdirsyncer Calendar Collections
-
-When adding a remote calendar collection to `home/gabriel/features/productivity/calendar.nix`:
-
-1. First verify the collection exists remotely with `vdirsyncer discover`.
-2. Add the collection name (or UUID) string to the `collections` list under the appropriate account.
-3. Use a `# Comment` to note the display name if it differs from the ID.
 
 ## Nix eval
 
