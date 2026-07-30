@@ -36,6 +36,9 @@
 
   environment.etc.hosts.enable = false;
 
+  # Workaround: nixpkgs man-db manualPages default errors.
+  documentation.man.man-db.enable = false;
+
   services.udev.extraRules = ''
     SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", MODE="0660", GROUP="users", TAG+="uaccess"
     SUBSYSTEM=="usb", ATTR{idVendor}=="22d9", ATTR{idProduct}=="0006", MODE="0660", GROUP="users", TAG+="uaccess"

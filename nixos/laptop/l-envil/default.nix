@@ -65,6 +65,9 @@
 
   users.users.deadbeef.extraGroups = [ "wheel" ];
 
+  # Workaround: nixpkgs man-db manualPages default errors.
+  documentation.man.man-db.enable = false;
+
   environment.systemPackages = [
     pkgs.mxbuild
   ];
