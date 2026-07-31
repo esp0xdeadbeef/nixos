@@ -2,7 +2,7 @@
 let
   ollamaSplitGGUF = _unstableFinal: unstablePrev:
     let
-      expectedVersion = "0.32.1";
+      expectedVersion = "0.32.4";
       cudaPackages = unstablePrev.cudaPackages;
       cudaLibs = [
         cudaPackages.cuda_cudart
@@ -45,7 +45,7 @@ let
           }
           // final.lib.optionalAttrs cuda {
             # setupCudaHook exposes the splayed CUDA outputs as a
-            # semicolon-separated CUDAToolkit_ROOT. Ollama 0.32.1 passes
+            # semicolon-separated CUDAToolkit_ROOT. Ollama 0.32.4 passes
             # that value into a nested CMake ExternalProject, whose
             # FindCUDAToolkit treats it as one malformed path. Reset it
             # after the configure hooks to the equivalent merged toolkit.
@@ -116,51 +116,6 @@ let
                     })
                   );
 
-              stamina =
-                let
-                  expectedVersion = "25.2.0";
-                  actualVersion =
-                    pythonPrev.stamina.version
-                      or (final.lib.getVersion pythonPrev.stamina.name);
-                in
-                assert final.lib.assertMsg (actualVersion == expectedVersion)
-                  "stamina overlay expects ${expectedVersion}, got ${actualVersion}; remove the test-ID fix once upstream uses unique parametrization IDs.";
-                builtins.trace
-                  "WARNING: local stamina pytest workaround is active; remove it once upstream uses unique parametrization IDs."
-                  (
-                    pythonPrev.stamina.overridePythonAttrs (old: {
-                      postPatch =
-                        (old.postPatch or "")
-                        + ''
-                          substituteInPlace tests/test_instrumentation.py \
-                            --replace-fail \
-                              '            (Foo.method, "test_instrumentation.Foo.method"),' \
-                              '            pytest.param(Foo.method, "test_instrumentation.Foo.method", id="Foo.method-unbound"),' \
-                            --replace-fail \
-                              '            (Foo.async_method, "test_instrumentation.Foo.async_method"),' \
-                              '            pytest.param(Foo.async_method, "test_instrumentation.Foo.async_method", id="Foo.async_method-unbound"),'
-                        '';
-                    })
-                  );
-
-              mitmproxy =
-                let
-                  expectedVersion = "12.2.3";
-                  actualVersion =
-                    pythonPrev.mitmproxy.version
-                      or (final.lib.getVersion pythonPrev.mitmproxy.name);
-                in
-                assert final.lib.assertMsg (actualVersion == expectedVersion)
-                  "mitmproxy overlay expects ${expectedVersion}, got ${actualVersion}; remove the msgpack relaxation once nixpkgs relaxes the upstream upper bound.";
-                builtins.trace
-                  "WARNING: local mitmproxy msgpack workaround is active; remove it once nixpkgs relaxes the upstream upper bound."
-                  (
-                    pythonPrev.mitmproxy.overridePythonAttrs (old: {
-                      pythonRelaxDeps =
-                        (old.pythonRelaxDeps or [ ])
-                        ++ [ "msgpack" ];
-                    })
-                  );
             }
         )
       ];
