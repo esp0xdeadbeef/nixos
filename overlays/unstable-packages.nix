@@ -75,10 +75,6 @@ let
         (
           _pythonFinal: pythonPrev:
             let
-              expectedVersion = "1.0.6";
-              actualVersion =
-                pythonPrev.pynfsclient.version
-                  or (final.lib.getVersion pythonPrev.pynfsclient.name);
             in
             {
               bloodhound-py =
@@ -96,24 +92,6 @@ let
                     pythonPrev.bloodhound-py.overridePythonAttrs {
                       pname = "bloodhound";
                     }
-                  );
-
-              pynfsclient =
-                assert final.lib.assertMsg (actualVersion == expectedVersion)
-                  "pynfsclient overlay expects ${expectedVersion}, got ${actualVersion}; remove the metadata fix once upstream updates pyNfsClient/__info__.py.";
-                builtins.trace
-                  "WARNING: local pynfsclient metadata workaround is active; remove it once upstream reports version ${expectedVersion}."
-                  (
-                    pythonPrev.pynfsclient.overridePythonAttrs (old: {
-                      postPatch =
-                        (old.postPatch or "")
-                        + ''
-                          substituteInPlace pyNfsClient/__info__.py \
-                            --replace-fail \
-                              '__version__ = "0.1.5"' \
-                              '__version__ = "${expectedVersion}"'
-                        '';
-                    })
                   );
 
             }
