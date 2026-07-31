@@ -8428,11 +8428,11 @@
     "pin-refresh-source": {
       "flake": false,
       "locked": {
-        "lastModified": 1785429345,
-        "narHash": "sha256-FzsY1PDpn503uVZOvfRXRTx7H+1gESm3IkiWWE8PUHA=",
+        "lastModified": 1785513057,
+        "narHash": "sha256-Wru8paKuLBiVhB1XNxsCgeTwZBbhMGJK+pnfb/KTdtM=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos",
-        "rev": "6db2b3f583659fe52a42c4ad4f1328ba80cf3d09",
+        "rev": "5214f4896e89a1123f3af20596887d7244451a73",
         "type": "github"
       },
       "original": {
