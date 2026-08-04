@@ -12,7 +12,7 @@
 
   local.llm.ollamaSmokeTest = {
     enable = true;
-    pullModel = true;
+    pullModel = false;
   };
 
   systemd.services.ollama = {
