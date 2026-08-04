@@ -42,8 +42,6 @@ in
     ./vlan2-reservation-dns.nix
     ./vlan3-dns-authority-override.nix
     ./vlan2-management-override.nix
-    ./legacy-parity-contract.nix
-
     (import ./renderers.nix {
       inherit
         inputs
@@ -58,6 +56,8 @@ in
       inherit system;
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
     })
+
+    ./legacy-parity-contract.nix
   ];
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;

@@ -1,4 +1,4 @@
-{ pkgs, relativeRepo, ... }:
+{ lib, pkgs, relativeRepo, ... }:
 let
   dns = import (relativeRepo.module "prod-network/current/dns-runtime-addresses.nix");
   ip = "${pkgs.iproute2}/bin/ip";
@@ -6,23 +6,25 @@ in
 {
   # TEMPORARY NETWORK-* COMPATIBILITY OVERRIDE.
   #
-  # The renderer currently copies the core service-link routes into every
-  # tenant policy table. Equal-prefix routes then let VLAN 2 or VLAN 7 DNS
-  # traffic leave through another tenant's upstream interface. Remove those
-  # copied routes so each table's existing, lane-specific default is used.
+  # The renderer now emits a native core-DNS route reconciliation service
+  # (FS-540) with lane-validation semantics. This override replaces that
+  # native implementation with the legacy aggressive route-deletion
+  # reconciler until the parity contract accepts the native cadence and
+  # the service-route closure stops leaking core routes across tenant
+  # tables.
   #
-  # Remove this entire file, its import, warning, and parity assertion once the
-  # network-* service-route closure emits the core DNS endpoint only through
-  # the requester's relation-bound upstream lane.
+  # Remove this entire file, its import, warning, and parity assertion once
+  # the network-* service-route closure emits the core DNS endpoint only
+  # through the requester's relation-bound upstream lane.
   containers.policy.config = {
     systemd.services.s-router-prod-core-dns-path-reconcile = {
-      description = "Reconcile production core DNS policy routes";
+      description = lib.mkForce "Reconcile production core DNS policy routes";
       after = [ "systemd-networkd.service" ];
       requires = [ "systemd-networkd.service" ];
 
-      serviceConfig.Type = "oneshot";
+      serviceConfig.Type = lib.mkForce "oneshot";
 
-      script = ''
+      script = lib.mkForce ''
         set -euo pipefail
 
         remove_all() {
@@ -66,12 +68,12 @@ in
     };
 
     systemd.timers.s-router-prod-core-dns-path-reconcile = {
-      description = "Reconcile production core DNS policy routes after link changes";
-      wantedBy = [ "timers.target" ];
+      description = lib.mkForce "Reconcile production core DNS policy routes after link changes";
+      wantedBy = lib.mkForce [ "timers.target" ];
       timerConfig = {
-        OnBootSec = "1s";
-        OnUnitActiveSec = "5s";
-        Unit = "s-router-prod-core-dns-path-reconcile.service";
+        OnBootSec = lib.mkForce "1s";
+        OnUnitActiveSec = lib.mkForce "5s";
+        Unit = lib.mkForce "s-router-prod-core-dns-path-reconcile.service";
       };
     };
   };
