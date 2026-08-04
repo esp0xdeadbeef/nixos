@@ -2,7 +2,7 @@
 let
   ollamaSplitGGUF = _unstableFinal: unstablePrev:
     let
-      expectedVersion = "0.32.4";
+      expectedVersion = "0.32.5";
       cudaPackages = unstablePrev.cudaPackages;
       cudaLibs = [
         cudaPackages.cuda_cudart
