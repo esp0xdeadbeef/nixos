@@ -531,6 +531,7 @@ in
       '';
 
       locals."dmarc.conf".text = ''
+        enabled = true;
         reporting = true;
         actions = {
           reject = "reject";
