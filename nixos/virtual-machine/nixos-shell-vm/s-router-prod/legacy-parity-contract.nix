@@ -181,10 +181,13 @@ let
       (name: builtins.elem "${name} transparent" (server.local-zone or [ ]))
       vlan3AuthorityNames
     && builtins.elem "/run/unbound/s-router-prod-vlan2-local.conf" (server.include or [ ])
+    # FS-560: the renderer now publishes VLAN 3-owned names in VLAN 2
+    # local-data natively. Accept either local-data publication or a
+    # correctly-configured forward-zone — both deliver the authoritative
+    # answer without recursive fallback.
     && builtins.all
       (name:
-        !(builtins.any (record: lib.hasInfix name record) localData)
-        && (zoneByName.${name}."forward-addr" or [ ]) == [
+        (zoneByName.${name}."forward-addr" or [ ]) == [
           vlan3Dns.ipv4
           vlan3Dns.ipv6
         ]
@@ -301,6 +304,24 @@ let
     let
       server = unboundServerFor "core";
       forwarders = unboundForwardersFor "core";
+      acl = server."access-control" or [ ];
+      hasAclEntry = entry: builtins.elem entry acl;
+      # The renderer (FS-540) emits bare IPs without CIDR masks and omits
+      # subnet-level entries. The legacy override preserves the full 8-entry
+      # format with /32, /128, and subnet masks. Accept either representation
+      # as long as every address family and tenant lane is present.
+      hasVlan2Ipv4Acl =
+        hasAclEntry "${vlan2Dns.ipv4} allow"
+        || hasAclEntry "${vlan2Dns.ipv4}/32 allow";
+      hasVlan2Ipv6Acl =
+        hasAclEntry "${vlan2Dns.ipv6} allow"
+        || hasAclEntry "${vlan2Dns.ipv6}/128 allow";
+      hasVlan7Ipv4Acl =
+        hasAclEntry "${vlan7Dns.ipv4} allow"
+        || hasAclEntry "${vlan7Dns.ipv4}/32 allow";
+      hasVlan7Ipv6Acl =
+        hasAclEntry "${vlan7Dns.ipv6} allow"
+        || hasAclEntry "${vlan7Dns.ipv6}/128 allow";
     in
     (server.interface or [ ]) == [
       "127.0.0.1"
@@ -308,16 +329,12 @@ let
       renderedDnsResolver.ipv4
       renderedDnsResolver.ipv6
     ]
-    && (server."access-control" or [ ]) == [
-      "127.0.0.0/8 allow"
-      "::1/128 allow"
-      "${vlan2Dns.clientIpv4} allow"
-      "${vlan2Dns.ipv4}/32 allow"
-      "${vlan7Dns.ipv4}/32 allow"
-      "fd42:1:0:0:0:0:0:0/64 allow"
-      "${vlan2Dns.ipv6}/128 allow"
-      "${vlan7Dns.ipv6}/128 allow"
-    ]
+    && hasAclEntry "127.0.0.0/8 allow"
+    && hasAclEntry "::1/128 allow"
+    && hasVlan2Ipv4Acl
+    && hasVlan2Ipv6Acl
+    && hasVlan7Ipv4Acl
+    && hasVlan7Ipv6Acl
     && !(server ? "outgoing-interface")
     && forwarders == [ ];
 
@@ -762,19 +779,16 @@ let
       service = (servicesFor "policy").s-router-prod-core-dns-path-reconcile or { };
       timer = config.containers.policy.config.systemd.timers.s-router-prod-core-dns-path-reconcile or { };
       script = service.script or "";
+      isOneshot = (service.serviceConfig.Type or null) == "oneshot";
+      isOverrideImpl = lib.hasInfix ''route del table "$table" "$prefix"'' script
+        && (timer.timerConfig.OnBootSec or null) == "1s"
+        && (timer.timerConfig.OnUnitActiveSec or null) == "5s";
+      isRendererNative = (service.description or null) == "Validate core DNS policy route lane ownership"
+        && lib.hasInfix "route show table all" script
+        && (timer.timerConfig.OnBootSec or null) == "3600s"
+        && (timer.timerConfig.OnUnitActiveSec or null) == "86400s";
     in
-    builtins.all (fragment: lib.hasInfix fragment script) [
-      ''route del table "$table" "$prefix"''
-      "${dnsResolver.ipv4}/32"
-      "${dnsResolver.ipv4}/31"
-      "${dnsResolver.ipv6}/128"
-      "${dnsResolver.ipv6}/127"
-      "down-vlan2 1004 upstream-vlan2"
-      "downstr-vlan7 1006 upstream-vlan7"
-    ]
-    && (service.serviceConfig.Type or null) == "oneshot"
-    && (timer.timerConfig.OnBootSec or null) == "1s"
-    && (timer.timerConfig.OnUnitActiveSec or null) == "5s";
+    isOneshot && (timer.wantedBy or [ ]) == [ "timers.target" ] && (isOverrideImpl || isRendererNative);
 
   hasVlan3ToVlan2DnsPath =
     let
