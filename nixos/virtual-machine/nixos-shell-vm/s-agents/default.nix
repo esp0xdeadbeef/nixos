@@ -145,6 +145,9 @@
   };
 
   home-manager.users.deadbeef = {
+    imports = [
+      profiles.home-manager.claude-code
+    ];
     programs.fish.enable = true;
     programs.zsh.enable = true;
     home.stateVersion = "26.05";

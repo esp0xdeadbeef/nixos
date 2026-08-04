@@ -1,12 +1,9 @@
 { inputs
 , lib
 , profiles
-, relativeRepo
 , ...
 }:
 {
-  sops.defaultSopsFile = relativeRepo.sourcePath "secrets/l-esp-default-deadbeef.yaml";
-
   imports = [
     profiles.nixos.laptop.intel-workstation
     profiles.nixos.network.nebula-mesh

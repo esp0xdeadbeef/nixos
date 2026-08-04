@@ -24,6 +24,7 @@ in
     profiles.home-manager.desktop-i3
     profiles.home-manager.mail.aerc
     profiles.home-manager.mail.geary
+    profiles.home-manager.claude-code
 
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
