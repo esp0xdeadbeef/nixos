@@ -532,7 +532,9 @@ in
 
       locals."dmarc.conf".text = ''
         enabled = true;
-        reporting = true;
+        reporting {
+          enabled = true;
+        }
         actions = {
           reject = "reject";
           quarantine = "add_header";
