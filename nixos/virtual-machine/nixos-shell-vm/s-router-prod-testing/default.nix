@@ -16,6 +16,8 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
+  local.nixosShellHost.secrets.enable = false;
+
   imports = [
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     "${modelSource}/runtime-secrets.nix"
