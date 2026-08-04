@@ -159,6 +159,7 @@ pkgs.writeShellApplication {
     vaccounts_raw="$postfix_dir/vaccounts.raw"
     vaccounts="$postfix_dir/vaccounts"
     shared_vaccounts=${lib.escapeShellArg sharedSenderLoginMap}
+    local_sender_reject="$postfix_dir/local_sender_reject"
     passwd_file="$dovecot_dir/passwd"
 
     : > "$vdomains"
@@ -170,6 +171,7 @@ pkgs.writeShellApplication {
     : > "$vaccounts_raw"
     : > "$vaccounts"
     : > "$shared_vaccounts"
+    : > "$local_sender_reject"
     : > "$passwd_file"
 
     first_domain=""
@@ -259,6 +261,12 @@ pkgs.writeShellApplication {
     ' "$vdomains_raw" > "$vdomains"
 
     awk '
+      NF && !seen[$1]++ {
+        print $1, "REJECT Sender domain is locally hosted; submit via authenticated SMTP on port 587"
+      }
+    ' "$vdomains_raw" > "$local_sender_reject"
+
+    awk '
       NR == FNR {
         if (NF) {
           mailbox[$1] = 1
@@ -305,8 +313,8 @@ pkgs.writeShellApplication {
     ' "$vaccounts_raw" > "$vaccounts"
 
     rm -f "$vdomains_raw" "$valias_domains_raw" "$vaccounts_raw"
-    chown root:postfix "$vdomains" "$valias_domains" "$valias" "$vmailbox" "$vaccounts" "$shared_vaccounts"
-    chmod 0640 "$vdomains" "$valias_domains" "$valias" "$vmailbox" "$vaccounts" "$shared_vaccounts"
+    chown root:postfix "$vdomains" "$valias_domains" "$valias" "$vmailbox" "$vaccounts" "$shared_vaccounts" "$local_sender_reject"
+    chmod 0640 "$vdomains" "$valias_domains" "$valias" "$vmailbox" "$vaccounts" "$shared_vaccounts" "$local_sender_reject"
     chown root:dovecot2 "$passwd_file"
     chmod 0440 "$passwd_file"
 
@@ -316,8 +324,9 @@ pkgs.writeShellApplication {
     postmap "$vmailbox"
     postmap "$vaccounts"
     postmap "$shared_vaccounts"
-    chown root:postfix "$vdomains.db" "$valias_domains.db" "$valias.db" "$vmailbox.db" "$vaccounts.db" "$shared_vaccounts.db"
-    chmod 0640 "$vdomains.db" "$valias_domains.db" "$valias.db" "$vmailbox.db" "$vaccounts.db" "$shared_vaccounts.db"
+    postmap "$local_sender_reject"
+    chown root:postfix "$vdomains.db" "$valias_domains.db" "$valias.db" "$vmailbox.db" "$vaccounts.db" "$shared_vaccounts.db" "$local_sender_reject.db"
+    chmod 0640 "$vdomains.db" "$valias_domains.db" "$valias.db" "$vmailbox.db" "$vaccounts.db" "$shared_vaccounts.db" "$local_sender_reject.db"
 
     main_cf=/var/lib/postfix/conf/main.cf
     if [ -L "$main_cf" ]; then
@@ -337,6 +346,7 @@ pkgs.writeShellApplication {
       "virtual_mailbox_maps = hash:$vmailbox" \
       "virtual_alias_maps = hash:$valias" \
       "smtpd_sender_login_maps = hash:$vaccounts hash:$shared_vaccounts" \
+      "smtpd_sender_restrictions = permit_mynetworks, permit_sasl_authenticated, check_sender_access hash:$local_sender_reject" \
       "smtpd_tls_chain_files = $tls_key $tls_fullchain"
 
     postfix -c /var/lib/postfix/conf check

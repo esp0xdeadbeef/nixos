@@ -477,6 +477,10 @@ in
           "permit_sasl_authenticated"
           "reject_unauth_destination"
         ];
+        smtpd_sender_restrictions = [
+          "permit_mynetworks"
+          "permit_sasl_authenticated"
+        ];
         smtpd_tls_auth_only = true;
 
         smtpd_tls_chain_files = [
