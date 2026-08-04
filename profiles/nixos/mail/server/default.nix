@@ -529,6 +529,37 @@ in
         selector = "mail";
         path = "/var/dkim/$domain.$selector.key";
       '';
+
+      locals."dmarc.conf".text = ''
+        reporting = true;
+        actions = {
+          reject = "reject";
+          quarantine = "add_header";
+        };
+      '';
+
+      locals."force_actions.conf".text = ''
+        rules {
+          DMARC_REJECT {
+            action = "reject";
+            expression = "DMARC_POLICY_REJECT";
+            message = "Message rejected per DMARC policy for %s (reject)";
+          }
+          SPF_FAIL {
+            action = "add_header";
+            expression = "R_SPF_FAIL";
+            message = "SPF validation failed for %s";
+          }
+        }
+      '';
+
+      locals."spf.conf".text = ''
+        spf_cache_size = 2k;
+      '';
+
+      locals."milter_headers.conf".text = ''
+        use = ["authentication-results"];
+      '';
     };
 
     services.dovecot2 = {
