@@ -1,5 +1,6 @@
 { inputs
 , lib
+, pkgs
 , relativeRepo
 , ...
 }:
@@ -17,6 +18,13 @@ in
   networking.hostName = lib.mkForce hostName;
 
   local.nixosShellHost.secrets.enable = false;
+
+  users.users.deadbeef = {
+    isNormalUser = true;
+    hashedPassword = "!";
+    shell = pkgs.zsh;
+  };
+  programs.zsh.enable = true;
 
   imports = [
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
