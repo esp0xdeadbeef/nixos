@@ -28,9 +28,9 @@ in
         modelSource
         ;
 
-      controlPlaneModelInput = inputs.network-control-plane-model;
-      networkRealizationModelInput = inputs.network-realization-model;
-      nixosRendererInput = inputs.network-renderer-nixos;
+      controlPlaneModelInput = inputs.network-control-plane-model-prod;
+      networkRealizationModelInput = inputs.network-realization-model-prod;
+      nixosRendererInput = inputs.network-renderer-nixos-prod;
       system = "x86_64-linux";
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod-testing/default.nix";
     })
