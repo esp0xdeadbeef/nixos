@@ -42,6 +42,13 @@ keys:
   - &s-mail-classifier age1elpsqft4da686ftu0237uv0vsc5zqcjcd2xphust5cmu2yk99epskk5r6c
 
 creation_rules:
+  - path_regex: '^prod-network/current/secrets/.*\.json(\.age)?$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-prod
   - path_regex: '^(secrets/)*mailbox-[A-Za-z0-9_-]+\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
