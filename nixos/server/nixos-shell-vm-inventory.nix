@@ -238,6 +238,10 @@ let
       activation.refreshPins = true;
     }
     {
+      name = "s-router-prod-testing";
+      description = "Production router testing VM (nixos-shell) — never auto-starts";
+    }
+    {
       name = "s-router-prod";
       description = "Production router canary VM (nixos-shell)";
       activation.rolloutCandidateOnGuestShutdown = true;
