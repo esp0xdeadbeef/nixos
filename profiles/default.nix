@@ -93,6 +93,7 @@
     llm-clients = {
       cache = import ./nixos/llm-clients/cache.nix;
       agents = import ./nixos/llm-clients/agents.nix;
+      claude-deepseek = import ./nixos/llm-clients/claude-deepseek.nix;
     };
     llm = {
       model-sets = import ./nixos/llm/model-sets.nix;

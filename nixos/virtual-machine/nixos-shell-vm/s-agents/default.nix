@@ -8,6 +8,7 @@
   imports = [
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config")
     profiles.nixos.llm-clients.agents
+    profiles.nixos.llm-clients.claude-deepseek
     profiles.nixos.impermanence.default
   ];
 

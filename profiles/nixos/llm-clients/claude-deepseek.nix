@@ -1,9 +1,8 @@
-{ config, lib, relativeRepo, ... }:
+{ config, lib, ... }:
 {
   local.llmClients.agents.packageNames = lib.mkAfter [ "claude-code" ];
 
   sops.secrets."deepseek-api" = {
-    sopsFile = relativeRepo.sourcePath "secrets/l-esp-default-deadbeef.yaml";
     owner = "deadbeef";
     group = "users";
     mode = "0400";
