@@ -37,7 +37,7 @@
     timer.enable = true;
 
     ollama = {
-      baseUrl = "http://192.168.3.108:11434";
+      baseUrl = "http://192.168.3.11:11434";
       model = "qwen3.5:9b-q4_K_M";
     };
   };

@@ -424,7 +424,7 @@ in
     ollama = {
       baseUrl = lib.mkOption {
         type = lib.types.str;
-        default = "http://192.168.3.108:11434";
+        default = "http://192.168.3.11:11434";
         description = "Ollama HTTP API base URL.";
       };
 
