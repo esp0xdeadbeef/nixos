@@ -30,7 +30,10 @@ in
 
     # Match the s-test container networking pattern: the VM owns the VLAN
     # bridge and the container receives one private veth on that bridge.
-    extraVeths.veth3.hostBridge = "vlan3";
+    extraVeths.veth3 = {
+      hostBridge = "vlan3";
+      localMacAddress = "02:14:58:52:89:41";
+    };
 
     allowedDevices = map
       (node: {

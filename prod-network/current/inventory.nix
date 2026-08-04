@@ -182,6 +182,7 @@ let
   downstreamAccessVlan7Link = "p2p-access-vlan7-downstream-selector";
   sNebulaContainerAddress = "192.168.3.10";
   sNebulaContainerAddress6 = "fd42:dead:beef:3::1337:dead:beef";
+  sLlmInferenceContainerAddress = "192.168.3.11";
 
   core =
     (mkNode "core" {
@@ -464,6 +465,10 @@ let
                 a = [ sNebulaContainerAddress ];
                 aaaa = [ sNebulaContainerAddress6 ];
               }
+              {
+                name = "s-llm-inference-container.lan.";
+                a = [ sLlmInferenceContainerAddress ];
+              }
             ];
       };
 
@@ -557,6 +562,10 @@ in
     s-nebula-container = {
       ipv4 = [ sNebulaContainerAddress ];
       ipv6 = [ sNebulaContainerAddress6 ];
+    };
+
+    s-llm-inference-container = {
+      ipv4 = [ sLlmInferenceContainerAddress ];
     };
 
     vlan7-dns = {
