@@ -24,10 +24,10 @@ in
       inherit
         inputs
         lib
-        hostName
         modelSource
         ;
 
+      hostName = "s-router-prod";
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
       networkRealizationModelInput = inputs.network-realization-model-prod;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
