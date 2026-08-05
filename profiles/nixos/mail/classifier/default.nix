@@ -436,7 +436,7 @@ in
 
       timeoutSeconds = lib.mkOption {
         type = lib.types.ints.positive;
-        default = 180;
+        default = 600;
         description = "Maximum time for each Ollama HTTP operation.";
       };
     };
