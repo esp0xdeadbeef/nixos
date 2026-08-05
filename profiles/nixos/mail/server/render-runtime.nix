@@ -246,6 +246,12 @@ pkgs.writeShellApplication {
         done
 
         unset_account_vars
+
+        catchall="''${MAILBOX_CATCHALL:-}"
+        if [ -n "$catchall" ]; then
+          catchall_address="$(expand_address "$domain" "$catchall")"
+          printf '@%s %s\n' "$domain" "$catchall_address" >> "$valias"
+        fi
       done
     done < "$mailbox_set_env_path_list"
 
