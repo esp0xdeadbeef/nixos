@@ -100,9 +100,14 @@ def message_body(message: Any) -> str:
             content = part.get_content()
         except (LookupError, UnicodeError):
             payload = part.get_payload(decode=True) or b""
-            content = payload.decode(
-                part.get_content_charset() or "utf-8", errors="replace"
-            )
+            charset = part.get_content_charset()
+            if charset:
+                try:
+                    content = payload.decode(charset, errors="replace")
+                except LookupError:
+                    content = payload.decode("latin-1", errors="replace")
+            else:
+                content = payload.decode("utf-8", errors="replace")
 
         if not isinstance(content, str):
             continue
@@ -800,6 +805,16 @@ def self_test() -> None:
         pass
     else:
         raise AssertionError("a missing exact Ollama model must fail")
+    unknown_encoding = (
+        b"Subject: test\r\n"
+        b"From: sender@example.test\r\n"
+        b"To: receiver@example.test\r\n"
+        b"Content-Type: text/plain; charset=cp-850\r\n"
+        b"\r\n"
+        b"Dies ist ein Test mit unbekannter Kodierung. \x80\x81\x82"
+    )
+    parsed_unknown = message_for_model(unknown_encoding, 500)
+    assert parsed_unknown["body"], "body must not be empty for unknown encoding"
     emit("self_test_passed")
 
 
