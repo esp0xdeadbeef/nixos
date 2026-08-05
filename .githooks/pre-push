@@ -363,8 +363,11 @@ def main() -> int:
 
         updates = parse_updates()
         public_ipv4 = discover_public_address(repo, 4)
-        public_ipv6 = discover_public_address(repo, 6)
-        public_ipv6_network = ipaddress.ip_network(f"{public_ipv6}/64", strict=False)
+        try:
+            public_ipv6 = discover_public_address(repo, 6)
+            public_ipv6_network = ipaddress.ip_network(f"{public_ipv6}/64", strict=False)
+        except PrivacyCheckError:
+            public_ipv6_network = ipaddress.IPv6Network("::/128")
         patterns, secret_ips = derive_private_denylist(repo)
         commits = commits_to_scan(repo, updates)
 
