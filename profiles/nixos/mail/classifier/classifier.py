@@ -584,6 +584,17 @@ class ImapMailbox:
             raw_message,
             self.config["maximumBodyCharacters"],
         )
+        emit(
+            "classifying",
+            account=self.account_id,
+            source="private" if source == "INBOX" else "shared",
+            source_id=mailbox_hash(source),
+            subject=single_line(model_message["subject"], 120),
+            from_=single_line(model_message["from"], 120),
+            date=single_line(model_message["date"], 40),
+            body_chars=len(model_message["body"]),
+            raw_bytes=len(raw_message),
+        )
         classification = self.classifier.classify(model_message)
         label = classification.label
         if classification.confidence < self.config["minimumConfidence"]:
