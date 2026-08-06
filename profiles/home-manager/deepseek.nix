@@ -1,6 +1,6 @@
 { config, lib, ... }:
 let
-  apiKeyPath = "/run/secrets/deepseek-api";
+  apiKeyPath = "${config.home.homeDirectory}/.config/sops-nix/secrets/deepseek-api";
   exportKeys = ''
     if [ -f ${apiKeyPath} ]; then
       export ANTHROPIC_AUTH_TOKEN="$(tr -d '\r\n' < ${apiKeyPath})"
@@ -10,6 +10,8 @@ let
   '';
 in
 {
+  sops.secrets."deepseek-api" = {};
+
   home.sessionVariables = {
     OPENAI_BASE_URL = "https://api.deepseek.com/v1";
   };
