@@ -6,7 +6,8 @@ in
   imports = [ ./agents.nix ];
 
   local.llmClients.agents.packageNames = lib.mkForce
-    (builtins.attrNames registry.runnablePackages);
+    (builtins.attrNames
+      (builtins.intersectAttrs registry.runnablePackages registry.persistenceByPackageName));
 
   sops.secrets."deepseek-api" = lib.mkDefault {
     owner = "deadbeef";
