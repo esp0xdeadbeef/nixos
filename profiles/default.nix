@@ -163,6 +163,7 @@
     };
     desktop-i3 = import ./home-manager/desktop-i3;
     desktop-sway = import ./home-manager/desktop-sway;
+    agents-all = import ./home-manager/agents-all.nix;
     claude-code = import ./home-manager/claude-code.nix;
   };
 }
