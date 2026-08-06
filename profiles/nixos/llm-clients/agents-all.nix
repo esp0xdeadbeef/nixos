@@ -3,6 +3,8 @@ let
   registry = import ./registry.nix { inherit inputs lib pkgs; };
 in
 {
+  imports = [ ./agents.nix ];
+
   local.llmClients.agents.packageNames = lib.mkForce
     (builtins.attrNames registry.runnablePackages);
 
