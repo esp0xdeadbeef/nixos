@@ -104,7 +104,9 @@ def apply_mailbox_aliases(
             catchall_addr = expand_address(first_domain, catchall_target)
             alias_address = expand_address(domain, alias_localpart)
             write_address_domain(alias_address, valias_domains_raw)
-            with open(valias, "a") as va, open(vaccounts_raw, "a") as vr, open(passwd_file, "a") as pf:
+            with open(valias, "a") as va, open(vaccounts_raw, "a") as vr, open(
+                passwd_file, "a"
+            ) as pf:
                 va.write(f"{alias_address} {catchall_addr}\n")
                 vr.write(f"{alias_address} {catchall_addr}\n")
                 pf.write(
@@ -172,9 +174,19 @@ def main() -> None:
     passwd_file = dovecot_dir / "passwd"
 
     # Truncate all output files
-    for f in (vdomains, vdomains_raw, valias_domains, valias_domains_raw,
-              valias, vmailbox, vaccounts_raw, vaccounts,
-              shared_vaccounts, local_sender_reject, passwd_file):
+    for f in (
+        vdomains,
+        vdomains_raw,
+        valias_domains,
+        valias_domains_raw,
+        valias,
+        vmailbox,
+        vaccounts_raw,
+        vaccounts,
+        shared_vaccounts,
+        local_sender_reject,
+        passwd_file,
+    ):
         f.write_text("")
 
     first_domain = ""
@@ -239,11 +251,15 @@ def main() -> None:
 
                 result = subprocess.run(
                     ["doveadm", "pw", "-s", "BLF-CRYPT", "-p", password],
-                    capture_output=True, text=True, check=True,
+                    capture_output=True,
+                    text=True,
+                    check=True,
                 )
                 password_hash = result.stdout.strip()
 
-                with open(vmailbox, "a") as vm, open(vaccounts_raw, "a") as vr, open(passwd_file, "a") as pf:
+                with open(vmailbox, "a") as vm, open(vaccounts_raw, "a") as vr, open(
+                    passwd_file, "a"
+                ) as pf:
                     vm.write(f"{address} {address}\n")
                     vr.write(f"{address} {address}\n")
                     pf.write(f"{address}:{password_hash}::::::\n")
@@ -254,7 +270,9 @@ def main() -> None:
                         continue
                     alias_address = expand_address(domain, alias)
                     write_address_domain(alias_address, valias_domains_raw)
-                    with open(valias, "a") as va, open(vaccounts_raw, "a") as vr, open(passwd_file, "a") as pf:
+                    with open(valias, "a") as va, open(vaccounts_raw, "a") as vr, open(
+                        passwd_file, "a"
+                    ) as pf:
                         va.write(f"{alias_address} {address}\n")
                         vr.write(f"{alias_address} {address}\n")
                         pf.write(
@@ -305,7 +323,9 @@ def main() -> None:
             line = line.strip()
             if line and line not in seen:
                 seen.add(line)
-                out.write(f"{line} REJECT Sender domain is locally hosted; submit via authenticated SMTP on port 587\n")
+                out.write(
+                    f"{line} REJECT Sender domain is locally hosted; submit via authenticated SMTP on port 587\n"
+                )
 
     # valias_domains
     mailbox_domains: set[str] = set()
@@ -350,16 +370,30 @@ def main() -> None:
     vaccounts_raw.unlink(missing_ok=True)
 
     # Set ownership and permissions
-    for f in (vdomains, valias_domains, valias, vmailbox, vaccounts,
-              shared_vaccounts, local_sender_reject):
+    for f in (
+        vdomains,
+        valias_domains,
+        valias,
+        vmailbox,
+        vaccounts,
+        shared_vaccounts,
+        local_sender_reject,
+    ):
         subprocess.run(["chown", "root:postfix", str(f)], check=True)
         subprocess.run(["chmod", "0640", str(f)], check=True)
     subprocess.run(["chown", "root:dovecot2", str(passwd_file)], check=True)
     subprocess.run(["chmod", "0440", str(passwd_file)], check=True)
 
     # Postmap
-    for f in (vdomains, valias_domains, valias, vmailbox, vaccounts,
-              shared_vaccounts, local_sender_reject):
+    for f in (
+        vdomains,
+        valias_domains,
+        valias,
+        vmailbox,
+        vaccounts,
+        shared_vaccounts,
+        local_sender_reject,
+    ):
         subprocess.run(["postmap", str(f)], check=True)
         db = Path(str(f) + ".db")
         subprocess.run(["chown", "root:postfix", str(db)], check=True)
@@ -371,24 +405,30 @@ def main() -> None:
         target = main_cf.resolve()
         main_cf.write_bytes(target.read_bytes())
 
-    subprocess.run([
-        "postconf", "-c", "/var/lib/postfix/conf", "-e",
-        f"myhostname = {os.environ['MAIL_FQDN']}",
-        f"mydomain = {first_domain}",
-        f"myorigin = {first_domain}",
-        f"smtp_bind_address = {os.environ['PUBLIC_IPV4']}",
-        f"smtp_bind_address6 = {os.environ['WEB_IPV6']}",
-        f"smtp_helo_name = {os.environ['MAIL_FQDN']}",
-        f"smtpd_banner = {os.environ['MAIL_FQDN']} ESMTP",
-        f"virtual_mailbox_domains = hash:{vdomains}",
-        f"virtual_alias_domains = hash:{valias_domains}",
-        f"virtual_mailbox_maps = hash:{vmailbox}",
-        f"virtual_alias_maps = hash:{valias}",
-        f"smtpd_sender_login_maps = hash:{vaccounts} hash:{shared_vaccounts}",
-        "smtpd_sender_restrictions = permit_mynetworks, "
-        f"permit_sasl_authenticated, check_sender_access hash:{local_sender_reject}",
-        f"smtpd_tls_chain_files = {args.tls_key} {args.tls_fullchain}",
-    ], check=True)
+    subprocess.run(
+        [
+            "postconf",
+            "-c",
+            "/var/lib/postfix/conf",
+            "-e",
+            f"myhostname = {os.environ['MAIL_FQDN']}",
+            f"mydomain = {first_domain}",
+            f"myorigin = {first_domain}",
+            f"smtp_bind_address = {os.environ['PUBLIC_IPV4']}",
+            f"smtp_bind_address6 = {os.environ['WEB_IPV6']}",
+            f"smtp_helo_name = {os.environ['MAIL_FQDN']}",
+            f"smtpd_banner = {os.environ['MAIL_FQDN']} ESMTP",
+            f"virtual_mailbox_domains = hash:{vdomains}",
+            f"virtual_alias_domains = hash:{valias_domains}",
+            f"virtual_mailbox_maps = hash:{vmailbox}",
+            f"virtual_alias_maps = hash:{valias}",
+            f"smtpd_sender_login_maps = hash:{vaccounts} hash:{shared_vaccounts}",
+            "smtpd_sender_restrictions = permit_mynetworks, "
+            f"permit_sasl_authenticated, check_sender_access hash:{local_sender_reject}",
+            f"smtpd_tls_chain_files = {args.tls_key} {args.tls_fullchain}",
+        ],
+        check=True,
+    )
 
     subprocess.run(["postfix", "-c", "/var/lib/postfix/conf", "check"], check=True)
 
