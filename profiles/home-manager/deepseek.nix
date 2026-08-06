@@ -9,7 +9,7 @@ in
     OPENAI_BASE_URL = "https://api.deepseek.com/v1";
   };
 
-  home.file.".zshenv".text = ''
+  home.file.".profile".text = ''
     if [ -f ${apiKeyPath} ]; then
       export ANTHROPIC_AUTH_TOKEN="$(tr -d '\r\n' < ${apiKeyPath})"
       export OPENAI_API_KEY="$(tr -d '\r\n' < ${apiKeyPath})"
