@@ -1,6 +1,6 @@
 { config, lib, ... }:
 let
-  apiKeyPath = "/run/secrets/deepseek-api";
+  apiKeyPath = "${config.home.homeDirectory}/.config/sops-nix/secrets/deepseek-api";
   exportToken = ''
     if [ -f ${apiKeyPath} ]; then
       export ANTHROPIC_AUTH_TOKEN="$(tr -d '\r\n' < ${apiKeyPath})"
@@ -8,6 +8,8 @@ let
   '';
 in
 {
+  sops.secrets."deepseek-api" = {};
+
   home.sessionVariables = {
     ANTHROPIC_BASE_URL = "https://api.deepseek.com/anthropic";
     ANTHROPIC_MODEL = "deepseek-v4-pro[1m]";
@@ -19,12 +21,10 @@ in
   };
 
   programs.bash.initExtra = exportToken;
-
   programs.fish.shellInit = lib.mkIf config.programs.fish.enable ''
     if test -f ${apiKeyPath}
       set -gx ANTHROPIC_AUTH_TOKEN (tr -d '\r\n' < ${apiKeyPath})
     end
   '';
-
   programs.zsh.initExtra = lib.mkIf config.programs.zsh.enable exportToken;
 }
