@@ -265,8 +265,8 @@ pkgs.writeShellApplication {
         for alias_spec in $mailbox_aliases; do
           [ -n "$alias_spec" ] || continue
 
-          alias_localpart="${alias_spec%%=*}"
-          targets="${alias_spec#*=}"
+          alias_localpart="''${alias_spec%%=*}"
+          targets="''${alias_spec#*=}"
 
           # Fall back to catchall if no explicit targets
           if [ -z "$targets" ] || [ "$targets" = "$alias_spec" ]; then
@@ -291,10 +291,10 @@ pkgs.writeShellApplication {
             write_address_domain "$alias_address" "$valias_domains_raw"
 
             expanded=""
-            remaining="${targets},"
-            while [ -n "$remaining" ] && [ "${remaining%,}" != "" ]; do
-              target="${remaining%%,*}"
-              remaining="${remaining#*,}"
+            remaining="''${targets},"
+            while [ -n "$remaining" ] && [ "''${remaining%,}" != "" ]; do
+              target="''${remaining%%,*}"
+              remaining="''${remaining#*,}"
               [ -n "$target" ] || continue
               target_addr="$(expand_address "$first_domain" "$target")"
               if [ -z "$expanded" ]; then
