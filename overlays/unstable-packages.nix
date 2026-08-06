@@ -106,7 +106,14 @@ in
       allowUnfree = true;
       android_sdk.accept_license = true;
       cudaCapabilities = prev.config.cudaCapabilities or [ ];
-    };
+    } // prev.lib.optionalAttrs
+      (prev.lib.elem "6.0" (prev.config.cudaCapabilities or [ ]))
+      {
+        # CUDA 13.x dropped offline compilation for Pascal (cc 6.0).
+        # Pin the CUDA toolkit major version so ollama-cuda continues
+        # to build with P100 support on hosts that have one.
+        cudaVersion = "12";
+      };
     overlays = [
       ollamaSplitGGUF
       pynfsclientMetadataVersion
