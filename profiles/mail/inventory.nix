@@ -18,7 +18,5 @@
     "mail-account-002"
     "mail-account-003"
     "mail-account-004"
-    "mail-account-005"
-    "mail-account-006"
   ];
 }
