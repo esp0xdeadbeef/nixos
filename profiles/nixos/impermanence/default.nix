@@ -95,27 +95,8 @@ let
     ".cache/geary"
   ];
 
-  selectedLlmAgentPackageNames =
-    lib.attrByPath
-      [
-        "local"
-        "llmClients"
-        "agents"
-        "packageNames"
-      ]
-      [ ]
-      config;
-
-  selectedLlmAgentPersistence =
-    lib.attrByPath
-      [
-        "local"
-        "llmClients"
-        "agents"
-        "persistence"
-      ]
-      { }
-      config;
+  selectedLlmAgentPackageNames = [ ];
+  selectedLlmAgentPersistence = { };
 
   normalUserNames = lib.filter
     (

@@ -1,6 +1,7 @@
 { inputs
 , lib
 , profiles
+, relativeRepo
 , ...
 }:
 {
