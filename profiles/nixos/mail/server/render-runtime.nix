@@ -261,17 +261,53 @@ pkgs.writeShellApplication {
         unset_account_vars
       done
 
-      if [ -n "$mailbox_aliases" ] && [ -n "$catchall_password_hash" ]; then
-        catchall_addr="$(expand_address "$domain" "$catchall_target")"
-        for alias in $(words "$mailbox_aliases"); do
-          [ -n "$alias" ] || continue
-          alias_address="$(expand_address "$domain" "$alias")"
-          write_address_domain "$alias_address" "$valias_domains_raw"
-          printf '%s %s\n' "$alias_address" "$catchall_addr" >> "$valias"
-          printf '%s %s\n' "$alias_address" "$catchall_addr" >> "$vaccounts_raw"
-          printf '%s:%s::::%s::mail=maildir:%s/mail\n' \
-            "$alias_address" "$catchall_password_hash" \
-            "$catchall_owner_home" "$catchall_owner_home" >> "$passwd_file"
+      if [ -n "$mailbox_aliases" ]; then
+        for alias_spec in $mailbox_aliases; do
+          [ -n "$alias_spec" ] || continue
+
+          alias_localpart="${alias_spec%%=*}"
+          targets="${alias_spec#*=}"
+
+          # Fall back to catchall if no explicit targets
+          if [ -z "$targets" ] || [ "$targets" = "$alias_spec" ]; then
+            if [ -z "$catchall_password_hash" ]; then
+              continue
+            fi
+            catchall_addr="$(expand_address "$domain" "$catchall_target")"
+            targets="$catchall_addr"
+            # Collect per-target details for the catchall
+            target_passwd="$catchall_password_hash"
+            target_home="$catchall_owner_home"
+
+            alias_address="$(expand_address "$domain" "$alias_localpart")"
+            write_address_domain "$alias_address" "$valias_domains_raw"
+            printf '%s %s\n' "$alias_address" "$targets" >> "$valias"
+            printf '%s %s\n' "$alias_address" "$targets" >> "$vaccounts_raw"
+            printf '%s:%s::::%s::mail=maildir:%s/mail\n' \
+              "$alias_address" "$target_passwd" "$target_home" "$target_home" >> "$passwd_file"
+          else
+            # Comma-separated targets → Postfix recipient list
+            alias_address="$(expand_address "$domain" "$alias_localpart")"
+            write_address_domain "$alias_address" "$valias_domains_raw"
+
+            expanded=""
+            remaining="${targets},"
+            while [ -n "$remaining" ] && [ "${remaining%,}" != "" ]; do
+              target="${remaining%%,*}"
+              remaining="${remaining#*,}"
+              [ -n "$target" ] || continue
+              target_addr="$(expand_address "$domain" "$target")"
+              if [ -z "$expanded" ]; then
+                expanded="$target_addr"
+              else
+                expanded="$expanded,$target_addr"
+              fi
+            done
+
+            if [ -n "$expanded" ]; then
+              printf '%s %s\n' "$alias_address" "$expanded" >> "$valias"
+            fi
+          fi
         done
       fi
 
