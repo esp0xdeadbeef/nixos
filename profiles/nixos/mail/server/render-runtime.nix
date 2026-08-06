@@ -208,6 +208,11 @@ pkgs.writeShellApplication {
 
       printf '%s\n' "$domain" >> "$vdomains_raw"
 
+      catchall_target="''${MAILBOX_CATCHALL:-}"
+      mailbox_aliases="''${MAILBOX_ALIASES:-}"
+      catchall_password_hash=""
+      catchall_owner_home=""
+
       for account_ref in $(words "$account_ids"); do
         [ -n "$account_ref" ] || continue
 
@@ -245,14 +250,35 @@ pkgs.writeShellApplication {
           printf '%s:%s::::%s::mail=maildir:%s/mail\n' "$alias_address" "$password_hash" "$owner_home" "$owner_home" >> "$passwd_file"
         done
 
-        unset_account_vars
-
-        catchall="''${MAILBOX_CATCHALL:-}"
-        if [ -n "$catchall" ]; then
-          catchall_address="$(expand_address "$domain" "$catchall")"
-          printf '@%s %s\n' "$domain" "$catchall_address" >> "$valias"
+        if [ -n "$catchall_target" ]; then
+          catchall_check="$(expand_address "$domain" "$catchall_target")"
+          if [ "$address" = "$catchall_check" ]; then
+            catchall_password_hash="$password_hash"
+            catchall_owner_home="$owner_home"
+          fi
         fi
+
+        unset_account_vars
       done
+
+      if [ -n "$mailbox_aliases" ] && [ -n "$catchall_password_hash" ]; then
+        catchall_addr="$(expand_address "$domain" "$catchall_target")"
+        for alias in $(words "$mailbox_aliases"); do
+          [ -n "$alias" ] || continue
+          alias_address="$(expand_address "$domain" "$alias")"
+          write_address_domain "$alias_address" "$valias_domains_raw"
+          printf '%s %s\n' "$alias_address" "$catchall_addr" >> "$valias"
+          printf '%s %s\n' "$alias_address" "$catchall_addr" >> "$vaccounts_raw"
+          printf '%s:%s::::%s::mail=maildir:%s/mail\n' \
+            "$alias_address" "$catchall_password_hash" \
+            "$catchall_owner_home" "$catchall_owner_home" >> "$passwd_file"
+        done
+      fi
+
+      if [ -n "$catchall_target" ]; then
+        catchall_address="$(expand_address "$domain" "$catchall_target")"
+        printf '@%s %s\n' "$domain" "$catchall_address" >> "$valias"
+      fi
     done < "$mailbox_set_env_path_list"
 
     if [ -z "$first_domain" ]; then
