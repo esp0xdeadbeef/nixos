@@ -403,7 +403,9 @@ def main() -> None:
     main_cf = Path("/var/lib/postfix/conf/main.cf")
     if main_cf.is_symlink():
         target = main_cf.resolve()
-        main_cf.write_bytes(target.read_bytes())
+        content = target.read_bytes()
+        main_cf.unlink()
+        main_cf.write_bytes(content)
 
     subprocess.run(
         [
