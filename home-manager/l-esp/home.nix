@@ -26,6 +26,7 @@ in
     profiles.home-manager.mail.geary
     profiles.home-manager.agents-all
     profiles.home-manager.claude-code
+    profiles.home-manager.deepseek
 
     # update nix-index database
     inputs.nix-index-database.homeModules.nix-index
