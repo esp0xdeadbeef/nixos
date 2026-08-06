@@ -2,7 +2,6 @@
 {
   imports = [
     profiles.nixos.llm.ollama-base
-    profiles.nixos.llm-clients.claude-deepseek
     profiles.nixos.llm-clients.agents-all
     ./ollama.nix
   ];
