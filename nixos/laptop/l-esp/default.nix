@@ -8,15 +8,20 @@
     profiles.nixos.laptop.intel-workstation
     profiles.nixos.network.nebula-mesh
     profiles.nixos.vm-host.nixos-shell
+    profiles.nixos.llm.ollama-base
+    profiles.nixos.llm-clients.agents-all
 
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
 
     ./connect-nas
     ./hardware
-    ./llms
     ./optional
     ./nixos-shell-servers
   ];
+
+  services.ollama.loadModels = profiles.nixos.llm.model-sets.workstation;
+
+  sops.secrets."deepseek-api".sopsFile = relativeRepo.sourcePath "secrets/l-esp-default-deadbeef.yaml";
 
   hardware.nvidia.prime = {
     intelBusId = "PCI:00:02:0";
