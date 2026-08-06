@@ -287,6 +287,35 @@ def tree_blobs(repo: Path, commit: str) -> list[tuple[str, str]]:
     return blobs
 
 
+def commit_diff_blobs(repo: Path, commit: str) -> list[tuple[str, str]]:
+    """Return blobs that changed in *commit* relative to its parent(s).
+
+    Falls back to *tree_blobs* for root commits or when diff-tree fails.
+    """
+    parent_spec = f"{commit}^@"
+    try:
+        changed = git(repo, "diff-tree", "-r", "--diff-filter=ACMR", "-z", parent_spec)
+    except PrivacyCheckError:
+        return tree_blobs(repo, commit)
+    blobs: list[tuple[str, str]] = []
+    for entry in changed.split(b"\0"):
+        if not entry:
+            continue
+        parts = entry.rsplit(b"\t", 1)
+        if len(parts) != 2:
+            continue
+        metadata_bytes, raw_path = parts
+        meta_parts = metadata_bytes.split()
+        if len(meta_parts) < 3:
+            continue
+        src_oid = meta_parts[2].decode("ascii")
+        if src_oid == "0" * 40:
+            continue
+        path = raw_path.decode("utf-8", errors="surrogateescape")
+        blobs.append((src_oid, path))
+    return blobs
+
+
 def index_blobs(repo: Path) -> list[tuple[str, str]]:
     changed = git(repo, "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
     blobs: list[tuple[str, str]] = []
@@ -366,7 +395,7 @@ def main() -> int:
         try:
             public_ipv6 = discover_public_address(repo, 6)
             public_ipv6_network = ipaddress.ip_network(f"{public_ipv6}/64", strict=False)
-        except PrivacyCheckError:
+        except Exception:
             public_ipv6_network = ipaddress.IPv6Network("::/128")
         patterns, secret_ips = derive_private_denylist(repo)
         commits = commits_to_scan(repo, updates)
@@ -374,7 +403,7 @@ def main() -> int:
         findings: set[tuple[str, int, str]] = set()
         scanned_blobs: set[str] = set()
         for commit in sorted(commits):
-            for object_id, path in tree_blobs(repo, commit):
+            for object_id, path in commit_diff_blobs(repo, commit):
                 if object_id in scanned_blobs:
                     continue
                 scanned_blobs.add(object_id)
