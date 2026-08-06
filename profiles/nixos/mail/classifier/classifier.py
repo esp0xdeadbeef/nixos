@@ -43,13 +43,21 @@ class HtmlTextExtractor(HTMLParser):
         super().__init__()
         self.parts: list[str] = []
         self.ignored_depth = 0
+        self.images: list[str] = []
+        self._image_index = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        del attrs
         if tag in {"script", "style", "head"}:
             self.ignored_depth += 1
         elif tag == "img":
-            self.parts.append("[image removed]")
+            src = ""
+            for name, value in attrs:
+                if name == "src" and value:
+                    src = value[:200]
+                    break
+            self.images.append(src)
+            self.parts.append(f"[image-{self._image_index}]")
+            self._image_index += 1
         elif tag in {"br", "p", "div", "li", "tr"}:
             self.parts.append("\n")
 
@@ -65,8 +73,6 @@ class HtmlTextExtractor(HTMLParser):
 
     def text(self) -> str:
         return re.sub(r"\n{3,}", "\n\n", html.unescape("".join(self.parts))).strip()
-
-
 def emit(event: str, **fields: Any) -> None:
     print(json.dumps({"event": event, **fields}, sort_keys=True), flush=True)
 
@@ -84,9 +90,10 @@ def decode_header_value(value: str | None) -> str:
     return "".join(decoded)
 
 
-def message_body(message: Any) -> str:
+def message_body(message: Any) -> tuple[str, list[str]]:
     plain_parts: list[str] = []
     html_parts: list[str] = []
+    images: list[str] = []
 
     for part in message.walk():
         if part.is_multipart():
@@ -119,20 +126,24 @@ def message_body(message: Any) -> str:
             extractor = HtmlTextExtractor()
             extractor.feed(content)
             html_parts.append(extractor.text())
+            images.extend(extractor.images)
 
-    return "\n\n".join(plain_parts or html_parts).strip()
+    return "\n\n".join(plain_parts or html_parts).strip(), images
 
 
 def message_for_model(raw_message: bytes, maximum_characters: int) -> dict[str, str]:
     message = BytesParser(policy=email.policy.default).parsebytes(raw_message)
-    body = message_body(message)
-    return {
+    body_text, images = message_body(message)
+    result: dict[str, str] = {
         "subject": decode_header_value(message.get("Subject")),
         "from": decode_header_value(message.get("From")),
         "to": decode_header_value(message.get("To")),
         "date": decode_header_value(message.get("Date")),
-        "body": body[:maximum_characters],
+        "body": body_text[:maximum_characters],
     }
+    for i, img in enumerate(images):
+        result[f"image_{i}"] = img
+    return result
 
 
 def mailbox_hash(mailbox: str) -> str:
@@ -899,11 +910,14 @@ def self_test() -> None:
         b"<html><body><p>Hello</p><img src='https://evil.test/pixel.png'><p>World</p></body></html>"
     )
     parsed_img = message_for_model(html_with_image, 500)
-    assert "[image removed]" in parsed_img["body"], (
-        "HTML img tags must be replaced with [image removed]"
+    assert "[image-0]" in parsed_img["body"], (
+        "HTML img tags must be replaced with [image-N] placeholder"
     )
     assert "evil.test" not in parsed_img["body"], (
         "image URLs must not survive into the extracted body"
+    )
+    assert parsed_img.get("image_0") == "https://evil.test/pixel.png", (
+        "image src must be captured in image_N field"
     )
     emit("self_test_passed")
 
