@@ -47,7 +47,7 @@ in
     enable = true;
     # Discover every hosted mailbox set secret. The account allow-list remains
     # explicit so external client-only credentials never reach this server.
-    names = null;
+    names = profiles.mail.inventory.hostedMailboxSets;
     accountNames = profiles.mail.inventory.hostedMailAccounts;
   };
 
