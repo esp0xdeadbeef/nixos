@@ -165,5 +165,6 @@
     desktop-sway = import ./home-manager/desktop-sway;
     agents-all = import ./home-manager/agents-all.nix;
     claude-code = import ./home-manager/claude-code.nix;
+    deepseek = import ./home-manager/deepseek.nix;
   };
 }
