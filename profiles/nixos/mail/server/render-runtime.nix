@@ -251,7 +251,7 @@ pkgs.writeShellApplication {
         done
 
         if [ -n "$catchall_target" ]; then
-          catchall_check="$(expand_address "$domain" "$catchall_target")"
+          catchall_check="$(expand_address "$first_domain" "$catchall_target")"
           if [ "$address" = "$catchall_check" ]; then
             catchall_password_hash="$password_hash"
             catchall_owner_home="$owner_home"
@@ -273,7 +273,7 @@ pkgs.writeShellApplication {
             if [ -z "$catchall_password_hash" ]; then
               continue
             fi
-            catchall_addr="$(expand_address "$domain" "$catchall_target")"
+            catchall_addr="$(expand_address "$first_domain" "$catchall_target")"
             targets="$catchall_addr"
             # Collect per-target details for the catchall
             target_passwd="$catchall_password_hash"
@@ -312,7 +312,7 @@ pkgs.writeShellApplication {
       fi
 
       if [ -n "$catchall_target" ]; then
-        catchall_address="$(expand_address "$domain" "$catchall_target")"
+        catchall_address="$(expand_address "$first_domain" "$catchall_target")"
         printf '@%s %s\n' "$domain" "$catchall_address" >> "$valias"
       fi
     done < "$mailbox_set_env_path_list"
