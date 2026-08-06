@@ -48,6 +48,8 @@ class HtmlTextExtractor(HTMLParser):
         del attrs
         if tag in {"script", "style", "head"}:
             self.ignored_depth += 1
+        elif tag == "img":
+            self.parts.append("[image removed]")
         elif tag in {"br", "p", "div", "li", "tr"}:
             self.parts.append("\n")
 
@@ -888,6 +890,21 @@ def self_test() -> None:
     )
     parsed_unknown = message_for_model(unknown_encoding, 500)
     assert parsed_unknown["body"], "body must not be empty for unknown encoding"
+    html_with_image = (
+        b"Subject: test\r\n"
+        b"From: sender@example.test\r\n"
+        b"To: receiver@example.test\r\n"
+        b"Content-Type: text/html; charset=utf-8\r\n"
+        b"\r\n"
+        b"<html><body><p>Hello</p><img src='https://evil.test/pixel.png'><p>World</p></body></html>"
+    )
+    parsed_img = message_for_model(html_with_image, 500)
+    assert "[image removed]" in parsed_img["body"], (
+        "HTML img tags must be replaced with [image removed]"
+    )
+    assert "evil.test" not in parsed_img["body"], (
+        "image URLs must not survive into the extracted body"
+    )
     emit("self_test_passed")
 
 
