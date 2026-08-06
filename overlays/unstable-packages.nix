@@ -105,6 +105,7 @@ in
     config = {
       allowUnfree = true;
       android_sdk.accept_license = true;
+      cudaCapabilities = prev.config.cudaCapabilities or [ ];
     };
     overlays = [
       ollamaSplitGGUF
