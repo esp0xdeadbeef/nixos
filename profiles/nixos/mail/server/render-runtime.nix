@@ -296,7 +296,7 @@ pkgs.writeShellApplication {
               target="${remaining%%,*}"
               remaining="${remaining#*,}"
               [ -n "$target" ] || continue
-              target_addr="$(expand_address "$domain" "$target")"
+              target_addr="$(expand_address "$first_domain" "$target")"
               if [ -z "$expanded" ]; then
                 expanded="$target_addr"
               else
