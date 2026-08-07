@@ -1,4 +1,5 @@
-{ lib
+{ inputs
+, lib
 , relativeRepo
 , pkgs
 , profiles
@@ -144,13 +145,29 @@
     rotateBtrfsRoot.enable = false;
   };
 
-  home-manager.users.deadbeef = {
-    imports = [
-      profiles.home-manager.claude-code
+  home-manager = {
+    sharedModules = [
+      inputs.sops-nix.homeManagerModules.sops
     ];
-    programs.fish.enable = true;
-    programs.zsh.enable = true;
-    home.stateVersion = "26.05";
+
+    extraSpecialArgs = {
+      inherit inputs;
+    };
+
+    users.deadbeef = {
+      imports = [
+        profiles.home-manager.claude-code
+      ];
+
+      sops = {
+        defaultSopsFile = relativeRepo.sourcePath "secrets/s-agents.yaml";
+        age.keyFile = "/persist/home/deadbeef/.config/sops/age/keys.txt";
+      };
+
+      programs.fish.enable = true;
+      programs.zsh.enable = true;
+      home.stateVersion = "26.05";
+    };
   };
 
   virtualisation = {
