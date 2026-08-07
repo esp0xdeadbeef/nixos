@@ -381,6 +381,7 @@ creation_rules:
           - *l-esp-deadbeef
           - *s-agents-u
           - *s-agents-r
+          - *codex-jail-u
   - path_regex: '^(secrets/)*s-router-(test|nixos).*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
