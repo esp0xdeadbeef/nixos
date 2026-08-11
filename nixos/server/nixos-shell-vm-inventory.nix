@@ -220,14 +220,6 @@ let
       };
     }
     {
-      name = "s-router-legacy-edge";
-      description = "s-router-legacy-edge VM (nixos-shell)";
-    }
-    {
-      name = "s-router-legacy-core";
-      description = "s-router-core VM (nixos-shell)";
-    }
-    {
       name = "s-router-clab";
       description = "s-router-clab VM (nixos-shell)";
       activation.refreshPins = true;
