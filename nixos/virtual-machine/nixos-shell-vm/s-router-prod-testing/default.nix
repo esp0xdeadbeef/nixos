@@ -6,7 +6,7 @@
 }:
 let
   hostName = "s-router-prod-testing";
-  modelSource = relativeRepo.sourcePath "prod-network/current";
+  modelSource = relativeRepo.sourcePath "prod-network/s-router-prod-testing";
 in
 {
   _module.args.sRouterProdProfile = {
