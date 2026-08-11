@@ -1,0 +1,22 @@
+{ pkgs, lib, ... }:
+{
+
+  environment.systemPackages = with pkgs; [
+    conntrack-tools
+    traceroute
+    nmap
+    dnsutils
+    ppp
+    iproute2
+    tcpdump
+    tmux
+    kea
+    dhcpcd
+    networkmanager
+    dig
+    neovim
+    nftables
+  ];
+
+  environment.etc.hosts.enable = lib.mkDefault false;
+}
