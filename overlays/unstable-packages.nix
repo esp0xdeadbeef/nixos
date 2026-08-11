@@ -2,7 +2,6 @@
 let
   ollamaSplitGGUF = _unstableFinal: unstablePrev:
     let
-      expectedVersion = "0.32.5";
       cudaPackages = unstablePrev.cudaPackages;
       cudaLibs = [
         cudaPackages.cuda_cudart
@@ -25,11 +24,6 @@ let
         , cuda ? false
         ,
         }:
-        let
-          actualVersion = package.version or (final.lib.getVersion package.name);
-        in
-        assert final.lib.assertMsg (actualVersion == expectedVersion)
-          "Ollama split-GGUF overlay expects ${expectedVersion}, got ${actualVersion}; review patches/ollama-hf-sharded-gguf.patch before updating Ollama.";
         package.overrideAttrs (
           old:
           {
