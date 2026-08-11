@@ -70,7 +70,7 @@ in
 
     config = {
       imports = [
-        (relativeRepo.module "library/11-containers/nixos-container")
+        (relativeRepo.module "profiles/nixos/containers/nixos-container")
         (relativeRepo.module "library/01-general/password-cracking/default.nix")
         profiles.nixos.llm.ollama-gpu-ready
         profiles.nixos.llm.ollama-smoke-test

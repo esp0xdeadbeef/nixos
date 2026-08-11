@@ -34,7 +34,7 @@
     profiles.nixos.virtualization.podman
     profiles.nixos.vm-host.nixos-shell
 
-    (relativeRepo.module "library/99-testing/enable-ssh-with-authorized-keys-and-add-NOPASSWD.nix")
+    profiles.nixos.nixos-shell-host.ssh-nopasswd
     (relativeRepo.module "modules/nixos/cuda-cache.nix")
     (relativeRepo.module "modules/nixos/local-users.nix")
   ];
