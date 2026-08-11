@@ -28,6 +28,21 @@
 }:
 
 let
+  # === Updating this package ===
+  #
+  # Dell regularly removes old RPMs. To find the latest version:
+  #
+  #   curl -fsSL "https://linux.dell.com/repo/hardware/dsu/os_independent/x86_64/" \
+  #     | grep -oP 'dell-system-update-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.[0-9]+\.[0-9]+\.x86_64\.rpm' \
+  #     | sort -t- -k4,4V | tail -5
+  #
+  # Once you have the new filename, update version, url, and run:
+  #
+  #   nix-prefetch-url "https://linux.dell.com/repo/hardware/dsu/os_independent/x86_64/<new-file>"
+  #
+  # Copy the sha256 hash from nix-prefetch-url into the src.hash field below.
+  # Then build to verify: nix build .#dell-system-update --no-link
+
   dellPgpPubkeys = "https://linux.dell.com/repo/pgp_pubkeys";
   dellBanner = "DELL FIRMWARE TOOLING IS PAINFUL";
 
