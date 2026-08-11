@@ -132,3 +132,15 @@ When verifying config output before deploying:
 - Specialised HM variant: `nixosConfigurations.<host>.config.home-manager.users.<user>.specialisation.<variant>.config.<path>`
 - `nix build <path>.source --no-link --print-out-paths` to get the built file
 - `nix eval <path> --json` to inspect raw attribute values
+
+## Updating fetchurl packages
+
+When a fetchurl-based derivation fails because the upstream URL 404s (Dell, etc.):
+
+1. Find the new version:\n   - For a directory listing: `curl -fsSL "<base-url>/" | grep -oP '<pattern>' | sort -V | tail -5`
+2. Get the new hash: `nix-prefetch-url "<new-url>"`
+   - The second line of output is the base32 Nix hash.
+   - Convert to SRI: `nix hash to-sri --type sha256 <base32-hash>`
+   - Or just let the build fail — the error message gives the correct SRI hash directly.
+3. Update `version`, `url`, and `hash` in the derivation.
+4. Verify: `nix build .#<package> --no-link`
