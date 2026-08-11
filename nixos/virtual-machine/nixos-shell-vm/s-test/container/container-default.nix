@@ -6,7 +6,7 @@
 }:
 {
   imports = [
-    (relativeRepo.module "library/11-containers/nixos-container")
+    (relativeRepo.module "profiles/nixos/containers/nixos-container")
     ./containerlab.nix
     ./podman-hello-world.nix
     ./network.nix

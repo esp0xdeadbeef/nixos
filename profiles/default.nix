@@ -25,6 +25,7 @@
     };
     containers = {
       firefox-vnc = import ./nixos/containers/firefox-vnc.nix;
+      nixos-container = import ./nixos/containers/nixos-container;
     };
     editors = {
       neovim = import ./nixos/editors/neovim;
@@ -140,7 +141,9 @@
       nixos-shell = import ./nixos/vm-host/nixos-shell;
     };
     nixos-shell-host = {
+      autologin = import ./nixos/nixos-shell-host/autologin.nix;
       common = import ./nixos/nixos-shell-host/common.nix;
+      ssh-nopasswd = import ./nixos/nixos-shell-host/ssh-nopasswd.nix;
     };
     workstation = {
       android = import ./nixos/workstation/android.nix;
