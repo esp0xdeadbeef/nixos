@@ -39,7 +39,7 @@ keys:
   - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
   - &hetz-test age1757z4z4t392kxuzfeajuaukh93na90e2p08t06k9ggpw6wa75dsshhqpzw
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
-  - &s-router-prod-testing age1u60cwewlzxlnjpdpkj5g5h6vy5j7ct3swckunc2ynxtwvdk84q6qgxpwyy
+  - &s-router-prod-testing age1ngrwcrmsy5qjruydsmu40jvj6u97r5cq6k02yjha7zkvz22epdws5tv7a4
   - &s-mail-classifier age1elpsqft4da686ftu0237uv0vsc5zqcjcd2xphust5cmu2yk99epskk5r6c
 
 creation_rules:
@@ -255,6 +255,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
+          - *s-router-prod-testing
 
   - path_regex: '^prod-network/legacy/secrets/vlan2-hostnames-servers\.json\.age$'
     input_type: binary
@@ -274,6 +275,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
+          - *s-router-prod-testing
 
   - path_regex: '^prod-network/s-router-prod-testing/secrets/runtime\.yaml$'
     encrypted_regex: ".*"
