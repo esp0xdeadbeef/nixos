@@ -42,6 +42,10 @@
   nixpkgs.config = {
     cudaCapabilities = [ "6.0" ];
     cudaForwardCompat = false;
+    # P100 (Pascal) needs custom CUDA architectures that miss the binary
+    # cache.  Pin ollama to stable nixpkgs so it only rebuilds on stable
+    # branch updates instead of every unstable bump.
+    ollamaPinToStable = true;
   };
 
   local.impermanence = {
