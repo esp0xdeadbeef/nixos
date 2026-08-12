@@ -180,6 +180,9 @@ let
   downstreamAccessVlan2Link = "p2p-access-vlan2-downstream-selector";
   downstreamAccessVlan3Link = "p2p-access-vlan3-downstream-selector";
   downstreamAccessVlan7Link = "p2p-access-vlan7-downstream-selector";
+  upstreamPolicyVlan8Link = "p2p-policy-upstream-selector--access-access-vlan8--uplink-wan";
+  policyDownstreamVlan8Link = "p2p-downstream-selector-policy--access-access-vlan8";
+  downstreamAccessVlan8Link = "p2p-access-vlan8-downstream-selector";
   sNebulaContainerAddress = "192.168.3.10";
   sNebulaContainerAddress6 = "fd42:dead:beef:3::1337:dead:beef";
   sLlmInferenceContainerAddress = "192.168.3.11";
@@ -211,6 +214,8 @@ let
             dnsRuntime.requesters.access-vlan2.clientIpv6
             "${dnsRuntime.requesters.access-vlan7.ipv4}/32"
             "${dnsRuntime.requesters.access-vlan7.ipv6}/128"
+            "${dnsRuntime.requesters.access-vlan8.ipv4}/32"
+            "${dnsRuntime.requesters.access-vlan8.ipv6}/128"
           ];
         };
 
@@ -286,6 +291,13 @@ let
       bridge = "rt-upstream-policy-vlan7";
       interfaceName = "policy";
     };
+
+    policy-vlan8 = p2pPort {
+      link = upstreamPolicyVlan8Link;
+      adapterName = "prod-8a1d3c2e4f56";
+      bridge = "rt-upstream-policy-vlan8";
+      interfaceName = "policy-vlan8";
+    };
   };
 
   policy = mkNode "policy" {
@@ -310,6 +322,13 @@ let
       interfaceName = "upstream-vlan7";
     };
 
+    upstream-vlan8 = p2pPort {
+      link = upstreamPolicyVlan8Link;
+      adapterName = "prod-9b2e4d1c3a65";
+      bridge = "rt-upstream-policy-vlan8";
+      interfaceName = "upstream-vlan8";
+    };
+
     downstream-vlan2 = p2pPort {
       link = policyDownstreamVlan2Link;
       adapterName = "prod-34fc7c237d32";
@@ -329,6 +348,13 @@ let
       adapterName = "prod-750978245400";
       bridge = "rt-policy-downstream-vlan7";
       interfaceName = "downstr-vlan7";
+    };
+
+    downstream-vlan8 = p2pPort {
+      link = policyDownstreamVlan8Link;
+      adapterName = "prod-7c4a1f8e2d39";
+      bridge = "rt-policy-downstream-vlan8";
+      interfaceName = "downstr-vlan8";
     };
   };
 
@@ -354,6 +380,13 @@ let
       interfaceName = "policy-vlan7";
     };
 
+    policy-vlan8 = p2pPort {
+      link = policyDownstreamVlan8Link;
+      adapterName = "prod-5d8a1c3e2f47";
+      bridge = "rt-policy-downstream-vlan8";
+      interfaceName = "policy-vlan8";
+    };
+
     access-vlan2 = p2pPort {
       link = downstreamAccessVlan2Link;
       adapterName = "prod-540264d3608b";
@@ -373,6 +406,13 @@ let
       adapterName = "prod-22766d6cc0fd";
       bridge = "rt-downstream-access-vlan7";
       interfaceName = "access-vlan7";
+    };
+
+    access-vlan8 = p2pPort {
+      link = downstreamAccessVlan8Link;
+      adapterName = "prod-3e6b2f1d4c58";
+      bridge = "rt-downstream-access-vlan8";
+      interfaceName = "access-vlan8";
     };
   };
 
@@ -539,6 +579,54 @@ let
         };
       };
     };
+
+  accessVlan8 =
+    (mkNode "access-vlan8" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessVlan8Link;
+        adapterName = "prod-8b7c6d5e4f39";
+        bridge = "rt-downstream-access-vlan8";
+        interfaceName = "access-vlan8";
+      };
+
+      tenant-vlan8 = tenantPort {
+        logicalInterface = "tenant-vlan8";
+        bridge = "lan8";
+        interfaceName = "lan8";
+        addr4 = "192.168.8.1/24";
+        addr6 = "fd42:dead:beef:8::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-vlan8.ipv4
+            dnsRuntime.requesters.access-vlan8.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-vlan8 = dhcp4Advertisement {
+            tenant = "vlan8";
+            interface = "tenant-vlan8";
+            subnet = "192.168.8.0/24";
+            poolStart = "192.168.8.100";
+            poolEnd = "192.168.8.200";
+            router = "192.168.8.1";
+            leaseStatePath = "/var/lib/kea/vlan8.leases";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-vlan8 = slaacRa "tenant-vlan8";
+        };
+      };
+    };
 in
 {
   schemaVersion = 1;
@@ -571,6 +659,11 @@ in
     vlan7-dns = {
       ipv4 = [ dnsRuntime.requesters.access-vlan7.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-vlan7.ipv6 ];
+    };
+
+    vlan8-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-vlan8.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan8.ipv6 ];
     };
   };
 
@@ -628,6 +721,12 @@ in
             vlan = 7;
             parentUplink = "trunk";
           };
+
+          lan8 = {
+            name = "lan8";
+            vlan = 8;
+            parentUplink = "trunk";
+          };
         };
 
         bridgeNetworks = {
@@ -641,6 +740,9 @@ in
           rt-upstream-policy-vlan2 = { };
           rt-upstream-policy-vlan3 = { };
           rt-upstream-policy-vlan7 = { };
+          rt-downstream-access-vlan8 = { };
+          rt-policy-downstream-vlan8 = { };
+          rt-upstream-policy-vlan8 = { };
         };
       };
     };
@@ -656,6 +758,7 @@ in
       ${nodeName "access-vlan2"} = accessVlan2;
       ${nodeName "access-vlan3"} = accessVlan3;
       ${nodeName "access-vlan7"} = accessVlan7;
+      ${nodeName "access-vlan8"} = accessVlan8;
     };
   };
 
@@ -689,6 +792,10 @@ in
       };
 
       access-vlan7 = {
+        deploymentHost = prodHost;
+      };
+
+      access-vlan8 = {
         deploymentHost = prodHost;
       };
     };

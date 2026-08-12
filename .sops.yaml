@@ -39,6 +39,7 @@ keys:
   - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
   - &hetz-test age1757z4z4t392kxuzfeajuaukh93na90e2p08t06k9ggpw6wa75dsshhqpzw
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
+  - &s-router-prod-testing age1u60cwewlzxlnjpdpkj5g5h6vy5j7ct3swckunc2ynxtwvdk84q6qgxpwyy
   - &s-mail-classifier age1elpsqft4da686ftu0237uv0vsc5zqcjcd2xphust5cmu2yk99epskk5r6c
 
 creation_rules:
@@ -273,6 +274,25 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
+
+  - path_regex: '^prod-network/s-router-prod-testing/secrets/runtime\.yaml$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-prod
+          - *s-router-prod-testing
+
+  - path_regex: '^prod-network/s-router-prod-testing/secrets/(vlan[23]-reservations|vlan2-reservation-names)\.json\.age$'
+    input_type: binary
+    output_type: binary
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-prod
+          - *s-router-prod-testing
 
   - path_regex: '^(secrets/)*s-router-legacy-edge.*\.(env|ya?ml)$'
     encrypted_regex: ".*"

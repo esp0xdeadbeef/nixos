@@ -615,20 +615,6 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
-        {
-          id = "deny-vlan8-dns-to-wan";
-          priority = 95;
-          from = {
-            kind = "service";
-            name = "vlan8-dns";
-          };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "deny";
-        }
       ];
 
       bindings = [
