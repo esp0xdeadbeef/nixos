@@ -26,17 +26,7 @@ let
         }:
         package.overrideAttrs (
           old:
-          {
-            patches =
-              (old.patches or [ ])
-              ++ [
-                # Hugging Face currently rejects its Ollama manifest endpoint
-                # for sharded GGUFs. Fall back to the Hub API, download every
-                # content-addressed shard, and feed them through Ollama's
-                # existing split-GGUF importer.
-                ../patches/ollama-hf-sharded-gguf.patch
-              ];
-          }
+          { }
           // final.lib.optionalAttrs cuda {
             # setupCudaHook exposes the splayed CUDA outputs as a
             # semicolon-separated CUDAToolkit_ROOT. Ollama 0.32.4 passes
