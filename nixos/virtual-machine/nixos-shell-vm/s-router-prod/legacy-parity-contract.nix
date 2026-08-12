@@ -16,6 +16,7 @@ let
   vlan2Dns = dnsRuntime.requesters.access-vlan2;
   vlan3Dns = dnsRuntime.requesters.access-vlan3;
   vlan7Dns = dnsRuntime.requesters.access-vlan7;
+  vlan8Dns = dnsRuntime.requesters.access-vlan8;
 
   expectedQemuNetworkingOptions = [
     "-nic none"
@@ -24,9 +25,10 @@ let
   ];
 
   expectedContainers = [
-    "access-vlan3"
     "access-vlan2"
+    "access-vlan3"
     "access-vlan7"
+    "access-vlan8"
     "core"
     "downstream-selector"
     "policy"
@@ -291,6 +293,13 @@ let
       "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} udp dport 53"
       "ip6 saddr ${vlan7Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} tcp dport 53"
     ];
+
+    access-vlan8 = [
+      "ip saddr ${vlan8Dns.ipv4} ip daddr ${dnsResolver.ipv4} udp dport 53"
+      "ip saddr ${vlan8Dns.ipv4} ip daddr ${dnsResolver.ipv4} tcp dport 53"
+      "ip6 saddr ${vlan8Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} udp dport 53"
+      "ip6 saddr ${vlan8Dns.ipv6} ip6 daddr ${renderedDnsResolver.ipv6} tcp dport 53"
+    ];
   };
 
   hasDnsEgressRules =
@@ -322,6 +331,12 @@ let
       hasVlan7Ipv6Acl =
         hasAclEntry "${vlan7Dns.ipv6} allow"
         || hasAclEntry "${vlan7Dns.ipv6}/128 allow";
+      hasVlan8Ipv4Acl =
+        hasAclEntry "${vlan8Dns.ipv4} allow"
+        || hasAclEntry "${vlan8Dns.ipv4}/32 allow";
+      hasVlan8Ipv6Acl =
+        hasAclEntry "${vlan8Dns.ipv6} allow"
+        || hasAclEntry "${vlan8Dns.ipv6}/128 allow";
     in
     (server.interface or [ ]) == [
       "127.0.0.1"
@@ -335,6 +350,8 @@ let
     && hasVlan2Ipv6Acl
     && hasVlan7Ipv4Acl
     && hasVlan7Ipv6Acl
+    && hasVlan8Ipv4Acl
+    && hasVlan8Ipv6Acl
     && !(server ? "outgoing-interface")
     && forwarders == [ ];
 
@@ -1144,11 +1161,12 @@ in
     {
       assertion =
         unboundForwardersFor "access-vlan2" == expectedDnsForwarders
-        && unboundForwardersFor "access-vlan7" == expectedDnsForwarders;
+        && unboundForwardersFor "access-vlan7" == expectedDnsForwarders
+        && unboundForwardersFor "access-vlan8" == expectedDnsForwarders;
       message = ''
-        s-router-prod VLAN 2 and VLAN 7 access resolvers must forward only to the
-        core recursive resolver service over its internal IPv4 and IPv6
-        endpoints.
+        s-router-prod VLAN 2, VLAN 7, and VLAN 8 access resolvers must forward
+        only to the core recursive resolver service over its internal IPv4 and
+        IPv6 endpoints.
       '';
     }
     {
@@ -1160,7 +1178,8 @@ in
         && hasCoreDnsTraversalRules
         && hasCoreDnsPathReconciliation
         && hasDnsEgressRules "access-vlan2"
-        && hasDnsEgressRules "access-vlan7";
+        && hasDnsEgressRules "access-vlan7"
+        && hasDnsEgressRules "access-vlan8";
       message = ''
         s-router-prod must preserve the address-free access-dns -> core-dns
         target intent and materialize its temporary inventory projection with
@@ -1168,7 +1187,7 @@ in
         core resolver isolation, and no invented public core forwarders. Until
         the network-* service-route closure stops leaking equal-prefix core
         routes across tenant tables, the explicit reconciliation override must
-        keep VLAN 2 and VLAN 7 on their relation-bound upstream lanes.
+        keep VLAN 2, VLAN 7, and VLAN 8 on their relation-bound upstream lanes.
       '';
     }
     {
