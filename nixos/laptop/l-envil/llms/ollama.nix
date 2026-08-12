@@ -2,7 +2,7 @@
 {
   services.ollama = {
     enable = true;
-    package = pkgs.ollama-cuda;
+    package = pkgs.ollamaForHost;
     #acceleration = "cuda";
 
     loadModels = profiles.nixos.llm.model-sets.heavy;

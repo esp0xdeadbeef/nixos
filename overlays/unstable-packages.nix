@@ -30,6 +30,11 @@ let
         )
       ];
   };
+
+  # Pascal GPUs (cc 6.0) need custom CUDA architectures that miss the binary
+  # cache.  For those hosts, pin ollama to stable nixpkgs to reduce rebuild
+  # churn; every other host tracks the latest unstable release.
+  isPascal = prev.lib.elem "6.0" (prev.config.cudaCapabilities or [ ]);
 in
 {
   unstable = import inputs.nixpkgs-unstable {
@@ -38,8 +43,7 @@ in
       allowUnfree = true;
       android_sdk.accept_license = true;
       cudaCapabilities = prev.config.cudaCapabilities or [ ];
-    } // prev.lib.optionalAttrs
-      (prev.lib.elem "6.0" (prev.config.cudaCapabilities or [ ]))
+    } // prev.lib.optionalAttrs isPascal
       {
         # CUDA 13.x dropped offline compilation for Pascal (cc 6.0).
         # Pin the CUDA toolkit major version so ollama-cuda continues
@@ -50,4 +54,9 @@ in
       pynfsclientMetadataVersion
     ];
   };
+
+  ollamaForHost =
+    if isPascal
+    then prev.ollama-cuda
+    else final.unstable.ollama-cuda;
 }
