@@ -17,6 +17,8 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
+  local.users.deadbeefSops.enable = false;
+
   users.users.deadbeef = {
     isNormalUser = true;
     hashedPassword = "!";
