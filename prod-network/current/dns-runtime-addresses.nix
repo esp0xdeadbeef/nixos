@@ -1,10 +1,6 @@
-# Explicit DNS service endpoint material for the current CPM schema.
-#
-# The target contract is address-free. The pinned compiler cannot consume that
-# service-origin contract without changing unrelated IPv6 route materialization,
-# so inventory temporarily needs explicit access forwarders and a core service
-# endpoint. Centralize those values here until CPM can bind the service directly
-# to the core port facing upstream-selector.
+# DNS runtime addresses extended from the production set with the IOT
+# (VLAN 8) access entry. Keep the production values as the primary
+# reference; any change here must also be reflected in ../current/.
 {
   resolver = {
     node = "core";
@@ -33,6 +29,13 @@
       ipv6 = "fd42:dead:beef:7::1";
       clientIpv4 = "192.168.2.0/24";
       clientIpv6 = "fd42:dead:beef:7::/64";
+    };
+
+    access-vlan8 = {
+      ipv4 = "192.168.8.1";
+      ipv6 = "fd42:dead:beef:8::1";
+      clientIpv4 = "192.168.8.0/24";
+      clientIpv6 = "fd42:dead:beef:8::/64";
     };
   };
 }

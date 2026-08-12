@@ -17,8 +17,6 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
-  local.nixosShellHost.secrets.enable = false;
-
   users.users.deadbeef = {
     isNormalUser = true;
     hashedPassword = "!";

@@ -32,6 +32,13 @@ in
       mode = "0400";
     };
 
+    subnet-ipv6-vlan8 = {
+      sopsFile = inventoryRuntimeSecretFile;
+      key = "subnet-ipv6";
+      owner = "root";
+      mode = "0400";
+    };
+
     s-router-prod-vlan2-reservations-json = {
       sopsFile = ./secrets/vlan2-reservations.json.age;
       format = "binary";

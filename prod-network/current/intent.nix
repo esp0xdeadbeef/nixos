@@ -150,6 +150,15 @@ in
             (runtimeIpv6Prefix "vlan7" 7)
           ];
         }
+        {
+          kind = "tenant";
+          name = "vlan8";
+          ipv4 = "192.168.8.0/24";
+          ipv6 = "fd42:dead:beef:8::/64";
+          routedPrefixes = [
+            (runtimeIpv6Prefix "vlan8" 8)
+          ];
+        }
       ];
 
       endpoints = [
@@ -181,6 +190,13 @@ in
           ipv4 = [ "192.168.2.1" ];
           ipv6 = [ "fd42:dead:beef:7::1" ];
         }
+        {
+          kind = "host";
+          name = "vlan8-dns";
+          tenant = "vlan8";
+          ipv4 = [ "192.168.8.1" ];
+          ipv6 = [ "fd42:dead:beef:8::1" ];
+        }
       ];
     };
 
@@ -206,6 +222,11 @@ in
         {
           name = "vlan7-dns";
           providers = [ "vlan7-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "vlan8-dns";
+          providers = [ "vlan8-dns" ];
           trafficType = "dns";
         }
         {
@@ -278,6 +299,21 @@ in
           to = {
             kind = "service";
             name = "vlan3-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan8-to-vlan8-dns";
+          priority = 86;
+          from = {
+            kind = "tenant";
+            name = "vlan8";
+          };
+          to = {
+            kind = "service";
+            name = "vlan8-dns";
           };
           trafficType = "dns";
           action = "allow";
@@ -420,19 +456,39 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
+        {
+          # See allow-vlan2-dns-to-wan: temporary compiler projection for VLAN 8.
+          id = "allow-vlan8-dns-to-wan";
+          priority = 93;
+          from = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
         (allowTenantToWan "vlan2" 100)
         (allowTenantToWan "vlan7" 110)
+        (allowTenantToWan "vlan8" 120)
       ];
 
       interfaceTags = {
         tenant-vlan2 = "vlan2";
         tenant-vlan3 = "vlan3";
         tenant-vlan7 = "vlan7";
+        tenant-vlan8 = "vlan8";
         external-wan = "wan";
         service-s-nebula-container = "s-nebula-container";
         service-vlan2-dns = "vlan2-dns";
         service-vlan3-dns = "vlan3-dns";
         service-vlan7-dns = "vlan7-dns";
+        service-vlan8-dns = "vlan8-dns";
       };
     };
 
@@ -544,6 +600,21 @@ in
           trafficType = "dns";
           action = "deny";
         }
+        {
+          id = "allow-vlan8-dns-to-core-dns";
+          priority = 94;
+          from = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
       ];
 
       bindings = [
@@ -597,6 +668,39 @@ in
           };
           resolverPath = [
             "access-vlan7"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-vlan8"
             "downstream-selector"
             "policy"
             "upstream-selector"
@@ -725,6 +829,16 @@ in
             }
           ];
         };
+
+        access-vlan8 = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "vlan8";
+            }
+          ];
+        };
       };
 
       links = [
@@ -751,6 +865,10 @@ in
         [
           "downstream-selector"
           "access-vlan7"
+        ]
+        [
+          "downstream-selector"
+          "access-vlan8"
         ]
       ];
     };
