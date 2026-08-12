@@ -11,7 +11,7 @@ let
   containerService = "container@${containerName}";
   hostStatePath = "/var/lib/private/ollama";
   hostModelsPath = "${hostStatePath}/models";
-  ollamaPackage = pkgs.ollama-cuda;
+  ollamaPackage = pkgs.ollamaForHost;
   nvidiaPackage = config.hardware.nvidia.package;
   nvidiaDevices = [
     "/dev/nvidia0"
