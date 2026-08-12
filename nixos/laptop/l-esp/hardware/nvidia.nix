@@ -1,7 +1,6 @@
-{
-  inputs,
-  pkgs,
-  ...
+{ inputs
+, pkgs
+, ...
 }:
 
 {
@@ -37,6 +36,6 @@
     };
   };
 
-  services.ollama.package = pkgs.unstable.ollama-cuda;
+  services.ollama.package = pkgs.ollama-cuda;
 
 }
