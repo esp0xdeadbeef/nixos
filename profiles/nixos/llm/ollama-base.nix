@@ -3,6 +3,6 @@
 {
   services.ollama = {
     enable = true;
-    package = lib.mkDefault pkgs.ollama;
+    package = lib.mkDefault pkgs.ollamaForHost;
   };
 }

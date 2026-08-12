@@ -6,7 +6,7 @@
 
 let
   defaultModel = "deepseek-r1:8b";
-  ollamaPackage = pkgs.ollama-cuda;
+  ollamaPackage = pkgs.ollamaForHost;
 
   benchmark = pkgs.writeShellApplication {
     name = "s-llm-inference-benchmark";
