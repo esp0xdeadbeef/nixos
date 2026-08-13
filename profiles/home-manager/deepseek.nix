@@ -41,4 +41,12 @@ in
       export DEEPSEEK_API_KEY="$(tr -d '\r\n' < ${apiKeyPath})"
     fi
   '';
+
+  home.file.".config/fish/conf.d/deepseek-api.fish".text = ''
+    set -gx OPENAI_BASE_URL "https://api.deepseek.com/v1"
+
+    if test -f ${apiKeyPath}
+      set -gx DEEPSEEK_API_KEY (tr -d '\r\n' < ${apiKeyPath})
+    end
+  '';
 }
