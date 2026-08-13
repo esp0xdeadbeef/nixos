@@ -463,3 +463,14 @@ creation_rules:
           - *codex-jail-u
           - *codex-jail-r
           - *hetz-test
+
+  - path_regex: '^(secrets/)*cobalt-switch-.*\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-envil-root
+          - *l-envil-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *l-portal-root
+          - *l-portal-deadbeef
