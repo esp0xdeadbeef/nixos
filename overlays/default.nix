@@ -6,4 +6,5 @@
   unstable-packages = import ./unstable-packages.nix { inherit inputs; };
   nixpkgs-25_11-packages = import ./nixpkgs-25_11-packages.nix { inherit inputs; };
   legcord-unstable-overwrite = import ./legcord-unstable-overwrite.nix;
+  angr-nixpkgs-25_11-overwrite = import ./angr-nixpkgs-25_11-overwrite.nix;
 }
