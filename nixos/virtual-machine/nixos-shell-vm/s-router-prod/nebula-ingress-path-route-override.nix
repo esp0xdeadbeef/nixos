@@ -19,8 +19,8 @@ in
     "10-upstream-vlan3" = {
       routes = lib.mkAfter [
         {
-          Destination = "10.19.0.3/32";
-          Gateway = "10.10.0.17";
+          Destination = "10.19.0.4/32";
+          Gateway = "10.10.0.21";
           GatewayOnLink = true;
           Table = routeTable;
         }
@@ -29,7 +29,7 @@ in
       routingPolicyRules = lib.mkAfter [
         {
           Family = "ipv4";
-          From = "10.19.0.3/32";
+          From = "10.19.0.4/32";
           IncomingInterface = "upstream-vlan3";
           Priority = rulePriority;
           Table = routeTable;
@@ -55,7 +55,7 @@ in
           IncomingInterface = "down-vlan3";
           Priority = rulePriority;
           Table = routeTable;
-          To = "10.19.0.3/32";
+          To = "10.19.0.4/32";
         }
       ];
     };

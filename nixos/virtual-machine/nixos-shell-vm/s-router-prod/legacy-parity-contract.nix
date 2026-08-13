@@ -11,7 +11,7 @@ let
   vlan3AuthorityNames = map (record: record.name) vlan3AuthorityRecords;
   dnsResolver = dnsRuntime.resolver;
   renderedDnsResolver = dnsResolver // {
-    ipv6 = "fd42:dead:beef:1000:0:0:0:6";
+    ipv6 = "fd42:dead:beef:1000:0:0:0:8";
   };
   vlan2Dns = dnsRuntime.requesters.access-vlan2;
   vlan3Dns = dnsRuntime.requesters.access-vlan3;
@@ -75,37 +75,42 @@ let
       "s88-delegated-prefix-route-policy"
       "s88-delegated-prefix-route-policy-vlan2"
       "s88-delegated-prefix-route-policy-vlan3"
+      "s88-delegated-prefix-route-policy-vlan8"
       "s88-delegated-prefix-policy-route-policy-1001"
       "s88-delegated-prefix-policy-route-policy-1002"
       "s88-delegated-prefix-policy-route-policy-vlan2-1001"
       "s88-delegated-prefix-policy-route-policy-vlan2-1003"
       "s88-delegated-prefix-policy-route-policy-vlan3-1001"
       "s88-delegated-prefix-policy-route-policy-vlan3-1004"
+      "s88-delegated-prefix-policy-route-policy-vlan8-1001"
+      "s88-delegated-prefix-policy-route-policy-vlan8-1005"
     ];
     policy = [
       "s88-delegated-prefix-route-down-vlan2"
       "s88-delegated-prefix-route-down-vlan3"
       "s88-delegated-prefix-route-downstr-vlan7"
+      "s88-delegated-prefix-route-downstr-vlan8"
       "s88-delegated-prefix-policy-route-down-vlan2-1001"
       "s88-delegated-prefix-policy-route-down-vlan2-1002"
-      "s88-delegated-prefix-policy-route-down-vlan2-1004"
+      "s88-delegated-prefix-policy-route-down-vlan2-1005"
       "s88-delegated-prefix-policy-route-down-vlan3-1001"
       "s88-delegated-prefix-policy-route-down-vlan3-1002"
       "s88-delegated-prefix-policy-route-down-vlan3-1003"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1001"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1002"
-      "s88-delegated-prefix-policy-route-downstr-vlan7-1006"
+      "s88-delegated-prefix-policy-route-downstr-vlan7-1007"
     ];
     downstream-selector = [
       "s88-delegated-prefix-route-access-vlan2"
       "s88-delegated-prefix-route-access-vlan3"
       "s88-delegated-prefix-route-access-vlan7"
+      "s88-delegated-prefix-route-access-vlan8"
       "s88-delegated-prefix-policy-route-access-vlan2-1001"
-      "s88-delegated-prefix-policy-route-access-vlan2-1004"
+      "s88-delegated-prefix-policy-route-access-vlan2-1005"
       "s88-delegated-prefix-policy-route-access-vlan3-1002"
-      "s88-delegated-prefix-policy-route-access-vlan3-1005"
+      "s88-delegated-prefix-policy-route-access-vlan3-1006"
       "s88-delegated-prefix-policy-route-access-vlan7-1003"
-      "s88-delegated-prefix-policy-route-access-vlan7-1006"
+      "s88-delegated-prefix-policy-route-access-vlan7-1007"
     ];
   };
 
@@ -573,8 +578,8 @@ let
       ''iifname "ppp0" oifname "ens3" ct status dnat meta nfproto ipv4 ip daddr 192.168.3.10 meta l4proto tcp tcp dport 4242 accept comment "allow-wan-to-s-nebula-container"''
       ''iifname "ppp0" meta l4proto udp udp dport 4242 dnat to 192.168.3.10:4242 comment "allow-wan-to-s-nebula-container"''
       ''iifname "ppp0" meta l4proto tcp tcp dport 4242 dnat to 192.168.3.10:4242 comment "allow-wan-to-s-nebula-container"''
-      ''oifname "ens3" ip daddr 192.168.3.10 meta l4proto udp udp dport 4242 snat to 10.19.0.3 comment "allow-wan-to-s-nebula-container-source-translation"''
-      ''oifname "ens3" ip daddr 192.168.3.10 meta l4proto tcp tcp dport 4242 snat to 10.19.0.3 comment "allow-wan-to-s-nebula-container-source-translation"''
+      ''oifname "ens3" ip daddr 192.168.3.10 meta l4proto udp udp dport 4242 snat to 10.19.0.4 comment "allow-wan-to-s-nebula-container-source-translation"''
+      ''oifname "ens3" ip daddr 192.168.3.10 meta l4proto tcp tcp dport 4242 snat to 10.19.0.4 comment "allow-wan-to-s-nebula-container-source-translation"''
     ];
 
   hasStatefulVlan3Return =
@@ -647,23 +652,23 @@ let
       Priority = 1002;
       Table = 1002;
     }
-    && hasTableRoute "downstream-selector" "10-policy-vlan2" "0.0.0.0/0" "10.10.0.9" 1004
+    && hasTableRoute "downstream-selector" "10-policy-vlan2" "0.0.0.0/0" "10.10.0.11" 1005
     && hasRoutingPolicyRule "downstream-selector" "10-policy-vlan2" {
       Family = "ipv4";
       From = "192.168.1.0/24";
       IncomingInterface = "access-vlan2";
-      Priority = 1004;
-      Table = 1004;
+      Priority = 1005;
+      Table = 1005;
     }
-    && hasTableRoute "policy" "10-upstream-vlan2" "0.0.0.0/0" "10.10.0.15" 1004
+    && hasTableRoute "policy" "10-upstream-vlan2" "0.0.0.0/0" "10.10.0.19" 1005
     && hasRoutingPolicyRule "policy" "10-upstream-vlan2" {
       Family = "ipv4";
       From = "192.168.1.0/24";
       IncomingInterface = "down-vlan2";
-      Priority = 1004;
-      Table = 1004;
+      Priority = 1005;
+      Table = 1005;
     }
-    && hasTableRoute "upstream-selector" "10-core" "0.0.0.0/0" "10.10.0.6" 1001
+    && hasTableRoute "upstream-selector" "10-core" "0.0.0.0/0" "10.10.0.8" 1001
     && hasRoutingPolicyRule "upstream-selector" "10-core" {
       Family = "ipv4";
       From = "192.168.1.0/24";
@@ -671,7 +676,7 @@ let
       Priority = 1001;
       Table = 1001;
     }
-    && hasRoute "core" "10-ens3" "192.168.1.0/24" "10.10.0.7";
+    && hasRoute "core" "10-ens3" "192.168.1.0/24" "10.10.0.9";
 
   hasVlan2InternetFirewallAndNat =
     builtins.all (fragment: lib.hasInfix fragment accessVlan2Nftables) [
@@ -951,14 +956,14 @@ let
     && lib.hasInfix "ct state established,related accept" policyRules;
 
   hasRendererNativeNebulaRoutes =
-    hasRoute "core" "10-ens3" "192.168.3.10/32" "10.10.0.7"
-    && hasRoute "upstream-selector" "10-policy-vlan3" "192.168.3.10/32" "10.10.0.16"
+    hasRoute "core" "10-ens3" "192.168.3.10/32" "10.10.0.9"
+    && hasRoute "upstream-selector" "10-policy-vlan3" "192.168.3.10/32" "10.10.0.20"
     && hasRoute "policy" "10-down-vlan3" "192.168.3.10/32" "10.10.0.10"
     && hasRoute "downstream-selector" "10-access-vlan3" "192.168.3.10/32" "10.10.0.2"
-    && hasRoute "access-vlan3" "10-access-vlan3" "10.19.0.3/32" "10.10.0.3"
-    && hasRoute "downstream-selector" "10-policy-vlan3" "10.19.0.3/32" "10.10.0.11"
-    && hasRoute "policy" "10-upstream-vlan3" "10.19.0.3/32" "10.10.0.17"
-    && hasRoute "upstream-selector" "10-core" "10.19.0.3/32" "10.10.0.6";
+    && hasRoute "access-vlan3" "10-access-vlan3" "10.19.0.4/32" "10.10.0.3"
+    && hasRoute "downstream-selector" "10-policy-vlan3" "10.19.0.4/32" "10.10.0.13"
+    && hasRoute "policy" "10-upstream-vlan3" "10.19.0.4/32" "10.10.0.21"
+    && hasRoute "upstream-selector" "10-core" "10.19.0.4/32" "10.10.0.8";
 
   hasNebulaIngressPathOverride =
     let
@@ -966,10 +971,10 @@ let
       rulePriority = 900;
     in
     hasTableRoute "policy" "10-down-vlan3" "192.168.3.10/32" "10.10.0.10" routeTable
-    && hasTableRoute "policy" "10-upstream-vlan3" "10.19.0.3/32" "10.10.0.17" routeTable
+    && hasTableRoute "policy" "10-upstream-vlan3" "10.19.0.4/32" "10.10.0.21" routeTable
     && hasRoutingPolicyRule "policy" "10-upstream-vlan3" {
       Family = "ipv4";
-      From = "10.19.0.3/32";
+      From = "10.19.0.4/32";
       IncomingInterface = "upstream-vlan3";
       Priority = rulePriority;
       Table = routeTable;
@@ -981,7 +986,7 @@ let
       IncomingInterface = "down-vlan3";
       Priority = rulePriority;
       Table = routeTable;
-      To = "10.19.0.3/32";
+      To = "10.19.0.4/32";
     };
 
   hasNoVlan2Vlan3MainTableOverride =
@@ -1024,7 +1029,7 @@ let
         && (rule.To or null) == "192.168.3.0/24"
         && (rule.IncomingInterface or null) == "access-vlan2"
         && (rule.Priority or null) == 1000
-        && (rule.Table or null) == 1004)
+        && (rule.Table or null) == 1005)
       (
         config.containers.downstream-selector.config.systemd.network.networks."10-access-vlan2".routingPolicyRules or [ ]
       );
