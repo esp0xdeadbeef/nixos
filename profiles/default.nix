@@ -148,6 +148,7 @@
     workstation = {
       android = import ./nixos/workstation/android.nix;
       android-emulator = import ./nixos/workstation/android-emulator.nix;
+      binary-exploitation = import ./nixos/workstation/binary-exploitation.nix;
       full = import ./nixos/workstation/full.nix;
       pentesting = import ./nixos/workstation/pentesting.nix;
     };
