@@ -1,0 +1,41 @@
+# Cobalt site — Netgear switch 802.1Q VLAN provisioning.
+#
+# Switch: NETGEAR GS108PEv3 (8-port), management at 192.168.1.47 (DHCP).
+#
+# The switch is just an 802.1Q trunk; WAN vs LAN is decided by the router:
+#   VLAN 300  = WAN
+#   VLAN 2/3/7/8 = LAN tenants
+#
+# Physical port map (verified by disable-port probe):
+#   1 -> l-envil USB  (enp0s13f0u4u4u3)  WAN (VLAN 300)
+#   2 -> l-portal USB (enu1u1)           client, VLAN 2
+#   3 -> l-envil dock (enp170s0)         LAN trunk (2/3/7/8)
+#   4 -> ISP router                      WAN (VLAN 300)
+#   5-8 -> empty
+#
+# Caveats:
+# - prosafe-vlan currently ships drivers for gs108ev3/gs116ev2; GS108PEv3 may
+#   need a driver alias/port added upstream.
+# - Enable the switch's "Advanced 802.1Q VLAN" mode via the web UI first; the
+#   tool does not enable it for you.
+# - The admin password is a secret; do not commit the real value.
+
+[switches.cobalt-switch]
+address = "192.168.1.47"
+password = "CHANGE_ME" # admin password is a secret
+model = "gs108ev3"     # TODO: GS108PEv3 driver
+
+[switches.cobalt-switch.ports]
+# WAN -> l-envil USB: mgmt VLAN 1 untagged + cobalt WAN container tags VLAN 300
+1 = { pvid = 1, vlans = ["1U", "300T"] }
+# client access -> l-portal USB: untagged VLAN 2
+2 = { pvid = 2, vlans = ["2U"] }
+# LAN trunk -> l-envil dock: mgmt VLAN 1 untagged, tenant VLANs tagged
+3 = { pvid = 1, vlans = ["1U", "2T", "3T", "7T", "8T"] }
+# WAN -> ISP router: untagged VLAN 300 (ISP router is untagged)
+4 = { pvid = 300, vlans = ["300U"] }
+# spare
+5 = { pvid = 1, vlans = ["1U"] }
+6 = { pvid = 1, vlans = ["1U"] }
+7 = { pvid = 1, vlans = ["1U"] }
+8 = { pvid = 1, vlans = ["1U"] }

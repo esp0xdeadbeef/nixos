@@ -873,4 +873,643 @@ in
       ];
     };
   };
+
+  esp0xdeadbeef.cobalt = {
+    pools = {
+      p2p = {
+        ipv4 = "10.1.0.0/24";
+        ipv6 = "fd42:dead:beef:2000::/118";
+      };
+
+      loopback = {
+        ipv4 = "10.1.1.0/24";
+        ipv6 = "fd42:dead:beef:2900::/118";
+      };
+    };
+
+    ownership = {
+      prefixes = [
+        {
+          kind = "tenant";
+          name = "vlan2";
+          ipv4 = "10.2.2.0/24";
+        }
+        {
+          kind = "tenant";
+          name = "vlan3";
+          ipv4 = "10.2.3.0/24";
+        }
+        {
+          kind = "tenant";
+          name = "vlan7";
+          ipv4 = "10.2.7.0/24";
+        }
+        {
+          kind = "tenant";
+          name = "vlan8";
+          ipv4 = "10.2.8.0/24";
+        }
+      ];
+
+      endpoints = [
+        {
+          kind = "host";
+          name = "vlan2-dns";
+          tenant = "vlan2";
+          ipv4 = [ "10.2.2.1" ];
+        }
+        {
+          kind = "host";
+          name = "vlan3-dns";
+          tenant = "vlan3";
+          ipv4 = [ "10.2.3.1" ];
+        }
+        {
+          kind = "host";
+          name = "vlan7-dns";
+          tenant = "vlan7";
+          ipv4 = [ "10.2.7.1" ];
+        }
+        {
+          kind = "host";
+          name = "vlan8-dns";
+          tenant = "vlan8";
+          ipv4 = [ "10.2.8.1" ];
+        }
+      ];
+    };
+
+    hostManagement = {
+      required = true;
+      interface = "vlan2";
+      purpose = "hardware-management";
+    };
+
+    communicationContract = {
+      inherit trafficTypes;
+      services = [
+        {
+          name = "vlan2-dns";
+          providers = [ "vlan2-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "vlan3-dns";
+          providers = [ "vlan3-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "vlan7-dns";
+          providers = [ "vlan7-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "vlan8-dns";
+          providers = [ "vlan8-dns" ];
+          trafficType = "dns";
+        }
+      ];
+
+      relations = [
+        {
+          id = "allow-vlan2-dns-to-vlan3-dns";
+          priority = 78;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "service";
+            name = "vlan3-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan2-to-vlan2-dns";
+          priority = 80;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan7-to-vlan7-dns";
+          priority = 81;
+          from = {
+            kind = "tenant";
+            name = "vlan7";
+          };
+          to = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan3-to-vlan3-dns";
+          priority = 82;
+          from = {
+            kind = "tenant";
+            name = "vlan3";
+          };
+          to = {
+            kind = "service";
+            name = "vlan3-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan8-to-vlan8-dns";
+          priority = 86;
+          from = {
+            kind = "tenant";
+            name = "vlan8";
+          };
+          to = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan3-dns-to-vlan2-dns";
+          priority = 79;
+          from = {
+            kind = "service";
+            name = "vlan3-dns";
+          };
+          to = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "deny-vlan3-to-vlan2";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "vlan3";
+          };
+          to = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          trafficType = "any";
+          action = "deny";
+        }
+        {
+          id = "allow-vlan2-to-vlan3";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "tenant";
+            name = "vlan3";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan2-dns-to-wan";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan7-dns-to-wan";
+          priority = 91;
+          from = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan8-dns-to-wan";
+          priority = 93;
+          from = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        (allowTenantToWan "vlan2" 100)
+        (allowTenantToWan "vlan7" 110)
+        (allowTenantToWan "vlan8" 120)
+      ];
+    };
+
+    interfaceTags = {
+      tenant-vlan2 = "vlan2";
+      tenant-vlan3 = "vlan3";
+      tenant-vlan7 = "vlan7";
+      tenant-vlan8 = "vlan8";
+      external-wan = "wan";
+      service-vlan2-dns = "vlan2-dns";
+      service-vlan3-dns = "vlan3-dns";
+      service-vlan7-dns = "vlan7-dns";
+      service-vlan8-dns = "vlan8-dns";
+    };
+
+    recursiveDnsIntent = {
+      services = [
+        {
+          name = "core-dns";
+          providerNode = "core";
+          addressAuthority = "model-allocated-service-prefix";
+          trafficType = "dns";
+        }
+      ];
+
+      relations = [
+        {
+          id = "allow-vlan2-to-core-dns";
+          priority = 87;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan2-dns-to-core-dns";
+          priority = 88;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan7-dns-to-core-dns";
+          priority = 89;
+          from = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-core-dns-to-wan";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "core-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "deny-vlan2-dns-to-wan";
+          priority = 92;
+          from = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+        {
+          id = "deny-vlan7-dns-to-wan";
+          priority = 93;
+          from = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+        {
+          id = "allow-vlan8-dns-to-core-dns";
+          priority = 94;
+          from = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+      ];
+
+      bindings = [
+        {
+          requesterScope = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-vlan2"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [ "ipv4" ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "vlan7-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-vlan7"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [ "ipv4" ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "vlan8-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-vlan8"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [ "ipv4" ];
+          directPublicFallback = false;
+        }
+      ];
+    };
+
+    localDnsSharingIntent = {
+      namespace = "lan.";
+      authority = {
+        service = "vlan2-dns";
+        records = [
+          "vlan2-kea-local-data"
+          "vlan3-static-local-data"
+        ];
+      };
+      requester = {
+        service = "vlan3-dns";
+        allowedNamespaces = [
+          "lan."
+          "2.2.10.in-addr.arpa."
+        ];
+        recursion = false;
+        publicFallback = false;
+      };
+      relation = {
+        id = "allow-vlan3-dns-to-vlan2-dns";
+        from = {
+          kind = "service";
+          name = "vlan3-dns";
+        };
+        to = {
+          kind = "service";
+          name = "vlan2-dns";
+        };
+        trafficType = "dns";
+        returnBehavior = "symmetric";
+        resolverPath = [
+          "access-vlan3"
+          "downstream-selector"
+          "access-vlan2"
+        ];
+      };
+      providerPolicy = {
+        source = "vlan3-dns";
+        action = "refuse_non_local";
+      };
+      lateralPolicy = {
+        source = "vlan2";
+        target = "vlan3-dns";
+        localData = true;
+        recursion = false;
+        transitiveEgress = false;
+        action = "refuse_non_local";
+      };
+    };
+
+    topology = {
+      nodes = {
+        core = {
+          role = "core";
+          uplinks = {
+            wan = {
+              ipv4 = [ "0.0.0.0/0" ];
+            };
+          };
+        };
+
+        upstream-selector = {
+          role = "upstream-selector";
+        };
+
+        policy = {
+          role = "policy";
+        };
+
+        downstream-selector = {
+          role = "downstream-selector";
+        };
+
+        access-vlan2 = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "vlan2";
+            }
+          ];
+        };
+
+        access-vlan3 = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "vlan3";
+            }
+          ];
+        };
+
+        access-vlan7 = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "vlan7";
+            }
+          ];
+        };
+
+        access-vlan8 = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "vlan8";
+            }
+          ];
+        };
+      };
+
+      links = [
+        [
+          "core"
+          "upstream-selector"
+        ]
+        [
+          "upstream-selector"
+          "policy"
+        ]
+        [
+          "policy"
+          "downstream-selector"
+        ]
+        [
+          "downstream-selector"
+          "access-vlan2"
+        ]
+        [
+          "downstream-selector"
+          "access-vlan3"
+        ]
+        [
+          "downstream-selector"
+          "access-vlan7"
+        ]
+        [
+          "downstream-selector"
+          "access-vlan8"
+        ]
+      ];
+    };
+  };
 }
