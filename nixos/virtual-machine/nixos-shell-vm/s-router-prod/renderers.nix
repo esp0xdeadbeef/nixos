@@ -15,7 +15,7 @@
 
 let
   intentPath = "${modelSource}/intent.nix";
-  inventoryPath = "${modelSource}/inventory.nix";
+  inventoryPath = "${modelSource}/inventory-all.nix";
 
   cpmLib = controlPlaneModelInput.libBySystem.${system};
 
@@ -36,7 +36,7 @@ let
       control_plane_model = cpmForRenderer;
       authorityConflicts = [ ];
       provenance = {
-        producer = "nixos/s-router-prod";
+        producer = "nixos/${hostName}";
         source = "network-control-plane-model";
       };
     };
@@ -45,7 +45,7 @@ let
     input = controlPlaneArtifact;
     requestScope = {
       kind = "complete-artifact";
-      identity = "s-router-prod";
+      identity = hostName;
     };
     rootLockIdentity = builtins.hashString "sha256" (builtins.readFile ../../../../flake.lock);
     producerRevision =
