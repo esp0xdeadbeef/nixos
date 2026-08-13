@@ -208,6 +208,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    nixos-winddk = {
+      url = "github:esp0xdeadbeef/nixos-winddk";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
     pin-refresh-source = {
       url = "github:esp0xdeadbeef/nixos";
       flake = false;
