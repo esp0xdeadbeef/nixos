@@ -18,7 +18,7 @@ let
     touch "$SESSION_FILE"
 
     # grab the current container IP (adjust container name & iface if needed)
-    IP="$(lxc-attach lxc-osee -- ip -4 addr show eth0 \
+    IP="$(${pkgs.lxc}/bin/lxc-attach lxc-osee -- ip -4 addr show eth0 \
       | sed -n 's/.*inet \([0-9\.]\+\)\/.*/\1/p' | tr -d '\n')"
 
     if [[ -z "$IP" ]]; then
@@ -108,20 +108,20 @@ let
       echo
     } >> "$SESSION_FILE"
 
-    entry=$(lxc-attach lxc-osee -- bash -c "ip a s eth0 | sed -n 's/.*inet \([0-9\.]\+\)\/.*/\1/p' | tr -d '\n' ; echo -n ' ' ; cat /etc/ssh/ssh_host_rsa_key.pub")
+    entry=$(${pkgs.lxc}/bin/lxc-attach lxc-osee -- bash -c "ip a s eth0 | sed -n 's/.*inet \([0-9\.]\+\)\/.*/\1/p' | tr -d '\n' ; echo -n ' ' ; cat /etc/ssh/ssh_host_rsa_key.pub")
 
     if ! grep -Fxq "$entry" "$HOME/.ssh/known_hosts"; then
         echo "$entry" >> "$HOME/.ssh/known_hosts"
     fi
 
-    echo "x2goclient --session='$session_name' --hide" > "$ID_FILE"
+    echo "${pkgs.x2goclient}/bin/x2goclient --session='$session_name' --hide" > "$ID_FILE"
     chmod +x "$ID_FILE"
-    "$ID_FILE"
+    ${pkgs.x2goclient}/bin/x2goclient --session="$session_name" --hide
   '';
 in
 {
   # install the little updater script into your user PATH
-  home.packages = [ updateX2GoSession ];
+  home.packages = [ updateX2GoSession pkgs.x2goclient pkgs.lxc ];
   systemd.user.services."updateX2GOSession" = {
     Unit = {
       Description = "update the x2go session file";
