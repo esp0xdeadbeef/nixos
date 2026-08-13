@@ -4,7 +4,7 @@ keys:
   - &l-portal-root age1u9tye6zc765aphr3fdvryzwjrw7a3nez4dw7tafveynsvycf7qvskpw6ds
   - &l-portal-deadbeef age19xpat8fwf97nkrxcgatny48sz0chrhml5j5ksrqvkyqkpnzp6qjssf0zzs
   - &l-envil-root age1t07vak4hlf47esar8temleglsa2c3lde24q6eu78aaq4a0n0ndqqc0mhp5
-  - &l-envil-deadbeef age1d7v0j80lqu7672upwc2fazux9h5e6xt6wmy7wp2svytpzxmc6vysqjp0q8
+  - &l-envil-deadbeef age1h5wkymmlvxhhdlmjj55pdrcsffev06c0u9akvgtplfx3rfv4u9hqf0xejt
   - &l-esp-root age1057zl675g0wv59dvzylsu59a35dnv8sc4m8545avl60u5uvdrfpqhjp256
   - &l-esp-deadbeef age1vfresmphe0ahyn9vdtsqzzz72kt2lyd8nya376yk7yxjpc5p298qya76kz
   - &s-sigma-nixos-proxmox-replacement age172vz7pyznaj5sattexdjg43aekx5qv9sjs49axshrlty6ndrdeyskajktk
