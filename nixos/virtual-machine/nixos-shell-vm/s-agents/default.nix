@@ -157,6 +157,7 @@
     users.deadbeef = {
       imports = [
         profiles.home-manager.claude-code
+        profiles.home-manager.deepseek
       ];
 
       sops = {
