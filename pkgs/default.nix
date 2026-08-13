@@ -7,12 +7,17 @@ let
   isLinux = builtins.match ".*-linux" system != null;
   isI686 = system == "i686-linux";
   isX86_64Linux = system == "x86_64-linux";
+
+  base = rec {
+    autorecon = pkgs.callPackage ./autorecon { };
+    mxbuild = pkgs.callPackage ./mxbuild { };
+    netgear-admin = pkgs.callPackage ./netgear-admin { };
+    pentest-workspace = pkgs.callPackage ./pentest-workspace { };
+    prosafe-vlan = pkgs.callPackage ./prosafe-vlan { };
+    cobalt-switch = pkgs.callPackage ./cobalt-switch { inherit prosafe-vlan; };
+  };
 in
-{
-  autorecon = pkgs.callPackage ./autorecon { };
-  mxbuild = pkgs.callPackage ./mxbuild { };
-  pentest-workspace = pkgs.callPackage ./pentest-workspace { };
-}
+base
 // lib.optionalAttrs (isLinux && !isI686) {
   android-emulator-sdk = pkgs.callPackage ./android-emulator-sdk { };
 }
