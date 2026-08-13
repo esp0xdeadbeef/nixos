@@ -5,8 +5,8 @@
   resolver = {
     node = "core";
     service = "core-dns";
-    ipv4 = "10.10.0.6";
-    ipv6 = "fd42:dead:beef:1000::6";
+    ipv4 = "10.10.0.8";
+    ipv6 = "fd42:dead:beef:1000::8";
   };
 
   requesters = {
