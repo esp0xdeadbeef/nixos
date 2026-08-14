@@ -40,7 +40,7 @@ keys:
   - &hetz-test age1757z4z4t392kxuzfeajuaukh93na90e2p08t06k9ggpw6wa75dsshhqpzw
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
   - &s-router-neon age14ks9zuh2t8kzflm79rz3yxx03csw7zl3t0zf7xxm22ph9lqxtfjsxawx5w
-  - &s-router-cobalt-prod age1fqla0mcf7dp5hytm6mvukjhe8pas636rtn3ts38pj3fv4mxjzyesj9ewms
+  - &s-router-cobalt age1fqla0mcf7dp5hytm6mvukjhe8pas636rtn3ts38pj3fv4mxjzyesj9ewms
   - &s-mail-classifier age1elpsqft4da686ftu0237uv0vsc5zqcjcd2xphust5cmu2yk99epskk5r6c
 
 creation_rules:
@@ -312,7 +312,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
-  - path_regex: '^(secrets/)*s-router-cobalt-prod.*\.(env|ya?ml)$'
+  - path_regex: '^(secrets/)*s-router-cobalt.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
       - age:
@@ -320,7 +320,7 @@ creation_rules:
           - *l-envil-deadbeef
           - *l-esp-root
           - *l-esp-deadbeef
-          - *s-router-cobalt-prod
+          - *s-router-cobalt
   - path_regex: '^(secrets/)*s-router-legacy-core.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
@@ -485,11 +485,11 @@ creation_rules:
           - *l-portal-root
           - *l-portal-deadbeef
 
-  - path_regex: '^prod-network/current/secrets/devices/[A-Za-z0-9_-]+\.age$'
+  - path_regex: '^prod-network/(current|testing)/secrets/devices/[A-Za-z0-9_-]+\.age$'
     input_type: binary
     output_type: binary
     key_groups:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
-          - *s-router-cobalt-prod
+          - *s-router-cobalt

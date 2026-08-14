@@ -6,7 +6,7 @@
 ISP router (NAT) and later moves to a direct fiber connection.
 
 - **Site name:** `cobalt` (`esp0xdeadbeef.cobalt`)
-- **Router:** `s-router-cobalt-prod` (nixos-shell VM, prod-pinned renderer stack)
+- **Router:** `s-router-cobalt` (nixos-shell VM, prod-pinned renderer stack)
 - **IPv6:** no public IPv6 from the ISP; internal ULA is kept because the
   pinned CPM requires an IPv6 loopback. No public PD, no WAN IPv6.
 - **WAN:** DHCP behind the ISP router for now; later direct fiber (see §6)
@@ -21,7 +21,7 @@ ISP router (NAT) and later moves to a direct fiber connection.
    (`inventory-all.nix`). Site-a's `inventory.nix` stays untouched.
 3. Cobalt is **public-IPv4-only**: no public IPv6, no PD, no WAN IPv6. Internal
    ULA is retained to satisfy the CPM loopback invariant.
-4. `s-router-cobalt-prod` is a **lean** prod-stack VM (no site-a overrides).
+4. `s-router-cobalt` is a **lean** prod-stack VM (no site-a overrides).
 5. Test behind NAT first, direct fiber second.
 
 ## 3. Data flow
@@ -42,7 +42,7 @@ network-control-plane-model + combined inventory (site-a + cobalt)
 network-renderer-nixos (renders ONE host)
         │
         ├── hostName = s-router-prod        → site-a render
-        └── hostName = s-router-cobalt-prod → cobalt render
+        └── hostName = s-router-cobalt → cobalt render
 ```
 
 ## 4. Cobalt IP plan (must be distinct from site-a)
@@ -72,9 +72,9 @@ Done so far:
 - `prod-network/current/dns-runtime-addresses-cobalt.nix` — cobalt resolver
   (`10.1.0.8`) and per-VLAN requester addresses.
 - `prod-network/current/inventory-cobalt.nix` — cobalt realization
-  (`s-router-cobalt-prod`, `esp0xdeadbeef-cobalt-*`), DHCP WAN, no PPPoE.
+  (`s-router-cobalt`, `esp0xdeadbeef-cobalt-*`), DHCP WAN, no PPPoE.
 - `prod-network/current/inventory-all.nix` — combined site-a + cobalt inventory.
-- `nixos/virtual-machine/nixos-shell-vm/s-router-cobalt-prod/` — lean prod VM.
+- `nixos/virtual-machine/nixos-shell-vm/s-router-cobalt/` — lean prod VM.
 - `nixos/virtual-machine/nixos-shell-vm/s-router-prod/renderers.nix` —
   parameterized identity and switched to `inventory-all.nix`.
 
@@ -197,7 +197,7 @@ Tooling (all in the flake):
 3. Cobalt DNS runtime addresses — ✅
 4. `inventory-cobalt.nix` — ✅ (WAN still needs `vlan = 300`)
 5. `inventory-all.nix` + renderers wiring — ✅
-6. `s-router-cobalt-prod` VM — ✅ (QEMU bridges pending host setup)
+6. `s-router-cobalt` VM — ✅ (QEMU bridges pending host setup)
 7. Register VM on l-envil + host bridges — pending
 8. Switch VLAN provisioning — ✅ (applied + tcpdump-validated)
 9. Compile iteration (cobalt link names, WAN VLAN 300) — in progress
@@ -208,7 +208,7 @@ Tooling (all in the flake):
 - `nix flake check --all-systems`
 - build cobalt image:
   ```sh
-  nix build .#nixosConfigurations.s-router-cobalt-prod.config.system.build.nixos-shell --no-link
+  nix build .#nixosConfigurations.s-router-cobalt.config.system.build.nixos-shell --no-link
   ```
 - Switch L2 validated with tcpdump:
   - l-portal untagged → trunk sees **VLAN 8** tagged ✅

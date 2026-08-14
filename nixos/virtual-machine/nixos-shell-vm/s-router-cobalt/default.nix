@@ -5,10 +5,10 @@
 , ...
 }:
 let
-  hostName = "s-router-cobalt-prod";
+  hostName = "s-router-cobalt";
   system = "x86_64-linux";
-  modelSource = relativeRepo.sourcePath "prod-network/current";
-  deviceDir = relativeRepo.sourcePath "prod-network/current/secrets/devices";
+  modelSource = relativeRepo.sourcePath "prod-network/testing";
+  deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
   deviceIds =
     map
       (name: lib.removeSuffix ".age" name)
@@ -40,14 +40,14 @@ in
         modelSource
         ;
 
-      hostName = "s-router-cobalt-prod";
+      hostName = "s-router-cobalt";
       # Cobalt tracks the latest network-* main branches; s-router-prod stays
       # pinned to the -prod inputs in flake.lock for stability.
       controlPlaneModelInput = inputs.network-control-plane-model;
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;
       inherit system;
-      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-cobalt-prod/default.nix";
+      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-cobalt/default.nix";
     })
   ];
 
