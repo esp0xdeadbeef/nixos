@@ -33,9 +33,11 @@ in
         ;
 
       hostName = "s-router-cobalt-prod";
-      controlPlaneModelInput = inputs.network-control-plane-model-prod;
-      networkRealizationModelInput = inputs.network-realization-model-prod;
-      nixosRendererInput = inputs.network-renderer-nixos-prod;
+      # Cobalt tracks the latest network-* main branches; s-router-prod stays
+      # pinned to the -prod inputs in flake.lock for stability.
+      controlPlaneModelInput = inputs.network-control-plane-model;
+      networkRealizationModelInput = inputs.network-realization-model;
+      nixosRendererInput = inputs.network-renderer-nixos;
       inherit system;
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-cobalt-prod/default.nix";
     })
