@@ -7,7 +7,7 @@
 let
   guestAgentHealth =
     inputs.nixos-shell-vm-manager.packages.${pkgs.stdenv.hostPlatform.system}."qga-systemd-health";
-  qgaSocket = "/run/nixos-shell-vm-manager/s-router-cobalt-prod/qga.sock";
+  qgaSocket = "/run/nixos-shell-vm-manager/s-router-cobalt/qga.sock";
 in
 {
   services.nixosShellVmManager = {
@@ -15,9 +15,9 @@ in
     maxConcurrentBuilds = 1;
     persistentDirectory = "/persist/vm-persists";
 
-    instances.s-router-cobalt-prod = {
+    instances.s-router-cobalt = {
       description = "cobalt site router (nixos-shell)";
-      image = self.nixosConfigurations.s-router-cobalt-prod.config.system.build.nixos-shell;
+      image = self.nixosConfigurations.s-router-cobalt.config.system.build.nixos-shell;
       activation.startOnBoot = true;
       healthCheck = {
         command = lib.escapeShellArgs [

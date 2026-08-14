@@ -55,7 +55,6 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
       networkRealizationModelInput = inputs.network-realization-model-prod;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
-      inventoryFileName = "inventory.nix";
       inherit system;
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
     })

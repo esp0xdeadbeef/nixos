@@ -5,8 +5,8 @@
 , ...
 }:
 let
-  hostName = "s-router-prod-testing";
-  modelSource = relativeRepo.sourcePath "prod-network/s-router-prod-testing";
+  hostName = "s-router-neon";
+  modelSource = relativeRepo.sourcePath "prod-network/testing";
 in
 {
   _module.args.sRouterProdProfile = {
@@ -43,7 +43,7 @@ in
       nixosRendererInput = inputs.network-renderer-nixos;
       inventoryFileName = "inventory-all.nix";
       system = "x86_64-linux";
-      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod-testing/default.nix";
+      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-neon/default.nix";
     })
   ];
 
