@@ -13,6 +13,16 @@
 
   systemd.network.enable = true;
 
+  # The cobalt bridges are pure L2 (no host IP), so they never become
+  # "online". Succeed once any real interface (Wi-Fi) is online instead.
+  systemd.network.wait-online = {
+    anyInterface = true;
+    ignoredInterfaces = [
+      "br-cobalt-lan"
+      "br-cobalt-wan"
+    ];
+  };
+
   # Pure L2 bridges: no IP on the host. The cobalt VM owns all addressing
   # (VLAN 300 tagged DHCP on the WAN side, LAN trunk on the dock side).
   systemd.network.netdevs = {
