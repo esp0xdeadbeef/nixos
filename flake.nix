@@ -72,7 +72,7 @@
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/d4ac8b63417aa2142323fe300f69bf05099b10be";
+      url = "github:esp0xdeadbeef/network-control-plane-model/8b33a8a7238c8a0fe2e03c37799468647b7ea22d";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
     };
