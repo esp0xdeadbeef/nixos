@@ -1,5 +1,5 @@
 let
-  prodHost = "s-router-cobalt-prod";
+  prodHost = "s-router-cobalt";
   dnsRuntime = import ./dns-runtime-addresses-cobalt.nix;
   nodeName = shortName: "esp0xdeadbeef-cobalt-${shortName}";
 
@@ -115,6 +115,38 @@ let
     ];
   };
 
+  protectedReservationSource = sourceFile: {
+    schema = "gamp-protected-reservation-set-v1";
+    sourceClass = "protected";
+    inherit sourceFile;
+  };
+
+  cobaltReservations = import ./cobalt-reservations.nix;
+
+  reservationsFor = vlan:
+    builtins.map
+      (deviceId:
+        let
+          device = cobaltReservations.${deviceId};
+        in
+        {
+          id = deviceId;
+          ipv4 = {
+            hostOffset = device.scopes.${vlan};
+          };
+          macSource = {
+            accepted = true;
+            purpose = "static-dhcp-reservation";
+            sourceClass = "protected";
+            source = "protected-inventory";
+            secretRef = deviceId;
+          };
+        }
+        // (if device ? hostname && device.hostname != null then { hostname = device.hostname; } else { }))
+      (builtins.filter
+        (deviceId: cobaltReservations.${deviceId}.scopes ? ${vlan})
+        (builtins.attrNames cobaltReservations));
+
   dhcp4Advertisement =
     { tenant
     , interface
@@ -123,6 +155,8 @@ let
     , poolEnd
     , router
     , leaseStatePath
+    , reservations ? null
+    , reservationSource ? null
     ,
     }:
     {
@@ -137,7 +171,9 @@ let
       dnsServers = [ router ];
       domain = "lan.";
       leaseState.path = leaseStatePath;
-    };
+    }
+    // (if reservations == null then { } else { inherit reservations; })
+    // (if reservationSource == null then { } else { inherit reservationSource; });
 
   slaacRa = interface: {
     enabled = true;
@@ -375,6 +411,8 @@ let
             poolEnd = "10.2.2.200";
             router = "10.2.2.1";
             leaseStatePath = "/var/lib/kea/vlan2.leases";
+            reservations = reservationsFor "vlan2";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
@@ -517,6 +555,8 @@ let
             poolEnd = "10.2.8.200";
             router = "10.2.8.1";
             leaseStatePath = "/var/lib/kea/vlan8.leases";
+            reservations = reservationsFor "vlan8";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
