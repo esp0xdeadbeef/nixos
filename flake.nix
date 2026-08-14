@@ -72,7 +72,7 @@
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/ed3ae7e9d6b28ccb0c7c5bd5f013c8848ab646a8";
+      url = "github:esp0xdeadbeef/network-control-plane-model/d6d5041f6b68a21530a4aa93093c8b973766a27d";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
     };
@@ -94,7 +94,7 @@
     };
 
     network-renderer-nixos-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/1a76274dab609b75510a096dc2b29b51f7bc74b7";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/6ba19fcb922297770e455fefbbf0249ed9943e54";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
