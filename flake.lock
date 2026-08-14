@@ -4962,17 +4962,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1786709971,
-        "narHash": "sha256-XzDMjKjrJOb1smN5WadbQsfpurzz644C/c3jaxSBUtA=",
+        "lastModified": 1786711040,
+        "narHash": "sha256-GUQl/R9OoNEjyHMUMoAm0EPOvKCldctfQEzvWjU/ZgM=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "6ba19fcb922297770e455fefbbf0249ed9943e54",
+        "rev": "b71e733e292651beec63ecbb1a09cb444b67784e",
         "type": "github"
       },
       "original": {
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "6ba19fcb922297770e455fefbbf0249ed9943e54",
+        "rev": "b71e733e292651beec63ecbb1a09cb444b67784e",
         "type": "github"
       }
     },
