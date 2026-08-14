@@ -64,7 +64,7 @@ jobs:
                             map
                               (name: {
                                 inherit name;
-                                value.enable = lib.mkForce (name == "s-router-prod");
+                                value.enable = lib.mkForce (name == "s-router-legacy-prod");
                               })
                               instanceNames
                           );
