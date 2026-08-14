@@ -749,12 +749,30 @@ in
   };
 
   realization = {
+    fabricLinks = {
+      "${nodeName "downstream-selector"}" = builtins.mapAttrs
+        (_: port: {
+          kind = "selector-fabric-link";
+          link = port.link;
+          transport.hostFacing = false;
+        })
+        downstreamSelector.ports;
+
+      "${nodeName "upstream-selector"}" = builtins.mapAttrs
+        (_: port: {
+          kind = "selector-fabric-link";
+          link = port.link;
+          transport.hostFacing = false;
+        })
+        upstreamSelector.ports;
+    };
+
     nodes = {
       ${nodeName "core"} = core;
       ${nodeName "isp-pppoe-peer"} = ispPppoePeer;
-      ${nodeName "upstream-selector"} = upstreamSelector;
+      ${nodeName "upstream-selector"} = upstreamSelector // { ports = { }; };
       ${nodeName "policy"} = policy;
-      ${nodeName "downstream-selector"} = downstreamSelector;
+      ${nodeName "downstream-selector"} = downstreamSelector // { ports = { }; };
       ${nodeName "access-vlan2"} = accessVlan2;
       ${nodeName "access-vlan3"} = accessVlan3;
       ${nodeName "access-vlan7"} = accessVlan7;

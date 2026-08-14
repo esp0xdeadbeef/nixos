@@ -11,7 +11,10 @@ in
   schemaVersion = 1;
   endpoints = siteA.endpoints // cobalt.endpoints;
   deployment.hosts = siteA.deployment.hosts // cobalt.deployment.hosts;
-  realization.nodes = siteA.realization.nodes // cobalt.realization.nodes;
+  realization = {
+    fabricLinks = (siteA.realization.fabricLinks or { }) // (cobalt.realization.fabricLinks or { });
+    nodes = siteA.realization.nodes // cobalt.realization.nodes;
+  };
   # Site-a still carries a legacy role-keyed render.hosts section. The current
   # renderer looks render.hosts up by host name and falls back to
   # deployment.hosts.<host>.wanUplink, so this is harmless and cobalt does not
