@@ -49,6 +49,7 @@ let
     , bridge
     , interfaceName
     , addr4
+    , addr6 ? null
     ,
     }:
     {
@@ -57,7 +58,8 @@ let
       interface = {
         name = interfaceName;
         inherit addr4;
-      };
+      }
+      // (if addr6 == null then { } else { inherit addr6; });
     };
 
   mkNode =
@@ -86,6 +88,7 @@ let
     {
       forwarders = [
         dnsRuntime.resolver.ipv4
+        dnsRuntime.resolver.ipv6
       ];
       outgoingInterfaces = addresses;
       roles.recursion.outgoingInterfaces = addresses;
@@ -136,9 +139,19 @@ let
       leaseState.path = leaseStatePath;
     };
 
+  slaacRa = interface: {
+    enabled = true;
+    inherit interface;
+    rdnss = [ "router-self" ];
+    dnssl = [ "lan." ];
+    managed = false;
+    otherConfig = false;
+    onLink = true;
+    autonomous = true;
+  };
+
   coreUpstreamLink = "p2p-core-upstream-selector";
   upstreamPolicyVlan2Link = "p2p-policy-upstream-selector--access-access-vlan2--uplink-wan";
-  upstreamPolicyVlan3Link = "p2p-policy-upstream-selector--access-access-vlan3--uplink-wan";
   upstreamPolicyVlan7Link = "p2p-policy-upstream-selector--access-access-vlan7--uplink-wan";
   policyDownstreamVlan2Link = "p2p-downstream-selector-policy--access-access-vlan2";
   policyDownstreamVlan3Link = "p2p-downstream-selector-policy--access-access-vlan3";
@@ -170,11 +183,15 @@ let
         dns = {
           listen = [
             dnsRuntime.resolver.ipv4
+            dnsRuntime.resolver.ipv6
           ];
           allowFrom = [
             dnsRuntime.requesters.access-vlan2.clientIpv4
+            dnsRuntime.requesters.access-vlan2.clientIpv6
             "${dnsRuntime.requesters.access-vlan7.ipv4}/32"
+            "${dnsRuntime.requesters.access-vlan7.ipv6}/128"
             "${dnsRuntime.requesters.access-vlan8.ipv4}/32"
+            "${dnsRuntime.requesters.access-vlan8.ipv6}/128"
           ];
         };
       };
@@ -193,13 +210,6 @@ let
       adapterName = "cb-us-p2";
       bridge = "rt-upstream-policy-vlan2";
       interfaceName = "policy-vlan2";
-    };
-
-    policy-vlan3 = p2pPort {
-      link = upstreamPolicyVlan3Link;
-      adapterName = "cb-us-p3";
-      bridge = "rt-upstream-policy-vlan3";
-      interfaceName = "policy-vlan3";
     };
 
     policy-vlan7 = p2pPort {
@@ -223,13 +233,6 @@ let
       adapterName = "cb-p-us2";
       bridge = "rt-upstream-policy-vlan2";
       interfaceName = "upstream-vlan2";
-    };
-
-    upstream-vlan3 = p2pPort {
-      link = upstreamPolicyVlan3Link;
-      adapterName = "cb-p-us3";
-      bridge = "rt-upstream-policy-vlan3";
-      interfaceName = "upstream-vlan3";
     };
 
     upstream-vlan7 = p2pPort {
@@ -347,6 +350,7 @@ let
         bridge = "lan2";
         interfaceName = "lan2";
         addr4 = "10.2.2.1/24";
+        addr6 = "fd42:dead:beef:c2::1/64";
       };
     })
     // {
@@ -356,6 +360,7 @@ let
         dns = accessDns {
           addresses = [
             dnsRuntime.requesters.access-vlan2.ipv4
+            dnsRuntime.requesters.access-vlan2.ipv6
           ];
         };
       };
@@ -371,6 +376,10 @@ let
             router = "10.2.2.1";
             leaseStatePath = "/var/lib/kea/vlan2.leases";
           };
+        };
+
+        ipv6Ra = {
+          tenant-vlan2 = slaacRa "tenant-vlan2";
         };
       };
     };
@@ -389,6 +398,7 @@ let
         bridge = "lan3";
         interfaceName = "lan3";
         addr4 = "10.2.3.1/24";
+        addr6 = "fd42:dead:beef:c3::1/64";
       };
     })
     // {
@@ -397,6 +407,7 @@ let
       services = {
         dns = localDns [
           dnsRuntime.requesters.access-vlan3.ipv4
+          dnsRuntime.requesters.access-vlan3.ipv6
         ] [ ];
       };
 
@@ -411,6 +422,10 @@ let
             router = "10.2.3.1";
             leaseStatePath = "/var/lib/kea/vlan3.leases";
           };
+        };
+
+        ipv6Ra = {
+          tenant-vlan3 = slaacRa "tenant-vlan3";
         };
       };
     };
@@ -429,6 +444,7 @@ let
         bridge = "lan7";
         interfaceName = "lan7";
         addr4 = "10.2.7.1/24";
+        addr6 = "fd42:dead:beef:c7::1/64";
       };
     })
     // {
@@ -438,6 +454,7 @@ let
         dns = accessDns {
           addresses = [
             dnsRuntime.requesters.access-vlan7.ipv4
+            dnsRuntime.requesters.access-vlan7.ipv6
           ];
         };
       };
@@ -453,6 +470,10 @@ let
             router = "10.2.7.1";
             leaseStatePath = "/var/lib/kea/vlan7.leases";
           };
+        };
+
+        ipv6Ra = {
+          tenant-vlan7 = slaacRa "tenant-vlan7";
         };
       };
     };
@@ -471,6 +492,7 @@ let
         bridge = "lan8";
         interfaceName = "lan8";
         addr4 = "10.2.8.1/24";
+        addr6 = "fd42:dead:beef:c8::1/64";
       };
     })
     // {
@@ -480,6 +502,7 @@ let
         dns = accessDns {
           addresses = [
             dnsRuntime.requesters.access-vlan8.ipv4
+            dnsRuntime.requesters.access-vlan8.ipv6
           ];
         };
       };
@@ -496,6 +519,10 @@ let
             leaseStatePath = "/var/lib/kea/vlan8.leases";
           };
         };
+
+        ipv6Ra = {
+          tenant-vlan8 = slaacRa "tenant-vlan8";
+        };
       };
     };
 in
@@ -503,24 +530,29 @@ in
   schemaVersion = 1;
 
   endpoints = {
-    core-dns = {
+    cobalt-core-dns = {
       ipv4 = [ dnsRuntime.resolver.ipv4 ];
+      ipv6 = [ dnsRuntime.resolver.ipv6 ];
     };
 
-    vlan2-dns = {
+    cobalt-vlan2-dns = {
       ipv4 = [ dnsRuntime.requesters.access-vlan2.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan2.ipv6 ];
     };
 
-    vlan3-dns = {
+    cobalt-vlan3-dns = {
       ipv4 = [ dnsRuntime.requesters.access-vlan3.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan3.ipv6 ];
     };
 
-    vlan7-dns = {
+    cobalt-vlan7-dns = {
       ipv4 = [ dnsRuntime.requesters.access-vlan7.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan7.ipv6 ];
     };
 
-    vlan8-dns = {
+    cobalt-vlan8-dns = {
       ipv4 = [ dnsRuntime.requesters.access-vlan8.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-vlan8.ipv6 ];
     };
   };
 
@@ -531,7 +563,8 @@ in
 
         uplinks = {
           upstream-core = {
-            mode = "native";
+            mode = "vlan";
+            vlan = 300;
             parent = "eth1";
             bridge = "br-wan";
             ipv4 = {
@@ -583,7 +616,6 @@ in
           rt-policy-downstream-vlan3 = { };
           rt-policy-downstream-vlan7 = { };
           rt-upstream-policy-vlan2 = { };
-          rt-upstream-policy-vlan3 = { };
           rt-upstream-policy-vlan7 = { };
           rt-downstream-access-vlan8 = { };
           rt-policy-downstream-vlan8 = { };

@@ -893,46 +893,50 @@ in
           kind = "tenant";
           name = "vlan2";
           ipv4 = "10.2.2.0/24";
+          ipv6 = "fd42:dead:beef:c2::/64";
         }
         {
           kind = "tenant";
           name = "vlan3";
           ipv4 = "10.2.3.0/24";
+          ipv6 = "fd42:dead:beef:c3::/64";
         }
         {
           kind = "tenant";
           name = "vlan7";
           ipv4 = "10.2.7.0/24";
+          ipv6 = "fd42:dead:beef:c7::/64";
         }
         {
           kind = "tenant";
           name = "vlan8";
           ipv4 = "10.2.8.0/24";
+          ipv6 = "fd42:dead:beef:c8::/64";
         }
       ];
 
       endpoints = [
         {
           kind = "host";
-          name = "vlan2-dns";
+          name = "cobalt-vlan2-dns";
           tenant = "vlan2";
           ipv4 = [ "10.2.2.1" ];
         }
         {
           kind = "host";
-          name = "vlan3-dns";
+          name = "cobalt-vlan3-dns";
           tenant = "vlan3";
           ipv4 = [ "10.2.3.1" ];
         }
         {
           kind = "host";
-          name = "vlan7-dns";
+          name = "cobalt-vlan7-dns";
           tenant = "vlan7";
           ipv4 = [ "10.2.7.1" ];
         }
         {
           kind = "host";
-          name = "vlan8-dns";
+          name = "cobalt-vlan8-dns";
           tenant = "vlan8";
           ipv4 = [ "10.2.8.1" ];
         }
@@ -950,22 +954,22 @@ in
       services = [
         {
           name = "vlan2-dns";
-          providers = [ "vlan2-dns" ];
+          providers = [ "cobalt-vlan2-dns" ];
           trafficType = "dns";
         }
         {
           name = "vlan3-dns";
-          providers = [ "vlan3-dns" ];
+          providers = [ "cobalt-vlan3-dns" ];
           trafficType = "dns";
         }
         {
           name = "vlan7-dns";
-          providers = [ "vlan7-dns" ];
+          providers = [ "cobalt-vlan7-dns" ];
           trafficType = "dns";
         }
         {
           name = "vlan8-dns";
-          providers = [ "vlan8-dns" ];
+          providers = [ "cobalt-vlan8-dns" ];
           trafficType = "dns";
         }
       ];
@@ -1300,7 +1304,7 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" ];
+          allowedAddressFamilies = [ "ipv4" "ipv6" ];
           directPublicFallback = false;
         }
         {
@@ -1330,7 +1334,7 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" ];
+          allowedAddressFamilies = [ "ipv4" "ipv6" ];
           directPublicFallback = false;
         }
         {
@@ -1360,7 +1364,7 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" ];
+          allowedAddressFamilies = [ "ipv4" "ipv6" ];
           directPublicFallback = false;
         }
       ];

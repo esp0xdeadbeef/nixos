@@ -1142,9 +1142,9 @@ in
         (config._module.args.sRouterProdModelSource.intentPath or null)
         == "${modelSource}/intent.nix"
         && (config._module.args.sRouterProdModelSource.inventoryPath or null)
-        == "${modelSource}/inventory.nix";
+        == "${modelSource}/inventory-all.nix";
       message = ''
-        s-router-prod must consume the production intent.nix and inventory.nix directly.
+        s-router-prod must consume the production intent.nix and combined inventory-all.nix directly.
       '';
     }
     {
