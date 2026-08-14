@@ -754,6 +754,7 @@ in
         (_: port: {
           kind = "selector-fabric-link";
           link = port.link;
+          runtimeIfName = port.interface.name;
           transport.hostFacing = false;
         })
         downstreamSelector.ports;
@@ -762,6 +763,7 @@ in
         (_: port: {
           kind = "selector-fabric-link";
           link = port.link;
+          runtimeIfName = port.interface.name;
           transport.hostFacing = false;
         })
         upstreamSelector.ports;
