@@ -90,15 +90,13 @@ let
       "s88-delegated-prefix-route-down-vlan3"
       "s88-delegated-prefix-route-downstr-vlan7"
       "s88-delegated-prefix-route-downstr-vlan8"
-      "s88-delegated-prefix-policy-route-down-vlan2-1001"
-      "s88-delegated-prefix-policy-route-down-vlan2-1002"
+      "s88-delegated-prefix-policy-route-down-vlan2-1003"
       "s88-delegated-prefix-policy-route-down-vlan2-1005"
-      "s88-delegated-prefix-policy-route-down-vlan3-1001"
-      "s88-delegated-prefix-policy-route-down-vlan3-1002"
-      "s88-delegated-prefix-policy-route-down-vlan3-1003"
+      "s88-delegated-prefix-policy-route-down-vlan3-1004"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1001"
-      "s88-delegated-prefix-policy-route-downstr-vlan7-1002"
       "s88-delegated-prefix-policy-route-downstr-vlan7-1007"
+      "s88-delegated-prefix-policy-route-downstr-vlan8-1002"
+      "s88-delegated-prefix-policy-route-downstr-vlan8-1008"
     ];
     downstream-selector = [
       "s88-delegated-prefix-route-access-vlan2"
@@ -282,6 +280,14 @@ let
       (line:
       builtins.all (fragment: lib.hasInfix fragment line) fragments
       && !(lib.hasInfix "ct state" line))
+      (lib.splitString "\n" ruleset);
+
+  # Matches a set of fragments on a single rule line, regardless of the
+  # source-scope tokens the CPM inserts between them.
+  hasRuleLine =
+    ruleset: fragments:
+    builtins.any
+      (line: builtins.all (fragment: lib.hasInfix fragment line) fragments)
       (lib.splitString "\n" ruleset);
 
   dnsEgressFragments = {
@@ -583,9 +589,13 @@ let
     ];
 
   hasStatefulVlan3Return =
-    lib.hasInfix
-      ''iifname "down-vlan3" oifname "down-vlan2" ct state established,related accept comment "allow-vlan2-to-vlan3"''
-      policyNftables;
+    hasRuleLine policyNftables [
+      ''iifname "down-vlan3"''
+      ''oifname "down-vlan2"''
+      ''ip saddr 192.168.3.0/24''
+      ''ct state established,related''
+      ''accept comment "allow-vlan2-to-vlan3"''
+    ];
 
   hasIpv6CompatibilityGlue =
     builtins.hasAttr "dhcpcd-ipv6" (servicesFor "core")
@@ -679,18 +689,28 @@ let
     && hasRoute "core" "10-ens3" "192.168.1.0/24" "10.10.0.9";
 
   hasVlan2InternetFirewallAndNat =
-    builtins.all (fragment: lib.hasInfix fragment accessVlan2Nftables) [
-      ''iifname "lan2" oifname "access-vlan2" accept comment "selector-handoff-forward--access-vlan2--selector-transport-to-access-to-selector--fabric"''
-      ''iifname "access-vlan2" oifname "lan2" ct state established,related accept comment "selector-handoff-reverse--access-vlan2--access-to-selector-to-selector-transport--fabric"''
+    (hasRuleLine accessVlan2Nftables [
+      ''iifname "lan2"''
+      ''oifname "access-vlan2"''
+      ''ip saddr 192.168.1.0/24''
+      ''accept comment "selector-handoff-forward--access-vlan2--selector-transport-to-access-to-selector--fabric"''
     ]
+    && builtins.all (fragment: lib.hasInfix fragment accessVlan2Nftables) [
+      ''iifname "access-vlan2" oifname "lan2" ct state established,related accept comment "selector-handoff-reverse--access-vlan2--access-to-selector-to-selector-transport--fabric"''
+    ])
     && builtins.all (fragment: lib.hasInfix fragment downstreamSelectorNftables) [
       ''iifname "access-vlan2" oifname "policy-vlan2" accept comment "selector-handoff-forward--access-vlan2--access-to-selector-to-selector-to-policy--fabric"''
       ''iifname "policy-vlan2" oifname "access-vlan2" ct state established,related accept comment "selector-handoff-reverse--access-vlan2--selector-to-policy-to-access-to-selector--fabric"''
     ]
-    && builtins.all (fragment: lib.hasInfix fragment policyNftables) [
-      ''iifname "down-vlan2" oifname "upstream-vlan2" accept comment "allow-vlan2-to-wan"''
-      ''iifname "upstream-vlan2" oifname "down-vlan2" ct state established,related accept comment "allow-vlan2-to-wan"''
+    && (hasRuleLine policyNftables [
+      ''iifname "down-vlan2"''
+      ''oifname "upstream-vlan2"''
+      ''ip saddr 192.168.1.0/24''
+      ''accept comment "allow-vlan2-to-wan"''
     ]
+    && builtins.all (fragment: lib.hasInfix fragment policyNftables) [
+      ''iifname "upstream-vlan2" oifname "down-vlan2" ct state established,related accept comment "allow-vlan2-to-wan"''
+    ])
     && builtins.all (fragment: lib.hasInfix fragment upstreamSelectorNftables) [
       ''iifname "policy-vlan2" oifname "core" accept comment "selector-handoff-forward--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"''
       ''iifname "core" oifname "policy-vlan2" ct state established,related accept comment "selector-handoff-reverse--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"''
@@ -785,9 +805,17 @@ let
       "selector-handoff-reverse-runtime-origin--access-vlan2"
       "selector-handoff-reverse-runtime-origin--access-vlan7"
     ]
-    && builtins.all (fragment: lib.hasInfix fragment policyRules) [
-      ''iifname "down-vlan2" oifname "upstream-vlan2" accept comment "allow-vlan2-to-wan"''
-      ''iifname "downstr-vlan7" oifname "upstream-vlan7" accept comment "allow-vlan7-to-wan"''
+    && hasRuleLine policyRules [
+      ''iifname "down-vlan2"''
+      ''oifname "upstream-vlan2"''
+      ''ip saddr 192.168.1.0/24''
+      ''accept comment "allow-vlan2-to-wan"''
+    ]
+    && hasRuleLine policyRules [
+      ''iifname "downstr-vlan7"''
+      ''oifname "upstream-vlan7"''
+      ''ip saddr 192.168.2.0/24''
+      ''accept comment "allow-vlan7-to-wan"''
     ]
     && builtins.all (fragment: lib.hasInfix fragment upstreamRules) [
       "selector-handoff-forward--access-vlan2--selector-policy-uplink-to-selector-policy-uplink--wan"

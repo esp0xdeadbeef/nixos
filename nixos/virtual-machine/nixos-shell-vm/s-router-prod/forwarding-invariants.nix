@@ -611,7 +611,14 @@ let
       vlan7SelectorNewFlows
     && vlan7PolicyNewFlows != [ ]
     && builtins.all
-      (line: lib.hasInfix ''oifname "upstream-vlan7"'' line)
+      (line:
+        lib.hasInfix ''oifname "upstream-vlan7"'' line
+        || lineMatches
+          [
+            ''oifname "downstr-vlan7"''
+            ''accept comment "allow-vlan7-to-vlan7-dns"''
+          ]
+          line)
       vlan7PolicyNewFlows;
 
   vlan3PolicyNewFlows =
@@ -633,6 +640,12 @@ let
           [
             ''oifname "down-vlan2"''
             ''accept comment "allow-vlan3-dns-to-vlan2-dns"''
+          ]
+          line
+        || lineMatches
+          [
+            ''oifname "down-vlan3"''
+            ''accept comment "allow-vlan3-to-vlan3-dns"''
           ]
           line)
       vlan3PolicyNewFlows;
