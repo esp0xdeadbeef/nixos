@@ -1,5 +1,6 @@
 { inputs
 , lib
+, config
 , relativeRepo
 , ...
 }:
@@ -7,6 +8,13 @@ let
   hostName = "s-router-cobalt-prod";
   system = "x86_64-linux";
   modelSource = relativeRepo.sourcePath "prod-network/current";
+  deviceDir = relativeRepo.sourcePath "prod-network/current/secrets/devices";
+  deviceIds =
+    map
+      (name: lib.removeSuffix ".age" name)
+      (builtins.filter
+        (name: lib.hasSuffix ".age" name)
+        (builtins.attrNames (builtins.readDir deviceDir)));
   qemuNetworkingOptions = [
     "-nic none"
     "-nic bridge,br=br-cobalt-lan,model=virtio-net-pci"
@@ -44,6 +52,47 @@ in
   ];
 
   system.stateVersion = lib.mkForce "26.05";
+
+  sops.secrets = lib.listToAttrs (
+    map
+      (id: {
+        name = "cobalt-device-${id}";
+        value = {
+          sopsFile = "${deviceDir}/${id}.age";
+          format = "binary";
+          path = "/run/secrets/devices/${id}";
+        };
+      })
+      deviceIds
+  );
+
+  containers.access-vlan2.bindMounts = lib.mkMerge [
+    (lib.listToAttrs (
+      map
+        (id: {
+          name = "/run/secrets/devices/${id}";
+          value = {
+            hostPath = config.sops.secrets."cobalt-device-${id}".path;
+            isReadOnly = true;
+          };
+        })
+        deviceIds
+    ))
+  ];
+
+  containers.access-vlan8.bindMounts = lib.mkMerge [
+    (lib.listToAttrs (
+      map
+        (id: {
+          name = "/run/secrets/devices/${id}";
+          value = {
+            hostPath = config.sops.secrets."cobalt-device-${id}".path;
+            isReadOnly = true;
+          };
+        })
+        deviceIds
+    ))
+  ];
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 }
