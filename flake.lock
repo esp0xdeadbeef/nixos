@@ -999,17 +999,17 @@
         "nixpkgs-network": "nixpkgs-network_15"
       },
       "locked": {
-        "lastModified": 1786709948,
-        "narHash": "sha256-D679KzDXx2+cj3zmhinDIe8st0k7cCRwfps8Jb4izLc=",
+        "lastModified": 1786710559,
+        "narHash": "sha256-g7gv/wNIZHsjCfoIHc5ONbnn4WsGu508q3mTVemSTRo=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "d6d5041f6b68a21530a4aa93093c8b973766a27d",
+        "rev": "d2875a6071f341c22b194f1a8c82779f38c0a435",
         "type": "github"
       },
       "original": {
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "d6d5041f6b68a21530a4aa93093c8b973766a27d",
+        "rev": "d2875a6071f341c22b194f1a8c82779f38c0a435",
         "type": "github"
       }
     },
