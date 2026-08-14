@@ -8,6 +8,7 @@
 , controlPlaneTransform ? cpm: cpm
 , nixosRendererInput ? inputs.network-renderer-nixos
 , hostName ? "s-router-prod"
+, inventoryFileName ? "inventory-all.nix"
 ,
 }:
 
@@ -15,7 +16,7 @@
 
 let
   intentPath = "${modelSource}/intent.nix";
-  inventoryPath = "${modelSource}/inventory-all.nix";
+  inventoryPath = "${modelSource}/${inventoryFileName}";
 
   cpmLib = controlPlaneModelInput.libBySystem.${system};
 

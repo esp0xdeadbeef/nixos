@@ -41,6 +41,7 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model;
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;
+      inventoryFileName = "inventory.nix";
       system = "x86_64-linux";
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod-testing/default.nix";
     })
