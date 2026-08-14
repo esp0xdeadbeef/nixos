@@ -23,6 +23,7 @@
     ./1-custom-packages/burp-fix.nix
     ./hardware/audio-and-bluetooth.nix
     ./hardware/bootloader.nix
+    ./hardware/cobalt-bridges.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/nvidia.nix
@@ -31,6 +32,7 @@
     ./disko/build_disko.nix
     ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
+    ./nixos-shell-servers
   ];
 
   local.network.private.enable = false;
