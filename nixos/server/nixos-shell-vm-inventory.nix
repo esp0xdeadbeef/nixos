@@ -230,7 +230,7 @@ let
       activation.refreshPins = true;
     }
     {
-      name = "s-router-prod-testing";
+      name = "s-router-neon";
       description = "Production router testing VM (nixos-shell) — never auto-starts";
     }
     {
