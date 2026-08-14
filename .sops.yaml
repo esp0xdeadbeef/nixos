@@ -39,7 +39,7 @@ keys:
   - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
   - &hetz-test age1757z4z4t392kxuzfeajuaukh93na90e2p08t06k9ggpw6wa75dsshhqpzw
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
-  - &s-router-prod-testing age14ks9zuh2t8kzflm79rz3yxx03csw7zl3t0zf7xxm22ph9lqxtfjsxawx5w
+  - &s-router-neon age14ks9zuh2t8kzflm79rz3yxx03csw7zl3t0zf7xxm22ph9lqxtfjsxawx5w
   - &s-router-cobalt-prod age1fqla0mcf7dp5hytm6mvukjhe8pas636rtn3ts38pj3fv4mxjzyesj9ewms
   - &s-mail-classifier age1elpsqft4da686ftu0237uv0vsc5zqcjcd2xphust5cmu2yk99epskk5r6c
 
@@ -256,7 +256,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
-          - *s-router-prod-testing
+          - *s-router-neon
 
   - path_regex: '^prod-network/legacy/secrets/vlan2-hostnames-servers\.json\.age$'
     input_type: binary
@@ -276,18 +276,18 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
-          - *s-router-prod-testing
+          - *s-router-neon
 
-  - path_regex: '^prod-network/s-router-prod-testing/secrets/runtime\.yaml$'
+  - path_regex: '^prod-network/s-router-neon/secrets/runtime\.yaml$'
     encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
-          - *s-router-prod-testing
+          - *s-router-neon
 
-  - path_regex: '^prod-network/s-router-prod-testing/secrets/(vlan[23]-reservations|vlan2-reservation-names)\.json\.age$'
+  - path_regex: '^prod-network/s-router-neon/secrets/(vlan[23]-reservations|vlan2-reservation-names)\.json\.age$'
     input_type: binary
     output_type: binary
     key_groups:
@@ -295,7 +295,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
-          - *s-router-prod-testing
+          - *s-router-neon
 
   - path_regex: '^(secrets/)*s-router-legacy-edge.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
@@ -484,3 +484,12 @@ creation_rules:
           - *l-esp-deadbeef
           - *l-portal-root
           - *l-portal-deadbeef
+
+  - path_regex: '^prod-network/current/secrets/devices/[A-Za-z0-9_-]+\.age$'
+    input_type: binary
+    output_type: binary
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-cobalt-prod
