@@ -112,7 +112,7 @@ behind the ISP router it is just DHCP on VLAN 300.
                          │
    l-envil USB (port 1) ─┴─ VLAN 300 (tagged toward the cobalt WAN container)
    l-envil dock (port 3) ─── LAN trunk: VLANs 2/3/7/8 tagged
-   l-portal USB (port 2) ─── VLAN 3 untagged (isolated portal)
+   l-portal USB (port 2) ─── VLAN 8 untagged (IOT)
 ```
 
 Verified port map (via `netgear-admin` disable probe):
@@ -120,7 +120,7 @@ Verified port map (via `netgear-admin` disable probe):
 | switch port | device | role |
 |---|---|---|
 | 1 | l-envil USB (`enp0s13f0u4u4u3`) | WAN (VLAN 300) |
-| 2 | l-portal USB (`enu1u1`) | portal (VLAN 3) |
+| 2 | l-portal USB (`enu1u1`) | portal (VLAN 8) |
 | 3 | l-envil dock (`enp170s0`) | LAN trunk (2/3/7/8) |
 | 4 | ISP router | WAN (VLAN 300 untagged) |
 | 5–8 | — | empty |
@@ -211,10 +211,10 @@ Tooling (all in the flake):
   nix build .#nixosConfigurations.s-router-cobalt-prod.config.system.build.nixos-shell --no-link
   ```
 - Switch L2 validated with tcpdump:
-  - l-portal untagged → trunk sees **VLAN 3** tagged ✅
+  - l-portal untagged → trunk sees **VLAN 8** tagged ✅
   - ISP untagged → l-envil USB sees **VLAN 300** tagged ✅
   - trunk shows **no VLAN 300** ✅
-- l-portal on VLAN 3 gets a DHCP lease, has no Internet, and is reachable from VLAN 2.
+- l-portal on VLAN 8 gets a DHCP lease and Internet (IOT lane, isolated from VLANs 2/3/7).
 
 ## 11. Open questions / resolutions
 
