@@ -29,6 +29,7 @@ in
     "TEMPORARY NETWORK-* NEBULA INGRESS PATH OVERRIDE (nebula-ingress-path-route-override.nix): the rendered policy tables copy the core-owned Nebula SNAT return route across tenant lanes, so policy rejects public UDP/TCP 4242 before forwarding; remove this file when network-* emits symmetric relation-bound forward and return policy routes for public ingress"
     "TEMPORARY NETWORK-RENDERER IPv6 PATH-MTU OVERRIDE (vlan2-ipv6-path-mtu-override.nix): VLAN 2 advertises the core PPPoE MTU of 1492 because network-renderer-nixos does not yet propagate uplink path MTU into access router advertisements; remove this file when the rendered RA owns AdvLinkMTU, while retaining the renderer-native inet-family TCP MSS clamp"
     "TEMPORARY NETWORK-* IPv6 UPLINK/INGRESS OVERRIDE (ipv6.nix): DHCPv6-PD acquisition and protected Nebula IPv6 ingress remain local compatibility glue; remove the local services, runtime address set, and nftables rules when the intent/compiler/renderer natively model PD plus an explicit scoped IPv6 public-ingress relation"
+    "TEMPORARY NETWORK-RENDERER VLAN 3 LOCAL-DATA RACE OVERRIDE (vlan3-unbound-local-data-race-override.nix): the renderer emits gen-s-router-prod-vlan3-unbound-local-data.service with Before=unbound.service but no RuntimeDirectory, so its ln races unbound's runtime directory and fails at boot; remove this file when network-renderer-nixos gives the generator its own RuntimeDirectory"
   ];
 
   imports = [
@@ -41,6 +42,7 @@ in
     ./vlan2-ipv6-path-mtu-override.nix
     ./vlan2-reservation-dns.nix
     ./vlan3-dns-authority-override.nix
+    ./vlan3-unbound-local-data-race-override.nix
     ./vlan2-management-override.nix
     (import ./renderers.nix {
       inherit
