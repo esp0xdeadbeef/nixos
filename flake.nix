@@ -94,7 +94,7 @@
     };
 
     network-renderer-nixos-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/6ba19fcb922297770e455fefbbf0249ed9943e54";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/b71e733e292651beec63ecbb1a09cb444b67784e";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
