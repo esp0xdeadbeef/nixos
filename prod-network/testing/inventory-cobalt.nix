@@ -866,7 +866,7 @@ in
                 };
                 interfaces = {
                   wan = "iot-srv";
-                  lan = "upstream-selector";
+                  lan = "us";
                   vpn = "wg0";
                 };
                 profile = {
@@ -897,6 +897,15 @@ in
                 };
                 runtime = {
                   uuidFile = "/run/network-renderer-wireguard/onyx.uuid";
+                  generatedConfigPath = "/run/network-renderer-wireguard/onyx.conf";
+                };
+                lan = {
+                  ipv4.address = "10.1.1.2/32";
+                  ipv6.address = "fd42:dead:beef:2900::2/128";
+                };
+                wan = {
+                  ipv4.method = "auto";
+                  ipv6.method = "auto";
                 };
                 dns.mode = "default";
                 firewall.mode = null;
