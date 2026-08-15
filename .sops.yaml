@@ -321,6 +321,16 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+  - path_regex: '^(secrets/)*s-router-cobalt-vpn-.*\.conf$'
+    input_type: binary
+    output_type: binary
+    key_groups:
+      - age:
+          - *l-envil-root
+          - *l-envil-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-cobalt
   - path_regex: '^(secrets/)*s-router-legacy-core.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:

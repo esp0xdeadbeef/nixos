@@ -1,5 +1,20 @@
 # NixConfig Conventions for LLMs
 
+## Approach
+
+Prefer the **best + safest** solution over the simplest + fastest. This
+config is destined for production, so thoroughness beats a quick hack: if
+doing it right takes longer, take that time. In particular:
+
+- Fix the root cause; do not layer a workaround over a broken mechanism.
+- Do not leave a legacy/dual mechanism behind "for back-compat" when the
+  design is being replaced — migrate it fully, including its GAMP contracts
+  and tests.
+- Leave the repo in a clean state: no stale branches, no reformatting noise
+  mixed into a semantic change, no half-finished migrations.
+- A complete fix that lands later is better than a shortcut that ships today
+  and needs revisiting in prod.
+
 ## Commit Messages
 
 Conventional commits: `type(scope): description`
