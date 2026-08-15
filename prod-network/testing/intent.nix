@@ -891,61 +891,73 @@ in
       prefixes = [
         {
           kind = "tenant";
-          name = "vlan2";
-          ipv4 = "10.2.2.0/24";
-          ipv6 = "fd42:dead:beef:c2::/64";
+          name = "svc";
+          ipv4 = "10.2.20.0/24";
+          ipv6 = "fd42:dead:beef:c14::/64";
         }
         {
           kind = "tenant";
-          name = "vlan3";
-          ipv4 = "10.2.3.0/24";
-          ipv6 = "fd42:dead:beef:c3::/64";
+          name = "clients";
+          ipv4 = "10.2.30.0/24";
+          ipv6 = "fd42:dead:beef:c1e::/64";
         }
         {
           kind = "tenant";
-          name = "vlan7";
-          ipv4 = "10.2.7.0/24";
-          ipv6 = "fd42:dead:beef:c7::/64";
+          name = "iot";
+          ipv4 = "10.2.50.0/24";
+          ipv6 = "fd42:dead:beef:c32::/64";
         }
         {
           kind = "tenant";
-          name = "vlan8";
-          ipv4 = "10.2.8.0/24";
-          ipv6 = "fd42:dead:beef:c8::/64";
+          name = "iot-srv";
+          ipv4 = "10.2.51.0/24";
+          ipv6 = "fd42:dead:beef:c33::/64";
+        }
+        {
+          kind = "tenant";
+          name = "dmz";
+          ipv4 = "10.2.60.0/24";
+          ipv6 = "fd42:dead:beef:c3c::/64";
         }
       ];
 
       endpoints = [
         {
           kind = "host";
-          name = "cobalt-vlan2-dns";
-          tenant = "vlan2";
-          ipv4 = [ "10.2.2.1" ];
+          name = "cobalt-svc-dns";
+          tenant = "svc";
+          ipv4 = [ "10.2.20.1" ];
         }
         {
           kind = "host";
-          name = "cobalt-vlan3-dns";
-          tenant = "vlan3";
-          ipv4 = [ "10.2.3.1" ];
+          name = "cobalt-clients-dns";
+          tenant = "clients";
+          ipv4 = [ "10.2.30.1" ];
         }
         {
           kind = "host";
-          name = "cobalt-vlan7-dns";
-          tenant = "vlan7";
-          ipv4 = [ "10.2.7.1" ];
+          name = "cobalt-iot-dns";
+          tenant = "iot";
+          ipv4 = [ "10.2.50.1" ];
         }
         {
           kind = "host";
-          name = "cobalt-vlan8-dns";
-          tenant = "vlan8";
-          ipv4 = [ "10.2.8.1" ];
+          name = "cobalt-iot-srv-dns";
+          tenant = "iot-srv";
+          ipv4 = [ "10.2.51.1" ];
+        }
+        {
+          kind = "host";
+          name = "cobalt-dmz-dns";
+          tenant = "dmz";
+          ipv4 = [ "10.2.60.1" ];
         }
       ];
     };
 
     hostManagement = {
       required = true;
-      interface = "vlan2";
+      interface = "clients";
       purpose = "hardware-management";
     };
 
@@ -953,153 +965,173 @@ in
       inherit trafficTypes;
       services = [
         {
-          name = "vlan2-dns";
-          providers = [ "cobalt-vlan2-dns" ];
+          name = "svc-dns";
+          providers = [ "cobalt-svc-dns" ];
           trafficType = "dns";
         }
         {
-          name = "vlan3-dns";
-          providers = [ "cobalt-vlan3-dns" ];
+          name = "clients-dns";
+          providers = [ "cobalt-clients-dns" ];
           trafficType = "dns";
         }
         {
-          name = "vlan7-dns";
-          providers = [ "cobalt-vlan7-dns" ];
+          name = "iot-dns";
+          providers = [ "cobalt-iot-dns" ];
           trafficType = "dns";
         }
         {
-          name = "vlan8-dns";
-          providers = [ "cobalt-vlan8-dns" ];
+          name = "iot-srv-dns";
+          providers = [ "cobalt-iot-srv-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "dmz-dns";
+          providers = [ "cobalt-dmz-dns" ];
           trafficType = "dns";
         }
       ];
 
       relations = [
         {
-          id = "allow-vlan2-dns-to-vlan3-dns";
+          id = "allow-clients-dns-to-dmz-dns";
           priority = 78;
           from = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "clients-dns";
           };
           to = {
             kind = "service";
-            name = "vlan3-dns";
+            name = "dmz-dns";
           };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-vlan2-to-vlan2-dns";
-          priority = 80;
-          from = {
-            kind = "tenant";
-            name = "vlan2";
-          };
-          to = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan7-to-vlan7-dns";
-          priority = 81;
-          from = {
-            kind = "tenant";
-            name = "vlan7";
-          };
-          to = {
-            kind = "service";
-            name = "vlan7-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan3-to-vlan3-dns";
-          priority = 82;
-          from = {
-            kind = "tenant";
-            name = "vlan3";
-          };
-          to = {
-            kind = "service";
-            name = "vlan3-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan8-to-vlan8-dns";
-          priority = 86;
-          from = {
-            kind = "tenant";
-            name = "vlan8";
-          };
-          to = {
-            kind = "service";
-            name = "vlan8-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan3-dns-to-vlan2-dns";
+          id = "allow-dmz-dns-to-clients-dns";
           priority = 79;
           from = {
             kind = "service";
-            name = "vlan3-dns";
+            name = "dmz-dns";
           };
           to = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "clients-dns";
           };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
         }
         {
-          id = "deny-vlan3-to-vlan2";
+          id = "allow-clients-to-clients-dns";
+          priority = 80;
+          from = {
+            kind = "tenant";
+            name = "clients";
+          };
+          to = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-svc-dns";
+          priority = 81;
+          from = {
+            kind = "tenant";
+            name = "svc";
+          };
+          to = {
+            kind = "service";
+            name = "svc-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-dmz-dns";
+          priority = 82;
+          from = {
+            kind = "tenant";
+            name = "dmz";
+          };
+          to = {
+            kind = "service";
+            name = "dmz-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "deny-dmz-to-clients";
           priority = 84;
           from = {
             kind = "tenant";
-            name = "vlan3";
+            name = "dmz";
           };
           to = {
             kind = "tenant";
-            name = "vlan2";
+            name = "clients";
           };
           trafficType = "any";
           action = "deny";
         }
         {
-          id = "allow-vlan2-to-vlan3";
+          id = "allow-clients-to-dmz";
           priority = 85;
           from = {
             kind = "tenant";
-            name = "vlan2";
+            name = "clients";
           };
           to = {
             kind = "tenant";
-            name = "vlan3";
+            name = "dmz";
           };
           trafficType = "any";
           action = "allow";
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-vlan2-dns-to-wan";
+          id = "allow-iot-to-iot-dns";
+          priority = 86;
+          from = {
+            kind = "tenant";
+            name = "iot";
+          };
+          to = {
+            kind = "service";
+            name = "iot-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-iot-srv-dns";
+          priority = 87;
+          from = {
+            kind = "tenant";
+            name = "iot-srv";
+          };
+          to = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-dns-to-wan";
           priority = 90;
           from = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "clients-dns";
           };
           to = {
             kind = "external";
@@ -1111,11 +1143,11 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-vlan7-dns-to-wan";
+          id = "allow-svc-dns-to-wan";
           priority = 91;
           from = {
             kind = "service";
-            name = "vlan7-dns";
+            name = "svc-dns";
           };
           to = {
             kind = "external";
@@ -1127,11 +1159,11 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-vlan8-dns-to-wan";
+          id = "allow-iot-dns-to-wan";
           priority = 93;
           from = {
             kind = "service";
-            name = "vlan8-dns";
+            name = "iot-dns";
           };
           to = {
             kind = "external";
@@ -1142,22 +1174,41 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
-        (allowTenantToWan "vlan2" 100)
-        (allowTenantToWan "vlan7" 110)
-        (allowTenantToWan "vlan8" 120)
+        {
+          id = "allow-iot-srv-dns-to-wan";
+          priority = 94;
+          from = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        (allowTenantToWan "clients" 100)
+        (allowTenantToWan "svc" 110)
+        (allowTenantToWan "iot" 120)
+        (allowTenantToWan "iot-srv" 130)
       ];
     };
 
     interfaceTags = {
-      tenant-vlan2 = "vlan2";
-      tenant-vlan3 = "vlan3";
-      tenant-vlan7 = "vlan7";
-      tenant-vlan8 = "vlan8";
+      tenant-svc = "svc";
+      tenant-clients = "clients";
+      tenant-iot = "iot";
+      tenant-iot-srv = "iot-srv";
+      tenant-dmz = "dmz";
       external-wan = "wan";
-      service-vlan2-dns = "vlan2-dns";
-      service-vlan3-dns = "vlan3-dns";
-      service-vlan7-dns = "vlan7-dns";
-      service-vlan8-dns = "vlan8-dns";
+      service-svc-dns = "svc-dns";
+      service-clients-dns = "clients-dns";
+      service-iot-dns = "iot-dns";
+      service-iot-srv-dns = "iot-srv-dns";
+      service-dmz-dns = "dmz-dns";
     };
 
     recursiveDnsIntent = {
@@ -1172,11 +1223,11 @@ in
 
       relations = [
         {
-          id = "allow-vlan2-to-core-dns";
+          id = "allow-clients-to-core-dns";
           priority = 87;
           from = {
             kind = "tenant";
-            name = "vlan2";
+            name = "clients";
           };
           to = {
             kind = "service";
@@ -1187,11 +1238,11 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-vlan2-dns-to-core-dns";
+          id = "allow-clients-dns-to-core-dns";
           priority = 88;
           from = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "clients-dns";
           };
           to = {
             kind = "service";
@@ -1202,11 +1253,11 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-vlan7-dns-to-core-dns";
+          id = "allow-svc-dns-to-core-dns";
           priority = 89;
           from = {
             kind = "service";
-            name = "vlan7-dns";
+            name = "svc-dns";
           };
           to = {
             kind = "service";
@@ -1232,11 +1283,11 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "deny-vlan2-dns-to-wan";
+          id = "deny-clients-dns-to-wan";
           priority = 92;
           from = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "clients-dns";
           };
           to = {
             kind = "external";
@@ -1246,11 +1297,11 @@ in
           action = "deny";
         }
         {
-          id = "deny-vlan7-dns-to-wan";
+          id = "deny-svc-dns-to-wan";
           priority = 93;
           from = {
             kind = "service";
-            name = "vlan7-dns";
+            name = "svc-dns";
           };
           to = {
             kind = "external";
@@ -1260,11 +1311,26 @@ in
           action = "deny";
         }
         {
-          id = "allow-vlan8-dns-to-core-dns";
+          id = "allow-iot-dns-to-core-dns";
           priority = 94;
           from = {
             kind = "service";
-            name = "vlan8-dns";
+            name = "iot-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-dns-to-core-dns";
+          priority = 95;
+          from = {
+            kind = "service";
+            name = "iot-srv-dns";
           };
           to = {
             kind = "service";
@@ -1280,11 +1346,11 @@ in
         {
           requesterScope = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "clients-dns";
           };
           advertisedResolver = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "clients-dns";
           };
           resolverSource = "local-recursive";
           upstreamResolver = {
@@ -1293,7 +1359,7 @@ in
             node = "core";
           };
           resolverPath = [
-            "access-vlan2"
+            "access-clients"
             "downstream-selector"
             "policy"
             "upstream-selector"
@@ -1310,11 +1376,11 @@ in
         {
           requesterScope = {
             kind = "service";
-            name = "vlan7-dns";
+            name = "svc-dns";
           };
           advertisedResolver = {
             kind = "service";
-            name = "vlan7-dns";
+            name = "svc-dns";
           };
           resolverSource = "local-recursive";
           upstreamResolver = {
@@ -1323,7 +1389,7 @@ in
             node = "core";
           };
           resolverPath = [
-            "access-vlan7"
+            "access-svc"
             "downstream-selector"
             "policy"
             "upstream-selector"
@@ -1340,11 +1406,11 @@ in
         {
           requesterScope = {
             kind = "service";
-            name = "vlan8-dns";
+            name = "iot-dns";
           };
           advertisedResolver = {
             kind = "service";
-            name = "vlan8-dns";
+            name = "iot-dns";
           };
           resolverSource = "local-recursive";
           upstreamResolver = {
@@ -1353,7 +1419,37 @@ in
             node = "core";
           };
           resolverPath = [
-            "access-vlan8"
+            "access-iot"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-iot-srv"
             "downstream-selector"
             "policy"
             "upstream-selector"
@@ -1371,48 +1467,48 @@ in
     };
 
     localDnsSharingIntent = {
-      namespace = "lan.";
+      namespace = "home.arpa.";
       authority = {
-        service = "vlan2-dns";
+        service = "clients-dns";
         records = [
-          "vlan2-kea-local-data"
-          "vlan3-static-local-data"
+          "clients-kea-local-data"
+          "dmz-static-local-data"
         ];
       };
       requester = {
-        service = "vlan3-dns";
+        service = "dmz-dns";
         allowedNamespaces = [
-          "lan."
-          "2.2.10.in-addr.arpa."
+          "home.arpa."
+          "30.2.10.in-addr.arpa."
         ];
         recursion = false;
         publicFallback = false;
       };
       relation = {
-        id = "allow-vlan3-dns-to-vlan2-dns";
+        id = "allow-dmz-dns-to-clients-dns";
         from = {
           kind = "service";
-          name = "vlan3-dns";
+          name = "dmz-dns";
         };
         to = {
           kind = "service";
-          name = "vlan2-dns";
+          name = "clients-dns";
         };
         trafficType = "dns";
         returnBehavior = "symmetric";
         resolverPath = [
-          "access-vlan3"
+          "access-dmz"
           "downstream-selector"
-          "access-vlan2"
+          "access-clients"
         ];
       };
       providerPolicy = {
-        source = "vlan3-dns";
+        source = "dmz-dns";
         action = "refuse_non_local";
       };
       lateralPolicy = {
-        source = "vlan2";
-        target = "vlan3-dns";
+        source = "clients";
+        target = "dmz-dns";
         localData = true;
         recursion = false;
         transitiveEgress = false;
@@ -1443,42 +1539,52 @@ in
           role = "downstream-selector";
         };
 
-        access-vlan2 = {
+        access-svc = {
           role = "access";
           attachments = [
             {
               kind = "tenant";
-              name = "vlan2";
+              name = "svc";
             }
           ];
         };
 
-        access-vlan3 = {
+        access-clients = {
           role = "access";
           attachments = [
             {
               kind = "tenant";
-              name = "vlan3";
+              name = "clients";
             }
           ];
         };
 
-        access-vlan7 = {
+        access-iot = {
           role = "access";
           attachments = [
             {
               kind = "tenant";
-              name = "vlan7";
+              name = "iot";
             }
           ];
         };
 
-        access-vlan8 = {
+        access-iot-srv = {
           role = "access";
           attachments = [
             {
               kind = "tenant";
-              name = "vlan8";
+              name = "iot-srv";
+            }
+          ];
+        };
+
+        access-dmz = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "dmz";
             }
           ];
         };
@@ -1499,19 +1605,23 @@ in
         ]
         [
           "downstream-selector"
-          "access-vlan2"
+          "access-svc"
         ]
         [
           "downstream-selector"
-          "access-vlan3"
+          "access-clients"
         ]
         [
           "downstream-selector"
-          "access-vlan7"
+          "access-dmz"
         ]
         [
           "downstream-selector"
-          "access-vlan8"
+          "access-iot-srv"
+        ]
+        [
+          "downstream-selector"
+          "access-iot"
         ]
       ];
     };

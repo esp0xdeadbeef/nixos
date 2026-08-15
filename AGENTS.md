@@ -117,6 +117,8 @@ Conventional commits: `type(scope): description`
 
 ## Checking
 
+- Prefer `rg` (ripgrep) over `grep` for code search — `grep` is slow on this
+  tree. `grep` is still allowed when `rg` isn't suitable.
 - Format touched Nix files with `nix fmt` (runs nixpkgs-fmt on all .nix files, or on explicit file args).
 - Run `nix flake check --all-systems` after meaningful Nix changes.
 

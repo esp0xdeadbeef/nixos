@@ -2,26 +2,32 @@
 
 Multi-site routing and segmentation design. It supersedes the original
 `s-router-policy-only/ROUTING-POLICY.md` (VLAN-number scheme) with a
-name-based model: the plane is encoded in the DNS suffix, never in the VLAN
+name-based model: the plane is encoded in the DNS zone, never in the VLAN
 number. Sites share one namespace; the site is a routing property, not part
 of any name.
 
 ## Principles
 
 1. **Plane = name.** The security boundary is expressed as a DNS zone
-   (`mgmt.lan`, `dmz.lan`, …), not as a VLAN number. VLAN numbers are
-   site-local implementation detail.
-2. **One shared namespace.** `lan` / `mgmt.lan` / `dmz.lan` / `iot.lan` are
-   global; hostnames are globally unique. No site suffix (`cobalt`/`neon`
-   never appears in an FQDN).
-3. **Reserve, instantiate lazily.** The full plane taxonomy is reserved here
+   (`mgmt.home.arpa`, `dmz.home.arpa`, …), not as a VLAN number. VLAN numbers
+   are site-local implementation detail.
+2. **One shared namespace, RFC 8375 root.** The namespace root is `home.arpa`
+   (the IETF-designated home-networking domain). Unregistered pseudo-TLDs such
+   as `.lan`, `.home`, `.local` are avoided: they can collide with a future
+   real delegation.
+3. **One zone per plane.** Each plane gets its own subdomain of `home.arpa`.
+   Hostnames are globally unique; the site never appears in an FQDN.
+4. **Reserve, instantiate lazily.** The full plane taxonomy is reserved here
    (names + spare VLAN ranges). A plane becomes a real VLAN + zone + policy
    relations only when the first device lands in it.
-4. **`vlan2` is legacy.** It is a holding pen: split it, do not grow it.
-5. **Policy decides recursion.** DNS recursion permission is a
+5. **`vlan2` is legacy.** It is a holding pen: split it, do not grow it.
+6. **Policy decides recursion.** DNS recursion permission is a
    `recursiveDnsIntent` relation enforced by the policy node. The overlay is
    transport only, never a recursion authority.
-6. **No zone transfers.** Topology is intent-driven and static; DNS links are
+7. **Policy decides the search domain.** The DHCP search domain (option 15) is
+   derived from the resolver's allowed namespaces (`localDnsSharingIntent`),
+   not hardcoded.
+8. **No zone transfers.** Topology is intent-driven and static; DNS links are
    predetermined (stub/forward zones) and derived from the policy relations.
 
 ## Plane taxonomy
@@ -29,22 +35,22 @@ of any name.
 VLAN ranges are *reserved*, not modeled. A range is instantiated only when a
 device actually needs it.
 
-| plane        | DNS zone      | trust        | reserved VLAN | status                          |
-| ------------ | ------------- | ------------ | ------------- | ------------------------------- |
-| control      | `mgmt.lan`    | absolute     | 10–19         | reserved — split out of `vlan2` |
-| service      | `lan`         | limited      | 20–29         | live (merged into `lan`)        |
-| endpoint     | `lan`         | untrusted    | 30–39         | live                            |
-| corp         | —             | semi-hostile | 40–49         | reserved                        |
-| iot          | `iot.lan`     | hostile      | 50–59         | live (`vlan7`/`vlan8`)          |
-| dmz          | `dmz.lan`     | exposed      | 60–69         | live (`vlan3`)                  |
-| lab          | `lab.lan`     | hostile      | 70–79         | reserved                        |
-| observability| —             | limited      | 80–89         | reserved                        |
-| transit      | `mesh`        | neutral      | 100–199       | live (overlay)                  |
-| wan          | —             | unknown      | 1000+         | live                            |
+| plane        | DNS zone              | trust        | reserved VLAN | status                          |
+| ------------ | --------------------- | ------------ | ------------- | ------------------------------- |
+| control      | `mgmt.home.arpa`      | absolute     | 10–19         | reserved — split out of `vlan2` |
+| service      | `svc.home.arpa`       | limited      | 20–29         | live                            |
+| endpoint     | `clients.home.arpa`   | untrusted    | 30–39         | live                            |
+| corp         | `corp.home.arpa`      | semi-hostile | 40–49         | reserved                        |
+| iot          | `iot.home.arpa`       | hostile      | 50–59         | live                            |
+| dmz          | `dmz.home.arpa`       | exposed      | 60–69         | live                            |
+| lab          | `lab.home.arpa`       | hostile      | 70–79         | reserved                        |
+| observability| `obs.home.arpa`       | limited      | 80–89         | reserved                        |
+| transit      | `mesh` (overlay)      | neutral      | 100–199       | live (overlay)                  |
+| wan          | —                     | unknown      | 1000+         | live                            |
 
 ### Trust anchors (normative)
 
-- Control plane is authority. If it grants trust, it lives in `mgmt.lan`.
+- Control plane is authority. If it grants trust, it lives in `mgmt.home.arpa`.
 - Service plane consumes trust; it does not define it.
 - Endpoints never reach control directly (bastion/jump only).
 - IoT reaches only WAN plus explicitly pinned services.
@@ -54,18 +60,23 @@ device actually needs it.
 
 ## DNS
 
-- **Shared namespace:** `.lan`, with functional zones `lan`, `mgmt.lan`,
-  `dmz.lan`, `iot.lan`. Overlay namespace reserved as `mesh` (separate view).
+- **Root:** `home.arpa` (RFC 8375). No `.lan`/`.local`/`.home`.
+- **Zones:** `<plane>.home.arpa` — `clients`, `svc`, `mgmt`, `dmz`, `iot`,
+  `lab`, `corp`, `obs`. The overlay is a separate `mesh` namespace.
 - **Site-local resolution for replicas:** the same FQDN resolves to the
-  nearest instance per site (`s-nebula-container.dmz.lan` → local IP).
+  nearest instance per site (`s-nebula-container.dmz.home.arpa` → local IP).
 - **Distinct instances get distinct names** (`s-nebula-container`,
   `s-nebula-container-b`), never a site suffix.
-- **Overlay resolution:** predetermined stub/forward links for `mesh` toward
-  the overlay resolver. No zone transfers; the topology is static.
+- **Search domain is policy-derived:** DHCP option 15 = the resolver's
+  `allowedNamespaces` from `localDnsSharingIntent`. A mgmt resolver advertises
+  `mgmt.home.arpa`; a resolver allowed both `mgmt` and `clients` advertises
+  both.
 - **Recursion is policy:** `recursiveDnsIntent` relations
   (`allow-<requester>-to-core-dns`, `allow-core-dns-to-wan|overlay`) decide who
   may recurse. The policy node emits the firewall rules; the resolver's
   forwarding config follows from those relations.
+- **No zone transfers:** predetermined stub/forward links, derived from the
+  relations.
 
 ## Reservations (who vs where)
 
@@ -81,17 +92,21 @@ assignment files are public, the `.age` payloads stay encrypted.
 
 Split `192.168.1.0/24` (site-a) / `10.2.2.0/24` (cobalt) into:
 
-- **`mgmt.lan`** — the iDRACs (`s-sigma-idrac`, `s-tau-idrac`, `idrac-20x`) and
-  switch admin.
-- **`lan`** — servers (`s-sigma`, `s-tau`, `pve-*`, `qnap-*`), routers
-  (`s-router-*`), clients (`l-*`, `win-pc-*`).
-- **`iot.lan`** — unifi APs, inverters, netgear, printers, `cs-*`.
+- **`mgmt.home.arpa`** — the iDRACs (`s-sigma-idrac`, `s-tau-idrac`,
+  `idrac-20x`) and switch admin.
+- **`svc.home.arpa`** — servers (`s-sigma`, `s-tau`, `pve-*`, `qnap-*`),
+  routers (`s-router-*`).
+- **`clients.home.arpa`** — clients (`l-*`, `win-pc-*`).
+- **`iot.home.arpa`** — unifi APs, inverters, netgear, printers, `cs-*`.
 
 The per-device handles are already zone-agnostic; a migration only moves the
 `scopes` entries to the new zone/VLAN. Handles must never change.
 
 ## References
 
+- RFC 8375 — Special-Use Domain `home.arpa.`
+- RFC 1034/1035 — DNS hierarchy (subdomain structure)
+- RFC 7788 / RFC 7368 — homenet architecture (context)
 - Original VLAN-number scheme: `s-router-policy-only/ROUTING-POLICY.md`
   (deleted; superseded by this file).
 - Original multi-site overlay plan: `s-router-test/MULTI_SITE_OVERLAY_PLAN.md`
