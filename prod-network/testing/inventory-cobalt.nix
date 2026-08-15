@@ -893,19 +893,14 @@ in
                   mode = "generated-peer";
                   generatedPeer = {
                     privateKeyFile = "/run/secrets/onyx-private-key";
-                    addresses = [
-                      "10.155.219.252/32"
-                      "fd7d:76ee:e68f:a993:da2c:8080:1405:77d1/128"
-                    ];
-                    dns = [
-                      "10.128.0.1"
-                      "fd7d:76ee:e68f:a993::1"
-                    ];
+                    addressesFile = "/run/secrets/onyx-address";
+                    dnsFile = "/run/secrets/onyx-dns";
                     mtu = 1320;
                     peers = [
                       {
-                        publicKey = "PyLCXAQT8KkM4T+dUsOQfn+Ub3pGxfGlxkIApuig+hk=";
+                        publicKeyFile = "/run/secrets/onyx-public-key";
                         endpointFile = "/run/secrets/onyx-endpoint";
+                        presharedKeyFile = "/run/secrets/onyx-preshared-key";
                         allowedIPs = [
                           "0.0.0.0/0"
                           "::/0"
