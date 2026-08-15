@@ -122,6 +122,38 @@ let
     ];
   };
 
+  protectedReservationSource = sourceFile: {
+    schema = "gamp-protected-reservation-set-v1";
+    sourceClass = "protected";
+    inherit sourceFile;
+  };
+
+  siteAReservations = import ./site-a-reservations.nix;
+
+  reservationsFor = vlan:
+    builtins.map
+      (deviceId:
+        let
+          device = siteAReservations.${deviceId};
+        in
+        {
+          id = deviceId;
+          ipv4 = {
+            hostOffset = device.scopes.${vlan};
+          };
+          macSource = {
+            accepted = true;
+            purpose = "static-dhcp-reservation";
+            sourceClass = "protected";
+            source = "protected-inventory";
+            secretRef = deviceId;
+          };
+        }
+        // (if device ? hostname && device.hostname != null then { hostname = device.hostname; } else { }))
+      (builtins.filter
+        (deviceId: siteAReservations.${deviceId}.scopes ? ${vlan})
+        (builtins.attrNames siteAReservations));
+
   dhcp4Advertisement =
     { tenant
     , interface
@@ -131,6 +163,7 @@ let
     , router
     , leaseStatePath
     , reservationSource ? null
+    , reservations ? null
     ,
     }:
     {
@@ -146,13 +179,8 @@ let
       domain = "lan.";
       leaseState.path = leaseStatePath;
     }
-    // (if reservationSource == null then { } else { inherit reservationSource; });
-
-  protectedReservationSource = sourceFile: {
-    schema = "gamp-protected-reservation-set-v1";
-    sourceClass = "protected";
-    inherit sourceFile;
-  };
+    // (if reservationSource == null then { } else { inherit reservationSource; })
+    // (if reservations == null then { } else { inherit reservations; });
 
   slaacRa = interface: {
     enabled = true;
@@ -459,7 +487,8 @@ let
             poolEnd = "192.168.1.200";
             router = "192.168.1.1";
             leaseStatePath = "/var/lib/kea/vlan2.leases";
-            reservationSource = protectedReservationSource "/run/secrets/s-router-prod-vlan2-reservations.json";
+            reservations = reservationsFor "vlan2";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
