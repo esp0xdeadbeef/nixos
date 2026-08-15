@@ -379,11 +379,11 @@
         "nixpkgs-network": "nixpkgs-network_3"
       },
       "locked": {
-        "lastModified": 1784567420,
-        "narHash": "sha256-5YkC+o+O6vVszsM85toqRMGpggU7IbMvk4hxLAASjPs=",
+        "lastModified": 1786802901,
+        "narHash": "sha256-HT5Vmonuvt7InoBUfWWWYC6aSEvkE9/cYi4YYGq3UTo=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "7a2e601c72606eda3e29b529ab39198ed4c97a76",
+        "rev": "b97ecac6bcb9e773a215508deb3b615051eb229d",
         "type": "github"
       },
       "original": {
@@ -948,11 +948,11 @@
         "nixpkgs-network": "nixpkgs-network_9"
       },
       "locked": {
-        "lastModified": 1786801231,
-        "narHash": "sha256-dqjvJ6EmnsO6kHTRSeDLatqW0fLqHUcmeylRKnoCsGI=",
+        "lastModified": 1786803934,
+        "narHash": "sha256-GaStRLp7vDM5J8ryzxl+zqmEJizU+p3fKcVE7w6N6pA=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "ab9f9cacab2266a862d2413e51cf2109d9858d22",
+        "rev": "265f85d8ee5e2f4fb56c3faecffac86cd5b564ca",
         "type": "github"
       },
       "original": {
@@ -1480,11 +1480,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1786796425,
-        "narHash": "sha256-qqqRCFEyNANjWLhp6ATv11FUzFzCIZAZFY+Uv1mpRpw=",
+        "lastModified": 1786802995,
+        "narHash": "sha256-Yns06kT82Q4ylQ2oxeREXIAoNnuRRB+G43LRqf6nzsE=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "41b33951495bd7b75127267aa47a8039187aa9cb",
+        "rev": "df01f92ed8fff6f8adda95cefa726716a5bef080",
         "type": "github"
       },
       "original": {
@@ -5911,11 +5911,11 @@
         "nixpkgs": "nixpkgs_29"
       },
       "locked": {
-        "lastModified": 1784606810,
-        "narHash": "sha256-QjK5/F9y0x48ILkMLJ9hvBv1fB1YFizXY/fwnMVzgtM=",
+        "lastModified": 1786807068,
+        "narHash": "sha256-RnYiMvZ1GKj+Xf8IS6fXxgD/rWTDgo9GvoGFUxdLo+I=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-wireguard",
-        "rev": "4dfd382102b67c073d07247b420b8700f0aa48c7",
+        "rev": "ce714d47a58e571b0a6b0d4166af5f538dab9fcc",
         "type": "github"
       },
       "original": {
