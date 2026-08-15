@@ -867,7 +867,7 @@ in
                 interfaces = {
                   wan = "iot-srv";
                   lan = "us";
-                  vpn = "wg0";
+                  vpn = "onyx";
                 };
                 profile = {
                   mode = "generated-peer";
@@ -935,7 +935,7 @@ in
                     "cobalt"
                   ];
                   service = {
-                    interface = "wg0";
+                    interface = "onyx";
                     name = "wireguard-runtime";
                   };
                 };
