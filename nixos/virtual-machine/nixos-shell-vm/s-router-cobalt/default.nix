@@ -2,6 +2,7 @@
 , lib
 , config
 , relativeRepo
+, outputs
 , ...
 }:
 let
@@ -31,6 +32,8 @@ in
   networking.hostName = lib.mkForce hostName;
 
   imports = [
+    outputs.nixosModules.containerNetworkDefaults
+
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
 
     (import ../s-router-prod/renderers.nix {
