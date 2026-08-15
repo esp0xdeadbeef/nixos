@@ -81,6 +81,30 @@ in
         key = "endpoint";
         path = "/run/secrets/onyx-endpoint";
       };
+
+      "cobalt-onyx-preshared-key" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-onyx-fields.yaml";
+        key = "presharedKey";
+        path = "/run/secrets/onyx-preshared-key";
+      };
+
+      "cobalt-onyx-public-key" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-onyx-fields.yaml";
+        key = "publicKey";
+        path = "/run/secrets/onyx-public-key";
+      };
+
+      "cobalt-onyx-address" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-onyx-fields.yaml";
+        key = "address";
+        path = "/run/secrets/onyx-address";
+      };
+
+      "cobalt-onyx-dns" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-onyx-fields.yaml";
+        key = "dns";
+        path = "/run/secrets/onyx-dns";
+      };
     };
 
   containers.access-clients.bindMounts = lib.mkMerge [
