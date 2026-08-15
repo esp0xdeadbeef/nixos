@@ -48,7 +48,7 @@ let
     { logicalInterface
     , bridge
     , interfaceName
-    , addr4
+    , addr4 ? null
     , addr6 ? null
     ,
     }:
@@ -57,8 +57,8 @@ let
       attach = bridgeAttach bridge;
       interface = {
         name = interfaceName;
-        inherit addr4;
       }
+      // (if addr4 == null then { } else { inherit addr4; })
       // (if addr6 == null then { } else { inherit addr6; });
     };
 
@@ -686,8 +686,6 @@ let
       logicalInterface = "tenant-iot-srv";
       bridge = "iot-srv";
       interfaceName = "iot-srv";
-      addr4 = "10.2.51.2/24";
-      addr6 = "fd42:dead:beef:c33::2/64";
     };
   };
 in
@@ -928,18 +926,7 @@ in
                   healthCheck.enable = false;
                 };
               };
-              runtimeNodes = {
-                core-vpn-onyx = {
-                  groups = [
-                    "vpn"
-                    "cobalt"
-                  ];
-                  service = {
-                    interface = "onyx";
-                    name = "wireguard-runtime";
-                  };
-                };
-              };
+              runtimeNodes = { };
             };
           };
         };

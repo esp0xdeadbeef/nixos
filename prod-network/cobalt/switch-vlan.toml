@@ -35,8 +35,8 @@ model = "gs108ev3"     # TODO: GS108PEv3 driver
 [switches.cobalt-switch.ports]
 # WAN -> l-envil USB: mgmt VLAN 1 untagged + cobalt WAN container tags VLAN 300
 1 = { pvid = 1, vlans = ["1U", "300T"] }
-# portal access -> l-portal USB: untagged iot (VLAN 50)
-2 = { pvid = 50, vlans = ["50U"] }
+# portal access -> l-portal USB: untagged iot-srv (VLAN 51) — kept for underlay internet test
+2 = { pvid = 51, vlans = ["51U"] }
 # LAN trunk -> l-envil dock: mgmt VLAN 1 untagged, tenant VLANs tagged
 3 = { pvid = 1, vlans = ["1U", "20T", "30T", "50T", "51T", "60T"] }
 # WAN -> ISP router: untagged VLAN 300 (ISP router is untagged)

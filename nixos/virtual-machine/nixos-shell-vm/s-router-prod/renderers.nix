@@ -117,12 +117,10 @@ let
               lib.concatMap
                 (overlayName:
                   let
-                    nodes = builtins.attrValues (overlays.${overlayName}.runtimeNodes or { });
-                    ifaces = builtins.filter (s: builtins.isString s && s != "") (
-                      map (n: (n.service or { }).interface or null) nodes
-                    );
+                    pc = overlays.${overlayName}.providerContract or null;
+                    vpn = if builtins.isAttrs pc && builtins.isAttrs (pc.interfaces or null) then pc.interfaces.vpn or null else null;
                   in
-                  if ifaces == [ ] then [ ] else [ { name = overlayName; value = { interface = builtins.head ifaces; }; } ])
+                  if vpn == null then [ ] else [ { name = overlayName; value = { interface = vpn; }; } ])
                 (builtins.attrNames overlays))
             (builtins.attrNames sites))
         (builtins.attrNames (inventory.controlPlane.sites or { }));
