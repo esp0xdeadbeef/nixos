@@ -11,28 +11,44 @@
 #     NixOS default, and a network opinion the container should not hold).
 #   - networkd.nix: `services.resolved.enable = mkDefault true` (assumes
 #     "networkd implies resolved", which is wrong for a router container).
-{ lib, pkgs, ... }:
+{ inputs, lib, ... }:
 
 let
-  patched = name: modulePath: find:
-    builtins.toFile name (
-      builtins.replaceStrings [ find ] [ "" ] (builtins.readFile modulePath)
-    );
+  nixpkgsSrc = inputs.nixpkgs;
+
+  # networkd.nix with the implicit `resolved = mkDefault true` stripped. This
+  # module is injected into each container's eval-config via the patched
+  # nixos-containers module below, because the container evaluates its own
+  # copy of the nixpkgs base modules and a host-level disabledModules does not
+  # reach inside it.
+  networkdNoResolved = builtins.toFile "networkd-no-resolved.nix" (
+    builtins.replaceStrings
+      [ "services.resolved.enable = mkDefault true;" ]
+      [ "" ]
+      (builtins.readFile "${nixpkgsSrc}/nixos/modules/system/boot/networkd.nix")
+  );
+
+  # nixos-containers.nix with the redundant useDHCP removed and the patched
+  # networkd injected into every container's eval-config.
+  nixosContainersNoNetwork = builtins.toFile "nixos-containers-no-network.nix" (
+    builtins.replaceStrings
+      [
+        "networking.useDHCP = false;"
+        "                            { options, ... }:\n                            {\n                              config = {"
+      ]
+      [
+        ""
+        "                            { options, ... }:\n                            {\n                              disabledModules = [ \"system/boot/networkd.nix\" ];\n                              imports = [ ${networkdNoResolved} ];\n                              config = {"
+      ]
+      (builtins.readFile "${nixpkgsSrc}/nixos/modules/virtualisation/nixos-containers.nix")
+  );
 in
 {
   disabledModules = [
     "virtualisation/nixos-containers.nix"
-    "system/boot/networkd.nix"
   ];
 
   imports = [
-    (patched
-      "nixos-containers-no-network.nix"
-      "${pkgs.path}/nixos/modules/virtualisation/nixos-containers.nix"
-      "networking.useDHCP = false;")
-    (patched
-      "networkd-no-resolved.nix"
-      "${pkgs.path}/nixos/modules/system/boot/networkd.nix"
-      "services.resolved.enable = mkDefault true;")
+    nixosContainersNoNetwork
   ];
 }
