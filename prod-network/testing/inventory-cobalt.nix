@@ -108,7 +108,7 @@ let
     localRecords = records;
     upstreamResolvers = [
       {
-        dst = "10.2.3.1";
+        dst = "10.2.60.1";
         scope = "local-access";
         source = "router-self";
       }
@@ -155,6 +155,7 @@ let
     , poolEnd
     , router
     , leaseStatePath
+    , domain ? "clients.home.arpa."
     , reservations ? null
     , reservationSource ? null
     ,
@@ -169,7 +170,7 @@ let
       };
       inherit router;
       dnsServers = [ router ];
-      domain = "lan.";
+      inherit domain;
       leaseState.path = leaseStatePath;
     }
     // (if reservations == null then { } else { inherit reservations; })
@@ -187,17 +188,20 @@ let
   };
 
   coreUpstreamLink = "p2p-core-upstream-selector";
-  upstreamPolicyVlan2Link = "p2p-policy-upstream-selector--access-access-vlan2--uplink-wan";
-  upstreamPolicyVlan7Link = "p2p-policy-upstream-selector--access-access-vlan7--uplink-wan";
-  policyDownstreamVlan2Link = "p2p-downstream-selector-policy--access-access-vlan2";
-  policyDownstreamVlan3Link = "p2p-downstream-selector-policy--access-access-vlan3";
-  policyDownstreamVlan7Link = "p2p-downstream-selector-policy--access-access-vlan7";
-  downstreamAccessVlan2Link = "p2p-access-vlan2-downstream-selector";
-  downstreamAccessVlan3Link = "p2p-access-vlan3-downstream-selector";
-  downstreamAccessVlan7Link = "p2p-access-vlan7-downstream-selector";
-  upstreamPolicyVlan8Link = "p2p-policy-upstream-selector--access-access-vlan8--uplink-wan";
-  policyDownstreamVlan8Link = "p2p-downstream-selector-policy--access-access-vlan8";
-  downstreamAccessVlan8Link = "p2p-access-vlan8-downstream-selector";
+  upstreamPolicyClientsLink = "p2p-policy-upstream-selector--access-access-clients--uplink-wan";
+  upstreamPolicyIotSrvLink = "p2p-policy-upstream-selector--access-access-iot-srv--uplink-wan";
+  policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
+  policyDownstreamDmzLink = "p2p-downstream-selector-policy--access-access-dmz";
+  policyDownstreamIotSrvLink = "p2p-downstream-selector-policy--access-access-iot-srv";
+  downstreamAccessClientsLink = "p2p-access-clients-downstream-selector";
+  upstreamPolicySvcLink = "p2p-policy-upstream-selector--access-access-svc--uplink-wan";
+  policyDownstreamSvcLink = "p2p-downstream-selector-policy--access-access-svc";
+  downstreamAccessSvcLink = "p2p-access-svc-downstream-selector";
+  downstreamAccessDmzLink = "p2p-access-dmz-downstream-selector";
+  downstreamAccessIotSrvLink = "p2p-access-iot-srv-downstream-selector";
+  upstreamPolicyIotLink = "p2p-policy-upstream-selector--access-access-iot--uplink-wan";
+  policyDownstreamIotLink = "p2p-downstream-selector-policy--access-access-iot";
+  downstreamAccessIotLink = "p2p-access-iot-downstream-selector";
 
   core =
     (mkNode "core" {
@@ -222,12 +226,14 @@ let
             dnsRuntime.resolver.ipv6
           ];
           allowFrom = [
-            dnsRuntime.requesters.access-vlan2.clientIpv4
-            dnsRuntime.requesters.access-vlan2.clientIpv6
-            "${dnsRuntime.requesters.access-vlan7.ipv4}/32"
-            "${dnsRuntime.requesters.access-vlan7.ipv6}/128"
-            "${dnsRuntime.requesters.access-vlan8.ipv4}/32"
-            "${dnsRuntime.requesters.access-vlan8.ipv6}/128"
+            dnsRuntime.requesters.access-clients.clientIpv4
+            dnsRuntime.requesters.access-clients.clientIpv6
+            dnsRuntime.requesters.access-svc.clientIpv4
+            dnsRuntime.requesters.access-svc.clientIpv6
+            "${dnsRuntime.requesters.access-iot-srv.ipv4}/32"
+            "${dnsRuntime.requesters.access-iot-srv.ipv6}/128"
+            "${dnsRuntime.requesters.access-iot.ipv4}/32"
+            "${dnsRuntime.requesters.access-iot.ipv6}/128"
           ];
         };
       };
@@ -241,152 +247,187 @@ let
       interfaceName = "core";
     };
 
-    policy-vlan2 = p2pPort {
-      link = upstreamPolicyVlan2Link;
+    policy-clients = p2pPort {
+      link = upstreamPolicyClientsLink;
       adapterName = "cb-us-p2";
-      bridge = "rt-upstream-policy-vlan2";
-      interfaceName = "policy-vlan2";
+      bridge = "rt-upstream-policy-clients";
+      interfaceName = "policy-clients";
     };
 
-    policy-vlan7 = p2pPort {
-      link = upstreamPolicyVlan7Link;
+    policy-svc = p2pPort {
+      link = upstreamPolicySvcLink;
+      adapterName = "cb-us-p1";
+      bridge = "rt-upstream-policy-svc";
+      interfaceName = "policy-svc";
+    };
+
+    policy-iot-srv = p2pPort {
+      link = upstreamPolicyIotSrvLink;
       adapterName = "cb-us-p7";
-      bridge = "rt-upstream-policy-vlan7";
+      bridge = "rt-upstream-policy-iot-srv";
       interfaceName = "policy";
     };
 
-    policy-vlan8 = p2pPort {
-      link = upstreamPolicyVlan8Link;
+    policy-iot = p2pPort {
+      link = upstreamPolicyIotLink;
       adapterName = "cb-us-p8";
-      bridge = "rt-upstream-policy-vlan8";
-      interfaceName = "policy-vlan8";
+      bridge = "rt-upstream-policy-iot";
+      interfaceName = "policy-iot";
     };
   };
 
   policy = mkNode "policy" {
-    upstream-vlan2 = p2pPort {
-      link = upstreamPolicyVlan2Link;
+    upstream-svc = p2pPort {
+      link = upstreamPolicySvcLink;
+      adapterName = "cb-p-us1";
+      bridge = "rt-upstream-policy-svc";
+      interfaceName = "upstream-svc";
+    };
+
+    upstream-clients = p2pPort {
+      link = upstreamPolicyClientsLink;
       adapterName = "cb-p-us2";
-      bridge = "rt-upstream-policy-vlan2";
-      interfaceName = "upstream-vlan2";
+      bridge = "rt-upstream-policy-clients";
+      interfaceName = "upstream-clients";
     };
 
-    upstream-vlan7 = p2pPort {
-      link = upstreamPolicyVlan7Link;
+    upstream-iot-srv = p2pPort {
+      link = upstreamPolicyIotSrvLink;
       adapterName = "cb-p-us7";
-      bridge = "rt-upstream-policy-vlan7";
-      interfaceName = "upstream-vlan7";
+      bridge = "rt-upstream-policy-iot-srv";
+      interfaceName = "upstream-iot-srv";
     };
 
-    upstream-vlan8 = p2pPort {
-      link = upstreamPolicyVlan8Link;
+    upstream-iot = p2pPort {
+      link = upstreamPolicyIotLink;
       adapterName = "cb-p-us8";
-      bridge = "rt-upstream-policy-vlan8";
-      interfaceName = "upstream-vlan8";
+      bridge = "rt-upstream-policy-iot";
+      interfaceName = "upstream-iot";
     };
 
-    downstream-vlan2 = p2pPort {
-      link = policyDownstreamVlan2Link;
+    downstream-svc = p2pPort {
+      link = policyDownstreamSvcLink;
+      adapterName = "cb-p-ds1";
+      bridge = "rt-policy-downstream-svc";
+      interfaceName = "downstream-svc";
+    };
+
+    downstream-clients = p2pPort {
+      link = policyDownstreamClientsLink;
       adapterName = "cb-p-ds2";
-      bridge = "rt-policy-downstream-vlan2";
-      interfaceName = "downstream-vlan2";
+      bridge = "rt-policy-downstream-clients";
+      interfaceName = "downstream-clients";
     };
 
-    downstream-vlan3 = p2pPort {
-      link = policyDownstreamVlan3Link;
+    downstream-dmz = p2pPort {
+      link = policyDownstreamDmzLink;
       adapterName = "cb-p-ds3";
-      bridge = "rt-policy-downstream-vlan3";
-      interfaceName = "downstream-vlan3";
+      bridge = "rt-policy-downstream-dmz";
+      interfaceName = "downstream-dmz";
     };
 
-    downstream-vlan7 = p2pPort {
-      link = policyDownstreamVlan7Link;
+    downstream-iot-srv = p2pPort {
+      link = policyDownstreamIotSrvLink;
       adapterName = "cb-p-ds7";
-      bridge = "rt-policy-downstream-vlan7";
-      interfaceName = "downstr-vlan7";
+      bridge = "rt-policy-downstream-iot-srv";
+      interfaceName = "downstr-iot-srv";
     };
 
-    downstream-vlan8 = p2pPort {
-      link = policyDownstreamVlan8Link;
+    downstream-iot = p2pPort {
+      link = policyDownstreamIotLink;
       adapterName = "cb-p-ds8";
-      bridge = "rt-policy-downstream-vlan8";
-      interfaceName = "downstr-vlan8";
+      bridge = "rt-policy-downstream-iot";
+      interfaceName = "downstr-iot";
     };
   };
 
   downstreamSelector = mkNode "downstream-selector" {
-    policy-vlan2 = p2pPort {
-      link = policyDownstreamVlan2Link;
+    policy-svc = p2pPort {
+      link = policyDownstreamSvcLink;
+      adapterName = "cb-ds-p1";
+      bridge = "rt-policy-downstream-svc";
+      interfaceName = "policy-svc";
+    };
+
+    policy-clients = p2pPort {
+      link = policyDownstreamClientsLink;
       adapterName = "cb-ds-p2";
-      bridge = "rt-policy-downstream-vlan2";
-      interfaceName = "policy-vlan2";
+      bridge = "rt-policy-downstream-clients";
+      interfaceName = "policy-clients";
     };
 
-    policy-vlan3 = p2pPort {
-      link = policyDownstreamVlan3Link;
+    policy-dmz = p2pPort {
+      link = policyDownstreamDmzLink;
       adapterName = "cb-ds-p3";
-      bridge = "rt-policy-downstream-vlan3";
-      interfaceName = "policy-vlan3";
+      bridge = "rt-policy-downstream-dmz";
+      interfaceName = "policy-dmz";
     };
 
-    policy-vlan7 = p2pPort {
-      link = policyDownstreamVlan7Link;
+    policy-iot-srv = p2pPort {
+      link = policyDownstreamIotSrvLink;
       adapterName = "cb-ds-p7";
-      bridge = "rt-policy-downstream-vlan7";
-      interfaceName = "policy-vlan7";
+      bridge = "rt-policy-downstream-iot-srv";
+      interfaceName = "policy-iot-srv";
     };
 
-    policy-vlan8 = p2pPort {
-      link = policyDownstreamVlan8Link;
+    policy-iot = p2pPort {
+      link = policyDownstreamIotLink;
       adapterName = "cb-ds-p8";
-      bridge = "rt-policy-downstream-vlan8";
-      interfaceName = "policy-vlan8";
+      bridge = "rt-policy-downstream-iot";
+      interfaceName = "policy-iot";
     };
 
-    access-vlan2 = p2pPort {
-      link = downstreamAccessVlan2Link;
+    access-svc = p2pPort {
+      link = downstreamAccessSvcLink;
+      adapterName = "cb-ds-a1";
+      bridge = "rt-downstream-access-svc";
+      interfaceName = "access-svc";
+    };
+
+    access-clients = p2pPort {
+      link = downstreamAccessClientsLink;
       adapterName = "cb-ds-a2";
-      bridge = "rt-downstream-access-vlan2";
-      interfaceName = "access-vlan2";
+      bridge = "rt-downstream-access-clients";
+      interfaceName = "access-clients";
     };
 
-    access-vlan3 = p2pPort {
-      link = downstreamAccessVlan3Link;
+    access-dmz = p2pPort {
+      link = downstreamAccessDmzLink;
       adapterName = "cb-ds-a3";
-      bridge = "rt-downstream-access-vlan3";
-      interfaceName = "access-vlan3";
+      bridge = "rt-downstream-access-dmz";
+      interfaceName = "access-dmz";
     };
 
-    access-vlan7 = p2pPort {
-      link = downstreamAccessVlan7Link;
+    access-iot-srv = p2pPort {
+      link = downstreamAccessIotSrvLink;
       adapterName = "cb-ds-a7";
-      bridge = "rt-downstream-access-vlan7";
-      interfaceName = "access-vlan7";
+      bridge = "rt-downstream-access-iot-srv";
+      interfaceName = "access-iot-srv";
     };
 
-    access-vlan8 = p2pPort {
-      link = downstreamAccessVlan8Link;
+    access-iot = p2pPort {
+      link = downstreamAccessIotLink;
       adapterName = "cb-ds-a8";
-      bridge = "rt-downstream-access-vlan8";
-      interfaceName = "access-vlan8";
+      bridge = "rt-downstream-access-iot";
+      interfaceName = "access-iot";
     };
   };
 
-  accessVlan2 =
-    (mkNode "access-vlan2" {
+  accessClients =
+    (mkNode "access-clients" {
       transit-downstream-selector = p2pPort {
-        link = downstreamAccessVlan2Link;
+        link = downstreamAccessClientsLink;
         adapterName = "cb-a2-ds";
-        bridge = "rt-downstream-access-vlan2";
-        interfaceName = "access-vlan2";
+        bridge = "rt-downstream-access-clients";
+        interfaceName = "access-clients";
       };
 
-      tenant-vlan2 = tenantPort {
-        logicalInterface = "tenant-vlan2";
-        bridge = "lan2";
-        interfaceName = "lan2";
-        addr4 = "10.2.2.1/24";
-        addr6 = "fd42:dead:beef:c2::1/64";
+      tenant-clients = tenantPort {
+        logicalInterface = "tenant-clients";
+        bridge = "clients";
+        interfaceName = "clients";
+        addr4 = "10.2.30.1/24";
+        addr6 = "fd42:dead:beef:c1e::1/64";
       };
     })
     // {
@@ -395,48 +436,98 @@ let
       services = {
         dns = accessDns {
           addresses = [
-            dnsRuntime.requesters.access-vlan2.ipv4
-            dnsRuntime.requesters.access-vlan2.ipv6
+            dnsRuntime.requesters.access-clients.ipv4
+            dnsRuntime.requesters.access-clients.ipv6
           ];
         };
       };
 
       advertisements = {
         dhcp4 = {
-          tenant-vlan2 = dhcp4Advertisement {
-            tenant = "vlan2";
-            interface = "tenant-vlan2";
-            subnet = "10.2.2.0/24";
-            poolStart = "10.2.2.100";
-            poolEnd = "10.2.2.200";
-            router = "10.2.2.1";
-            leaseStatePath = "/var/lib/kea/vlan2.leases";
-            reservations = reservationsFor "vlan2";
+          tenant-clients = dhcp4Advertisement {
+            tenant = "clients";
+            interface = "tenant-clients";
+            subnet = "10.2.30.0/24";
+            poolStart = "10.2.30.100";
+            poolEnd = "10.2.30.200";
+            router = "10.2.30.1";
+            leaseStatePath = "/var/lib/kea/clients.leases";
+            domain = "clients.home.arpa.";
+            reservations = reservationsFor "clients";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
         ipv6Ra = {
-          tenant-vlan2 = slaacRa "tenant-vlan2";
+          tenant-clients = slaacRa "tenant-clients";
+        };
+      };
+    };
+  accessSvc =
+    (mkNode "access-svc" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessSvcLink;
+        adapterName = "cb-a1-ds";
+        bridge = "rt-downstream-access-svc";
+        interfaceName = "access-svc";
+      };
+
+      tenant-svc = tenantPort {
+        logicalInterface = "tenant-svc";
+        bridge = "svc";
+        interfaceName = "svc";
+        addr4 = "10.2.20.1/24";
+        addr6 = "fd42:dead:beef:c14::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-svc.ipv4
+            dnsRuntime.requesters.access-svc.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-svc = dhcp4Advertisement {
+            tenant = "svc";
+            interface = "tenant-svc";
+            subnet = "10.2.20.0/24";
+            poolStart = "10.2.20.100";
+            poolEnd = "10.2.20.200";
+            router = "10.2.20.1";
+            leaseStatePath = "/var/lib/kea/svc.leases";
+            domain = "svc.home.arpa.";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-svc = slaacRa "tenant-svc";
         };
       };
     };
 
-  accessVlan3 =
-    (mkNode "access-vlan3" {
+  accessDmz =
+    (mkNode "access-dmz" {
       transit-downstream-selector = p2pPort {
-        link = downstreamAccessVlan3Link;
+        link = downstreamAccessDmzLink;
         adapterName = "cb-a3-ds";
-        bridge = "rt-downstream-access-vlan3";
-        interfaceName = "access-vlan3";
+        bridge = "rt-downstream-access-dmz";
+        interfaceName = "access-dmz";
       };
 
-      tenant-vlan3 = tenantPort {
-        logicalInterface = "tenant-vlan3";
-        bridge = "lan3";
-        interfaceName = "lan3";
-        addr4 = "10.2.3.1/24";
-        addr6 = "fd42:dead:beef:c3::1/64";
+      tenant-dmz = tenantPort {
+        logicalInterface = "tenant-dmz";
+        bridge = "dmz";
+        interfaceName = "dmz";
+        addr4 = "10.2.60.1/24";
+        addr6 = "fd42:dead:beef:c3c::1/64";
       };
     })
     // {
@@ -444,45 +535,46 @@ let
 
       services = {
         dns = localDns [
-          dnsRuntime.requesters.access-vlan3.ipv4
-          dnsRuntime.requesters.access-vlan3.ipv6
+          dnsRuntime.requesters.access-dmz.ipv4
+          dnsRuntime.requesters.access-dmz.ipv6
         ] [ ];
       };
 
       advertisements = {
         dhcp4 = {
-          tenant-vlan3 = dhcp4Advertisement {
-            tenant = "vlan3";
-            interface = "tenant-vlan3";
-            subnet = "10.2.3.0/24";
-            poolStart = "10.2.3.100";
-            poolEnd = "10.2.3.200";
-            router = "10.2.3.1";
-            leaseStatePath = "/var/lib/kea/vlan3.leases";
+          tenant-dmz = dhcp4Advertisement {
+            tenant = "dmz";
+            interface = "tenant-dmz";
+            subnet = "10.2.60.0/24";
+            poolStart = "10.2.60.100";
+            poolEnd = "10.2.60.200";
+            router = "10.2.60.1";
+            leaseStatePath = "/var/lib/kea/dmz.leases";
+            domain = "dmz.home.arpa.";
           };
         };
 
         ipv6Ra = {
-          tenant-vlan3 = slaacRa "tenant-vlan3";
+          tenant-dmz = slaacRa "tenant-dmz";
         };
       };
     };
 
-  accessVlan7 =
-    (mkNode "access-vlan7" {
+  accessIotSrv =
+    (mkNode "access-iot-srv" {
       transit-downstream-selector = p2pPort {
-        link = downstreamAccessVlan7Link;
+        link = downstreamAccessIotSrvLink;
         adapterName = "cb-a7-ds";
-        bridge = "rt-downstream-access-vlan7";
-        interfaceName = "access-vlan7";
+        bridge = "rt-downstream-access-iot-srv";
+        interfaceName = "access-iot-srv";
       };
 
-      tenant-vlan7 = tenantPort {
-        logicalInterface = "tenant-vlan7";
-        bridge = "lan7";
-        interfaceName = "lan7";
-        addr4 = "10.2.7.1/24";
-        addr6 = "fd42:dead:beef:c7::1/64";
+      tenant-iot-srv = tenantPort {
+        logicalInterface = "tenant-iot-srv";
+        bridge = "iot-srv";
+        interfaceName = "iot-srv";
+        addr4 = "10.2.51.1/24";
+        addr6 = "fd42:dead:beef:c33::1/64";
       };
     })
     // {
@@ -491,46 +583,47 @@ let
       services = {
         dns = accessDns {
           addresses = [
-            dnsRuntime.requesters.access-vlan7.ipv4
-            dnsRuntime.requesters.access-vlan7.ipv6
+            dnsRuntime.requesters.access-iot-srv.ipv4
+            dnsRuntime.requesters.access-iot-srv.ipv6
           ];
         };
       };
 
       advertisements = {
         dhcp4 = {
-          tenant-vlan7 = dhcp4Advertisement {
-            tenant = "vlan7";
-            interface = "tenant-vlan7";
-            subnet = "10.2.7.0/24";
-            poolStart = "10.2.7.100";
-            poolEnd = "10.2.7.200";
-            router = "10.2.7.1";
-            leaseStatePath = "/var/lib/kea/vlan7.leases";
+          tenant-iot-srv = dhcp4Advertisement {
+            tenant = "iot-srv";
+            interface = "tenant-iot-srv";
+            subnet = "10.2.51.0/24";
+            poolStart = "10.2.51.100";
+            poolEnd = "10.2.51.200";
+            router = "10.2.51.1";
+            leaseStatePath = "/var/lib/kea/iot-srv.leases";
+            domain = "iot-srv.home.arpa.";
           };
         };
 
         ipv6Ra = {
-          tenant-vlan7 = slaacRa "tenant-vlan7";
+          tenant-iot-srv = slaacRa "tenant-iot-srv";
         };
       };
     };
 
-  accessVlan8 =
-    (mkNode "access-vlan8" {
+  accessIot =
+    (mkNode "access-iot" {
       transit-downstream-selector = p2pPort {
-        link = downstreamAccessVlan8Link;
+        link = downstreamAccessIotLink;
         adapterName = "cb-a8-ds";
-        bridge = "rt-downstream-access-vlan8";
-        interfaceName = "access-vlan8";
+        bridge = "rt-downstream-access-iot";
+        interfaceName = "access-iot";
       };
 
-      tenant-vlan8 = tenantPort {
-        logicalInterface = "tenant-vlan8";
-        bridge = "lan8";
-        interfaceName = "lan8";
-        addr4 = "10.2.8.1/24";
-        addr6 = "fd42:dead:beef:c8::1/64";
+      tenant-iot = tenantPort {
+        logicalInterface = "tenant-iot";
+        bridge = "iot";
+        interfaceName = "iot";
+        addr4 = "10.2.50.1/24";
+        addr6 = "fd42:dead:beef:c32::1/64";
       };
     })
     // {
@@ -539,29 +632,30 @@ let
       services = {
         dns = accessDns {
           addresses = [
-            dnsRuntime.requesters.access-vlan8.ipv4
-            dnsRuntime.requesters.access-vlan8.ipv6
+            dnsRuntime.requesters.access-iot.ipv4
+            dnsRuntime.requesters.access-iot.ipv6
           ];
         };
       };
 
       advertisements = {
         dhcp4 = {
-          tenant-vlan8 = dhcp4Advertisement {
-            tenant = "vlan8";
-            interface = "tenant-vlan8";
-            subnet = "10.2.8.0/24";
-            poolStart = "10.2.8.100";
-            poolEnd = "10.2.8.200";
-            router = "10.2.8.1";
-            leaseStatePath = "/var/lib/kea/vlan8.leases";
-            reservations = reservationsFor "vlan8";
+          tenant-iot = dhcp4Advertisement {
+            tenant = "iot";
+            interface = "tenant-iot";
+            subnet = "10.2.50.0/24";
+            poolStart = "10.2.50.100";
+            poolEnd = "10.2.50.200";
+            router = "10.2.50.1";
+            leaseStatePath = "/var/lib/kea/iot.leases";
+            domain = "iot.home.arpa.";
+            reservations = reservationsFor "iot";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
         ipv6Ra = {
-          tenant-vlan8 = slaacRa "tenant-vlan8";
+          tenant-iot = slaacRa "tenant-iot";
         };
       };
     };
@@ -575,24 +669,29 @@ in
       ipv6 = [ dnsRuntime.resolver.ipv6 ];
     };
 
-    cobalt-vlan2-dns = {
-      ipv4 = [ dnsRuntime.requesters.access-vlan2.ipv4 ];
-      ipv6 = [ dnsRuntime.requesters.access-vlan2.ipv6 ];
+    cobalt-svc-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-svc.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-svc.ipv6 ];
     };
 
-    cobalt-vlan3-dns = {
-      ipv4 = [ dnsRuntime.requesters.access-vlan3.ipv4 ];
-      ipv6 = [ dnsRuntime.requesters.access-vlan3.ipv6 ];
+    cobalt-clients-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-clients.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-clients.ipv6 ];
     };
 
-    cobalt-vlan7-dns = {
-      ipv4 = [ dnsRuntime.requesters.access-vlan7.ipv4 ];
-      ipv6 = [ dnsRuntime.requesters.access-vlan7.ipv6 ];
+    cobalt-dmz-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-dmz.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-dmz.ipv6 ];
     };
 
-    cobalt-vlan8-dns = {
-      ipv4 = [ dnsRuntime.requesters.access-vlan8.ipv4 ];
-      ipv6 = [ dnsRuntime.requesters.access-vlan8.ipv6 ];
+    cobalt-iot-srv-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-iot-srv.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-iot-srv.ipv6 ];
+    };
+
+    cobalt-iot-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-iot.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-iot.ipv6 ];
     };
   };
 
@@ -622,44 +721,53 @@ in
         };
 
         transitBridges = {
-          lan2 = {
-            name = "lan2";
-            vlan = 2;
+          svc = {
+            name = "svc";
+            vlan = 20;
             parentUplink = "trunk";
           };
 
-          lan3 = {
-            name = "lan3";
-            vlan = 3;
+          clients = {
+            name = "clients";
+            vlan = 30;
             parentUplink = "trunk";
           };
 
-          lan7 = {
-            name = "lan7";
-            vlan = 7;
+          iot = {
+            name = "iot";
+            vlan = 50;
             parentUplink = "trunk";
           };
 
-          lan8 = {
-            name = "lan8";
-            vlan = 8;
+          iot-srv = {
+            name = "iot-srv";
+            vlan = 51;
+            parentUplink = "trunk";
+          };
+
+          dmz = {
+            name = "dmz";
+            vlan = 60;
             parentUplink = "trunk";
           };
         };
 
         bridgeNetworks = {
           rt-core-upstream-selector = { };
-          rt-downstream-access-vlan2 = { };
-          rt-downstream-access-vlan3 = { };
-          rt-downstream-access-vlan7 = { };
-          rt-policy-downstream-vlan2 = { };
-          rt-policy-downstream-vlan3 = { };
-          rt-policy-downstream-vlan7 = { };
-          rt-upstream-policy-vlan2 = { };
-          rt-upstream-policy-vlan7 = { };
-          rt-downstream-access-vlan8 = { };
-          rt-policy-downstream-vlan8 = { };
-          rt-upstream-policy-vlan8 = { };
+          rt-downstream-access-svc = { };
+          rt-downstream-access-clients = { };
+          rt-downstream-access-dmz = { };
+          rt-downstream-access-iot-srv = { };
+          rt-policy-downstream-svc = { };
+          rt-policy-downstream-clients = { };
+          rt-policy-downstream-dmz = { };
+          rt-policy-downstream-iot-srv = { };
+          rt-upstream-policy-svc = { };
+          rt-upstream-policy-clients = { };
+          rt-upstream-policy-iot-srv = { };
+          rt-downstream-access-iot = { };
+          rt-policy-downstream-iot = { };
+          rt-upstream-policy-iot = { };
         };
       };
     };
@@ -689,10 +797,11 @@ in
       ${nodeName "upstream-selector"} = upstreamSelector // { ports = { }; };
       ${nodeName "policy"} = policy;
       ${nodeName "downstream-selector"} = downstreamSelector // { ports = { }; };
-      ${nodeName "access-vlan2"} = accessVlan2;
-      ${nodeName "access-vlan3"} = accessVlan3;
-      ${nodeName "access-vlan7"} = accessVlan7;
-      ${nodeName "access-vlan8"} = accessVlan8;
+      ${nodeName "access-clients"} = accessClients;
+      ${nodeName "access-svc"} = accessSvc;
+      ${nodeName "access-dmz"} = accessDmz;
+      ${nodeName "access-iot-srv"} = accessIotSrv;
+      ${nodeName "access-iot"} = accessIot;
     };
   };
 }

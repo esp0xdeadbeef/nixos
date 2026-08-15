@@ -66,7 +66,7 @@ in
       deviceIds
   );
 
-  containers.access-vlan2.bindMounts = lib.mkMerge [
+  containers.access-clients.bindMounts = lib.mkMerge [
     (lib.listToAttrs (
       map
         (id: {
@@ -80,7 +80,7 @@ in
     ))
   ];
 
-  containers.access-vlan8.bindMounts = lib.mkMerge [
+  containers.access-iot.bindMounts = lib.mkMerge [
     (lib.listToAttrs (
       map
         (id: {
