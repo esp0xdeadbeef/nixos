@@ -4,12 +4,16 @@
 #
 # The switch is just an 802.1Q trunk; WAN vs LAN is decided by the router:
 #   VLAN 300  = WAN
-#   VLAN 2/3/7/8 = LAN tenants
+#   VLAN 20   = svc      (service plane)
+#   VLAN 30   = clients  (endpoint plane)
+#   VLAN 50   = iot      (untrusted devices)
+#   VLAN 51   = iot-srv  (untrusted server uplink)
+#   VLAN 60   = dmz      (exposed plane)
 #
 # Physical port map (verified by disable-port probe):
 #   1 -> l-envil USB  (enp0s13f0u4u4u3)  WAN (VLAN 300)
-#   2 -> l-portal USB (enu1u1)           portal, VLAN 8
-#   3 -> l-envil dock (enp170s0)         LAN trunk (2/3/7/8)
+#   2 -> l-portal USB (enu1u1)           portal, iot (VLAN 50)
+#   3 -> l-envil dock (enp170s0)         LAN trunk (20/30/50/51/60)
 #   4 -> ISP router                      WAN (VLAN 300)
 #   5-8 -> empty
 #
@@ -28,10 +32,10 @@ model = "gs108ev3"     # TODO: GS108PEv3 driver
 [switches.cobalt-switch.ports]
 # WAN -> l-envil USB: mgmt VLAN 1 untagged + cobalt WAN container tags VLAN 300
 1 = { pvid = 1, vlans = ["1U", "300T"] }
-# portal access -> l-portal USB: untagged VLAN 8
-2 = { pvid = 8, vlans = ["8U"] }
+# portal access -> l-portal USB: untagged iot (VLAN 50)
+2 = { pvid = 50, vlans = ["50U"] }
 # LAN trunk -> l-envil dock: mgmt VLAN 1 untagged, tenant VLANs tagged
-3 = { pvid = 1, vlans = ["1U", "2T", "3T", "7T", "8T"] }
+3 = { pvid = 1, vlans = ["1U", "20T", "30T", "50T", "51T", "60T"] }
 # WAN -> ISP router: untagged VLAN 300 (ISP router is untagged)
 4 = { pvid = 300, vlans = ["300U"] }
 # spare
