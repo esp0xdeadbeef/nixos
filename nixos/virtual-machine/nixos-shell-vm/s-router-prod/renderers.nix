@@ -7,6 +7,7 @@
 , networkRealizationModelInput ? inputs.network-realization-model
 , controlPlaneTransform ? cpm: cpm
 , nixosRendererInput ? inputs.network-renderer-nixos
+, wireguardRendererInput ? inputs.network-renderer-wireguard
 , hostName ? "s-router-prod"
 , inventoryFileName ? "inventory-all.nix"
 ,
@@ -68,6 +69,14 @@ let
       }
     );
 
+  render-wireguard =
+    wireguardRendererInput.libBySystem.${system}.renderer.canonical.hostModule (
+      rendererInput
+      // {
+        inherit lib;
+      }
+    );
+
   renderer-contract = {
     inherit canonicalBundle controlPlaneArtifact render-nixos;
     cpm = cpmForRenderer;
@@ -78,6 +87,7 @@ in
 {
   imports = [
     render-nixos
+    render-wireguard
   ];
 
   _module.args.sRouterProdRenderers = renderer-contract;

@@ -1,7 +1,7 @@
 { ... }:
 {
   imports = [
-    (import ../../nixos-shell-vm-inventory.nix {
+    (import ../../neon/nixos-shell-vm-inventory.nix {
       # Preserve the legacy host's automatic-start authority during migration.
       startOnBootInstances = [
         "s-infra"

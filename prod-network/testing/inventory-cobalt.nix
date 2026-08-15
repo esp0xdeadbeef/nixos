@@ -857,6 +857,68 @@ in
           overlays = {
             onyx = {
               provider = "wireguard";
+              providerContract = {
+                id = "onyx";
+                provider = {
+                  class = "commercial-imported";
+                  mode = "egress-only";
+                  prefixAuthority = "host-only-128";
+                };
+                interfaces = {
+                  wan = "iot-srv";
+                  lan = "upstream-selector";
+                  vpn = "wg0";
+                };
+                profile = {
+                  mode = "generated-peer";
+                  generatedPeer = {
+                    privateKeyFile = "/run/secrets/onyx-private-key";
+                    addresses = [
+                      "10.155.219.252/32"
+                      "fd7d:76ee:e68f:a993:da2c:8080:1405:77d1/128"
+                    ];
+                    dns = [
+                      "10.128.0.1"
+                      "fd7d:76ee:e68f:a993::1"
+                    ];
+                    mtu = 1320;
+                    peers = [
+                      {
+                        publicKey = "PyLCXAQT8KkM4T+dUsOQfn+Ub3pGxfGlxkIApuig+hk=";
+                        endpointFile = "/run/secrets/onyx-endpoint";
+                        allowedIPs = [
+                          "0.0.0.0/0"
+                          "::/0"
+                        ];
+                        persistentKeepalive = 15;
+                      }
+                    ];
+                  };
+                };
+                runtime = {
+                  uuidFile = "/run/network-renderer-wireguard/onyx.uuid";
+                };
+                dns.mode = "default";
+                firewall.mode = null;
+                nat = {
+                  ipv4 = {
+                    enable = true;
+                    sourceCidrs = [ "10.2.30.0/24" ];
+                  };
+                  ipv6 = {
+                    enable = true;
+                    sourceCidrs = [ "fd42:dead:beef:c1e::/64" ];
+                    toAddress = "fd42:dead:feed:c1e::1";
+                  };
+                };
+                publicIngress = [ ];
+                portForwards = [ ];
+                services = {
+                  dhcp4.enable = false;
+                  ra.enable = false;
+                  healthCheck.enable = false;
+                };
+              };
               runtimeNodes = {
                 core-vpn-onyx = {
                   groups = [
