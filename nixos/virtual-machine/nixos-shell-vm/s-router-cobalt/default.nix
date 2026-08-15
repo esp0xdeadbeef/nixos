@@ -53,18 +53,32 @@ in
 
   system.stateVersion = lib.mkForce "26.05";
 
-  sops.secrets = lib.listToAttrs (
-    map
-      (id: {
-        name = "cobalt-device-${id}";
-        value = {
-          sopsFile = "${deviceDir}/${id}.age";
-          format = "binary";
-          path = "/run/secrets/devices/${id}";
-        };
-      })
-      deviceIds
-  );
+  sops.secrets =
+    (lib.listToAttrs (
+      map
+        (id: {
+          name = "cobalt-device-${id}";
+          value = {
+            sopsFile = "${deviceDir}/${id}.age";
+            format = "binary";
+            path = "/run/secrets/devices/${id}";
+          };
+        })
+        deviceIds
+    ))
+    // {
+      "cobalt-onyx-private-key" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-onyx-fields.yaml";
+        key = "privateKey";
+        path = "/run/secrets/onyx-private-key";
+      };
+
+      "cobalt-onyx-endpoint" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-onyx-fields.yaml";
+        key = "endpoint";
+        path = "/run/secrets/onyx-endpoint";
+      };
+    };
 
   containers.access-clients.bindMounts = lib.mkMerge [
     (lib.listToAttrs (

@@ -74,13 +74,65 @@ let
       rendererInput
       // {
         inherit lib;
+        inherit
+          providerContracts
+          wgInventory
+          ;
       }
     );
+
+  providerContracts =
+    let
+      inventory = import inventoryPath;
+      entries = lib.concatMap
+        (enterpriseName:
+          let sites = inventory.controlPlane.sites.${enterpriseName} or { };
+          in
+          lib.concatMap
+            (siteName:
+              let overlays = sites.${siteName}.overlays or { };
+              in
+              lib.concatMap
+                (overlayName:
+                  let pc = overlays.${overlayName}.providerContract or null;
+                  in
+                  if pc == null then [ ] else [ { name = overlayName; value = pc; } ])
+                (builtins.attrNames overlays))
+            (builtins.attrNames sites))
+        (builtins.attrNames (inventory.controlPlane.sites or { }));
+    in
+    { wireguard = builtins.listToAttrs entries; };
+
+  wgInventory =
+    let
+      inventory = import inventoryPath;
+      entries = lib.concatMap
+        (enterpriseName:
+          let sites = inventory.controlPlane.sites.${enterpriseName} or { };
+          in
+          lib.concatMap
+            (siteName:
+              let overlays = sites.${siteName}.overlays or { };
+              in
+              lib.concatMap
+                (overlayName:
+                  let
+                    nodes = builtins.attrValues (overlays.${overlayName}.runtimeNodes or { });
+                    ifaces = builtins.filter (s: builtins.isString s && s != "") (
+                      map (n: (n.service or { }).interface or null) nodes
+                    );
+                  in
+                  if ifaces == [ ] then [ ] else [ { name = overlayName; value = { interface = builtins.head ifaces; }; } ])
+                (builtins.attrNames overlays))
+            (builtins.attrNames sites))
+        (builtins.attrNames (inventory.controlPlane.sites or { }));
+    in
+    builtins.listToAttrs entries;
 
   renderer-contract = {
     inherit canonicalBundle controlPlaneArtifact render-nixos;
     cpm = cpmForRenderer;
-    inventory = import inventoryPath { };
+    inventory = import inventoryPath;
     inherit intentPath inventoryPath;
   };
 in
