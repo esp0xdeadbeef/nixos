@@ -968,7 +968,7 @@ in
 
     hostManagement = {
       required = true;
-      interface = "clients";
+      interface = "vlan300";
       purpose = "hardware-management";
     };
 

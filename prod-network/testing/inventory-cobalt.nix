@@ -730,6 +730,21 @@ in
       ${prodHost} = {
         wanUplink = "upstream-core";
 
+        hostManagement = {
+          logicalInterface = "vlan300";
+          link = {
+            kind = "bridge";
+            name = "br-wan";
+          };
+          addressAcquisition = {
+            ipv4 = "dhcp";
+            ipv6 = "disabled";
+            acceptRA = false;
+            useDns = false;
+            defaultRoute = false;
+          };
+        };
+
         uplinks = {
           upstream-core = {
             mode = "vlan";
