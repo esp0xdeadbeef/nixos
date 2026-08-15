@@ -13,32 +13,39 @@
   };
 
   requesters = {
-    access-vlan2 = {
-      ipv4 = "10.2.2.1";
-      ipv6 = "fd42:dead:beef:c2::1";
-      clientIpv4 = "10.2.2.0/24";
-      clientIpv6 = "fd42:dead:beef:c2::/64";
+    access-svc = {
+      ipv4 = "10.2.20.1";
+      ipv6 = "fd42:dead:beef:c14::1";
+      clientIpv4 = "10.2.20.0/24";
+      clientIpv6 = "fd42:dead:beef:c14::/64";
     };
 
-    access-vlan3 = {
-      ipv4 = "10.2.3.1";
-      ipv6 = "fd42:dead:beef:c3::1";
-      clientIpv4 = "10.2.3.0/24";
-      clientIpv6 = "fd42:dead:beef:c3::/64";
+    access-clients = {
+      ipv4 = "10.2.30.1";
+      ipv6 = "fd42:dead:beef:c1e::1";
+      clientIpv4 = "10.2.30.0/24";
+      clientIpv6 = "fd42:dead:beef:c1e::/64";
     };
 
-    access-vlan7 = {
-      ipv4 = "10.2.7.1";
-      ipv6 = "fd42:dead:beef:c7::1";
-      clientIpv4 = "10.2.7.0/24";
-      clientIpv6 = "fd42:dead:beef:c7::/64";
+    access-dmz = {
+      ipv4 = "10.2.60.1";
+      ipv6 = "fd42:dead:beef:c3c::1";
+      clientIpv4 = "10.2.60.0/24";
+      clientIpv6 = "fd42:dead:beef:c3c::/64";
     };
 
-    access-vlan8 = {
-      ipv4 = "10.2.8.1";
-      ipv6 = "fd42:dead:beef:c8::1";
-      clientIpv4 = "10.2.8.0/24";
-      clientIpv6 = "fd42:dead:beef:c8::/64";
+    access-iot-srv = {
+      ipv4 = "10.2.51.1";
+      ipv6 = "fd42:dead:beef:c33::1";
+      clientIpv4 = "10.2.51.0/24";
+      clientIpv6 = "fd42:dead:beef:c33::/64";
+    };
+
+    access-iot = {
+      ipv4 = "10.2.50.1";
+      ipv6 = "fd42:dead:beef:c32::1";
+      clientIpv4 = "10.2.50.0/24";
+      clientIpv6 = "fd42:dead:beef:c32::/64";
     };
   };
 }

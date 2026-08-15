@@ -9,8 +9,8 @@
   l-portal-usb = {
     hostname = "l-portal";
     scopes = {
-      vlan2 = 10;
-      vlan8 = 10;
+      clients = 10;
+      iot = 10;
     };
   };
 }
