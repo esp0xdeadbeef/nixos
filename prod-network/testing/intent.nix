@@ -1210,7 +1210,7 @@ in
           priority = 140;
           from = {
             kind = "external";
-            uplinks = [ "onyx" ];
+            name = "onyx";
           };
           to = {
             kind = "external";
@@ -1670,6 +1670,19 @@ in
           "downstream-selector"
           "access-iot"
         ]
+      ];
+    };
+
+    transport = {
+      overlays = [
+        {
+          name = "onyx";
+          terminateOn = [ "core-vpn-onyx" ];
+          underlayAccess = {
+            kind = "tenant";
+            name = "iot-srv";
+          };
+        }
       ];
     };
   };
