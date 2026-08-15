@@ -871,7 +871,7 @@ in
                 };
                 interfaces = {
                   wan = "iot-srv";
-                  lan = "us";
+                  lan = "up-sel";
                   vpn = "onyx";
                 };
                 profile = {
