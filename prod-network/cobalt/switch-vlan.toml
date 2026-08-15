@@ -26,7 +26,10 @@
 
 [switches.cobalt-switch]
 address = "192.168.1.47"
-password = "CHANGE_ME" # admin password is a secret
+# The admin password is a secret and must not be committed. Pass it via the
+# PROSAFE_VLAN_PASSWORD environment variable:
+#
+#   PROSAFE_VLAN_PASSWORD='...' prosafe-vlan apply ./switch-vlan.toml
 model = "gs108ev3"     # TODO: GS108PEv3 driver
 
 [switches.cobalt-switch.ports]
