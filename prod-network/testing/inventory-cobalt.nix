@@ -57,6 +57,7 @@ let
       attach = bridgeAttach bridge;
       interface = {
         name = interfaceName;
+        logical = true;
       }
       // (if addr4 == null then { } else { inherit addr4; })
       // (if addr6 == null then { } else { inherit addr6; });
