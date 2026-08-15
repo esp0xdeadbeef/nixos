@@ -2,11 +2,11 @@ let
   prodHost = "s-router-prod";
   externalIspHost = "external-isp";
   dnsRuntime = import ./dns-runtime-addresses.nix;
-  nodeName = shortName: "esp0xdeadbeef-site-a-${shortName}";
+  nodeName = shortName: "esp0xdeadbeef-neon-${shortName}";
 
   logicalNode = name: {
     enterprise = "esp0xdeadbeef";
-    site = "site-a";
+    site = "neon";
     inherit name;
   };
 
@@ -128,13 +128,13 @@ let
     inherit sourceFile;
   };
 
-  siteAReservations = import ./site-a-reservations.nix;
+  neonReservations = import ./neon-reservations.nix;
 
   reservationsFor = vlan:
     builtins.map
       (deviceId:
         let
-          device = siteAReservations.${deviceId};
+          device = neonReservations.${deviceId};
         in
         {
           id = deviceId;
@@ -151,8 +151,8 @@ let
         }
         // (if device ? hostname && device.hostname != null then { hostname = device.hostname; } else { }))
       (builtins.filter
-        (deviceId: siteAReservations.${deviceId}.scopes ? ${vlan})
-        (builtins.attrNames siteAReservations));
+        (deviceId: neonReservations.${deviceId}.scopes ? ${vlan})
+        (builtins.attrNames neonReservations));
 
   dhcp4Advertisement =
     { tenant
