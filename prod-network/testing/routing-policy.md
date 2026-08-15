@@ -85,12 +85,12 @@ device actually needs it.
 - **Scope** = public assignment (`<handle> → { scopes.<zone> = <offset> }`),
   reassignable when a device moves planes/sites.
 
-Implemented in `site-a-reservations.nix` and `cobalt-reservations.nix`; the
+Implemented in `neon-reservations.nix` and `cobalt-reservations.nix`; the
 assignment files are public, the `.age` payloads stay encrypted.
 
 ## `vlan2` migration (legacy holding pen)
 
-Split `192.168.1.0/24` (site-a) / `10.2.2.0/24` (cobalt) into:
+Split `192.168.1.0/24` (neon) / `10.2.2.0/24` (cobalt) into:
 
 - **`mgmt.home.arpa`** — the iDRACs (`s-sigma-idrac`, `s-tau-idrac`,
   `idrac-20x`) and switch admin.

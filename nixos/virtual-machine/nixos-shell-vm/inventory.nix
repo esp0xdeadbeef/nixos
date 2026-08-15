@@ -208,13 +208,13 @@
 
   realization = {
     nodes = {
-      esp0xdeadbeef-site-a-s-router-core = {
+      esp0xdeadbeef-neon-s-router-core = {
         host = "s-router-core";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          site = "site-a";
+          site = "neon";
           name = "s-router-core";
         };
         ports = {
@@ -244,13 +244,13 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-access-admin = {
+      esp0xdeadbeef-neon-s-router-access-admin = {
         host = "s-router-access";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          site = "site-a";
+          site = "neon";
           name = "s-router-access-admin";
         };
         ports = {
@@ -307,13 +307,13 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-access-client = {
+      esp0xdeadbeef-neon-s-router-access-client = {
         host = "s-router-access";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          site = "site-a";
+          site = "neon";
           name = "s-router-access-client";
         };
         ports = {
@@ -370,13 +370,13 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-access-mgmt = {
+      esp0xdeadbeef-neon-s-router-access-mgmt = {
         host = "s-router-access";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          site = "site-a";
+          site = "neon";
           name = "s-router-access-mgmt";
         };
         ports = {
@@ -433,13 +433,13 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-policy = {
+      esp0xdeadbeef-neon-s-router-policy = {
         host = "s-router-policy";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          site = "site-a";
+          site = "neon";
           name = "s-router-policy";
         };
         ports = {
@@ -517,13 +517,13 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-upstream-selector = {
+      esp0xdeadbeef-neon-s-router-upstream-selector = {
         host = "s-router-core";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          site = "site-a";
+          site = "neon";
           name = "s-router-upstream-selector";
         };
         ports = {
@@ -577,13 +577,13 @@
         };
       };
 
-      esp0xdeadbeef-site-a-s-router-downstream-selector = {
+      esp0xdeadbeef-neon-s-router-downstream-selector = {
         host = "s-router-access";
         platform = "nixos-container";
 
         logicalNode = {
           enterprise = "esp0xdeadbeef";
-          site = "site-a";
+          site = "neon";
           name = "s-router-downstream-selector";
         };
         ports = {
