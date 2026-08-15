@@ -63,6 +63,17 @@ let
     }
 
     {
+      name = "wireguard-1637";
+      match = [
+        {
+          proto = "udp";
+          dports = [ 1637 ];
+          family = "any";
+        }
+      ];
+    }
+
+    {
       name = "nebula";
       match = [
         {
@@ -1194,6 +1205,22 @@ in
         (allowTenantToWan "svc" 110)
         (allowTenantToWan "iot" 120)
         (allowTenantToWan "iot-srv" 130)
+        {
+          id = "allow-onyx-uplink-to-wan";
+          priority = 140;
+          from = {
+            kind = "external";
+            uplinks = [ "onyx" ];
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "wireguard-1637";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
       ];
     };
 
@@ -1527,6 +1554,22 @@ in
           };
         };
 
+        core-vpn-onyx = {
+          role = "core";
+          uplinks = {
+            onyx = {
+              ipv4 = [ "0.0.0.0/0" ];
+              ipv6 = [ "fd42:dead:feed:c1e::/64" ];
+            };
+          };
+          attachments = [
+            {
+              kind = "tenant";
+              name = "iot-srv";
+            }
+          ];
+        };
+
         upstream-selector = {
           role = "upstream-selector";
         };
@@ -1593,6 +1636,10 @@ in
       links = [
         [
           "core"
+          "upstream-selector"
+        ]
+        [
+          "core-vpn-onyx"
           "upstream-selector"
         ]
         [

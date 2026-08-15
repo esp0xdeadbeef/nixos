@@ -188,6 +188,7 @@ let
   };
 
   coreUpstreamLink = "p2p-core-upstream-selector";
+  coreVpnOnyxUpstreamLink = "p2p-core-vpn-onyx-upstream-selector";
   upstreamPolicyClientsLink = "p2p-policy-upstream-selector--access-access-clients--uplink-wan";
   upstreamPolicyIotSrvLink = "p2p-policy-upstream-selector--access-access-iot-srv--uplink-wan";
   policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
@@ -245,6 +246,13 @@ let
       adapterName = "cb-us-core";
       bridge = "rt-core-upstream-selector";
       interfaceName = "core";
+    };
+
+    core-vpn-onyx = p2pPort {
+      link = coreVpnOnyxUpstreamLink;
+      adapterName = "cb-us-cvo";
+      bridge = "rt-core-vpn-onyx-upstream-selector";
+      interfaceName = "core-vpn-onyx";
     };
 
     policy-clients = p2pPort {
@@ -659,6 +667,29 @@ let
         };
       };
     };
+
+  vpnOnyx = mkNode "core-vpn-onyx" {
+    upstream-selector = p2pPort {
+      link = coreVpnOnyxUpstreamLink;
+      adapterName = "cb-cvo-us";
+      bridge = "rt-core-vpn-onyx-upstream-selector";
+      interfaceName = "upstream-selector";
+    };
+
+    onyx = uplinkPort {
+      uplink = "onyx";
+      bridge = "br-onyx";
+      interfaceName = "onyx";
+    };
+
+    tenant-iot-srv = tenantPort {
+      logicalInterface = "tenant-iot-srv";
+      bridge = "iot-srv";
+      interfaceName = "iot-srv";
+      addr4 = "10.2.51.2/24";
+      addr6 = "fd42:dead:beef:c33::2/64";
+    };
+  };
 in
 {
   schemaVersion = 1;
@@ -713,6 +744,18 @@ in
             };
           };
 
+          onyx = {
+            bridge = "br-onyx";
+            parent = "onyx-wg";
+            ipv4 = {
+              method = "none";
+            };
+            ipv6 = {
+              method = "none";
+            };
+            upstream = "onyx";
+          };
+
           trunk = {
             parent = "eth0";
             bridge = "br-lan-trunk";
@@ -754,6 +797,7 @@ in
 
         bridgeNetworks = {
           rt-core-upstream-selector = { };
+          rt-core-vpn-onyx-upstream-selector = { };
           rt-downstream-access-svc = { };
           rt-downstream-access-clients = { };
           rt-downstream-access-dmz = { };
@@ -802,6 +846,33 @@ in
       ${nodeName "access-dmz"} = accessDmz;
       ${nodeName "access-iot-srv"} = accessIotSrv;
       ${nodeName "access-iot"} = accessIot;
+      ${nodeName "core-vpn-onyx"} = vpnOnyx;
+    };
+  };
+
+  controlPlane = {
+    sites = {
+      esp0xdeadbeef = {
+        cobalt = {
+          overlays = {
+            onyx = {
+              provider = "wireguard";
+              runtimeNodes = {
+                core-vpn-onyx = {
+                  groups = [
+                    "vpn"
+                    "cobalt"
+                  ];
+                  service = {
+                    interface = "wg0";
+                    name = "wireguard-runtime";
+                  };
+                };
+              };
+            };
+          };
+        };
+      };
     };
   };
 }
