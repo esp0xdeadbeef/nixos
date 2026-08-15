@@ -2,6 +2,7 @@
 , lib
 , pkgs
 , relativeRepo
+, outputs
 , ...
 }:
 let
@@ -27,6 +28,8 @@ in
   programs.zsh.enable = true;
 
   imports = [
+    outputs.nixosModules.containerNetworkDefaults
+
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     "${modelSource}/runtime-secrets.nix"
 
