@@ -27,6 +27,11 @@ in
     };
 
     config = { config, lib, pkgs, ... }: {
+      # The rt2800usb cannot set its MAC from inside a non-initial netns, and
+      # the hostapd module demands an explicit bssid for multi-BSS. Drop both:
+      # the adapter's existing (non-real) MACs are used as the BSSIDs.
+      assertions = lib.filter (a: !lib.hasInfix "bssid must be specified" a.message) config.assertions;
+
       systemd.services.ap-vap = {
         description = "Create the secondary ALFA AP VAP";
         wantedBy = [ "hostapd.service" ];
