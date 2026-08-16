@@ -1036,8 +1036,7 @@ in
                   };
                   ipv6 = {
                     enable = true;
-                    sourceCidrs = [ "fd42:dead:beef:c1e::/64" ];
-                    toAddress = "fd42:dead:feed:c1e::1";
+                    sourceCidrs = [ "fd42:dead:beef:c1e::/64" "fd42:dead:beef:c1f::/64" ];
                   };
                 };
                 publicIngress = [ ];
