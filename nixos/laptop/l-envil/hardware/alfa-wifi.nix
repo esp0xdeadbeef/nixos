@@ -95,7 +95,7 @@ in
       networks = {
         "${ifname}" = {
           ssid = "neon-clients";
-          bssid = "96:fa:21:a0:d7:1b";
+          bssid = "02:00:00:00:00:01";
           authentication = {
             mode = "wpa3-sae";
             saePasswords = [{ passwordFile = config.sops.secrets."l-envil-wifi-clients".path; }];
@@ -104,7 +104,7 @@ in
         };
         "${ifname}-1" = {
           ssid = "neon-clients-vpn";
-          bssid = "9e:fa:21:a0:d7:1b";
+          bssid = "02:00:00:00:00:02";
           authentication = {
             mode = "wpa3-sae";
             saePasswords = [{ passwordFile = config.sops.secrets."l-envil-wifi-clients-vpn".path; }];
