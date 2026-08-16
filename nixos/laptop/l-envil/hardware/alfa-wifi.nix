@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, relativeRepo, ... }:
 
 # Temporary ALFA USB AP on l-envil, bridging the neon client networks onto the
 # cobalt LAN trunk. The Ralink RT3070 (rt2800usb) supports up to 8 AP VAPs, so
@@ -9,11 +9,11 @@ in
 {
   sops.secrets = {
     "l-envil-wifi-clients" = {
-      sopsFile = ../../../../secrets/l-envil-default-wifi.yaml;
+      sopsFile = relativeRepo.sourcePath "secrets/l-envil-default-wifi.yaml";
       key = "wifi-clients";
     };
     "l-envil-wifi-clients-vpn" = {
-      sopsFile = ../../../../secrets/l-envil-default-wifi.yaml;
+      sopsFile = relativeRepo.sourcePath "secrets/l-envil-default-wifi.yaml";
       key = "wifi-clients-vpn";
     };
   };
