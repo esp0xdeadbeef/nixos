@@ -33,6 +33,9 @@ in
         "socket,id=qga0,path=${qgaSocket},server=on,wait=off"
         "-device"
         "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        "-usb"
+        "-device"
+        "usb-host,vendorid=0x148f,productid=0x3070"
       ];
       storage.persistentDisk = {
         enable = true;
