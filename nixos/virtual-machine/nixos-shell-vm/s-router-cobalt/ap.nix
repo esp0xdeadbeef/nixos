@@ -32,9 +32,10 @@ let
     chanlist=1 6 11
     country_code=NL
     wpa=2
-    wpa_key_mgmt=SAE
-    sae_pwe=1
-    sae_password=$pass1
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+
+    wpa_passphrase=$pass1
     bridge=clients
     EOF
     cat > /run/ap/${wifiIf}-1.conf <<EOF
@@ -49,9 +50,10 @@ let
     chanlist=1 6 11
     country_code=NL
     wpa=2
-    wpa_key_mgmt=SAE
-    sae_pwe=1
-    sae_password=$pass2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+
+    wpa_passphrase=$pass2
     bridge=clients-vpn
     EOF
   '';
