@@ -204,6 +204,9 @@ let
   upstreamPolicyIotLink = "p2p-policy-upstream-selector--access-access-iot--uplink-wan";
   policyDownstreamIotLink = "p2p-downstream-selector-policy--access-access-iot";
   downstreamAccessIotLink = "p2p-access-iot-downstream-selector";
+  upstreamPolicyClientsVpnLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-onyx";
+  policyDownstreamClientsVpnLink = "p2p-downstream-selector-policy--access-access-clients-vpn";
+  downstreamAccessClientsVpnLink = "p2p-access-clients-vpn-downstream-selector";
 
   core =
     (mkNode "core" {
@@ -236,6 +239,8 @@ let
             "${dnsRuntime.requesters.access-iot-srv.ipv6}/128"
             "${dnsRuntime.requesters.access-iot.ipv4}/32"
             "${dnsRuntime.requesters.access-iot.ipv6}/128"
+            "${dnsRuntime.requesters.access-clients-vpn.ipv4}/32"
+            "${dnsRuntime.requesters.access-clients-vpn.ipv6}/128"
           ];
         };
       };
@@ -283,6 +288,13 @@ let
       bridge = "rt-upstream-policy-iot";
       interfaceName = "policy-iot";
     };
+
+    policy-clients-vpn = p2pPort {
+      link = upstreamPolicyClientsVpnLink;
+      adapterName = "cb-us-p9";
+      bridge = "rt-upstream-policy-clients-vpn";
+      interfaceName = "policy-clients-vpn";
+    };
   };
 
   policy = mkNode "policy" {
@@ -312,6 +324,13 @@ let
       adapterName = "cb-p-us8";
       bridge = "rt-upstream-policy-iot";
       interfaceName = "upstream-iot";
+    };
+
+    upstream-clients-vpn = p2pPort {
+      link = upstreamPolicyClientsVpnLink;
+      adapterName = "cb-p-us9";
+      bridge = "rt-upstream-policy-clients-vpn";
+      interfaceName = "upstream-clients-vpn";
     };
 
     downstream-svc = p2pPort {
@@ -347,6 +366,13 @@ let
       adapterName = "cb-p-ds8";
       bridge = "rt-policy-downstream-iot";
       interfaceName = "downstr-iot";
+    };
+
+    downstream-clients-vpn = p2pPort {
+      link = policyDownstreamClientsVpnLink;
+      adapterName = "cb-p-ds9";
+      bridge = "rt-policy-downstream-clients-vpn";
+      interfaceName = "downstr-clients-vpn";
     };
   };
 
@@ -386,6 +412,13 @@ let
       interfaceName = "policy-iot";
     };
 
+    policy-clients-vpn = p2pPort {
+      link = policyDownstreamClientsVpnLink;
+      adapterName = "cb-ds-p9";
+      bridge = "rt-policy-downstream-clients-vpn";
+      interfaceName = "policy-clients-vpn";
+    };
+
     access-svc = p2pPort {
       link = downstreamAccessSvcLink;
       adapterName = "cb-ds-a1";
@@ -419,6 +452,13 @@ let
       adapterName = "cb-ds-a8";
       bridge = "rt-downstream-access-iot";
       interfaceName = "access-iot";
+    };
+
+    access-clients-vpn = p2pPort {
+      link = downstreamAccessClientsVpnLink;
+      adapterName = "cb-ds-a9";
+      bridge = "rt-downstream-access-clients-vpn";
+      interfaceName = "access-clients-vpn";
     };
   };
 
@@ -669,6 +709,56 @@ let
       };
     };
 
+  accessClientsVpn =
+    (mkNode "access-clients-vpn" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessClientsVpnLink;
+        adapterName = "cb-a9-ds";
+        bridge = "rt-downstream-access-clients-vpn";
+        interfaceName = "access-clients-vpn";
+      };
+
+      tenant-clients-vpn = tenantPort {
+        logicalInterface = "tenant-clients-vpn";
+        bridge = "clients-vpn";
+        interfaceName = "clients-vpn";
+        addr4 = "10.2.31.1/24";
+        addr6 = "fd42:dead:beef:c1f::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-clients-vpn.ipv4
+            dnsRuntime.requesters.access-clients-vpn.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-clients-vpn = dhcp4Advertisement {
+            tenant = "clients-vpn";
+            interface = "tenant-clients-vpn";
+            subnet = "10.2.31.0/24";
+            poolStart = "10.2.31.100";
+            poolEnd = "10.2.31.200";
+            router = "10.2.31.1";
+            leaseStatePath = "/var/lib/kea/clients-vpn.leases";
+            domain = "clients-vpn.home.arpa.";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-clients-vpn = slaacRa "tenant-clients-vpn";
+        };
+      };
+    };
+
   vpnOnyx = mkNode "core-vpn-onyx" {
     upstream-selector = p2pPort {
       link = coreVpnOnyxUpstreamLink;
@@ -722,6 +812,11 @@ in
     cobalt-iot-dns = {
       ipv4 = [ dnsRuntime.requesters.access-iot.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-iot.ipv6 ];
+    };
+
+    cobalt-clients-vpn-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-clients-vpn.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-clients-vpn.ipv6 ];
     };
   };
 
@@ -807,6 +902,12 @@ in
             vlan = 60;
             parentUplink = "trunk";
           };
+
+          clients-vpn = {
+            name = "clients-vpn";
+            vlan = 31;
+            parentUplink = "trunk";
+          };
         };
 
         bridgeNetworks = {
@@ -826,6 +927,9 @@ in
           rt-downstream-access-iot = { };
           rt-policy-downstream-iot = { };
           rt-upstream-policy-iot = { };
+          rt-downstream-access-clients-vpn = { };
+          rt-policy-downstream-clients-vpn = { };
+          rt-upstream-policy-clients-vpn = { };
         };
       };
     };
@@ -860,6 +964,7 @@ in
       ${nodeName "access-dmz"} = accessDmz;
       ${nodeName "access-iot-srv"} = accessIotSrv;
       ${nodeName "access-iot"} = accessIot;
+      ${nodeName "access-clients-vpn"} = accessClientsVpn;
       ${nodeName "core-vpn-onyx"} = vpnOnyx;
     };
   };
@@ -927,7 +1032,7 @@ in
                 nat = {
                   ipv4 = {
                     enable = true;
-                    sourceCidrs = [ "10.2.30.0/24" ];
+                    sourceCidrs = [ "10.2.30.0/24" "10.2.31.0/24" ];
                   };
                   ipv6 = {
                     enable = true;
