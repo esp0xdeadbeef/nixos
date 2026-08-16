@@ -54,6 +54,7 @@ let
 
   chanOptimizer = pkgs.writeShellScript "wifi-chan-optimizer" ''
     set -euo pipefail
+    ${pkgs.iproute2}/bin/ip link set ${scanIf} up 2>/dev/null || true
     ${pkgs.iw}/bin/iw dev ${scanIf} scan > /run/ap/scan.txt 2>/dev/null || true
 
     c1=$(${pkgs.gnugrep}/bin/grep -c "freq: 2412" /run/ap/scan.txt || true)
@@ -102,7 +103,6 @@ in
         ${pkgs.iw}/bin/iw phy phy0 interface add ${scanIf} type station 2>/dev/null || true
         sleep 1
       done
-      ${pkgs.iproute2}/bin/ip link set ${scanIf} up
     '';
   };
 
