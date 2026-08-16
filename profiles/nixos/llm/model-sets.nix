@@ -60,28 +60,20 @@ let
 
     # Very large coding model; primarily system-RAM bound on a P100.
     "hf.co/ymsf/Huihui-Qwen3-Coder-Next-Abliterated-GGUF:Q4_K_M"
+
+    # Offensive-security abliterated 35B. The HF proxy rejects the
+    # explicit Q4_K tag for this repository, so use "latest", which
+    # currently resolves to the Q4_K single-file quant plus its mmproj
+    # projector.
+    "hf.co/huihui-ai/Huihui-CyberStrike-OffSec-35B-abliterated-GGUF:latest"
   ];
 
-  # Official, locally runnable DeepSeek-V4-Flash GGUF.
+  # Abliterated DeepSeek-V4-Flash GGUF.
   #
-  # UD-IQ2_M is approximately 90.9 GB. It is a more defensible choice
-  # than IQ1 on a server with roughly 128 GB RAM, while remaining much
-  # smaller than the approximately 155 GB Q4_K_XL quant.
-  deepseekV4Official = [
-    "hf.co/unsloth/DeepSeek-V4-Flash-GGUF:UD-IQ2_M"
-  ];
-
-  # Alternative to the official V4 quant, not an additional dependency.
-  #
-  # Keeping this in a separate profile avoids automatically downloading
-  # both approximately 90.9 GB of official V4 and approximately 86.9 GB
-  # of abliterated V4 weights.
-  deepseekV4Unrestricted = [
-    "hf.co/huihui-ai/Huihui-DeepSeek-V4-Flash-abliterated-GGUF:UD-IQ1_M"
-  ];
-
-  # Additional CyberNeurova alternative kept out of active profiles until it
-  # can be evaluated separately.
+  # The unsloth official V4 repository is sharded and cannot be pulled via
+  # ollama's registry, and the previous huihui-ai abliterated V4 repository
+  # is now gated, so this non-gated CyberNeurova single-file quant is the
+  # active V4 variant.
   deepseekV4CyberNeurova = [
     "hf.co/cyberneurova/CyberNeurova-DeepSeek-V4-Flash-abliterated-GGUF:Q2_K"
   ];
@@ -95,7 +87,5 @@ in
     baseline
     ++ workstationExtra
     ++ heavyExtra
-    ++ deepseekV4Official
-    ++ deepseekV4Unrestricted
     ++ deepseekV4CyberNeurova;
 }
