@@ -6,8 +6,9 @@
 #   VLAN 300  = WAN
 #   VLAN 20   = svc      (service plane)
 #   VLAN 30   = clients  (endpoint plane)
+#   VLAN 31   = clients-vpn (endpoint plane, egresses via AirVPN onyx)
 #   VLAN 50   = iot      (untrusted devices)
-#   VLAN 51   = iot-srv  (untrusted server uplink)
+#   VLAN 51   = iot-srv  (untrusted server uplink, onyx underlay)
 #   VLAN 60   = dmz      (exposed plane)
 #
 # Physical port map (verified by disable-port probe):
@@ -35,10 +36,10 @@ model = "gs108ev3"     # TODO: GS108PEv3 driver
 [switches.cobalt-switch.ports]
 # WAN -> l-envil USB: mgmt VLAN 1 untagged + cobalt WAN container tags VLAN 300
 1 = { pvid = 1, vlans = ["1U", "300T"] }
-# portal access -> l-portal USB: untagged iot-srv (VLAN 51) — kept for underlay internet test
-2 = { pvid = 51, vlans = ["51U"] }
+# portal access -> l-portal USB: untagged clients-vpn (VLAN 31) — VPN egress
+2 = { pvid = 31, vlans = ["31U"] }
 # LAN trunk -> l-envil dock: mgmt VLAN 1 untagged, tenant VLANs tagged
-3 = { pvid = 1, vlans = ["1U", "20T", "30T", "50T", "51T", "60T"] }
+3 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T"] }
 # WAN -> ISP router: untagged VLAN 300 (ISP router is untagged)
 4 = { pvid = 300, vlans = ["300U"] }
 # spare
