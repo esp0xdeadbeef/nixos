@@ -24,6 +24,7 @@ in
         ipv4 = {
           method = "auto";
           route-metric = 700;
+          dns-priority = -10;
           route1 = "0.0.0.0/0,${vpnGateway}";
           route1_options = "table=${vpnTable}";
           routing-rule1 = "priority ${vpnTable} from ${vpnV4Prefix} table ${vpnTable}";
@@ -32,6 +33,7 @@ in
         ipv6 = {
           method = "auto";
           route-metric = 700;
+          dns-priority = -10;
         };
       };
     };
