@@ -2,6 +2,10 @@
 
 Laatste update: 2026-06-22 20:10 CEST
 
+> NB: de MAC-adressen in dit document zijn vervangen door spoofed
+> placeholders (`02:00:00:00:00:aa` / `02:00:00:00:00:bb`) en zijn niet de
+> echte adapter-MACs.
+
 Doel: hibernate op `l-portal` werkend krijgen met encrypted root via
 Clevis/Tang en encrypted persistent swap via keyfile in `/persist`.
 
@@ -1388,11 +1392,11 @@ nixos-hardware-x13s -> NixOS/nixos-hardware 08018c72174a4df5657f8d94178ac69fb9c2
 Er staat geen `BrainWart` of `x13s-updates` meer in `flake.nix`/`flake.lock`.
 
 Tijdens de vergelijking bleek dat de officiële upstream X13s-module een
-hardcoded Wi-Fi MAC (`e4:65:38:52:22:a9`) zou zetten, terwijl de live machine
+hardcoded Wi-Fi MAC (`02:00:00:00:00:aa`) zou zetten, terwijl de live machine
 nu deze Wi-Fi MAC gebruikt:
 
 ```text
-wlP6p1s0  00:03:7f:12:68:72
+wlP6p1s0  02:00:00:00:00:bb
 ```
 
 Om geen MAC-wijziging te introduceren is in `l-portal/default.nix` een lokale
@@ -1400,7 +1404,7 @@ udev-regel toegevoegd die de live MAC behoudt:
 
 ```nix
 services.udev.extraRules = ''
-  ACTION=="add", SUBSYSTEM=="net", KERNELS=="0006:01:00.0", RUN+="${pkgs.iproute2}/bin/ip link set dev $name address 00:03:7f:12:68:72"
+  ACTION=="add", SUBSYSTEM=="net", KERNELS=="0006:01:00.0", RUN+="${pkgs.iproute2}/bin/ip link set dev $name address 02:00:00:00:00:bb"
 '';
 ```
 
@@ -1413,7 +1417,7 @@ Switch-resultaat:
 Na switch was de live MAC nog correct:
 
 ```text
-wlP6p1s0 UP 00:03:7f:12:68:72
+wlP6p1s0 UP 02:00:00:00:00:bb
 ```
 
 Let op: `/proc/cmdline` toont tot de volgende reboot nog de oude bootgeneratie.
@@ -1429,7 +1433,7 @@ Resultaat:
 ```text
 boot-id: a1fded76-d19a-4304-8765-4aa8c71476f5
 current-system: /nix/store/nlp5qw6mshmb55rv8fgb9fq9a641z1i8-nixos-system-l-portal-26.05.20260611.a037402
-wlP6p1s0: 00:03:7f:12:68:72
+wlP6p1s0: 02:00:00:00:00:bb
 ```
 
 De kernel commandline gebruikt nu de nieuwe generatie:
