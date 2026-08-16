@@ -32,7 +32,7 @@ let
     wpa=2
     wpa_key_mgmt=SAE
     sae_pwe=2
-    wpa_passphrase=$pass1
+    sae_password=$pass1
     bridge=clients
     EOF
     cat > /run/ap/${wifiIf}-1.conf <<EOF
@@ -47,7 +47,7 @@ let
     wpa=2
     wpa_key_mgmt=SAE
     sae_pwe=2
-    wpa_passphrase=$pass2
+    sae_password=$pass2
     bridge=clients-vpn
     EOF
   '';
