@@ -49,7 +49,13 @@ in
       RemainAfterExit = true;
     };
     script = ''
-      ${pkgs.iw}/bin/iw phy phy0 interface add ${wifiIf}-1 type __ap 2>/dev/null || true
+      for _ in $(seq 1 30); do
+        if [ -d /sys/class/net/${wifiIf}-1 ]; then
+          exit 0
+        fi
+        ${pkgs.iw}/bin/iw phy phy0 interface add ${wifiIf}-1 type __ap 2>/dev/null || true
+        sleep 1
+      done
     '';
   };
 
