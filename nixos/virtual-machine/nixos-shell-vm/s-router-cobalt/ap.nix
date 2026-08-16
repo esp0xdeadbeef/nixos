@@ -39,6 +39,12 @@ in
         '';
       };
 
+      # The wireless interface is moved into this container via
+      # --network-interface, so systemd cannot track it as a device unit.
+      # Drop hostapd's device binding and let ap-vap order the start.
+      systemd.services.hostapd.bindsTo = lib.mkForce [ ];
+      systemd.services.hostapd.after = lib.mkForce [ "ap-vap.service" ];
+
       systemd.network.netdevs = {
         "20-ap-vlan30" = {
           netdevConfig = { Name = "ve-ap.30"; Kind = "vlan"; };
