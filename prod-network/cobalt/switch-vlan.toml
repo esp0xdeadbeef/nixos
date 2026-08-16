@@ -36,8 +36,8 @@ model = "gs108ev3"     # TODO: GS108PEv3 driver
 [switches.cobalt-switch.ports]
 # WAN -> l-envil USB: mgmt VLAN 1 untagged + cobalt WAN container tags VLAN 300
 1 = { pvid = 1, vlans = ["1U", "300T"] }
-# portal access -> l-portal USB: untagged clients-vpn (VLAN 31) — VPN egress
-2 = { pvid = 31, vlans = ["31U"] }
+# portal access -> l-portal USB: untagged clients (VLAN 30) — plain WAN egress
+2 = { pvid = 30, vlans = ["30U"] }
 # LAN trunk -> l-envil dock: mgmt VLAN 1 untagged, tenant VLANs tagged
 3 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T"] }
 # WAN -> ISP router: untagged VLAN 300 (ISP router is untagged)
