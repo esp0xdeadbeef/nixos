@@ -31,6 +31,9 @@ let
     interface=${wifiIf}-1
     driver=nl80211
     ssid=$ssid2
+    hw_mode=g
+    channel=6
+    country_code=NL
     wpa=2
     wpa_key_mgmt=SAE
     sae_pwe=2
