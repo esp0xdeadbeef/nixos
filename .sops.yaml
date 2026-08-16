@@ -194,6 +194,16 @@ creation_rules:
           - *l-esp-deadbeef
           - *s-router-vpn-impermanence-root
 
+  - path_regex: '^secrets/l-portal-mac\.ya?ml$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-portal-root
+          - *l-portal-deadbeef
+          - *s-router-cobalt
+          - *l-esp-root
+          - *l-esp-deadbeef
+
   - path_regex: '^(secrets/)*l-portal-.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
