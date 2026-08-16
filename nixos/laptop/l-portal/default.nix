@@ -46,6 +46,11 @@ in
   ];
 
   sops.defaultSopsFile = relativeRepo.sourcePath "secrets/${hostName}-default.yaml";
+  sops.secrets."l-portal-mac" = {
+    sopsFile = relativeRepo.sourcePath "secrets/l-portal-mac.yaml";
+    key = "mac";
+    path = "/run/secrets/l-portal-mac";
+  };
 
   time.timeZone = "Europe/Amsterdam";
 
@@ -61,8 +66,20 @@ in
   networking.hostName = hostName;
   networking.networkmanager.enable = true;
   services.udev.extraRules = ''
-    ACTION=="add", SUBSYSTEM=="net", KERNELS=="0006:01:00.0", RUN+="${pkgs.iproute2}/bin/ip link set dev $name address 00:03:7f:12:68:72"
+    ACTION=="add", SUBSYSTEM=="net", KERNELS=="0006:01:00.0", RUN+="${pkgs.iproute2}/bin/ip link set dev $name address $(cat /run/secrets/l-portal-mac)"
   '';
+
+  # The NIC is probed before sops-install-secrets runs, so re-trigger the udev
+  # rule once the SOPS MAC secret is available.
+  systemd.services.l-portal-mac-udev = {
+    description = "Apply the SOPS-backed l-portal NIC MAC after secrets are ready";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "sops-install-secrets.service" ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      ${pkgs.systemd}/bin/udevadm trigger --subsystem-match=net --attr-match=KERNELS=0006:01:00.0
+    '';
+  };
   warnings = [
     "l-portal: systemctl hibernate is intentionally blocked because X13s cold hibernate restore currently crashes after image restore; use documented debug sysfs tests only."
   ];
