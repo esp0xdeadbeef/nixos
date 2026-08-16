@@ -47,5 +47,12 @@
       clientIpv4 = "10.2.50.0/24";
       clientIpv6 = "fd42:dead:beef:c32::/64";
     };
+
+    access-clients-vpn = {
+      ipv4 = "10.2.31.1";
+      ipv6 = "fd42:dead:beef:c1f::1";
+      clientIpv4 = "10.2.31.0/24";
+      clientIpv6 = "fd42:dead:beef:c1f::/64";
+    };
   };
 }
