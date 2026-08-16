@@ -1,20 +1,16 @@
 { lib
-, python3
-, chromium
+, nodejs
 , writeShellApplication
 }:
 
-let
-  python = python3.withPackages (ps: [ ps.websocket-client ]);
-in
 writeShellApplication {
   name = "cobalt-switch-bootstrap";
-  runtimeInputs = [ python chromium ];
+  runtimeInputs = [ nodejs ];
   text = ''
-    exec python3 ${./bootstrap.py}
+    exec node ${./bootstrap.mjs}
   '';
   meta = with lib; {
-    description = "Drive the cobalt GS108PEv3 web UI (login + default-password change) via headless Chromium/CDP";
+    description = "Drive the cobalt GS108PEv3 web UI (login + default-password change) without a browser";
     mainProgram = "cobalt-switch-bootstrap";
   };
 }
