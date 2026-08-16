@@ -114,11 +114,13 @@ in
       "cobalt-wifi-clients" = {
         sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
         key = "wifi-clients";
+        path = "/run/secrets/wifi-clients";
       };
 
       "cobalt-wifi-clients-vpn" = {
         sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
         key = "wifi-clients-vpn";
+        path = "/run/secrets/wifi-clients-vpn";
       };
     };
 
