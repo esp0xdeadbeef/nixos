@@ -95,7 +95,6 @@ in
           networks = {
             "${wifiIf}" = {
               ssid = "neon-clients";
-              bssid = "02:00:00:00:00:01";
               authentication = {
                 mode = "wpa3-sae";
                 saePasswords = [{ passwordFile = "/run/secrets/wifi-clients"; }];
@@ -104,7 +103,6 @@ in
             };
             "${wifiIf}-1" = {
               ssid = "neon-clients-vpn";
-              bssid = "02:00:00:00:00:02";
               authentication = {
                 mode = "wpa3-sae";
                 saePasswords = [{ passwordFile = "/run/secrets/wifi-clients-vpn"; }];
