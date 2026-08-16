@@ -22,6 +22,8 @@ let
     pass2=$(cat /run/secrets/wifi-clients-vpn)
     cat > /run/ap/${wifiIf}.conf <<EOF
     ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
     interface=${wifiIf}
     driver=nl80211
     ssid=$ssid1
@@ -37,6 +39,8 @@ let
     EOF
     cat > /run/ap/${wifiIf}-1.conf <<EOF
     ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
     interface=${wifiIf}-1
     driver=nl80211
     ssid=$ssid2
