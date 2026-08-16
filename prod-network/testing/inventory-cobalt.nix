@@ -992,7 +992,7 @@ in
                 interfaces = {
                   wan = "iot-srv";
                   lan = "up-sel";
-                  vpn = "onyx";
+                  vpn = "overlay-onyx";
                 };
                 profile = {
                   mode = "generated-peer";
