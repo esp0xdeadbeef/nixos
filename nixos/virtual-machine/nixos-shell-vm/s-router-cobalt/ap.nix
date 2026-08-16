@@ -6,9 +6,9 @@
 # passphrases come from SOPS at runtime and no explicit bssid is required --
 # the rt2800usb cannot reliably change its MAC over the passthrough.
 #
-# Two AP VAPs serve the SSIDs; a third spare VAP (wlan0-scan, station mode)
-# is used by an hourly timer to scan the band and trigger a seamless
-# 802.11h channel switch (CSA) when a less-congested channel is found.
+# At startup a spare station VAP (wlan0-scan) scans the 2.4GHz band and the
+# least-congested of channels 1/6/11 is selected for the two AP VAPs; no
+# channel is hardcoded.
 let
   wifiIf = "wlan0";
   scanIf = "wlan0-scan";
@@ -16,10 +16,40 @@ let
 
   hostapdConf = pkgs.writeShellScript "make-ap-hostapd-conf" ''
     set -euo pipefail
+
+    # Scan and pick the least-congested 2.4GHz channel (1/6/11).
+    ${pkgs.iproute2}/bin/ip link set ${scanIf} up 2>/dev/null || true
+    sleep 2
+    ${pkgs.iw}/bin/iw dev ${scanIf} scan > /run/ap/scan.txt 2>/dev/null || true
+    ${pkgs.iproute2}/bin/ip link set ${scanIf} down 2>/dev/null || true
+
+    c1=$(${pkgs.gnugrep}/bin/grep -c "freq: 2412" /run/ap/scan.txt || true)
+    c6=$(${pkgs.gnugrep}/bin/grep -c "freq: 2437" /run/ap/scan.txt || true)
+    c11=$(${pkgs.gnugrep}/bin/grep -c "freq: 2462" /run/ap/scan.txt || true)
+
+    bestfreq=2412
+    bestn=$c1
+    if [ "$c6" -lt "$bestn" ]; then
+      bestfreq=2437
+      bestn=$c6
+    fi
+    if [ "$c11" -lt "$bestn" ]; then
+      bestfreq=2462
+      bestn=$c11
+    fi
+
+    case "$bestfreq" in
+      2412) ch=1 ;;
+      2437) ch=6 ;;
+      2462) ch=11 ;;
+      *) ch=6 ;;
+    esac
+
     ssid1=$(cat /run/secrets/wifi-ssid-clients)
     ssid2=$(cat /run/secrets/wifi-ssid-clients-vpn)
     pass1=$(cat /run/secrets/wifi-clients)
     pass2=$(cat /run/secrets/wifi-clients-vpn)
+
     cat > /run/ap/${wifiIf}.conf <<EOF
     ctrl_interface=${ctrl}
     logger_stdout_level=0
@@ -28,8 +58,7 @@ let
     driver=nl80211
     ssid=$ssid1
     hw_mode=g
-    channel=11
-    chanlist=1 6 11
+    channel=$ch
     ieee80211n=1
     ht_capab=[SHORT-GI-20]
     wmm_enabled=1
@@ -37,7 +66,6 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-
     wpa_passphrase=$pass1
     bridge=clients
     EOF
@@ -49,8 +77,7 @@ let
     driver=nl80211
     ssid=$ssid2
     hw_mode=g
-    channel=11
-    chanlist=1 6 11
+    channel=$ch
     ieee80211n=1
     ht_capab=[SHORT-GI-20]
     wmm_enabled=1
@@ -58,37 +85,9 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-
     wpa_passphrase=$pass2
     bridge=clients-vpn
     EOF
-  '';
-
-  chanOptimizer = pkgs.writeShellScript "wifi-chan-optimizer" ''
-    set -euo pipefail
-    ${pkgs.iproute2}/bin/ip link set ${scanIf} up 2>/dev/null || true
-    ${pkgs.iw}/bin/iw dev ${scanIf} scan > /run/ap/scan.txt 2>/dev/null || true
-
-    c1=$(${pkgs.gnugrep}/bin/grep -c "freq: 2412" /run/ap/scan.txt || true)
-    c6=$(${pkgs.gnugrep}/bin/grep -c "freq: 2437" /run/ap/scan.txt || true)
-    c11=$(${pkgs.gnugrep}/bin/grep -c "freq: 2462" /run/ap/scan.txt || true)
-
-    best=2412
-    bestn=$c1
-    if [ "$c6" -lt "$bestn" ]; then
-      best=2437
-      bestn=$c6
-    fi
-    if [ "$c11" -lt "$bestn" ]; then
-      best=2462
-      bestn=$c11
-    fi
-
-    cur=$(${pkgs.iw}/bin/iw dev ${wifiIf} info | ${pkgs.gnugrep}/bin/grep -oP 'channel \d+ \(\K\d+' || echo 2437)
-
-    if [ "$cur" != "$best" ]; then
-      ${pkgs.hostapd}/bin/hostapd_cli -p ${ctrl} -i ${wifiIf} chan_switch 5 "$best"
-    fi
   '';
 in
 {
@@ -128,24 +127,6 @@ in
       ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf";
       Restart = "always";
       RuntimeDirectory = "ap";
-    };
-  };
-
-  systemd.services.wifi-chan-optimizer = {
-    description = "Scan and switch the AP to the least-congested 2.4GHz channel";
-    after = [ "ap.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = chanOptimizer;
-    };
-  };
-
-  systemd.timers.wifi-chan-optimizer = {
-    description = "Hourly wifi channel re-optimization";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "5min";
-      OnUnitActiveSec = "1h";
     };
   };
 }
