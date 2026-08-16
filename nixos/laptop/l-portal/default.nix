@@ -65,9 +65,15 @@ in
 
   networking.hostName = hostName;
   networking.networkmanager.enable = true;
-  services.udev.extraRules = ''
-    ACTION=="add", SUBSYSTEM=="net", KERNELS=="0006:01:00.0", RUN+="${pkgs.iproute2}/bin/ip link set dev $name address $(cat /run/secrets/l-portal-mac)"
-  '';
+  services.udev.extraRules =
+    let
+      lPortalMacScript = pkgs.writeShellScript "l-portal-set-mac" ''
+        exec ${pkgs.iproute2}/bin/ip link set dev "$1" address "$(cat /run/secrets/l-portal-mac)"
+      '';
+    in
+    ''
+      ACTION=="add", SUBSYSTEM=="net", KERNELS=="0006:01:00.0", RUN+="${lPortalMacScript} $name"
+    '';
 
   # The NIC is probed before sops-install-secrets runs, so re-trigger the udev
   # rule once the SOPS MAC secret is available.
