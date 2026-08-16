@@ -32,6 +32,7 @@ in
     ./hardware/bootloader.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
+    ./network.nix
     ./disko.nix
     ./packages/packages.nix
     ./packages/widevine.nix
