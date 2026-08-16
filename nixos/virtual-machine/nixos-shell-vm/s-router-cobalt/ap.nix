@@ -22,6 +22,12 @@ in
     '';
   };
 
+  # The secondary VAP (wlan0-1) is created at runtime by ap-vap, so systemd
+  # cannot track it as a device unit. Drop the device binding and order the
+  # start after the VAP exists.
+  systemd.services.hostapd.bindsTo = lib.mkForce [ ];
+  systemd.services.hostapd.after = lib.mkForce [ "ap-vap.service" ];
+
   services.hostapd = {
     enable = true;
     radios = {
