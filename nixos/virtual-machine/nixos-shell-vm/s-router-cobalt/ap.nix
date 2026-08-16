@@ -14,7 +14,7 @@ let
     ssid2=$(cat /run/secrets/wifi-ssid-clients-vpn)
     pass1=$(cat /run/secrets/wifi-clients)
     pass2=$(cat /run/secrets/wifi-clients-vpn)
-    cat > /run/ap/hostapd.conf <<EOF
+    cat > /run/ap/${wifiIf}.conf <<EOF
     interface=${wifiIf}
     driver=nl80211
     ssid=$ssid1
@@ -26,9 +26,14 @@ let
     sae_pwe=2
     wpa_passphrase=$pass1
     bridge=clients
-
-    bss=${wifiIf}-1
+    EOF
+    cat > /run/ap/${wifiIf}-1.conf <<EOF
+    interface=${wifiIf}-1
+    driver=nl80211
     ssid=$ssid2
+    wpa=2
+    wpa_key_mgmt=SAE
+    sae_pwe=2
     wpa_passphrase=$pass2
     bridge=clients-vpn
     EOF
@@ -55,7 +60,7 @@ in
     requires = [ "ap-vap.service" ];
     serviceConfig = {
       ExecStartPre = hostapdConf;
-      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/hostapd.conf";
+      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf";
       Restart = "always";
       RuntimeDirectory = "ap";
     };
