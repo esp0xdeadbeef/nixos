@@ -930,6 +930,12 @@ in
           ipv4 = "10.2.60.0/24";
           ipv6 = "fd42:dead:beef:c3c::/64";
         }
+        {
+          kind = "tenant";
+          name = "clients-vpn";
+          ipv4 = "10.2.31.0/24";
+          ipv6 = "fd42:dead:beef:c1f::/64";
+        }
       ];
 
       endpoints = [
@@ -962,6 +968,12 @@ in
           name = "cobalt-dmz-dns";
           tenant = "dmz";
           ipv4 = [ "10.2.60.1" ];
+        }
+        {
+          kind = "host";
+          name = "cobalt-clients-vpn-dns";
+          tenant = "clients-vpn";
+          ipv4 = [ "10.2.31.1" ];
         }
       ];
     };
@@ -998,6 +1010,11 @@ in
         {
           name = "dmz-dns";
           providers = [ "cobalt-dmz-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "clients-vpn-dns";
+          providers = [ "cobalt-clients-vpn-dns" ];
           trafficType = "dns";
         }
       ];
@@ -1138,6 +1155,21 @@ in
           returnBehavior = "symmetric";
         }
         {
+          id = "allow-clients-vpn-to-clients-vpn-dns";
+          priority = 87;
+          from = {
+            kind = "tenant";
+            name = "clients-vpn";
+          };
+          to = {
+            kind = "service";
+            name = "clients-vpn-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-clients-dns-to-wan";
           priority = 90;
           from = {
@@ -1206,6 +1238,21 @@ in
         (allowTenantToWan "iot" 120)
         (allowTenantToWan "iot-srv" 130)
         {
+          id = "allow-clients-vpn-to-onyx";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "clients-vpn";
+          };
+          to = {
+            kind = "external";
+            name = "onyx";
+            uplinks = [ "onyx" ];
+          };
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-onyx-uplink-to-wan";
           priority = 140;
           from = {
@@ -1230,9 +1277,11 @@ in
       tenant-iot = "iot";
       tenant-iot-srv = "iot-srv";
       tenant-dmz = "dmz";
+      tenant-clients-vpn = "clients-vpn";
       external-wan = "wan";
       service-svc-dns = "svc-dns";
       service-clients-dns = "clients-dns";
+      service-clients-vpn-dns = "clients-vpn-dns";
       service-iot-dns = "iot-dns";
       service-iot-srv-dns = "iot-srv-dns";
       service-dmz-dns = "dmz-dns";
@@ -1249,6 +1298,21 @@ in
       ];
 
       relations = [
+        {
+          id = "allow-clients-vpn-to-core-dns";
+          priority = 86;
+          from = {
+            kind = "tenant";
+            name = "clients-vpn";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
         {
           id = "allow-clients-to-core-dns";
           priority = 87;
@@ -1358,6 +1422,21 @@ in
           from = {
             kind = "service";
             name = "iot-srv-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-vpn-dns-to-core-dns";
+          priority = 96;
+          from = {
+            kind = "service";
+            name = "clients-vpn-dns";
           };
           to = {
             kind = "service";
@@ -1477,6 +1556,36 @@ in
           };
           resolverPath = [
             "access-iot-srv"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "clients-vpn-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "clients-vpn-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-clients-vpn"
             "downstream-selector"
             "policy"
             "upstream-selector"
@@ -1631,6 +1740,16 @@ in
             }
           ];
         };
+
+        access-clients-vpn = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "clients-vpn";
+            }
+          ];
+        };
       };
 
       links = [
@@ -1669,6 +1788,10 @@ in
         [
           "downstream-selector"
           "access-iot"
+        ]
+        [
+          "downstream-selector"
+          "access-clients-vpn"
         ]
       ];
     };

@@ -58,6 +58,23 @@ device actually needs it.
 - Lab is assumed compromised by design.
 - Transit carries routers only: no RA/DHCP/mDNS, `/31` IPv4, `/127` IPv6.
 
+## VPN egress (onyx)
+
+The endpoint plane has two egress paths:
+
+| tenant        | subnet         | VLAN | egress                    |
+| ------------- | -------------- | ---- | ------------------------- |
+| `clients`     | `10.2.30.0/24` | 30   | WAN (provider)               |
+| `clients-vpn` | `10.2.31.0/24` | 31   | onyx overlay (AirVPN)     |
+
+- `clients-vpn` egresses through the AirVPN WireGuard tunnel (`onyx`,
+  terminated on `core-vpn-onyx`) instead of the WAN. Its traffic is SNAT'd to
+  the onyx egress ULA pool, so the site's public WAN address and WAN DNS are
+  never used for this plane.
+- The onyx underlay is `iot-srv` (VLAN 51). That carries only the WG
+  handshake/transport to the AirVPN endpoint — never client egress.
+- `clients-vpn` recursion is pinned through the tunnel (no WAN resolver leak).
+
 ## DNS
 
 - **Root:** `home.arpa` (RFC 8375). No `.lan`/`.local`/`.home`.
