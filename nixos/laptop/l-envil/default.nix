@@ -23,7 +23,6 @@
 
     ./1-custom-packages/burp-fix.nix
     ./hardware/audio-and-bluetooth.nix
-    ./hardware/alfa-wifi.nix
     ./hardware/bootloader.nix
     ./hardware/cobalt-bridges.nix
     ./hardware/hardware-configuration.nix

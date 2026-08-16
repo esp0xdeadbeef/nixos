@@ -32,6 +32,8 @@ in
   networking.hostName = lib.mkForce hostName;
 
   imports = [
+    ./ap.nix
+
     outputs.nixosModules.containerNetworkDefaults
 
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
@@ -104,6 +106,16 @@ in
         sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-onyx-fields.yaml";
         key = "dns";
         path = "/run/secrets/onyx-dns";
+      };
+
+      "cobalt-wifi-clients" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
+        key = "wifi-clients";
+      };
+
+      "cobalt-wifi-clients-vpn" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
+        key = "wifi-clients-vpn";
       };
     };
 
