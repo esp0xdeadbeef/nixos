@@ -33,15 +33,65 @@ in
     '';
   };
 
+  # Per-SSID VLAN sub-interfaces and bridges on the cobalt LAN trunk.
+  systemd.network.netdevs = {
+    "20-vlan30" = {
+      netdevConfig = {
+        Name = "vlan30";
+        Kind = "vlan";
+      };
+      vlanConfig.Id = 30;
+    };
+    "20-vlan31" = {
+      netdevConfig = {
+        Name = "vlan31";
+        Kind = "vlan";
+      };
+      vlanConfig.Id = 31;
+    };
+    "20-br-wifi-clients" = {
+      netdevConfig = {
+        Name = "br-wifi-clients";
+        Kind = "bridge";
+      };
+    };
+    "20-br-wifi-clients-vpn" = {
+      netdevConfig = {
+        Name = "br-wifi-clients-vpn";
+        Kind = "bridge";
+      };
+    };
+  };
+
+  systemd.network.networks = {
+    "20-vlan30" = {
+      matchConfig.Name = "vlan30";
+      networkConfig.Bridge = "br-wifi-clients";
+    };
+    "20-vlan31" = {
+      matchConfig.Name = "vlan31";
+      networkConfig.Bridge = "br-wifi-clients-vpn";
+    };
+    "20-br-wifi-clients" = {
+      matchConfig.Name = "br-wifi-clients";
+      networkConfig = { };
+    };
+    "20-br-wifi-clients-vpn" = {
+      matchConfig.Name = "br-wifi-clients-vpn";
+      networkConfig = { };
+    };
+    "20-br-cobalt-lan-vlans" = {
+      matchConfig.Name = "br-cobalt-lan";
+      networkConfig.VLAN = [ "vlan30" "vlan31" ];
+    };
+  };
+
   services.hostapd = {
     enable = true;
     radios.${ifname} = {
       band = "2g";
       channel = 6;
       countryCode = "NL";
-      settings = {
-        vlan_tagged_interface = "br-cobalt-lan";
-      };
       networks = {
         "${ifname}" = {
           ssid = "neon-clients";
@@ -50,7 +100,7 @@ in
             mode = "wpa3-sae";
             saePasswords = [{ passwordFile = config.sops.secrets."l-envil-wifi-clients".path; }];
           };
-          settings = { vlan_id = 30; };
+          settings = { bridge = "br-wifi-clients"; };
         };
         "${ifname}-1" = {
           ssid = "neon-clients-vpn";
@@ -59,7 +109,7 @@ in
             mode = "wpa3-sae";
             saePasswords = [{ passwordFile = config.sops.secrets."l-envil-wifi-clients-vpn".path; }];
           };
-          settings = { vlan_id = 31; };
+          settings = { bridge = "br-wifi-clients-vpn"; };
         };
       };
     };
