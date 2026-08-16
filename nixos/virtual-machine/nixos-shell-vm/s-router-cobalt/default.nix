@@ -31,6 +31,9 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
+  # The ALFA AP container needs the rt2800usb firmware (rt2870/rt3070).
+  hardware.enableAllFirmware = true;
+
   imports = [
     ./ap.nix
 
