@@ -71,9 +71,53 @@ The endpoint plane has two egress paths:
   terminated on `core-vpn-onyx`) instead of the WAN. Its traffic is SNAT'd to
   the onyx egress ULA pool, so the site's public WAN address and WAN DNS are
   never used for this plane.
+- IPv4: masquerade on `overlay-onyx` for `10.2.31.0/24`. IPv6: NAT66
+  masquerade for `fd42:dead:beef:c1f::/64` (the clients-vpn ULA); the source
+  is rewritten to the WireGuard tunnel address so AirVPN routes it. Both are
+  modeled in the inventory `nat` block (no explicit `toAddress` — the
+  masquerade uses the tunnel address).
 - The onyx underlay is `iot-srv` (VLAN 51). That carries only the WG
   handshake/transport to the AirVPN endpoint — never client egress.
-- `clients-vpn` recursion is pinned through the tunnel (no WAN resolver leak).
+- `clients-vpn` recursion is pinned through the tunnel (no WAN resolver leak),
+  see the DNS section below.
+
+## DNS recursion / leak boundary (onyx)
+
+The clients-vpn DNS chain is modeled in `recursiveDnsIntent` as an explicit
+second resolver so its recursion egresses through the tunnel, not the WAN:
+
+- Service `onyx-dns` with `providerNode = core-vpn-onyx` (addresses from the
+  node's loopback model; the relation resolves to the `up-sel` p2p `10.1.0.14`
+  / `fd42:dead:beef:2000::e`).
+- Relation `allow-clients-vpn-to-onyx-dns` (tenant → service) and
+  `allow-onyx-dns-to-onyx` (service → external `uplinks = [ "onyx" ]`).
+- Binding `clients-vpn-dns` → `onyx-dns` with
+  `resolverPath = [ access-clients-vpn downstream-selector policy upstream-selector core-vpn-onyx ]`
+  and `egressSurface.uplinks = [ "onyx" ]`.
+
+The core-vpn-onyx unbound runs in iterative mode (no forward zone); the CPM
+`dnsEgressPolicy` selects the `overlay-onyx` interface, and the renderer marks
+DNS output (`fwmark` = the selected policy table) so it routes out the tunnel
+instead of the underlay. Chain:
+
+```
+client → access 10.2.31.1 (unbound) → core-vpn-onyx 10.1.0.14 (unbound, iterative)
+       → overlay-onyx → AirVPN DNS
+```
+
+### Client-side (l-portal)
+
+l-portal's USB Ethernet (`enu1u1`) is a plain DHCP/SLAAC client of VLAN 31.
+Its NixOS config (`nixos/laptop/l-portal/network.nix`) declares the `cobalt-vpn`
+NM profile: metric 700 + a source rule `from 10.2.31.0/24 lookup 3100` so the
+USB-origin traffic does not fall back to the WiFi default. A
+`systemctl restart NetworkManager` is all the client needs after a rebuild.
+
+The USB's DHCP/SLAAC comes only from cobalt (address `10.2.31.x` / ULA
+`fd42:dead:beef:c1f::/64`, default via `10.2.31.1`/`fe80::…`, DNS
+`10.2.31.1` + `fd42:dead:beef:c1f::1`); no home-router DNS is pushed. If the
+client also has a WiFi connection, its resolver ordering is a client-side
+concern — the VPN profile's DNS priority can be lowered to win.
 
 ## DNS
 
