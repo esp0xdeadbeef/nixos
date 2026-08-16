@@ -1246,7 +1246,6 @@ in
           };
           to = {
             kind = "external";
-            name = "onyx";
             uplinks = [ "onyx" ];
           };
           action = "allow";
