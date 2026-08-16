@@ -9,11 +9,11 @@ in
 {
   sops.secrets = {
     "l-envil-wifi-clients" = {
-      sopsFile = ../../../secrets/l-envil-default-wifi.yaml;
+      sopsFile = ../../../../secrets/l-envil-default-wifi.yaml;
       key = "wifi-clients";
     };
     "l-envil-wifi-clients-vpn" = {
-      sopsFile = ../../../secrets/l-envil-default-wifi.yaml;
+      sopsFile = ../../../../secrets/l-envil-default-wifi.yaml;
       key = "wifi-clients-vpn";
     };
   };
