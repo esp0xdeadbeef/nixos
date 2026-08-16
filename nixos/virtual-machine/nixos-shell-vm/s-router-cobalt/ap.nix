@@ -28,8 +28,11 @@ let
     driver=nl80211
     ssid=$ssid1
     hw_mode=g
-    channel=6
+    channel=11
     chanlist=1 6 11
+    ieee80211n=1
+    ht_capab=[SHORT-GI-20]
+    wmm_enabled=1
     country_code=NL
     wpa=2
     wpa_key_mgmt=WPA-PSK
@@ -46,8 +49,11 @@ let
     driver=nl80211
     ssid=$ssid2
     hw_mode=g
-    channel=6
+    channel=11
     chanlist=1 6 11
+    ieee80211n=1
+    ht_capab=[SHORT-GI-20]
+    wmm_enabled=1
     country_code=NL
     wpa=2
     wpa_key_mgmt=WPA-PSK
