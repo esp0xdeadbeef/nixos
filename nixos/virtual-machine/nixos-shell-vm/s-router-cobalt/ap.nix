@@ -31,7 +31,7 @@ let
     country_code=NL
     wpa=2
     wpa_key_mgmt=SAE
-    sae_pwe=2
+    sae_pwe=1
     sae_password=$pass1
     bridge=clients
     EOF
@@ -46,7 +46,7 @@ let
     country_code=NL
     wpa=2
     wpa_key_mgmt=SAE
-    sae_pwe=2
+    sae_pwe=1
     sae_password=$pass2
     bridge=clients-vpn
     EOF
