@@ -50,6 +50,7 @@ in
     };
     script = ''
       rm -f "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection"
+      rm -f "/run/NetworkManager/system-connections/cobalt-vpn.nmconnection"
     '';
   };
 }
