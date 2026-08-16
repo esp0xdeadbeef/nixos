@@ -1294,11 +1294,17 @@ in
           addressAuthority = "model-allocated-service-prefix";
           trafficType = "dns";
         }
+        {
+          name = "onyx-dns";
+          providerNode = "core-vpn-onyx";
+          addressAuthority = "model-allocated-service-prefix";
+          trafficType = "dns";
+        }
       ];
 
       relations = [
         {
-          id = "allow-clients-vpn-to-core-dns";
+          id = "allow-clients-vpn-to-onyx-dns";
           priority = 86;
           from = {
             kind = "tenant";
@@ -1306,7 +1312,22 @@ in
           };
           to = {
             kind = "service";
-            name = "core-dns";
+            name = "onyx-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-onyx-dns-to-onyx";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "onyx-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "onyx" ];
           };
           trafficType = "dns";
           action = "allow";
@@ -1431,7 +1452,7 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-clients-vpn-dns-to-core-dns";
+          id = "allow-clients-vpn-dns-to-onyx-dns";
           priority = 96;
           from = {
             kind = "service";
@@ -1439,7 +1460,7 @@ in
           };
           to = {
             kind = "service";
-            name = "core-dns";
+            name = "onyx-dns";
           };
           trafficType = "dns";
           action = "allow";
@@ -1580,19 +1601,19 @@ in
           resolverSource = "local-recursive";
           upstreamResolver = {
             kind = "service";
-            name = "core-dns";
-            node = "core";
+            name = "onyx-dns";
+            node = "core-vpn-onyx";
           };
           resolverPath = [
             "access-clients-vpn"
             "downstream-selector"
             "policy"
             "upstream-selector"
-            "core"
+            "core-vpn-onyx"
           ];
           egressSurface = {
             kind = "external";
-            uplinks = [ "wan" ];
+            uplinks = [ "onyx" ];
           };
           returnBehavior = "symmetric";
           allowedAddressFamilies = [ "ipv4" "ipv6" ];
