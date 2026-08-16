@@ -29,7 +29,7 @@ in
       countryCode = "NL";
       networks = {
         "${wifiIf}" = {
-          ssid = "neon-clients";
+          ssid = "cobalt-clients";
           bssid = "02:00:00:00:00:01";
           authentication = {
             mode = "wpa3-sae";
@@ -38,7 +38,7 @@ in
           settings = { bridge = "clients"; };
         };
         "${wifiIf}-1" = {
-          ssid = "neon-clients-vpn";
+          ssid = "cobalt-clients-vpn";
           bssid = "02:00:00:00:00:02";
           authentication = {
             mode = "wpa3-sae";
