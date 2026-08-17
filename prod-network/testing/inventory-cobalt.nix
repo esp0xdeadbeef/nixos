@@ -116,6 +116,19 @@ let
     ];
   };
 
+  unlockDns = addresses: {
+    forwarders = [ ];
+    outgoingInterfaces = addresses;
+    roles.recursion.outgoingInterfaces = addresses;
+    localZones = [
+      {
+        name = "unlock.home.arpa.";
+        type = "static";
+      }
+    ];
+    localRecords = [ ];
+  };
+
   protectedReservationSource = sourceFile: {
     schema = "gamp-protected-reservation-set-v1";
     sourceClass = "protected";
@@ -207,6 +220,8 @@ let
   upstreamPolicyClientsVpnLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-onyx";
   policyDownstreamClientsVpnLink = "p2p-downstream-selector-policy--access-access-clients-vpn";
   downstreamAccessClientsVpnLink = "p2p-access-clients-vpn-downstream-selector";
+  policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
+  downstreamAccessUnlockLink = "p2p-access-unlock-downstream-selector";
 
   core =
     (mkNode "core" {
@@ -374,6 +389,13 @@ let
       bridge = "rt-policy-downstream-clients-vpn";
       interfaceName = "downstr-clients-vpn";
     };
+
+    downstream-unlock = p2pPort {
+      link = policyDownstreamUnlockLink;
+      adapterName = "cb-p-ds4";
+      bridge = "rt-policy-downstream-unlock";
+      interfaceName = "downstream-unlock";
+    };
   };
 
   downstreamSelector = mkNode "downstream-selector" {
@@ -419,6 +441,13 @@ let
       interfaceName = "policy-clients-vpn";
     };
 
+    policy-unlock = p2pPort {
+      link = policyDownstreamUnlockLink;
+      adapterName = "cb-ds-p4";
+      bridge = "rt-policy-downstream-unlock";
+      interfaceName = "policy-unlock";
+    };
+
     access-svc = p2pPort {
       link = downstreamAccessSvcLink;
       adapterName = "cb-ds-a1";
@@ -459,6 +488,13 @@ let
       adapterName = "cb-ds-a9";
       bridge = "rt-downstream-access-clients-vpn";
       interfaceName = "access-clients-vpn";
+    };
+
+    access-unlock = p2pPort {
+      link = downstreamAccessUnlockLink;
+      adapterName = "cb-ds-a4";
+      bridge = "rt-downstream-access-unlock";
+      interfaceName = "access-unlock";
     };
   };
 
@@ -759,6 +795,53 @@ let
       };
     };
 
+  accessUnlock =
+    (mkNode "access-unlock" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessUnlockLink;
+        adapterName = "cb-au-ds";
+        bridge = "rt-downstream-access-unlock";
+        interfaceName = "access-unlock";
+      };
+
+      tenant-unlock = tenantPort {
+        logicalInterface = "tenant-unlock";
+        bridge = "unlock";
+        interfaceName = "unlock";
+        addr4 = "10.2.90.1/24";
+        addr6 = "fd42:dead:beef:c5a::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = unlockDns [
+          dnsRuntime.requesters.access-unlock.ipv4
+          dnsRuntime.requesters.access-unlock.ipv6
+        ];
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-unlock = dhcp4Advertisement {
+            tenant = "unlock";
+            interface = "tenant-unlock";
+            subnet = "10.2.90.0/24";
+            poolStart = "10.2.90.100";
+            poolEnd = "10.2.90.200";
+            router = "10.2.90.1";
+            leaseStatePath = "/var/lib/kea/unlock.leases";
+            domain = "unlock.home.arpa.";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-unlock = slaacRa "tenant-unlock";
+        };
+      };
+    };
+
   vpnOnyx = mkNode "core-vpn-onyx" {
     upstream-selector = p2pPort {
       link = coreVpnOnyxUpstreamLink;
@@ -908,6 +991,12 @@ in
             vlan = 31;
             parentUplink = "trunk";
           };
+
+          unlock = {
+            name = "unlock";
+            vlan = 90;
+            parentUplink = "trunk";
+          };
         };
 
         bridgeNetworks = {
@@ -930,6 +1019,8 @@ in
           rt-downstream-access-clients-vpn = { };
           rt-policy-downstream-clients-vpn = { };
           rt-upstream-policy-clients-vpn = { };
+          rt-downstream-access-unlock = { };
+          rt-policy-downstream-unlock = { };
         };
       };
     };
@@ -965,6 +1056,7 @@ in
       ${nodeName "access-iot-srv"} = accessIotSrv;
       ${nodeName "access-iot"} = accessIot;
       ${nodeName "access-clients-vpn"} = accessClientsVpn;
+      ${nodeName "access-unlock"} = accessUnlock;
       ${nodeName "core-vpn-onyx"} = vpnOnyx;
     };
   };

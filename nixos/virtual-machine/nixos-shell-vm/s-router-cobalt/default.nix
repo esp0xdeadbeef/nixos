@@ -134,6 +134,18 @@ in
         key = "ssid-clients-vpn";
         path = "/run/secrets/wifi-ssid-clients-vpn";
       };
+
+      "cobalt-wifi-unlock" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
+        key = "wifi-unlock";
+        path = "/run/secrets/wifi-unlock";
+      };
+
+      "cobalt-wifi-ssid-unlock" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
+        key = "ssid-unlock";
+        path = "/run/secrets/wifi-ssid-unlock";
+      };
     };
 
   containers.access-clients.bindMounts = lib.mkMerge [

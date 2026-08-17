@@ -1,5 +1,13 @@
 # Cobalt site — implementation plan
 
+> **Superseded.** This plan describes the original cobalt NAT-phase topology
+> (VLANs 2/3/7/8). The current network is the name-based plane model under
+> `prod-network/testing/` — see `routing-policy.md` (plane taxonomy),
+> `intent.nix` (`esp0xdeadbeef.cobalt`), `inventory-cobalt.nix`, and
+> `prod-network/cobalt/switch-vlan.toml` (VLANs 20/30/31/50/51/60). The
+> physical-port and switch-provisioning notes remain useful; the IP plan and
+> VLAN-number sections are outdated.
+
 ## 1. Context
 
 `cobalt` is a new site (element naming convention). It starts behind the home

@@ -45,6 +45,7 @@ device actually needs it.
 | dmz          | `dmz.home.arpa`       | exposed      | 60–69         | live                            |
 | lab          | `lab.home.arpa`       | hostile      | 70–79         | reserved                        |
 | observability| `obs.home.arpa`       | limited      | 80–89         | reserved                        |
+| unlock       | `unlock.home.arpa`    | hostile      | 90–99         | live (Tang-only, cobalt)        |
 | transit      | `mesh` (overlay)      | neutral      | 100–199       | live (overlay)                  |
 | wan          | —                     | unknown      | 1000+         | live                            |
 
@@ -57,6 +58,10 @@ device actually needs it.
 - DMZ reaches inward only through explicit backends.
 - Lab is assumed compromised by design.
 - Transit carries routers only: no RA/DHCP/mDNS, `/31` IPv4, `/127` IPv6.
+- Unlock is a Tang-only access plane for stage-1 NBDE. Its PSK is shared in
+  the repo/SOPS, so it is treated as hostile: DHCP is the only fabric service
+  it receives, and its sole egress is the `tang` service (tcp/7500) on `svc`.
+  No WAN, no recursion, no path to other planes.
 
 ## VPN egress (onyx)
 
@@ -107,17 +112,18 @@ client → access 10.2.31.1 (unbound) → core-vpn-onyx 10.1.0.14 (unbound, iter
 
 ### Client-side (l-portal)
 
-l-portal's USB Ethernet (`enu1u1`) is a plain DHCP/SLAAC client of VLAN 31.
-Its NixOS config (`nixos/laptop/l-portal/network.nix`) declares the `cobalt-vpn`
-NM profile: metric 700 + a source rule `from 10.2.31.0/24 lookup 3100` so the
-USB-origin traffic does not fall back to the WiFi default. A
-`systemctl restart NetworkManager` is all the client needs after a rebuild.
+l-portal's USB Ethernet (`enu1u1`) is a plain DHCP/SLAAC client of whichever
+cobalt access VLAN the switch port lands on — VLAN 31 `clients-vpn` for the
+AirVPN egress test, VLAN 30 `clients` otherwise. NetworkManager owns `enu1u1`
+outright: the hardcoded `cobalt-vpn` / `cobalt-clients` NM profiles and their
+source-route rules were dropped in favour of default DHCP/SLAAC behaviour, so
+no client-side routing config is needed.
 
 The USB's DHCP/SLAAC comes only from cobalt (address `10.2.31.x` / ULA
 `fd42:dead:beef:c1f::/64`, default via `10.2.31.1`/`fe80::…`, DNS
 `10.2.31.1` + `fd42:dead:beef:c1f::1`); no home-router DNS is pushed. If the
 client also has a WiFi connection, its resolver ordering is a client-side
-concern — the VPN profile's DNS priority can be lowered to win.
+concern.
 
 ## DNS
 

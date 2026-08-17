@@ -50,39 +50,27 @@ swapon --show
 
 ## Initrd Wi-Fi Unlock
 
-`l-portal` can unlock root through Clevis/Tang during initrd. The Tang server is
-declared in `hardware/bootloader.nix`:
+`l-portal` unlocks root through Clevis/Tang during initrd. The Tang binding is
+an SSS pin with threshold 1 over two Tang servers (any one reachable suffices):
 
-```nix
-local.boot.clevisTangUnlock.tang = {
-  host = "192.168.1.75";
-  port = 7500;
-};
-```
+- neon: `http://192.168.1.75:7500`
+- cobalt: `http://10.2.90.10:7500` (dedicated Tang server on l-envil's unlock
+  plane, VLAN 90)
 
-That renders to `http://192.168.1.75:7500` for the Clevis binding. The initrd
-Wi-Fi config is intentionally host-local and persisted outside git:
+The `tang.host` / `tang.port` options in `hardware/bootloader.nix` are
+documentation only; the real endpoints are baked into `root.jwe` by
+`clevis-init-jwe.sh` (see `TANG_URLS` there).
 
-```bash
-sudo install -d -m 0755 /persist/etc/diskunlock
-sudo tee /persist/etc/diskunlock/wpa_supplicant.conf >/dev/null <<'EOF'
-ctrl_interface=/run/wpa_supplicant
-update_config=0
-network={
-    ssid="diskunlock"
-    psk="Inpo3BeHLCcajYuOkFwM"
-    key_mgmt=WPA-PSK
-}
-EOF
-sudo chmod 600 /persist/etc/diskunlock/wpa_supplicant.conf
-```
-
-During a live USB install, also copy it into the target persist volume:
+The initrd Wi-Fi config is SOPS-managed (`secrets/l-portal-initrd-wifi.yaml`,
+binary format) and contains both the neon `diskunlock` and cobalt
+`cobalt-unlock` networks. sops-nix decrypts it at activation and bakes it into
+the initrd; the age key never enters the initrd. Because `nixos-rebuild switch`
+installs the bootloader before running sops-nix's activation hook, provision
+the secret first whenever it changes:
 
 ```bash
-sudo install -d -m 0755 /mnt/persist/etc/diskunlock
-sudo cp /persist/etc/diskunlock/wpa_supplicant.conf /mnt/persist/etc/diskunlock/wpa_supplicant.conf
-sudo chmod 600 /mnt/persist/etc/diskunlock/wpa_supplicant.conf
+sudo nixos-rebuild test --flake .#l-portal    # decrypt sops secrets to /run/secrets
+sudo nixos-rebuild switch --flake .#l-portal  # now bake them into the initrd
 ```
 
 Generate or refresh the Clevis JWE after formatting root LUKS:
@@ -92,8 +80,9 @@ cd /mnt/src/nixos/nixos/laptop/l-portal/hardware
 sudo ./clevis-init-jwe.sh
 ```
 
-The helper defaults to `TANG_HOST=192.168.1.75` and `TANG_PORT=7500`. Override
-those environment variables before running it if the Tang endpoint changes.
+`clevis-init-jwe.sh` defaults to binding both Tang servers
+(`TANG_URLS="http://192.168.1.75:7500 http://10.2.90.10:7500"`). Override
+`TANG_URLS` if the endpoints change.
 
 Commit `nixos/laptop/l-portal/hardware/root.jwe` with the host config. The JWE
 is not the Wi-Fi password; it is the Tang-wrapped random unlock key.
@@ -193,7 +182,7 @@ Refresh the Clevis binding so initrd receives the new unlock secret:
 
 ```bash
 cd /home/deadbeef/github/nixos/nixos/laptop/l-portal/hardware
-TANG_HOST=192.168.1.75 TANG_PORT=7500 sudo ./clevis-init-jwe.sh
+sudo ./clevis-init-jwe.sh
 ```
 
 Rebuild after committing or syncing the updated `root.jwe`:
