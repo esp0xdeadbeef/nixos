@@ -2840,11 +2840,11 @@
     "pin-refresh-source": {
       "flake": false,
       "locked": {
-        "lastModified": 1786962991,
-        "narHash": "sha256-5mSAMLzhnVhb4Km7he3zRFl50vrdSIZmszWgKGeuDAY=",
+        "lastModified": 1786965299,
+        "narHash": "sha256-xg5JoEMVT+8Opbklgx/dRL4hbyo3z1cnmKtPVjjtFYw=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos",
-        "rev": "ca0ec9b6b1d762f7729fba2d87bb92524d6d7650",
+        "rev": "b15c4bee15c7a2fb91a21a2322353a2ab16c3f69",
         "type": "github"
       },
       "original": {
