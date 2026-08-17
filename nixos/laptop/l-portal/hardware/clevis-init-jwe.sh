@@ -3,9 +3,10 @@
 
 set -euo pipefail
 
-TANG_HOST="${TANG_HOST:-192.168.1.75}"
-TANG_PORT="${TANG_PORT:-7500}"
-TANG_URL="${TANG_URL:-http://${TANG_HOST}:${TANG_PORT}}"
+# Space-separated list of Tang servers bound into a single SSS pin with
+# threshold 1 (any one reachable Tang suffices at unlock time). Defaults to
+# the neon Tang plus the cobalt unlock-plane Tang.
+TANG_URLS="${TANG_URLS:-http://192.168.1.75:7500 http://10.2.90.10:7500}"
 LUKS_DEV="/dev/disk/by-partlabel/disk-nvme0n1-luks"
 JWE_OUT="./root.jwe"
 
@@ -19,8 +20,16 @@ if [[ ! -b "$LUKS_DEV" ]]; then
   exit 1
 fi
 
-echo "Checking Tang advertisement..."
-curl -fsS "$TANG_URL/adv" >/dev/null
+read -r -a urls <<< "$TANG_URLS"
+if [[ ${#urls[@]} -eq 0 ]]; then
+  echo "TANG_URLS must list at least one Tang URL" >&2
+  exit 1
+fi
+
+for url in "${urls[@]}"; do
+  echo "Checking Tang advertisement at $url..."
+  curl -fsS "$url/adv" >/dev/null
+done
 
 echo
 read -r -s -p "Enter CURRENT LUKS passphrase: " EXISTING_LUKS_PASS
@@ -36,10 +45,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Build an SSS pin with threshold 1 over every Tang URL: the generated key is
+# recoverable if ANY bound Tang server is reachable during initrd unlock.
+pins=""
+for url in "${urls[@]}"; do
+  pins+="{\"url\":\"$url\"},"
+done
+pins="${pins%,}"
+sss_cfg="{\"t\":1,\"pins\":{\"tang\":[$pins]}}"
+
 CLEVIS_PASS="$(head -c 32 /dev/urandom | base64)"
 
 printf '%s' "$CLEVIS_PASS" \
-  | clevis encrypt tang "{\"url\":\"$TANG_URL\"}" -y \
+  | clevis encrypt sss "$sss_cfg" -y \
   > "$JWE_OUT"
 
 printf '%s' "$EXISTING_LUKS_PASS" \

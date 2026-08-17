@@ -7,10 +7,11 @@
 # the rt2800usb cannot reliably change its MAC over the passthrough.
 #
 # At startup a spare station VAP (wlan0-scan) scans the 2.4GHz band and the
-# least-congested of channels 1/6/11 is selected for the two AP VAPs; no
+# least-congested of channels 1/6/11 is selected for the AP VAPs; no
 # channel is hardcoded.
 let
   wifiIf = "wlan0";
+  unlockIf = "wlan0-2";
   scanIf = "wlan0-scan";
   ctrl = "/run/ap";
 
@@ -47,8 +48,10 @@ let
 
     ssid1=$(cat /run/secrets/wifi-ssid-clients)
     ssid2=$(cat /run/secrets/wifi-ssid-clients-vpn)
+    ssid3=$(cat /run/secrets/wifi-ssid-unlock)
     pass1=$(cat /run/secrets/wifi-clients)
     pass2=$(cat /run/secrets/wifi-clients-vpn)
+    pass3=$(cat /run/secrets/wifi-unlock)
 
     cat > /run/ap/${wifiIf}.conf <<EOF
     ctrl_interface=${ctrl}
@@ -88,6 +91,25 @@ let
     wpa_passphrase=$pass2
     bridge=clients-vpn
     EOF
+    cat > /run/ap/${unlockIf}.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${unlockIf}
+    driver=nl80211
+    ssid=$ssid3
+    hw_mode=g
+    channel=$ch
+    ieee80211n=1
+    ht_capab=[SHORT-GI-20]
+    wmm_enabled=1
+    country_code=NL
+    wpa=2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass3
+    bridge=unlock
+    EOF
   '';
 in
 {
@@ -108,6 +130,13 @@ in
         sleep 1
       done
       for _ in $(seq 1 30); do
+        if [ -d /sys/class/net/${unlockIf} ]; then
+          break
+        fi
+        ${pkgs.iw}/bin/iw phy phy0 interface add ${unlockIf} type __ap 2>/dev/null || true
+        sleep 1
+      done
+      for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${scanIf} ]; then
           break
         fi
@@ -124,7 +153,7 @@ in
     requires = [ "ap-vap.service" ];
     serviceConfig = {
       ExecStartPre = hostapdConf;
-      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf";
+      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf /run/ap/${unlockIf}.conf";
       Restart = "always";
       RuntimeDirectory = "ap";
     };
