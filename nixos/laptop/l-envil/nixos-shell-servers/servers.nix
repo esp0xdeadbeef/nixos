@@ -8,6 +8,7 @@ let
   guestAgentHealth =
     inputs.nixos-shell-vm-manager.packages.${pkgs.stdenv.hostPlatform.system}."qga-systemd-health";
   qgaSocket = "/run/nixos-shell-vm-manager/s-router-cobalt/qga.sock";
+  tangQgaSocket = "/run/nixos-shell-vm-manager/s-tang/qga.sock";
 in
 {
   services.nixosShellVmManager = {
@@ -45,6 +46,30 @@ in
         size = "20G";
       };
       runner.stopGraceSeconds = 60;
+    };
+
+    instances.s-tang = {
+      description = "cobalt Tang (NBDE) server";
+      image = self.nixosConfigurations.s-tang.config.system.build.nixos-shell;
+      activation.startOnBoot = true;
+      healthCheck = {
+        command = lib.escapeShellArgs [
+          (lib.getExe guestAgentHealth)
+          tangQgaSocket
+        ];
+        timeoutSeconds = 10;
+        retries = 60;
+        intervalSeconds = 2;
+      };
+      runner.qemuArguments = [
+        "-chardev"
+        "socket,id=qga0,path=${tangQgaSocket},server=on,wait=off"
+        "-device"
+        "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        "-nic"
+        "bridge,br=br-cobalt-lan,model=virtio-net-pci"
+      ];
+      runner.stopGraceSeconds = 30;
     };
   };
 }
