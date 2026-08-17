@@ -1,22 +1,21 @@
 { config
-, pkgs
 , lib
 , profiles
+, relativeRepo
 , ...
 }:
-let
-  initrdWifiConfig = pkgs.writeText "l-portal-initrd-wpa_supplicant.conf" ''
-    ctrl_interface=DIR=/run/wpa_supplicant GROUP=0
-    update_config=0
-    network={
-        ssid="diskunlock"
-        psk="Inpo3BeHLCcajYuOkFwM"
-        key_mgmt=WPA-PSK
-    }
-  '';
-in
 {
   imports = [ profiles.nixos.boot.clevis-tang-unlock ];
+
+  # Stage-1 Wi-Fi association for Clevis/Tang unlock. The wpa_supplicant
+  # config (with both the neon "diskunlock" and cobalt "cobalt-unlock"
+  # networks) is SOPS-managed so the passphrases never sit in cleartext in
+  # the repo. sops-nix decrypts it at activation; see l-portal/README.md for
+  # the required `nixos-rebuild test` before `switch` on first provision.
+  sops.secrets."l-portal-initrd-wifi" = {
+    sopsFile = relativeRepo.sourcePath "secrets/l-portal-initrd-wifi.yaml";
+    format = "binary";
+  };
 
   hardware.deviceTree = {
     enable = true;
@@ -90,7 +89,7 @@ in
     wifi = {
       enable = true;
       interface = "wlP6p1s0";
-      configFile = initrdWifiConfig;
+      configFile = config.sops.secrets."l-portal-initrd-wifi".path;
       timeout = 25;
     };
     kernelModules = [

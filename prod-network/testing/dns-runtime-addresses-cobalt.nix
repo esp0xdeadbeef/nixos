@@ -54,5 +54,12 @@
       clientIpv4 = "10.2.31.0/24";
       clientIpv6 = "fd42:dead:beef:c1f::/64";
     };
+
+    access-unlock = {
+      ipv4 = "10.2.90.1";
+      ipv6 = "fd42:dead:beef:c5a::1";
+      clientIpv4 = "10.2.90.0/24";
+      clientIpv6 = "fd42:dead:beef:c5a::/64";
+    };
   };
 }

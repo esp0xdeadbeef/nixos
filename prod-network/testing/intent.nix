@@ -88,6 +88,17 @@ let
         }
       ];
     }
+
+    {
+      name = "tang";
+      match = [
+        {
+          proto = "tcp";
+          dports = [ 7500 ];
+          family = "any";
+        }
+      ];
+    }
   ];
 
   allowTenantToWan =
@@ -936,6 +947,12 @@ in
           ipv4 = "10.2.31.0/24";
           ipv6 = "fd42:dead:beef:c1f::/64";
         }
+        {
+          kind = "tenant";
+          name = "unlock";
+          ipv4 = "10.2.90.0/24";
+          ipv6 = "fd42:dead:beef:c5a::/64";
+        }
       ];
 
       endpoints = [
@@ -974,6 +991,12 @@ in
           name = "cobalt-clients-vpn-dns";
           tenant = "clients-vpn";
           ipv4 = [ "10.2.31.1" ];
+        }
+        {
+          kind = "host";
+          name = "cobalt-tang";
+          tenant = "unlock";
+          ipv4 = [ "10.2.90.10" ];
         }
       ];
     };
@@ -1016,6 +1039,11 @@ in
           name = "clients-vpn-dns";
           providers = [ "cobalt-clients-vpn-dns" ];
           trafficType = "dns";
+        }
+        {
+          name = "tang";
+          providers = [ "cobalt-tang" ];
+          trafficType = "tang";
         }
       ];
 
@@ -1170,6 +1198,21 @@ in
           returnBehavior = "symmetric";
         }
         {
+          id = "allow-unlock-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-clients-dns-to-wan";
           priority = 90;
           from = {
@@ -1277,6 +1320,7 @@ in
       tenant-iot-srv = "iot-srv";
       tenant-dmz = "dmz";
       tenant-clients-vpn = "clients-vpn";
+      tenant-unlock = "unlock";
       external-wan = "wan";
       service-svc-dns = "svc-dns";
       service-clients-dns = "clients-dns";
@@ -1284,6 +1328,7 @@ in
       service-iot-dns = "iot-dns";
       service-iot-srv-dns = "iot-srv-dns";
       service-dmz-dns = "dmz-dns";
+      service-tang = "tang";
     };
 
     recursiveDnsIntent = {
@@ -1770,6 +1815,16 @@ in
             }
           ];
         };
+
+        access-unlock = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "unlock";
+            }
+          ];
+        };
       };
 
       links = [
@@ -1812,6 +1867,10 @@ in
         [
           "downstream-selector"
           "access-clients-vpn"
+        ]
+        [
+          "downstream-selector"
+          "access-unlock"
         ]
       ];
     };
