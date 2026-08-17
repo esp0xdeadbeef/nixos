@@ -16,7 +16,6 @@ let
     prosafe-vlan = pkgs.callPackage ./prosafe-vlan { };
     cobalt-switch = pkgs.callPackage ./cobalt-switch { inherit prosafe-vlan cobalt-switch-bootstrap; };
     cobalt-switch-bootstrap = pkgs.callPackage ./cobalt-switch-bootstrap { };
-    cobalt-switch-provision = pkgs.callPackage ./cobalt-switch-provision { };
   };
 in
 base
