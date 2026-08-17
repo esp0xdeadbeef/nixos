@@ -11,7 +11,6 @@
 
     extraSystemDirectories = [
       "/var/lib/waydroid/"
-      "/var/lib/tang"
     ];
   };
 }
