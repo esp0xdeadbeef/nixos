@@ -42,7 +42,7 @@ jobs:
           check_vm_host() {
             local host="$1"
 
-            echo "::group::Checking ${host} with one embedded VM"
+            echo "::group::Checking ${host} with carrier-controlled VMs enabled"
             # The ${host} below is Nix interpolation, not shell interpolation.
             # shellcheck disable=SC2016
             nix derivation show \
@@ -56,6 +56,11 @@ jobs:
                   instanceNames =
                     builtins.attrNames
                       original.config.services.nixosShellVmManager.instances;
+                  carrierInstances =
+                    builtins.concatMap
+                      (control: control.instances)
+                      (builtins.attrValues
+                        original.config.services.nixosShellVmManager.carrierControls);
                   filtered = original.extendModules {
                     modules = [
                       ({ lib, ... }: {
@@ -64,7 +69,7 @@ jobs:
                             map
                               (name: {
                                 inherit name;
-                                value.enable = lib.mkForce (name == "s-router-legacy-prod");
+                                value.enable = lib.mkForce (builtins.elem name carrierInstances);
                               })
                               instanceNames
                           );
@@ -82,9 +87,10 @@ jobs:
             [[ -n "${configuration}" ]] || continue
             case "${configuration}" in
               s-sigma | s-tau)
-                # These hosts embed every nixos-shell guest image. Evaluate one
-                # representative embedded VM here; every guest configuration
-                # is evaluated independently by the surrounding loop.
+                # These hosts embed every nixos-shell guest image. Evaluate with
+                # only carrier-controlled instances enabled to keep the host
+                # toplevel evaluation cheap; every guest configuration is
+                # evaluated independently by the surrounding loop.
                 check_vm_host "${configuration}"
                 ;;
               *)
