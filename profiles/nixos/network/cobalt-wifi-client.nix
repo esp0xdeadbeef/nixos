@@ -84,6 +84,11 @@ in
       after = [ "sops-install-secrets.service" ];
       before = [ "NetworkManager-ensure-profiles.service" ];
       wantedBy = [ "multi-user.target" ];
+      path = [
+        pkgs.coreutils
+        pkgs.gawk
+        pkgs.gnugrep
+      ];
       serviceConfig.Type = "oneshot";
       script = ''
         umask 077
