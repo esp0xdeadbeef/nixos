@@ -106,7 +106,14 @@ in
           prefixLength = 24;
         }
       ];
+      networking.interfaces.eth0.ipv6.addresses = [
+        {
+          address = "fd42:dead:beef:290::10";
+          prefixLength = 64;
+        }
+      ];
       networking.defaultGateway = "10.2.90.1";
+      networking.defaultGateway6 = "fd42:dead:beef:290::1";
 
       services.tang = {
         enable = true;
@@ -116,6 +123,12 @@ in
         # inside the container, so it is omitted.
         listenStream = [ "7500" ];
       };
+
+      # The tang module only creates the socket; it does not open the port in
+      # the container's own nftables, so external TCP SYN is dropped (ICMP
+      # echo is the only thing allowed by default, which is why ping worked
+      # while curl failed).
+      networking.firewall.allowedTCPPorts = [ 7500 ];
 
       # Fixed uid keeps the persisted keypair ownership stable across reboots.
       users.users.tang = {
