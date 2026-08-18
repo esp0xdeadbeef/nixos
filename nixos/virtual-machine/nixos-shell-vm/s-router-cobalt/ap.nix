@@ -60,10 +60,10 @@ let
     seed=$("$YQ" -r '.seed' "$SEC")
     used=/run/ap/used-ssids
     rm -f "$used"
-    ssid1=$(${deriveSsid} "$seed" clients ${ssidList} "$used")
-    ssid2=$(${deriveSsid} "$seed" clients-vpn ${ssidList} "$used")
+    ssid1=$(${deriveSsid} "$seed" cobalt-clients ${ssidList} "$used")
+    ssid2=$(${deriveSsid} "$seed" cobalt-clients-vpn ${ssidList} "$used")
     ssid3=$("$YQ" -r '.cobalt-unlock.ssid' "$SEC")
-    ssid4=$(${deriveSsid} "$seed" mgmt ${ssidList} "$used")
+    ssid4=$(${deriveSsid} "$seed" cobalt-mgmt ${ssidList} "$used")
     pass1=$("$YQ" -r '.cobalt-clients.psk' "$SEC")
     pass2=$("$YQ" -r '.cobalt-clients-vpn.psk' "$SEC")
     pass3=$("$YQ" -r '.cobalt-unlock.psk' "$SEC")
