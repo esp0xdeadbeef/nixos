@@ -90,6 +90,7 @@ in
     autoStart = true;
     privateNetwork = true;
     hostBridge = "tang-br";
+    localAddress = "10.2.90.2/24";
 
     bindMounts."/var/lib/tang" = {
       hostPath = "/persist/var/lib/tang";
