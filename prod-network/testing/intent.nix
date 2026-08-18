@@ -7,6 +7,10 @@ let
           proto = "icmp";
           family = "ipv4";
         }
+        {
+          proto = "icmpv6";
+          family = "ipv6";
+        }
       ];
     }
 
@@ -1236,8 +1240,8 @@ in
             name = "clients";
           };
           to = {
-            kind = "service";
-            name = "tang";
+            kind = "tenant";
+            name = "unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1251,8 +1255,8 @@ in
             name = "svc";
           };
           to = {
-            kind = "service";
-            name = "tang";
+            kind = "tenant";
+            name = "unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1266,8 +1270,8 @@ in
             name = "iot";
           };
           to = {
-            kind = "service";
-            name = "tang";
+            kind = "tenant";
+            name = "unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1281,8 +1285,8 @@ in
             name = "iot-srv";
           };
           to = {
-            kind = "service";
-            name = "tang";
+            kind = "tenant";
+            name = "unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1296,8 +1300,8 @@ in
             name = "dmz";
           };
           to = {
-            kind = "service";
-            name = "tang";
+            kind = "tenant";
+            name = "unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1311,8 +1315,8 @@ in
             name = "clients-vpn";
           };
           to = {
-            kind = "service";
-            name = "tang";
+            kind = "tenant";
+            name = "unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1326,10 +1330,34 @@ in
             name = "mgmt";
           };
           to = {
-            kind = "service";
-            name = "tang";
+            kind = "tenant";
+            name = "unlock";
           };
           trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-icmp-to-tang";
+          priority = 84;
+          from = {
+            kind = "tenant-set";
+            members = [
+              "clients"
+              "svc"
+              "iot"
+              "iot-srv"
+              "dmz"
+              "clients-vpn"
+              "mgmt"
+              "unlock"
+            ];
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "icmp";
           action = "allow";
           returnBehavior = "symmetric";
         }
