@@ -190,16 +190,22 @@ let
     // (if reservations == null then { } else { inherit reservations; })
     // (if reservationSource == null then { } else { inherit reservationSource; });
 
-  slaacRa = interface: {
-    enabled = true;
-    inherit interface;
-    rdnss = [ "router-self" ];
-    dnssl = [ "lan." ];
-    managed = false;
-    otherConfig = false;
-    onLink = true;
-    autonomous = true;
-  };
+  slaacRa = interface:
+    let
+      # tenant-<plane> -> <plane>.home.arpa. (the RFC 8375 search domain,
+      # not the legacy `lan.`)
+      plane = builtins.substring 7 (builtins.stringLength interface - 7) interface;
+    in
+    {
+      enabled = true;
+      inherit interface;
+      rdnss = [ "router-self" ];
+      dnssl = [ "${plane}.home.arpa." ];
+      managed = false;
+      otherConfig = false;
+      onLink = true;
+      autonomous = true;
+    };
 
   coreUpstreamLink = "p2p-core-upstream-selector";
   coreVpnOnyxUpstreamLink = "p2p-core-vpn-onyx-upstream-selector";

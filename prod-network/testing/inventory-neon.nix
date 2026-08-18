@@ -182,16 +182,20 @@ let
     // (if reservationSource == null then { } else { inherit reservationSource; })
     // (if reservations == null then { } else { inherit reservations; });
 
-  slaacRa = interface: {
-    enabled = true;
-    inherit interface;
-    rdnss = [ "router-self" ];
-    dnssl = [ "lan." ];
-    managed = false;
-    otherConfig = false;
-    onLink = true;
-    autonomous = true;
-  };
+  slaacRa = interface:
+    let
+      plane = builtins.substring 7 (builtins.stringLength interface - 7) interface;
+    in
+    {
+      enabled = true;
+      inherit interface;
+      rdnss = [ "router-self" ];
+      dnssl = [ "${plane}.home.arpa." ];
+      managed = false;
+      otherConfig = false;
+      onLink = true;
+      autonomous = true;
+    };
 
   pppoeCredentials = {
     usernameFile = "/run/secrets/pppoe-username";
