@@ -1,4 +1,9 @@
-{ config, lib, profiles, ... }:
+{ config, lib, profiles, relativeRepo, ... }:
+
+let
+  dnsRuntime = import (relativeRepo.sourcePath "prod-network/testing/dns-runtime-addresses-cobalt.nix");
+  tangAllowedSubnets = builtins.map (r: r.clientIpv4) (builtins.attrValues dnsRuntime.requesters);
+in
 
 {
   imports = [
@@ -105,16 +110,7 @@
       services.tang = {
         enable = true;
         listenStream = [ "10.2.90.10:7500" ];
-        ipAddressAllow = [
-          "10.2.10.0/24"
-          "10.2.20.0/24"
-          "10.2.30.0/24"
-          "10.2.31.0/24"
-          "10.2.50.0/24"
-          "10.2.51.0/24"
-          "10.2.60.0/24"
-          "10.2.90.0/24"
-        ];
+        ipAddressAllow = tangAllowedSubnets;
       };
 
       # Fixed uid keeps the persisted keypair ownership stable across reboots.
