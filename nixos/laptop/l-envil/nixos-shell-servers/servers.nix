@@ -66,6 +66,10 @@ in
         "socket,id=qga0,path=${tangQgaSocket},server=on,wait=off"
         "-device"
         "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        # Drop the nixos-shell default user-mode NAT NIC; the Tang host only
+        # needs the cobalt trunk (mgmt VLAN 10 + unlock VLAN 90).
+        "-net"
+        "none"
         "-nic"
         "bridge,br=br-cobalt-lan,model=virtio-net-pci"
       ];
