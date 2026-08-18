@@ -7,6 +7,7 @@
 {
   imports = [
     profiles.nixos.laptop.intel-workstation
+    profiles.nixos.network.cobalt-wifi-client
     profiles.nixos.network.nebula-mesh
     profiles.nixos.vm-host.nixos-shell
     profiles.nixos.llm.ollama-base
