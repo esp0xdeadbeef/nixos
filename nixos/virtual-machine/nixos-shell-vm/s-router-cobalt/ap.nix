@@ -75,7 +75,7 @@ let
     logger_syslog_level=0
     interface=${wifiIf}
     driver=nl80211
-    ssid="$ssid1"
+    ssid=$ssid1
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -83,7 +83,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase="$pass1"
+    wpa_passphrase=$pass1
     bridge=clients
     EOF
     cat > /run/ap/${wifiIf}-1.conf <<EOF
@@ -92,7 +92,7 @@ let
     logger_syslog_level=0
     interface=${wifiIf}-1
     driver=nl80211
-    ssid="$ssid2"
+    ssid=$ssid2
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -100,7 +100,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase="$pass2"
+    wpa_passphrase=$pass2
     bridge=clients-vpn
     EOF
     cat > /run/ap/${unlockIf}.conf <<EOF
@@ -109,7 +109,7 @@ let
     logger_syslog_level=0
     interface=${unlockIf}
     driver=nl80211
-    ssid="$ssid3"
+    ssid=$ssid3
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -117,7 +117,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase="$pass3"
+    wpa_passphrase=$pass3
     bridge=unlock
     EOF
     cat > /run/ap/${mgmtIf}.conf <<EOF
@@ -126,7 +126,7 @@ let
     logger_syslog_level=0
     interface=${mgmtIf}
     driver=nl80211
-    ssid="$ssid4"
+    ssid=$ssid4
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -134,7 +134,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase="$pass4"
+    wpa_passphrase=$pass4
     bridge=mgmt
     EOF
   '';
