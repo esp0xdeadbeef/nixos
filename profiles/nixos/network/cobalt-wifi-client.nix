@@ -56,6 +56,7 @@ in
       default = [
         "cobalt-clients"
         "cobalt-clients-vpn"
+        "cobalt-mgmt"
       ];
       description = "Network keys in secrets/s-router-cobalt-wifi.yaml (unlock is intentionally excluded).";
     };
