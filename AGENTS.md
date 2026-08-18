@@ -15,6 +15,22 @@ doing it right takes longer, take that time. In particular:
 - A complete fix that lands later is better than a shortcut that ships today
   and needs revisiting in prod.
 
+## Git safety (applies to every repo, not just network-*)
+
+Never discard work to "get back to a baseline". The working tree is the
+progress. Before reverting, stashing, or resetting anything:
+
+- Run `git status --short` and `git diff` first and read them.
+- Preserve the state: `git stash push` (or `git diff > /tmp/work.patch`).
+- Only then apply the minimal revert/checkout for the specific file or hunk
+  under investigation, never `git reset --hard` / `git clean -fd` / `git
+  checkout -- .` on the whole tree.
+- `rsync --delete` must also be preceded by capturing the destination state
+  or scoping the sync to the exact files changed.
+
+If the diagnosis is uncertain, capture the diff and show it before touching
+anything; do not guess-and-nuke.
+
 ## Commit Messages
 
 Conventional commits: `type(scope): description`
