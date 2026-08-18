@@ -82,6 +82,7 @@
     users = {
       deadbeef-ssh = import ./nixos/users/deadbeef-ssh.nix;
       deadbeef-sops = import ./nixos/users/deadbeef-sops.nix;
+      sudo-nopasswd = import ./nixos/users/sudo-nopasswd.nix;
     };
     virtualization = {
       docker = import ./nixos/virtualization/docker.nix;
