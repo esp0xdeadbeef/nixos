@@ -12,6 +12,7 @@
 let
   wifiIf = "wlan0";
   unlockIf = "wlan0-2";
+  mgmtIf = "wlan0-3";
   scanIf = "wlan0-scan";
   ctrl = "/run/ap";
 
@@ -46,12 +47,17 @@ let
       *) ch=6 ;;
     esac
 
-    ssid1=$(cat /run/secrets/wifi-ssid-clients)
-    ssid2=$(cat /run/secrets/wifi-ssid-clients-vpn)
-    ssid3=$(cat /run/secrets/wifi-ssid-unlock)
-    pass1=$(cat /run/secrets/wifi-clients)
-    pass2=$(cat /run/secrets/wifi-clients-vpn)
-    pass3=$(cat /run/secrets/wifi-unlock)
+    YQ=${pkgs.yq-go}/bin/yq
+    SEC=/run/secrets/cobalt-wifi
+
+    ssid1=$("$YQ" -r '.cobalt-clients.ssid' "$SEC")
+    ssid2=$("$YQ" -r '.cobalt-clients-vpn.ssid' "$SEC")
+    ssid3=$("$YQ" -r '.cobalt-unlock.ssid' "$SEC")
+    ssid4=$("$YQ" -r '.cobalt-mgmt.ssid' "$SEC")
+    pass1=$("$YQ" -r '.cobalt-clients.psk' "$SEC")
+    pass2=$("$YQ" -r '.cobalt-clients-vpn.psk' "$SEC")
+    pass3=$("$YQ" -r '.cobalt-unlock.psk' "$SEC")
+    pass4=$("$YQ" -r '.cobalt-mgmt.psk' "$SEC")
 
     cat > /run/ap/${wifiIf}.conf <<EOF
     ctrl_interface=${ctrl}
@@ -62,8 +68,6 @@ let
     ssid=$ssid1
     hw_mode=g
     channel=$ch
-    ieee80211n=1
-    ht_capab=[SHORT-GI-20]
     wmm_enabled=1
     country_code=NL
     wpa=2
@@ -81,8 +85,6 @@ let
     ssid=$ssid2
     hw_mode=g
     channel=$ch
-    ieee80211n=1
-    ht_capab=[SHORT-GI-20]
     wmm_enabled=1
     country_code=NL
     wpa=2
@@ -100,8 +102,6 @@ let
     ssid=$ssid3
     hw_mode=g
     channel=$ch
-    ieee80211n=1
-    ht_capab=[SHORT-GI-20]
     wmm_enabled=1
     country_code=NL
     wpa=2
@@ -109,6 +109,23 @@ let
     wpa_pairwise=CCMP
     wpa_passphrase=$pass3
     bridge=unlock
+    EOF
+    cat > /run/ap/${mgmtIf}.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${mgmtIf}
+    driver=nl80211
+    ssid=$ssid4
+    hw_mode=g
+    channel=$ch
+    wmm_enabled=1
+    country_code=NL
+    wpa=2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass4
+    bridge=mgmt
     EOF
   '';
 in
@@ -137,6 +154,13 @@ in
         sleep 1
       done
       for _ in $(seq 1 30); do
+        if [ -d /sys/class/net/${mgmtIf} ]; then
+          break
+        fi
+        ${pkgs.iw}/bin/iw phy phy0 interface add ${mgmtIf} type __ap 2>/dev/null || true
+        sleep 1
+      done
+      for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${scanIf} ]; then
           break
         fi
@@ -153,7 +177,7 @@ in
     requires = [ "ap-vap.service" ];
     serviceConfig = {
       ExecStartPre = hostapdConf;
-      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf /run/ap/${unlockIf}.conf";
+      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf /run/ap/${unlockIf}.conf /run/ap/${mgmtIf}.conf";
       Restart = "always";
       RuntimeDirectory = "ap";
     };
