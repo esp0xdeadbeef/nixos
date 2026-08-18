@@ -322,6 +322,17 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
+  - path_regex: '^(secrets/)*s-router-cobalt-wifi\.ya?ml$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-portal-root
+          - *l-portal-deadbeef
+          - *l-envil-root
+          - *l-envil-deadbeef
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-cobalt
   - path_regex: '^(secrets/)*s-router-cobalt.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
@@ -517,6 +528,13 @@ creation_rules:
   - path_regex: '^prod-network/(current|testing)/secrets/devices/[A-Za-z0-9_-]+\.age$'
     input_type: binary
     output_type: binary
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-cobalt
+  - path_regex: '^prod-network/(current|testing)/secrets/devices/[A-Za-z0-9_-]+\.sops\.ya?ml$'
+    encrypted_regex: ".*"
     key_groups:
       - age:
           - *l-esp-root

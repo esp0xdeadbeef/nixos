@@ -52,6 +52,48 @@ in
     path = "/run/secrets/l-portal-mac";
   };
 
+  sops.secrets."cobalt-wifi" = {
+    sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
+    key = "";
+    path = "/run/secrets/cobalt-wifi";
+  };
+
+  systemd.services.cobalt-wifi-env = {
+    description = "Extract cobalt-clients Wi-Fi credentials for NetworkManager";
+    after = [ "sops-install-secrets.service" ];
+    before = [ "NetworkManager-ensure-profiles.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      umask 077
+      ${pkgs.yq-go}/bin/yq -r \
+        '"COBALT_CLIENTS_SSID=" + .["cobalt-clients"].ssid, "COBALT_CLIENTS_PSK=" + .["cobalt-clients"].psk' \
+        /run/secrets/cobalt-wifi > /run/cobalt-wifi.env
+    '';
+  };
+
+  networking.networkmanager.ensureProfiles = {
+    environmentFiles = [ "/run/cobalt-wifi.env" ];
+    profiles.cobalt-clients = {
+      connection = {
+        id = "cobalt-clients";
+        type = "wifi";
+        autoconnect = true;
+        autoconnect-priority = 200;
+      };
+      wifi = {
+        mode = "infrastructure";
+        ssid = "$COBALT_CLIENTS_SSID";
+      };
+      wifi-security = {
+        key-mgmt = "wpa-psk";
+        psk = "$COBALT_CLIENTS_PSK";
+      };
+      ipv4.method = "auto";
+      ipv6.method = "auto";
+    };
+  };
+
   time.timeZone = "Europe/Amsterdam";
 
   nixpkgs = {

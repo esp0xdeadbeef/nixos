@@ -25,26 +25,83 @@
     };
 
     # Network control-plane / renderer graph.
-    #
-    # network-labs is the single flake-aware aggregator for the network-*
-    # repos: its flake.lock pins every repo and wires the cross-repo follows
-    # so each repo appears exactly once. Following that graph here means
-    # `nix flake update` moves the whole graph cleanly and the network-*
-    # repos' own flake.locks are ignored.
+    # network-labs is only used by s-router-nixos, which reads its lab
+    # intent/inventory from the network-labs repo's active-lab directory.
+    # All other network-* inputs are pinned directly here (tracking main),
+    # so `nix flake update` moves them to the latest main without going
+    # through network-labs.
     network-labs = {
       url = "github:esp0xdeadbeef/network-labs";
     };
 
-    network-compiler.follows = "network-labs/network-compiler";
-    network-forwarding-model.follows = "network-labs/network-forwarding-model";
-    network-control-plane-model.follows = "network-labs/network-control-plane-model";
-    network-realization-schema.follows = "network-labs/network-realization-schema";
-    network-realization-model.follows = "network-labs/network-realization-model";
-    nixos-network-compiler.follows = "network-labs/nixos-network-compiler";
-    network-renderer-nixos.follows = "network-labs/network-renderer-nixos";
-    network-renderer-wireguard.follows = "network-labs/network-renderer-wireguard";
-    network-renderer-nebula.follows = "network-labs/network-renderer-nebula";
-    network-renderer-access-endpoint-nixos.follows = "network-labs/network-renderer-access-endpoint-nixos";
+    network-compiler = {
+      url = "github:esp0xdeadbeef/network-compiler";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-labs.follows = "network-labs";
+    };
+
+    network-forwarding-model = {
+      url = "github:esp0xdeadbeef/network-forwarding-model";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-compiler.follows = "network-compiler";
+      inputs.network-labs.follows = "network-labs";
+    };
+
+    network-control-plane-model = {
+      url = "github:esp0xdeadbeef/network-control-plane-model";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-forwarding-model.follows = "network-forwarding-model";
+      inputs.network-labs.follows = "network-labs";
+    };
+
+    network-realization-schema = {
+      url = "github:esp0xdeadbeef/network-realization-schema";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    network-realization-model = {
+      url = "github:esp0xdeadbeef/network-realization-model";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-realization-schema.follows = "network-realization-schema";
+    };
+
+    nixos-network-compiler = {
+      url = "github:esp0xdeadbeef/nixos-network-compiler";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-labs.follows = "network-labs";
+    };
+    network-renderer-nixos = {
+      url = "github:esp0xdeadbeef/network-renderer-nixos";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixos-network-compiler.follows = "nixos-network-compiler";
+      inputs.network-control-plane-model.follows = "network-control-plane-model";
+      inputs.network-forwarding-model.follows = "network-forwarding-model";
+      inputs.network-realization-model.follows = "network-realization-model";
+      inputs.network-labs.follows = "network-labs";
+    };
+
+    network-renderer-wireguard = {
+      url = "github:esp0xdeadbeef/network-renderer-wireguard";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-control-plane-model.follows = "network-control-plane-model";
+      inputs.network-realization-model.follows = "network-realization-model";
+    };
+
+    network-renderer-nebula = {
+      url = "github:esp0xdeadbeef/network-renderer-nebula";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-control-plane-model.follows = "network-control-plane-model";
+      inputs.network-realization-model.follows = "network-realization-model";
+      inputs.network-labs.follows = "network-labs";
+    };
+
+    network-renderer-access-endpoint-nixos = {
+      url = "github:esp0xdeadbeef/network-renderer-access-endpoint-nixos";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-control-plane-model.follows = "network-control-plane-model";
+      inputs.network-realization-model.follows = "network-realization-model";
+      inputs.network-labs.follows = "network-labs";
+    };
 
     network-compiler-prod = {
       url = "github:esp0xdeadbeef/network-compiler/d4f15004ae306951a63e02d5d5dfba8e4e7f46f0";
@@ -118,7 +175,15 @@
       inputs.nixos-network-compiler.follows = "nixos-network-compiler-legacy-prod";
     };
 
-    network-renderer-containerlab-linux-backend.follows = "network-labs/network-renderer-containerlab-linux-backend";
+    network-renderer-containerlab-linux-backend = {
+      url = "github:esp0xdeadbeef/network-renderer-containerlab-linux-backend";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-realization-model.follows = "network-realization-model";
+      inputs.network-compiler.follows = "network-compiler";
+      inputs.network-forwarding-model.follows = "network-forwarding-model";
+      inputs.network-control-plane-model.follows = "network-control-plane-model";
+      inputs.network-labs.follows = "network-labs";
+    };
 
     llm-agents = {
       url = "github:numtide/llm-agents.nix";

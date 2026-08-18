@@ -222,6 +222,9 @@ let
   downstreamAccessClientsVpnLink = "p2p-access-clients-vpn-downstream-selector";
   policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
   downstreamAccessUnlockLink = "p2p-access-unlock-downstream-selector";
+  upstreamPolicyMgmtLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-wan";
+  policyDownstreamMgmtLink = "p2p-downstream-selector-policy--access-access-mgmt";
+  downstreamAccessMgmtLink = "p2p-access-mgmt-downstream-selector";
 
   core =
     (mkNode "core" {
@@ -310,6 +313,13 @@ let
       bridge = "rt-upstream-policy-clients-vpn";
       interfaceName = "policy-clients-vpn";
     };
+
+    policy-mgmt = p2pPort {
+      link = upstreamPolicyMgmtLink;
+      adapterName = "cb-us-p10";
+      bridge = "rt-upstream-policy-mgmt";
+      interfaceName = "policy-mgmt";
+    };
   };
 
   policy = mkNode "policy" {
@@ -346,6 +356,13 @@ let
       adapterName = "cb-p-us9";
       bridge = "rt-upstream-policy-clients-vpn";
       interfaceName = "upstream-clients-vpn";
+    };
+
+    upstream-mgmt = p2pPort {
+      link = upstreamPolicyMgmtLink;
+      adapterName = "cb-p-us10";
+      bridge = "rt-upstream-policy-mgmt";
+      interfaceName = "upstream-mgmt";
     };
 
     downstream-svc = p2pPort {
@@ -395,6 +412,13 @@ let
       adapterName = "cb-p-ds4";
       bridge = "rt-policy-downstream-unlock";
       interfaceName = "downstream-unlock";
+    };
+
+    downstream-mgmt = p2pPort {
+      link = policyDownstreamMgmtLink;
+      adapterName = "cb-p-ds10";
+      bridge = "rt-policy-downstream-mgmt";
+      interfaceName = "downstream-mgmt";
     };
   };
 
@@ -448,6 +472,13 @@ let
       interfaceName = "policy-unlock";
     };
 
+    policy-mgmt = p2pPort {
+      link = policyDownstreamMgmtLink;
+      adapterName = "cb-ds-p10";
+      bridge = "rt-policy-downstream-mgmt";
+      interfaceName = "policy-mgmt";
+    };
+
     access-svc = p2pPort {
       link = downstreamAccessSvcLink;
       adapterName = "cb-ds-a1";
@@ -495,6 +526,13 @@ let
       adapterName = "cb-ds-a4";
       bridge = "rt-downstream-access-unlock";
       interfaceName = "access-unlock";
+    };
+
+    access-mgmt = p2pPort {
+      link = downstreamAccessMgmtLink;
+      adapterName = "cb-ds-a5";
+      bridge = "rt-downstream-access-mgmt";
+      interfaceName = "access-mgmt";
     };
   };
 
@@ -842,6 +880,55 @@ let
       };
     };
 
+  accessMgmt =
+    (mkNode "access-mgmt" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessMgmtLink;
+        adapterName = "cb-am-ds";
+        bridge = "rt-downstream-access-mgmt";
+        interfaceName = "access-mgmt";
+      };
+
+      tenant-mgmt = tenantPort {
+        logicalInterface = "tenant-mgmt";
+        bridge = "mgmt";
+        interfaceName = "mgmt";
+        addr4 = "10.2.10.1/24";
+        addr6 = "fd42:dead:beef:c0a::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-mgmt.ipv4
+            dnsRuntime.requesters.access-mgmt.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-mgmt = dhcp4Advertisement {
+            tenant = "mgmt";
+            interface = "tenant-mgmt";
+            subnet = "10.2.10.0/24";
+            poolStart = "10.2.10.100";
+            poolEnd = "10.2.10.200";
+            router = "10.2.10.1";
+            leaseStatePath = "/var/lib/kea/mgmt.leases";
+            domain = "mgmt.home.arpa.";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-mgmt = slaacRa "tenant-mgmt";
+        };
+      };
+    };
+
   vpnOnyx = mkNode "core-vpn-onyx" {
     upstream-selector = p2pPort {
       link = coreVpnOnyxUpstreamLink;
@@ -900,6 +987,11 @@ in
     cobalt-clients-vpn-dns = {
       ipv4 = [ dnsRuntime.requesters.access-clients-vpn.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-clients-vpn.ipv6 ];
+    };
+
+    cobalt-mgmt-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-mgmt.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-mgmt.ipv6 ];
     };
   };
 
@@ -997,6 +1089,12 @@ in
             vlan = 90;
             parentUplink = "trunk";
           };
+
+          mgmt = {
+            name = "mgmt";
+            vlan = 10;
+            parentUplink = "trunk";
+          };
         };
 
         bridgeNetworks = {
@@ -1021,6 +1119,9 @@ in
           rt-upstream-policy-clients-vpn = { };
           rt-downstream-access-unlock = { };
           rt-policy-downstream-unlock = { };
+          rt-downstream-access-mgmt = { };
+          rt-policy-downstream-mgmt = { };
+          rt-upstream-policy-mgmt = { };
         };
       };
     };
@@ -1057,6 +1158,7 @@ in
       ${nodeName "access-iot"} = accessIot;
       ${nodeName "access-clients-vpn"} = accessClientsVpn;
       ${nodeName "access-unlock"} = accessUnlock;
+      ${nodeName "access-mgmt"} = accessMgmt;
       ${nodeName "core-vpn-onyx"} = vpnOnyx;
     };
   };
