@@ -110,11 +110,11 @@ in
 
       services.tang = {
         enable = true;
-        # Bind all interfaces (the container only has eth0 = 10.2.90.10); the
-        # ipAddressAllow eBPF filter still restricts sources to the tenants.
         # "7500" binds [::]:7500 dual-stack, so it serves both IPv4 and IPv6.
+        # Source restriction is enforced by the cobalt allow-<tenant>-to-tang
+        # firewall rules; the eBPF ipAddressAllow mis-filtered external TCP
+        # inside the container, so it is omitted.
         listenStream = [ "7500" ];
-        ipAddressAllow = tangAllowedSubnets;
       };
 
       # Fixed uid keeps the persisted keypair ownership stable across reboots.
