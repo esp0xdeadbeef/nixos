@@ -112,10 +112,8 @@ in
         enable = true;
         # Bind all interfaces (the container only has eth0 = 10.2.90.10); the
         # ipAddressAllow eBPF filter still restricts sources to the tenants.
-        listenStream = [
-          "0.0.0.0:7500"
-          "[::]:7500"
-        ];
+        # "7500" binds [::]:7500 dual-stack, so it serves both IPv4 and IPv6.
+        listenStream = [ "7500" ];
         ipAddressAllow = tangAllowedSubnets;
       };
 
