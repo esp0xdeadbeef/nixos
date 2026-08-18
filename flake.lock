@@ -3283,7 +3283,8 @@
         "nixpkgs-25_11": "nixpkgs-25_11",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "pin-refresh-source": "pin-refresh-source",
-        "sops-nix": "sops-nix"
+        "sops-nix": "sops-nix",
+        "wifi-ssids": "wifi-ssids"
       }
     },
     "rust-overlay": {
@@ -3375,6 +3376,22 @@
       "original": {
         "owner": "numtide",
         "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "wifi-ssids": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1752593882,
+        "narHash": "sha256-aRCrVW8BZ1mFbdAJE5eS5unl/XLDr6nzZUiiZ6Ec/s0=",
+        "owner": "Bronyte",
+        "repo": "Wifi-Names",
+        "rev": "e4ce861856450bf69dc9e8451d8eb0bc89c0cfca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Bronyte",
+        "repo": "Wifi-Names",
         "type": "github"
       }
     }

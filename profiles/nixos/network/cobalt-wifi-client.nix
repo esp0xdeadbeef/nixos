@@ -1,6 +1,7 @@
 { config
 , lib
 , pkgs
+, inputs
 , relativeRepo
 , ...
 }:
@@ -8,17 +9,20 @@
 let
   cfg = config.local.network.cobalt-wifi-client;
 
+  ssidList = inputs.wifi-ssids.outPath + "/ssids.txt";
+  deriveSsid = pkgs.writeShellScript "derive-ssid" (
+    builtins.readFile (relativeRepo.sourcePath "library/01-general/network/wifi-ssid-derive.sh")
+  );
+
   envName = name: lib.toUpper (lib.replaceStrings [ "-" ] [ "_" ] name);
   envVar = name: field: "${envName name}_${field}";
 
-  yqExpr = lib.concatStringsSep ", " (
-    lib.concatMap
-      (name: [
-        "\"${envVar name "SSID"}=\" + .[\"${name}\"].ssid"
-        "\"${envVar name "PSK"}=\" + .[\"${name}\"].psk"
-      ])
-      cfg.networks
-  );
+  mkEnvLines = lib.concatMapStrings
+    (name: ''
+      printf '%s=%s\n' '${envVar name "SSID"}' "$(${deriveSsid} "$seed" '${name}' ${ssidList} "$used")" >> /run/cobalt-wifi.env
+      printf '%s=%s\n' '${envVar name "PSK"}' "$(${pkgs.yq-go}/bin/yq -r '.["${name}"].psk' /run/secrets/cobalt-wifi)" >> /run/cobalt-wifi.env
+    '')
+    cfg.networks;
 
   mkProfile =
     name:
@@ -83,8 +87,11 @@ in
       serviceConfig.Type = "oneshot";
       script = ''
         umask 077
-        ${pkgs.yq-go}/bin/yq -r '${yqExpr}' \
-          /run/secrets/cobalt-wifi > /run/cobalt-wifi.env
+        seed=$(${pkgs.yq-go}/bin/yq -r '.seed' /run/secrets/cobalt-wifi)
+        used=/run/cobalt-wifi-used
+        rm -f "$used"
+        : > /run/cobalt-wifi.env
+        ${mkEnvLines}
       '';
     };
 
