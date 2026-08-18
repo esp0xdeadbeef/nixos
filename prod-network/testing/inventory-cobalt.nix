@@ -1005,6 +1005,11 @@ in
       ipv4 = [ dnsRuntime.requesters.access-mgmt.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-mgmt.ipv6 ];
     };
+
+    cobalt-unlock-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-unlock.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-unlock.ipv6 ];
+    };
   };
 
   deployment = {
