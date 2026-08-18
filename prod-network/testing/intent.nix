@@ -914,49 +914,49 @@ in
           kind = "tenant";
           name = "svc";
           ipv4 = "10.2.20.0/24";
-          ipv6 = "fd42:dead:beef:c14::/64";
+          ipv6 = "fd42:dead:beef:220::/64";
         }
         {
           kind = "tenant";
           name = "clients";
           ipv4 = "10.2.30.0/24";
-          ipv6 = "fd42:dead:beef:c1e::/64";
+          ipv6 = "fd42:dead:beef:230::/64";
         }
         {
           kind = "tenant";
           name = "iot";
           ipv4 = "10.2.50.0/24";
-          ipv6 = "fd42:dead:beef:c32::/64";
+          ipv6 = "fd42:dead:beef:250::/64";
         }
         {
           kind = "tenant";
           name = "iot-srv";
           ipv4 = "10.2.51.0/24";
-          ipv6 = "fd42:dead:beef:c33::/64";
+          ipv6 = "fd42:dead:beef:251::/64";
         }
         {
           kind = "tenant";
           name = "dmz";
           ipv4 = "10.2.60.0/24";
-          ipv6 = "fd42:dead:beef:c3c::/64";
+          ipv6 = "fd42:dead:beef:260::/64";
         }
         {
           kind = "tenant";
           name = "clients-vpn";
           ipv4 = "10.2.31.0/24";
-          ipv6 = "fd42:dead:beef:c1f::/64";
+          ipv6 = "fd42:dead:beef:231::/64";
         }
         {
           kind = "tenant";
           name = "unlock";
           ipv4 = "10.2.90.0/24";
-          ipv6 = "fd42:dead:beef:c5a::/64";
+          ipv6 = "fd42:dead:beef:290::/64";
         }
         {
           kind = "tenant";
           name = "mgmt";
           ipv4 = "10.2.10.0/24";
-          ipv6 = "fd42:dead:beef:c0a::/64";
+          ipv6 = "fd42:dead:beef:210::/64";
         }
       ];
 

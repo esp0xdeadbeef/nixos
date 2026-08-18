@@ -77,7 +77,7 @@ The endpoint plane has two egress paths:
   the onyx egress ULA pool, so the site's public WAN address and WAN DNS are
   never used for this plane.
 - IPv4: masquerade on `overlay-onyx` for `10.2.31.0/24`. IPv6: NAT66
-  masquerade for `fd42:dead:beef:c1f::/64` (the clients-vpn ULA); the source
+  masquerade for `fd42:dead:beef:231::/64` (the clients-vpn ULA); the source
   is rewritten to the WireGuard tunnel address so AirVPN routes it. Both are
   modeled in the inventory `nat` block (no explicit `toAddress` — the
   masquerade uses the tunnel address).
@@ -120,8 +120,8 @@ source-route rules were dropped in favour of default DHCP/SLAAC behaviour, so
 no client-side routing config is needed.
 
 The USB's DHCP/SLAAC comes only from cobalt (address `10.2.31.x` / ULA
-`fd42:dead:beef:c1f::/64`, default via `10.2.31.1`/`fe80::…`, DNS
-`10.2.31.1` + `fd42:dead:beef:c1f::1`); no home-router DNS is pushed. If the
+`fd42:dead:beef:231::/64`, default via `10.2.31.1`/`fe80::…`, DNS
+`10.2.31.1` + `fd42:dead:beef:231::1`); no home-router DNS is pushed. If the
 client also has a WiFi connection, its resolver ordering is a client-side
 concern.
 
