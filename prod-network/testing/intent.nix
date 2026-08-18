@@ -1338,20 +1338,101 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-icmp-to-tang";
+          id = "allow-clients-to-tang-icmp";
           priority = 84;
           from = {
-            kind = "tenant-set";
-            members = [
-              "clients"
-              "svc"
-              "iot"
-              "iot-srv"
-              "dmz"
-              "clients-vpn"
-              "mgmt"
-              "unlock"
-            ];
+            kind = "tenant";
+            name = "clients";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "svc";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "iot";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "iot-srv";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "dmz";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-vpn-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "clients-vpn";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "mgmt";
           };
           to = {
             kind = "tenant";
