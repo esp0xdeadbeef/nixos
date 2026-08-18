@@ -109,7 +109,9 @@ in
 
       services.tang = {
         enable = true;
-        listenStream = [ "10.2.90.10:7500" ];
+        # Bind all interfaces (the container only has eth0 = 10.2.90.10); the
+        # ipAddressAllow eBPF filter still restricts sources to the tenants.
+        listenStream = [ "7500" ];
         ipAddressAllow = tangAllowedSubnets;
       };
 
