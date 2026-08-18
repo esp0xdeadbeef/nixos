@@ -1229,6 +1229,111 @@ in
           returnBehavior = "symmetric";
         }
         {
+          id = "allow-clients-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "clients";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "svc";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "iot";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "iot-srv";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "dmz";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-vpn-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "clients-vpn";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "mgmt";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-mgmt-to-mgmt-dns";
           priority = 88;
           from = {
