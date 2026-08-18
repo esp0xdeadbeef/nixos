@@ -2,7 +2,8 @@
 
 let
   dnsRuntime = import (relativeRepo.sourcePath "prod-network/testing/dns-runtime-addresses-cobalt.nix");
-  tangAllowedSubnets = builtins.map (r: r.clientIpv4) (builtins.attrValues dnsRuntime.requesters);
+  requesterValues = builtins.attrValues dnsRuntime.requesters;
+  tangAllowedSubnets = map (r: r.clientIpv4) requesterValues ++ map (r: r.clientIpv6) requesterValues;
 in
 
 {
@@ -111,7 +112,10 @@ in
         enable = true;
         # Bind all interfaces (the container only has eth0 = 10.2.90.10); the
         # ipAddressAllow eBPF filter still restricts sources to the tenants.
-        listenStream = [ "7500" ];
+        listenStream = [
+          "0.0.0.0:7500"
+          "[::]:7500"
+        ];
         ipAddressAllow = tangAllowedSubnets;
       };
 
