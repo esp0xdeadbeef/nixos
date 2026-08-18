@@ -185,6 +185,11 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "ap-vap.service" ];
     requires = [ "ap-vap.service" ];
+    path = [
+      pkgs.coreutils
+      pkgs.gawk
+      pkgs.gnugrep
+    ];
     serviceConfig = {
       ExecStartPre = hostapdConf;
       ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf /run/ap/${unlockIf}.conf /run/ap/${mgmtIf}.conf";
