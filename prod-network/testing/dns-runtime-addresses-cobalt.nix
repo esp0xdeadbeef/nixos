@@ -15,58 +15,58 @@
   requesters = {
     access-svc = {
       ipv4 = "10.2.20.1";
-      ipv6 = "fd42:dead:beef:c14::1";
+      ipv6 = "fd42:dead:beef:220::1";
       clientIpv4 = "10.2.20.0/24";
-      clientIpv6 = "fd42:dead:beef:c14::/64";
+      clientIpv6 = "fd42:dead:beef:220::/64";
     };
 
     access-clients = {
       ipv4 = "10.2.30.1";
-      ipv6 = "fd42:dead:beef:c1e::1";
+      ipv6 = "fd42:dead:beef:230::1";
       clientIpv4 = "10.2.30.0/24";
-      clientIpv6 = "fd42:dead:beef:c1e::/64";
+      clientIpv6 = "fd42:dead:beef:230::/64";
     };
 
     access-dmz = {
       ipv4 = "10.2.60.1";
-      ipv6 = "fd42:dead:beef:c3c::1";
+      ipv6 = "fd42:dead:beef:260::1";
       clientIpv4 = "10.2.60.0/24";
-      clientIpv6 = "fd42:dead:beef:c3c::/64";
+      clientIpv6 = "fd42:dead:beef:260::/64";
     };
 
     access-iot-srv = {
       ipv4 = "10.2.51.1";
-      ipv6 = "fd42:dead:beef:c33::1";
+      ipv6 = "fd42:dead:beef:251::1";
       clientIpv4 = "10.2.51.0/24";
-      clientIpv6 = "fd42:dead:beef:c33::/64";
+      clientIpv6 = "fd42:dead:beef:251::/64";
     };
 
     access-iot = {
       ipv4 = "10.2.50.1";
-      ipv6 = "fd42:dead:beef:c32::1";
+      ipv6 = "fd42:dead:beef:250::1";
       clientIpv4 = "10.2.50.0/24";
-      clientIpv6 = "fd42:dead:beef:c32::/64";
+      clientIpv6 = "fd42:dead:beef:250::/64";
     };
 
     access-clients-vpn = {
       ipv4 = "10.2.31.1";
-      ipv6 = "fd42:dead:beef:c1f::1";
+      ipv6 = "fd42:dead:beef:231::1";
       clientIpv4 = "10.2.31.0/24";
-      clientIpv6 = "fd42:dead:beef:c1f::/64";
+      clientIpv6 = "fd42:dead:beef:231::/64";
     };
 
     access-unlock = {
       ipv4 = "10.2.90.1";
-      ipv6 = "fd42:dead:beef:c5a::1";
+      ipv6 = "fd42:dead:beef:290::1";
       clientIpv4 = "10.2.90.0/24";
-      clientIpv6 = "fd42:dead:beef:c5a::/64";
+      clientIpv6 = "fd42:dead:beef:290::/64";
     };
 
     access-mgmt = {
       ipv4 = "10.2.10.1";
-      ipv6 = "fd42:dead:beef:c0a::1";
+      ipv6 = "fd42:dead:beef:210::1";
       clientIpv4 = "10.2.10.0/24";
-      clientIpv6 = "fd42:dead:beef:c0a::/64";
+      clientIpv6 = "fd42:dead:beef:210::/64";
     };
   };
 }
