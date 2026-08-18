@@ -85,7 +85,6 @@ Conventional commits: `type(scope): description`
 ├── prod-network/           # Network prod-pin scripts
 ├── .github/workflows/      # CI workflows
 ├── flake.nix               # Flake entry point
-├── deploy.sh               # nixos-rebuild wrapper
 └── .sops.yaml              # SOPS encryption keys
 ```
 
@@ -153,7 +152,7 @@ Conventional commits: `type(scope): description`
 - Format touched Nix files with `nix fmt` (runs nixpkgs-fmt on all .nix files, or on explicit file args).
 - Run `nix flake check --all-systems` after meaningful Nix changes.
 
-Do not run `nixos-rebuild switch`, deploy scripts, or other apply/deploy commands
+Do not run `nixos-rebuild switch` or other apply/deploy commands
 unless the user explicitly asks for that.
 
 ## Nix eval
