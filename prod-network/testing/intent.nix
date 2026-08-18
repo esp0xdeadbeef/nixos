@@ -1,4 +1,6 @@
 let
+  traceroutePorts = builtins.genList (x: 33434 + x) 90;
+
   trafficTypes = [
     {
       name = "icmp";
@@ -99,6 +101,17 @@ let
         {
           proto = "tcp";
           dports = [ 7500 ];
+          family = "any";
+        }
+      ];
+    }
+
+    {
+      name = "traceroute";
+      match = [
+        {
+          proto = "udp";
+          dports = traceroutePorts;
           family = "any";
         }
       ];
@@ -1439,6 +1452,111 @@ in
             name = "unlock";
           };
           trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "clients";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "svc";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "iot";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "iot-srv";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "dmz";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-vpn-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "clients-vpn";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "mgmt";
+          };
+          to = {
+            kind = "tenant";
+            name = "unlock";
+          };
+          trafficType = "traceroute";
           action = "allow";
           returnBehavior = "symmetric";
         }
