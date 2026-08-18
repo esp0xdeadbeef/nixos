@@ -1238,7 +1238,11 @@ in
                 services = {
                   dhcp4.enable = false;
                   ra.enable = false;
-                  healthCheck.enable = false;
+                  healthCheck = {
+                    enable = true;
+                    target4 = "1.1.1.1";
+                    interval = "60s";
+                  };
                 };
               };
               runtimeNodes = { };
