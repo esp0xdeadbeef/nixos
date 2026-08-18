@@ -26,6 +26,7 @@ in
     profiles.nixos.sops.persist-root-ssh
     profiles.nixos.ssh.password-login
     profiles.nixos.users.deadbeef-sops
+    profiles.nixos.users.sudo-nopasswd
 
     inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops

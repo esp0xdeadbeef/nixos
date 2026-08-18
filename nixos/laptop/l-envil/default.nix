@@ -14,6 +14,7 @@
     profiles.nixos.llm.open-webui
     profiles.nixos.containers.firefox-vnc
     profiles.nixos.ssh.password-login
+    profiles.nixos.users.sudo-nopasswd
 
     inputs.disko.nixosModules.disko
     inputs.nixos-hardware.nixosModules.common-cpu-intel
