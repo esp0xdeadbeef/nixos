@@ -550,7 +550,7 @@ let
         bridge = "clients";
         interfaceName = "clients";
         addr4 = "10.2.30.1/24";
-        addr6 = "fd42:dead:beef:c1e::1/64";
+        addr6 = "fd42:dead:beef:230::1/64";
       };
     })
     // {
@@ -600,7 +600,7 @@ let
         bridge = "svc";
         interfaceName = "svc";
         addr4 = "10.2.20.1/24";
-        addr6 = "fd42:dead:beef:c14::1/64";
+        addr6 = "fd42:dead:beef:220::1/64";
       };
     })
     // {
@@ -650,7 +650,7 @@ let
         bridge = "dmz";
         interfaceName = "dmz";
         addr4 = "10.2.60.1/24";
-        addr6 = "fd42:dead:beef:c3c::1/64";
+        addr6 = "fd42:dead:beef:260::1/64";
       };
     })
     // {
@@ -697,7 +697,7 @@ let
         bridge = "iot-srv";
         interfaceName = "iot-srv";
         addr4 = "10.2.51.1/24";
-        addr6 = "fd42:dead:beef:c33::1/64";
+        addr6 = "fd42:dead:beef:251::1/64";
       };
     })
     // {
@@ -746,7 +746,7 @@ let
         bridge = "iot";
         interfaceName = "iot";
         addr4 = "10.2.50.1/24";
-        addr6 = "fd42:dead:beef:c32::1/64";
+        addr6 = "fd42:dead:beef:250::1/64";
       };
     })
     // {
@@ -797,7 +797,7 @@ let
         bridge = "clients-vpn";
         interfaceName = "clients-vpn";
         addr4 = "10.2.31.1/24";
-        addr6 = "fd42:dead:beef:c1f::1/64";
+        addr6 = "fd42:dead:beef:231::1/64";
       };
     })
     // {
@@ -847,7 +847,7 @@ let
         bridge = "unlock";
         interfaceName = "unlock";
         addr4 = "10.2.90.1/24";
-        addr6 = "fd42:dead:beef:c5a::1/64";
+        addr6 = "fd42:dead:beef:290::1/64";
       };
     })
     // {
@@ -894,7 +894,7 @@ let
         bridge = "mgmt";
         interfaceName = "mgmt";
         addr4 = "10.2.10.1/24";
-        addr6 = "fd42:dead:beef:c0a::1/64";
+        addr6 = "fd42:dead:beef:210::1/64";
       };
     })
     // {
@@ -1230,7 +1230,7 @@ in
                   };
                   ipv6 = {
                     enable = true;
-                    sourceCidrs = [ "fd42:dead:beef:c1e::/64" "fd42:dead:beef:c1f::/64" ];
+                    sourceCidrs = [ "fd42:dead:beef:230::/64" "fd42:dead:beef:231::/64" ];
                   };
                 };
                 publicIngress = [ ];
