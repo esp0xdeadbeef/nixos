@@ -42,6 +42,15 @@
       IPv6AcceptRA = false;
       LLDP = false;
     };
+    routes = [
+      { Gateway = "10.2.90.1"; Destination = "10.2.10.0/24"; }
+      { Gateway = "10.2.90.1"; Destination = "10.2.20.0/24"; }
+      { Gateway = "10.2.90.1"; Destination = "10.2.30.0/24"; }
+      { Gateway = "10.2.90.1"; Destination = "10.2.31.0/24"; }
+      { Gateway = "10.2.90.1"; Destination = "10.2.50.0/24"; }
+      { Gateway = "10.2.90.1"; Destination = "10.2.51.0/24"; }
+      { Gateway = "10.2.90.1"; Destination = "10.2.60.0/24"; }
+    ];
     linkConfig.RequiredForOnline = false;
   };
 
