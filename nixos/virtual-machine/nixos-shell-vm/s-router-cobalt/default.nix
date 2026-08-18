@@ -12,9 +12,9 @@ let
   deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
   deviceIds =
     map
-      (name: lib.removeSuffix ".age" name)
+      (name: lib.removeSuffix ".sops.yaml" name)
       (builtins.filter
-        (name: lib.hasSuffix ".age" name)
+        (name: lib.hasSuffix ".sops.yaml" name)
         (builtins.attrNames (builtins.readDir deviceDir)));
   qemuNetworkingOptions = [
     "-nic none"
@@ -67,8 +67,9 @@ in
         (id: {
           name = "cobalt-device-${id}";
           value = {
-            sopsFile = "${deviceDir}/${id}.age";
-            format = "binary";
+            sopsFile = "${deviceDir}/${id}.sops.yaml";
+            key = "mac";
+            format = "yaml";
             path = "/run/secrets/devices/${id}";
           };
         })
@@ -111,40 +112,10 @@ in
         path = "/run/secrets/onyx-dns";
       };
 
-      "cobalt-wifi-clients" = {
+      "cobalt-wifi" = {
         sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
-        key = "wifi-clients";
-        path = "/run/secrets/wifi-clients";
-      };
-
-      "cobalt-wifi-clients-vpn" = {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
-        key = "wifi-clients-vpn";
-        path = "/run/secrets/wifi-clients-vpn";
-      };
-
-      "cobalt-wifi-ssid-clients" = {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
-        key = "ssid-clients";
-        path = "/run/secrets/wifi-ssid-clients";
-      };
-
-      "cobalt-wifi-ssid-clients-vpn" = {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
-        key = "ssid-clients-vpn";
-        path = "/run/secrets/wifi-ssid-clients-vpn";
-      };
-
-      "cobalt-wifi-unlock" = {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
-        key = "wifi-unlock";
-        path = "/run/secrets/wifi-unlock";
-      };
-
-      "cobalt-wifi-ssid-unlock" = {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
-        key = "ssid-unlock";
-        path = "/run/secrets/wifi-ssid-unlock";
+        key = "";
+        path = "/run/secrets/cobalt-wifi";
       };
     };
 

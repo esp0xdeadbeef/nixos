@@ -61,5 +61,12 @@
       clientIpv4 = "10.2.90.0/24";
       clientIpv6 = "fd42:dead:beef:c5a::/64";
     };
+
+    access-mgmt = {
+      ipv4 = "10.2.10.1";
+      ipv6 = "fd42:dead:beef:c0a::1";
+      clientIpv4 = "10.2.10.0/24";
+      clientIpv6 = "fd42:dead:beef:c0a::/64";
+    };
   };
 }

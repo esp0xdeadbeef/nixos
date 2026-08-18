@@ -112,9 +112,8 @@ let
       };
       to = {
         kind = "external";
-        name = "wan";
+        uplinks = [ "wan" ];
       };
-      trafficType = "any";
       action = "allow";
       returnBehavior = "symmetric";
     };
@@ -953,6 +952,12 @@ in
           ipv4 = "10.2.90.0/24";
           ipv6 = "fd42:dead:beef:c5a::/64";
         }
+        {
+          kind = "tenant";
+          name = "mgmt";
+          ipv4 = "10.2.10.0/24";
+          ipv6 = "fd42:dead:beef:c0a::/64";
+        }
       ];
 
       endpoints = [
@@ -997,6 +1002,12 @@ in
           name = "cobalt-tang";
           tenant = "unlock";
           ipv4 = [ "10.2.90.10" ];
+        }
+        {
+          kind = "host";
+          name = "cobalt-mgmt-dns";
+          tenant = "mgmt";
+          ipv4 = [ "10.2.10.1" ];
         }
       ];
     };
@@ -1044,6 +1055,11 @@ in
           name = "tang";
           providers = [ "cobalt-tang" ];
           trafficType = "tang";
+        }
+        {
+          name = "mgmt-dns";
+          providers = [ "cobalt-mgmt-dns" ];
+          trafficType = "dns";
         }
       ];
 
@@ -1213,6 +1229,21 @@ in
           returnBehavior = "symmetric";
         }
         {
+          id = "allow-mgmt-to-mgmt-dns";
+          priority = 88;
+          from = {
+            kind = "tenant";
+            name = "mgmt";
+          };
+          to = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
           id = "allow-clients-dns-to-wan";
           priority = 90;
           from = {
@@ -1276,10 +1307,27 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
+        {
+          id = "allow-mgmt-dns-to-wan";
+          priority = 95;
+          from = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
         (allowTenantToWan "clients" 100)
         (allowTenantToWan "svc" 110)
         (allowTenantToWan "iot" 120)
         (allowTenantToWan "iot-srv" 130)
+        (allowTenantToWan "mgmt" 140)
         {
           id = "allow-clients-vpn-to-onyx";
           priority = 85;
@@ -1321,6 +1369,7 @@ in
       tenant-dmz = "dmz";
       tenant-clients-vpn = "clients-vpn";
       tenant-unlock = "unlock";
+      tenant-mgmt = "mgmt";
       external-wan = "wan";
       service-svc-dns = "svc-dns";
       service-clients-dns = "clients-dns";
@@ -1329,6 +1378,7 @@ in
       service-iot-srv-dns = "iot-srv-dns";
       service-dmz-dns = "dmz-dns";
       service-tang = "tang";
+      service-mgmt-dns = "mgmt-dns";
     };
 
     recursiveDnsIntent = {
@@ -1399,6 +1449,36 @@ in
           from = {
             kind = "service";
             name = "clients-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-core-dns";
+          priority = 89;
+          from = {
+            kind = "tenant";
+            name = "mgmt";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-dns-to-core-dns";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "mgmt-dns";
           };
           to = {
             kind = "service";
@@ -1825,6 +1905,16 @@ in
             }
           ];
         };
+
+        access-mgmt = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "mgmt";
+            }
+          ];
+        };
       };
 
       links = [
@@ -1871,6 +1961,10 @@ in
         [
           "downstream-selector"
           "access-unlock"
+        ]
+        [
+          "downstream-selector"
+          "access-mgmt"
         ]
       ];
     };
