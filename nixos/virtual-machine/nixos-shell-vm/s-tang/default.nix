@@ -129,6 +129,9 @@ in
       # echo is the only thing allowed by default, which is why ping worked
       # while curl failed).
       networking.firewall.allowedTCPPorts = [ 7500 ];
+      # Allow the standard traceroute UDP probe range so the kernel replies
+      # with ICMP port-unreachable (the destination hop of a UDP traceroute).
+      networking.firewall.allowedUDPPorts = lib.range 33434 33523;
 
       # Fixed uid keeps the persisted keypair ownership stable across reboots.
       users.users.tang = {
