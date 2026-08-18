@@ -126,7 +126,13 @@ let
         type = "static";
       }
     ];
-    localRecords = [ ];
+    localRecords = [
+      {
+        name = "tang.unlock.home.arpa.";
+        a = [ "10.2.90.10" ];
+        aaaa = [ "fd42:dead:beef:290::10" ];
+      }
+    ];
   };
 
   protectedReservationSource = sourceFile: {
