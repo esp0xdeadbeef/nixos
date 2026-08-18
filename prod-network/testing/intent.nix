@@ -1026,6 +1026,12 @@ in
           tenant = "mgmt";
           ipv4 = [ "10.2.10.1" ];
         }
+        {
+          kind = "host";
+          name = "cobalt-unlock-dns";
+          tenant = "unlock";
+          ipv4 = [ "10.2.90.1" ];
+        }
       ];
     };
 
@@ -1074,6 +1080,11 @@ in
           trafficType = "tang";
         }
         {
+          name = "unlock-dns";
+          providers = [ "cobalt-unlock-dns" ];
+          trafficType = "dns";
+        }
+        {
           name = "mgmt-dns";
           providers = [ "cobalt-mgmt-dns" ];
           trafficType = "dns";
@@ -1106,6 +1117,21 @@ in
           to = {
             kind = "service";
             name = "clients-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-dns-to-unlock-dns";
+          priority = 81;
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "service";
+            name = "unlock-dns";
           };
           trafficType = "dns";
           action = "allow";
@@ -1711,6 +1737,7 @@ in
       service-dmz-dns = "dmz-dns";
       service-tang = "tang";
       service-mgmt-dns = "mgmt-dns";
+      service-unlock-dns = "unlock-dns";
     };
 
     recursiveDnsIntent = {
@@ -2079,55 +2106,105 @@ in
       ];
     };
 
-    localDnsSharingIntent = {
-      namespace = "home.arpa.";
-      authority = {
-        service = "clients-dns";
-        records = [
-          "clients-kea-local-data"
-          "dmz-static-local-data"
-        ];
-      };
-      requester = {
-        service = "dmz-dns";
-        allowedNamespaces = [
-          "home.arpa."
-          "30.2.10.in-addr.arpa."
-        ];
-        recursion = false;
-        publicFallback = false;
-      };
-      relation = {
-        id = "allow-dmz-dns-to-clients-dns";
-        from = {
-          kind = "service";
-          name = "dmz-dns";
+    localDnsSharingIntent = [
+      {
+        namespace = "home.arpa.";
+        authority = {
+          service = "clients-dns";
+          records = [
+            "clients-kea-local-data"
+            "dmz-static-local-data"
+          ];
         };
-        to = {
-          kind = "service";
-          name = "clients-dns";
+        requester = {
+          service = "dmz-dns";
+          allowedNamespaces = [
+            "home.arpa."
+            "30.2.10.in-addr.arpa."
+          ];
+          recursion = false;
+          publicFallback = false;
         };
-        trafficType = "dns";
-        returnBehavior = "symmetric";
-        resolverPath = [
-          "access-dmz"
-          "downstream-selector"
-          "access-clients"
-        ];
-      };
-      providerPolicy = {
-        source = "dmz-dns";
-        action = "refuse_non_local";
-      };
-      lateralPolicy = {
-        source = "clients";
-        target = "dmz-dns";
-        localData = true;
-        recursion = false;
-        transitiveEgress = false;
-        action = "refuse_non_local";
-      };
-    };
+        relation = {
+          id = "allow-dmz-dns-to-clients-dns";
+          from = {
+            kind = "service";
+            name = "dmz-dns";
+          };
+          to = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          trafficType = "dns";
+          returnBehavior = "symmetric";
+          resolverPath = [
+            "access-dmz"
+            "downstream-selector"
+            "access-clients"
+          ];
+        };
+        providerPolicy = {
+          source = "dmz-dns";
+          action = "refuse_non_local";
+        };
+        lateralPolicy = {
+          source = "clients";
+          target = "dmz-dns";
+          localData = true;
+          recursion = false;
+          transitiveEgress = false;
+          action = "refuse_non_local";
+        };
+      }
+      {
+        namespace = "home.arpa.";
+        authority = {
+          service = "unlock-dns";
+          records = [
+            "unlock-static-local-data"
+          ];
+        };
+        requester = {
+          service = "clients-dns";
+          allowedNamespaces = [
+            "unlock.home.arpa."
+            "90.2.10.in-addr.arpa."
+          ];
+          recursion = false;
+          publicFallback = false;
+        };
+        relation = {
+          id = "allow-clients-dns-to-unlock-dns";
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "service";
+            name = "unlock-dns";
+          };
+          trafficType = "dns";
+          returnBehavior = "symmetric";
+          resolverPath = [
+            "access-clients"
+            "downstream-selector"
+            "access-unlock"
+          ];
+        };
+        providerPolicy = {
+          source = "clients-dns";
+          action = "refuse_non_local";
+        };
+        lateralPolicy = {
+          source = "unlock";
+          target = "clients-dns";
+          localData = true;
+          recursion = false;
+          transitiveEgress = false;
+          action = "refuse_non_local";
+        };
+      }
+    ];
 
     topology = {
       nodes = {
