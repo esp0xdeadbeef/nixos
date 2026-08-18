@@ -49,7 +49,16 @@
     enable = true;
     listenStream = [ "10.2.90.10:7500" ];
     # The unlock tenant subnet is the only permitted source.
-    ipAddressAllow = [ "10.2.90.0/24" ];
+    ipAddressAllow = [
+      "10.2.10.0/24"
+      "10.2.20.0/24"
+      "10.2.30.0/24"
+      "10.2.31.0/24"
+      "10.2.50.0/24"
+      "10.2.51.0/24"
+      "10.2.60.0/24"
+      "10.2.90.0/24"
+    ];
   };
 
   # Tang's server keypair must survive reboots or every bound LUKS disk loses
