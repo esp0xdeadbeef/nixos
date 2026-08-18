@@ -1,10 +1,12 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, inputs, relativeRepo, ... }:
 
 # Temporary ALFA USB AP on the cobalt VM host. The USB device is passed
 # through via qemu-xhci and appears as wlan0 in the VM's own netns. We drive
-# hostapd directly (not via the NixOS hostapd module) so the SSIDs and
-# passphrases come from SOPS at runtime and no explicit bssid is required --
-# the rt2800usb cannot reliably change its MAC over the passthrough.
+# hostapd directly (not via the NixOS hostapd module) so the passphrases come
+# from SOPS at runtime and no explicit bssid is required -- the rt2800usb
+# cannot reliably change its MAC over the passthrough. SSIDs are derived
+# deterministically from a SOPS seed + the vendored wardriving SSID list, so
+# no recognizable SSID is ever hardcoded.
 #
 # At startup a spare station VAP (wlan0-scan) scans the 2.4GHz band and the
 # least-congested of channels 1/6/11 is selected for the AP VAPs; no
@@ -15,6 +17,11 @@ let
   mgmtIf = "wlan0-3";
   scanIf = "wlan0-scan";
   ctrl = "/run/ap";
+
+  ssidList = inputs.wifi-ssids.outPath + "/ssids.txt";
+  deriveSsid = pkgs.writeShellScript "derive-ssid" (
+    builtins.readFile (relativeRepo.sourcePath "library/01-general/network/wifi-ssid-derive.sh")
+  );
 
   hostapdConf = pkgs.writeShellScript "make-ap-hostapd-conf" ''
     set -euo pipefail
@@ -50,10 +57,13 @@ let
     YQ=${pkgs.yq-go}/bin/yq
     SEC=/run/secrets/cobalt-wifi
 
-    ssid1=$("$YQ" -r '.cobalt-clients.ssid' "$SEC")
-    ssid2=$("$YQ" -r '.cobalt-clients-vpn.ssid' "$SEC")
+    seed=$("$YQ" -r '.seed' "$SEC")
+    used=/run/ap/used-ssids
+    rm -f "$used"
+    ssid1=$(${deriveSsid} "$seed" clients ${ssidList} "$used")
+    ssid2=$(${deriveSsid} "$seed" clients-vpn ${ssidList} "$used")
     ssid3=$("$YQ" -r '.cobalt-unlock.ssid' "$SEC")
-    ssid4=$("$YQ" -r '.cobalt-mgmt.ssid' "$SEC")
+    ssid4=$(${deriveSsid} "$seed" mgmt ${ssidList} "$used")
     pass1=$("$YQ" -r '.cobalt-clients.psk' "$SEC")
     pass2=$("$YQ" -r '.cobalt-clients-vpn.psk' "$SEC")
     pass3=$("$YQ" -r '.cobalt-unlock.psk' "$SEC")
@@ -65,7 +75,7 @@ let
     logger_syslog_level=0
     interface=${wifiIf}
     driver=nl80211
-    ssid=$ssid1
+    ssid="$ssid1"
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -73,7 +83,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase=$pass1
+    wpa_passphrase="$pass1"
     bridge=clients
     EOF
     cat > /run/ap/${wifiIf}-1.conf <<EOF
@@ -82,7 +92,7 @@ let
     logger_syslog_level=0
     interface=${wifiIf}-1
     driver=nl80211
-    ssid=$ssid2
+    ssid="$ssid2"
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -90,7 +100,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase=$pass2
+    wpa_passphrase="$pass2"
     bridge=clients-vpn
     EOF
     cat > /run/ap/${unlockIf}.conf <<EOF
@@ -99,7 +109,7 @@ let
     logger_syslog_level=0
     interface=${unlockIf}
     driver=nl80211
-    ssid=$ssid3
+    ssid="$ssid3"
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -107,7 +117,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase=$pass3
+    wpa_passphrase="$pass3"
     bridge=unlock
     EOF
     cat > /run/ap/${mgmtIf}.conf <<EOF
@@ -116,7 +126,7 @@ let
     logger_syslog_level=0
     interface=${mgmtIf}
     driver=nl80211
-    ssid=$ssid4
+    ssid="$ssid4"
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -124,7 +134,7 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase=$pass4
+    wpa_passphrase="$pass4"
     bridge=mgmt
     EOF
   '';

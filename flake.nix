@@ -19,6 +19,14 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    # Raw wardriving SSID list (Bronyte/Wifi-Names); used to derive
+    # plausible, boring Wi-Fi SSIDs from a SOPS seed instead of hardcoding
+    # recognizable names. flake = false so only the tree is fetched.
+    wifi-ssids = {
+      url = "github:Bronyte/Wifi-Names";
+      flake = false;
+    };
+
     nixos-mailserver = {
       url = "gitlab:simple-nixos-mailserver/nixos-mailserver/nixos-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
