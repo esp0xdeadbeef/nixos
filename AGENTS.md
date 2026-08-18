@@ -155,6 +155,21 @@ Conventional commits: `type(scope): description`
 Do not run `nixos-rebuild switch` or other apply/deploy commands
 unless the user explicitly asks for that.
 
+## Tool documentation
+
+When you need to know a tool's configuration syntax, option names, or data
+formats (kea, radvd, hostapd, …), read the docs/examples the package ships —
+don't guess. Pull the package into a shell and read its `share/doc` tree:
+
+```bash
+nix shell nixpkgs#kea -c bash -c 'which kea-dhcp4'
+# then inspect <store-path>/share/doc/kea/ (e.g. examples/kea4/all-options.json)
+```
+
+Examples live under `<store-path>/share/doc/<pkg>/` and are authoritative for
+exact option names and formats (kea's `all-options.json` documents every DHCP
+option, including classless-static-route 121's `dst - router` dash format).
+
 ## Nix eval
 
 When verifying config output before deploying:
