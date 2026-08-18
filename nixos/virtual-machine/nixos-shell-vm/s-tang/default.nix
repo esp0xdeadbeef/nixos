@@ -148,7 +148,9 @@ in
   virtualisation.cores = 2;
   virtualisation.memorySize = 1024;
   virtualisation.diskSize = 2048;
-  virtualisation.qemu.networkingOptions = [
+  # Only the cobalt trunk NIC; no user-mode NAT (the guest agent socket is the
+  # management channel, and the mgmt VLAN 10 provides the host network).
+  virtualisation.qemu.networkingOptions = lib.mkForce [
     "-nic bridge,br=br-cobalt-lan,model=virtio-net-pci"
   ];
 }
