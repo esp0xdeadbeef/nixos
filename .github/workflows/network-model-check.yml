@@ -1,0 +1,43 @@
+name: "Network model check"
+
+on:
+  push:
+    paths:
+      - "prod-network/**"
+      - "nixos/virtual-machine/nixos-shell-vm/s-router-*/**"
+      - "flake.lock"
+  pull_request:
+    paths:
+      - "prod-network/**"
+      - "nixos/virtual-machine/nixos-shell-vm/s-router-*/**"
+      - "flake.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  router-configs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Evaluate network router configurations
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # These two renderers compile the shared prod-network/testing model
+          # (intent.nix + combined inventory) through the CPM, realization
+          # model, and NixOS renderer. Evaluating their toplevel derivations
+          # is the cheapest way to catch an infinitely-recursive rendered
+          # config (e.g. a forwarding-model normalization cycle) before it
+          # reaches a host rebuild.
+          for host in s-router-neon s-router-cobalt; do
+            echo "::group::Checking ${host}"
+            nix derivation show \
+              ".#nixosConfigurations.${host}.config.system.build.toplevel" \
+              >/dev/null
+            echo "::endgroup::"
+          done
