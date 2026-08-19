@@ -9,8 +9,8 @@
   l-portal-usb = {
     hostname = "l-portal";
     scopes = {
-      clients = 10;
-      iot = 10;
+      cobalt-clients = 10;
+      cobalt-iot = 10;
     };
   };
 }

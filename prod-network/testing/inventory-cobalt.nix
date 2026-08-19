@@ -580,7 +580,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-clients = dhcp4Advertisement {
-            tenant = "clients";
+            tenant = "cobalt-clients";
             interface = "tenant-clients";
             subnet = "10.2.30.0/24";
             poolStart = "10.2.30.100";
@@ -588,7 +588,7 @@ let
             router = "10.2.30.1";
             leaseStatePath = "/var/lib/kea/clients.leases";
             domain = "clients.home.arpa.";
-            reservations = reservationsFor "clients";
+            reservations = reservationsFor "cobalt-clients";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
@@ -630,7 +630,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-svc = dhcp4Advertisement {
-            tenant = "svc";
+            tenant = "cobalt-svc";
             interface = "tenant-svc";
             subnet = "10.2.20.0/24";
             poolStart = "10.2.20.100";
@@ -678,7 +678,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-dmz = dhcp4Advertisement {
-            tenant = "dmz";
+            tenant = "cobalt-dmz";
             interface = "tenant-dmz";
             subnet = "10.2.60.0/24";
             poolStart = "10.2.60.100";
@@ -727,7 +727,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-iot-srv = dhcp4Advertisement {
-            tenant = "iot-srv";
+            tenant = "cobalt-iot-srv";
             interface = "tenant-iot-srv";
             subnet = "10.2.51.0/24";
             poolStart = "10.2.51.100";
@@ -776,7 +776,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-iot = dhcp4Advertisement {
-            tenant = "iot";
+            tenant = "cobalt-iot";
             interface = "tenant-iot";
             subnet = "10.2.50.0/24";
             poolStart = "10.2.50.100";
@@ -784,7 +784,7 @@ let
             router = "10.2.50.1";
             leaseStatePath = "/var/lib/kea/iot.leases";
             domain = "iot.home.arpa.";
-            reservations = reservationsFor "iot";
+            reservations = reservationsFor "cobalt-iot";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
@@ -827,7 +827,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-clients-vpn = dhcp4Advertisement {
-            tenant = "clients-vpn";
+            tenant = "cobalt-clients-vpn";
             interface = "tenant-clients-vpn";
             subnet = "10.2.31.0/24";
             poolStart = "10.2.31.100";
@@ -875,7 +875,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-unlock = dhcp4Advertisement {
-            tenant = "unlock";
+            tenant = "cobalt-unlock";
             interface = "tenant-unlock";
             subnet = "10.2.90.0/24";
             poolStart = "10.2.90.100";
@@ -924,7 +924,7 @@ let
       advertisements = {
         dhcp4 = {
           tenant-mgmt = dhcp4Advertisement {
-            tenant = "mgmt";
+            tenant = "cobalt-mgmt";
             interface = "tenant-mgmt";
             subnet = "10.2.10.0/24";
             poolStart = "10.2.10.100";
