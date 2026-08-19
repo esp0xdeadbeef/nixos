@@ -929,49 +929,49 @@ in
       prefixes = [
         {
           kind = "tenant";
-          name = "svc";
+          name = "cobalt-svc";
           ipv4 = "10.2.20.0/24";
           ipv6 = "fd42:dead:beef:220::/64";
         }
         {
           kind = "tenant";
-          name = "clients";
+          name = "cobalt-clients";
           ipv4 = "10.2.30.0/24";
           ipv6 = "fd42:dead:beef:230::/64";
         }
         {
           kind = "tenant";
-          name = "iot";
+          name = "cobalt-iot";
           ipv4 = "10.2.50.0/24";
           ipv6 = "fd42:dead:beef:250::/64";
         }
         {
           kind = "tenant";
-          name = "iot-srv";
+          name = "cobalt-iot-srv";
           ipv4 = "10.2.51.0/24";
           ipv6 = "fd42:dead:beef:251::/64";
         }
         {
           kind = "tenant";
-          name = "dmz";
+          name = "cobalt-dmz";
           ipv4 = "10.2.60.0/24";
           ipv6 = "fd42:dead:beef:260::/64";
         }
         {
           kind = "tenant";
-          name = "clients-vpn";
+          name = "cobalt-clients-vpn";
           ipv4 = "10.2.31.0/24";
           ipv6 = "fd42:dead:beef:231::/64";
         }
         {
           kind = "tenant";
-          name = "unlock";
+          name = "cobalt-unlock";
           ipv4 = "10.2.90.0/24";
           ipv6 = "fd42:dead:beef:290::/64";
         }
         {
           kind = "tenant";
-          name = "mgmt";
+          name = "cobalt-mgmt";
           ipv4 = "10.2.10.0/24";
           ipv6 = "fd42:dead:beef:210::/64";
         }
@@ -981,55 +981,55 @@ in
         {
           kind = "host";
           name = "cobalt-svc-dns";
-          tenant = "svc";
+          tenant = "cobalt-svc";
           ipv4 = [ "10.2.20.1" ];
         }
         {
           kind = "host";
           name = "cobalt-clients-dns";
-          tenant = "clients";
+          tenant = "cobalt-clients";
           ipv4 = [ "10.2.30.1" ];
         }
         {
           kind = "host";
           name = "cobalt-iot-dns";
-          tenant = "iot";
+          tenant = "cobalt-iot";
           ipv4 = [ "10.2.50.1" ];
         }
         {
           kind = "host";
           name = "cobalt-iot-srv-dns";
-          tenant = "iot-srv";
+          tenant = "cobalt-iot-srv";
           ipv4 = [ "10.2.51.1" ];
         }
         {
           kind = "host";
           name = "cobalt-dmz-dns";
-          tenant = "dmz";
+          tenant = "cobalt-dmz";
           ipv4 = [ "10.2.60.1" ];
         }
         {
           kind = "host";
           name = "cobalt-clients-vpn-dns";
-          tenant = "clients-vpn";
+          tenant = "cobalt-clients-vpn";
           ipv4 = [ "10.2.31.1" ];
         }
         {
           kind = "host";
           name = "cobalt-tang";
-          tenant = "unlock";
+          tenant = "cobalt-unlock";
           ipv4 = [ "10.2.90.10" ];
         }
         {
           kind = "host";
           name = "cobalt-mgmt-dns";
-          tenant = "mgmt";
+          tenant = "cobalt-mgmt";
           ipv4 = [ "10.2.10.1" ];
         }
         {
           kind = "host";
           name = "cobalt-unlock-dns";
-          tenant = "unlock";
+          tenant = "cobalt-unlock";
           ipv4 = [ "10.2.90.1" ];
         }
       ];
@@ -1142,7 +1142,7 @@ in
           priority = 80;
           from = {
             kind = "tenant";
-            name = "clients";
+            name = "cobalt-clients";
           };
           to = {
             kind = "service";
@@ -1157,7 +1157,7 @@ in
           priority = 81;
           from = {
             kind = "tenant";
-            name = "svc";
+            name = "cobalt-svc";
           };
           to = {
             kind = "service";
@@ -1172,7 +1172,7 @@ in
           priority = 82;
           from = {
             kind = "tenant";
-            name = "dmz";
+            name = "cobalt-dmz";
           };
           to = {
             kind = "service";
@@ -1187,11 +1187,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "dmz";
+            name = "cobalt-dmz";
           };
           to = {
             kind = "tenant";
-            name = "clients";
+            name = "cobalt-clients";
           };
           trafficType = "any";
           action = "deny";
@@ -1201,11 +1201,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "clients";
+            name = "cobalt-clients";
           };
           to = {
             kind = "tenant";
-            name = "dmz";
+            name = "cobalt-dmz";
           };
           trafficType = "any";
           action = "allow";
@@ -1216,7 +1216,7 @@ in
           priority = 86;
           from = {
             kind = "tenant";
-            name = "iot";
+            name = "cobalt-iot";
           };
           to = {
             kind = "service";
@@ -1231,7 +1231,7 @@ in
           priority = 87;
           from = {
             kind = "tenant";
-            name = "iot-srv";
+            name = "cobalt-iot-srv";
           };
           to = {
             kind = "service";
@@ -1246,7 +1246,7 @@ in
           priority = 87;
           from = {
             kind = "tenant";
-            name = "clients-vpn";
+            name = "cobalt-clients-vpn";
           };
           to = {
             kind = "service";
@@ -1261,7 +1261,7 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           to = {
             kind = "service";
@@ -1276,11 +1276,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "clients";
+            name = "cobalt-clients";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1291,11 +1291,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "svc";
+            name = "cobalt-svc";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1306,11 +1306,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "iot";
+            name = "cobalt-iot";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1321,11 +1321,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "iot-srv";
+            name = "cobalt-iot-srv";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1336,11 +1336,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "dmz";
+            name = "cobalt-dmz";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1351,11 +1351,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "clients-vpn";
+            name = "cobalt-clients-vpn";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1366,11 +1366,11 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "mgmt";
+            name = "cobalt-mgmt";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "tang";
           action = "allow";
@@ -1381,11 +1381,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "clients";
+            name = "cobalt-clients";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "icmp";
           action = "allow";
@@ -1396,11 +1396,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "svc";
+            name = "cobalt-svc";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "icmp";
           action = "allow";
@@ -1411,11 +1411,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "iot";
+            name = "cobalt-iot";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "icmp";
           action = "allow";
@@ -1426,11 +1426,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "iot-srv";
+            name = "cobalt-iot-srv";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "icmp";
           action = "allow";
@@ -1441,11 +1441,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "dmz";
+            name = "cobalt-dmz";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "icmp";
           action = "allow";
@@ -1456,11 +1456,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "clients-vpn";
+            name = "cobalt-clients-vpn";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "icmp";
           action = "allow";
@@ -1471,11 +1471,11 @@ in
           priority = 84;
           from = {
             kind = "tenant";
-            name = "mgmt";
+            name = "cobalt-mgmt";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "icmp";
           action = "allow";
@@ -1486,11 +1486,11 @@ in
           priority = 83;
           from = {
             kind = "tenant";
-            name = "clients";
+            name = "cobalt-clients";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "traceroute";
           action = "allow";
@@ -1501,11 +1501,11 @@ in
           priority = 83;
           from = {
             kind = "tenant";
-            name = "svc";
+            name = "cobalt-svc";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "traceroute";
           action = "allow";
@@ -1516,11 +1516,11 @@ in
           priority = 83;
           from = {
             kind = "tenant";
-            name = "iot";
+            name = "cobalt-iot";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "traceroute";
           action = "allow";
@@ -1531,11 +1531,11 @@ in
           priority = 83;
           from = {
             kind = "tenant";
-            name = "iot-srv";
+            name = "cobalt-iot-srv";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "traceroute";
           action = "allow";
@@ -1546,11 +1546,11 @@ in
           priority = 83;
           from = {
             kind = "tenant";
-            name = "dmz";
+            name = "cobalt-dmz";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "traceroute";
           action = "allow";
@@ -1561,11 +1561,11 @@ in
           priority = 83;
           from = {
             kind = "tenant";
-            name = "clients-vpn";
+            name = "cobalt-clients-vpn";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "traceroute";
           action = "allow";
@@ -1576,11 +1576,11 @@ in
           priority = 83;
           from = {
             kind = "tenant";
-            name = "mgmt";
+            name = "cobalt-mgmt";
           };
           to = {
             kind = "tenant";
-            name = "unlock";
+            name = "cobalt-unlock";
           };
           trafficType = "traceroute";
           action = "allow";
@@ -1591,7 +1591,7 @@ in
           priority = 88;
           from = {
             kind = "tenant";
-            name = "mgmt";
+            name = "cobalt-mgmt";
           };
           to = {
             kind = "service";
@@ -1691,7 +1691,7 @@ in
           priority = 85;
           from = {
             kind = "tenant";
-            name = "clients-vpn";
+            name = "cobalt-clients-vpn";
           };
           to = {
             kind = "external";
@@ -1720,14 +1720,14 @@ in
     };
 
     interfaceTags = {
-      tenant-svc = "svc";
-      tenant-clients = "clients";
-      tenant-iot = "iot";
-      tenant-iot-srv = "iot-srv";
-      tenant-dmz = "dmz";
-      tenant-clients-vpn = "clients-vpn";
-      tenant-unlock = "unlock";
-      tenant-mgmt = "mgmt";
+      tenant-svc = "cobalt-svc";
+      tenant-clients = "cobalt-clients";
+      tenant-iot = "cobalt-iot";
+      tenant-iot-srv = "cobalt-iot-srv";
+      tenant-dmz = "cobalt-dmz";
+      tenant-clients-vpn = "cobalt-clients-vpn";
+      tenant-unlock = "cobalt-unlock";
+      tenant-mgmt = "cobalt-mgmt";
       external-wan = "wan";
       service-svc-dns = "svc-dns";
       service-clients-dns = "clients-dns";
@@ -1762,7 +1762,7 @@ in
           priority = 86;
           from = {
             kind = "tenant";
-            name = "clients-vpn";
+            name = "cobalt-clients-vpn";
           };
           to = {
             kind = "service";
@@ -1792,7 +1792,7 @@ in
           priority = 87;
           from = {
             kind = "tenant";
-            name = "clients";
+            name = "cobalt-clients";
           };
           to = {
             kind = "service";
@@ -1822,7 +1822,7 @@ in
           priority = 89;
           from = {
             kind = "tenant";
-            name = "mgmt";
+            name = "cobalt-mgmt";
           };
           to = {
             kind = "service";
@@ -2178,7 +2178,7 @@ in
           action = "refuse_non_local";
         };
         lateralPolicy = {
-          source = "clients";
+          source = "cobalt-clients";
           target = "dmz-dns";
           localData = true;
           recursion = false;
@@ -2226,7 +2226,7 @@ in
           action = "refuse_non_local";
         };
         lateralPolicy = {
-          source = "unlock";
+          source = "cobalt-unlock";
           target = "clients-dns";
           localData = true;
           recursion = false;
@@ -2258,7 +2258,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "iot-srv";
+              name = "cobalt-iot-srv";
             }
           ];
         };
@@ -2280,7 +2280,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "svc";
+              name = "cobalt-svc";
             }
           ];
         };
@@ -2290,7 +2290,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "clients";
+              name = "cobalt-clients";
             }
           ];
         };
@@ -2300,7 +2300,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "iot";
+              name = "cobalt-iot";
             }
           ];
         };
@@ -2310,7 +2310,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "iot-srv";
+              name = "cobalt-iot-srv";
             }
           ];
         };
@@ -2320,7 +2320,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "dmz";
+              name = "cobalt-dmz";
             }
           ];
         };
@@ -2330,7 +2330,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "clients-vpn";
+              name = "cobalt-clients-vpn";
             }
           ];
         };
@@ -2340,7 +2340,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "unlock";
+              name = "cobalt-unlock";
             }
           ];
         };
@@ -2350,7 +2350,7 @@ in
           attachments = [
             {
               kind = "tenant";
-              name = "mgmt";
+              name = "cobalt-mgmt";
             }
           ];
         };
@@ -2415,7 +2415,7 @@ in
           terminateOn = [ "core-vpn-onyx" ];
           underlayAccess = {
             kind = "tenant";
-            name = "iot-srv";
+            name = "cobalt-iot-srv";
           };
         }
       ];
