@@ -533,6 +533,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-prod
           - *s-router-neon
   - path_regex: '^prod-network/(current|testing)/secrets/devices/[A-Za-z0-9_-]+\.sops\.ya?ml$'
     encrypted_regex: ".*"
@@ -541,4 +542,5 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-prod
           - *s-router-neon
