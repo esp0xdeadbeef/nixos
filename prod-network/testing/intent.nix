@@ -197,6 +197,48 @@ in
             (runtimeIpv6Prefix "vlan8" 8)
           ];
         }
+        {
+          kind = "tenant";
+          name = "neon-mgmt";
+          ipv4 = "10.3.10.0/24";
+          ipv6 = "fd42:dead:beef:310::/64";
+        }
+        {
+          kind = "tenant";
+          name = "neon-svc";
+          ipv4 = "10.3.20.0/24";
+          ipv6 = "fd42:dead:beef:320::/64";
+        }
+        {
+          kind = "tenant";
+          name = "neon-clients";
+          ipv4 = "10.3.30.0/24";
+          ipv6 = "fd42:dead:beef:330::/64";
+        }
+        {
+          kind = "tenant";
+          name = "neon-iot";
+          ipv4 = "10.3.50.0/24";
+          ipv6 = "fd42:dead:beef:350::/64";
+        }
+        {
+          kind = "tenant";
+          name = "neon-iot-srv";
+          ipv4 = "10.3.51.0/24";
+          ipv6 = "fd42:dead:beef:351::/64";
+        }
+        {
+          kind = "tenant";
+          name = "neon-dmz";
+          ipv4 = "10.3.60.0/24";
+          ipv6 = "fd42:dead:beef:360::/64";
+        }
+        {
+          kind = "tenant";
+          name = "neon-unlock";
+          ipv4 = "10.3.90.0/24";
+          ipv6 = "fd42:dead:beef:390::/64";
+        }
       ];
 
       endpoints = [
@@ -234,6 +276,54 @@ in
           tenant = "vlan8";
           ipv4 = [ "192.168.8.1" ];
           ipv6 = [ "fd42:dead:beef:8::1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-mgmt-dns";
+          tenant = "neon-mgmt";
+          ipv4 = [ "10.3.10.1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-svc-dns";
+          tenant = "neon-svc";
+          ipv4 = [ "10.3.20.1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-clients-dns";
+          tenant = "neon-clients";
+          ipv4 = [ "10.3.30.1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-iot-dns";
+          tenant = "neon-iot";
+          ipv4 = [ "10.3.50.1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-iot-srv-dns";
+          tenant = "neon-iot-srv";
+          ipv4 = [ "10.3.51.1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-dmz-dns";
+          tenant = "neon-dmz";
+          ipv4 = [ "10.3.60.1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-unlock-dns";
+          tenant = "neon-unlock";
+          ipv4 = [ "10.3.90.1" ];
+        }
+        {
+          kind = "host";
+          name = "neon-tang";
+          tenant = "neon-unlock";
+          ipv4 = [ "10.3.90.10" ];
         }
       ];
     };
@@ -276,6 +366,46 @@ in
           name = "s-nebula-container-icmp";
           providers = [ "s-nebula-container" ];
           trafficType = "icmp";
+        }
+        {
+          name = "mgmt-dns";
+          providers = [ "neon-mgmt-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "svc-dns";
+          providers = [ "neon-svc-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "clients-dns";
+          providers = [ "neon-clients-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "iot-dns";
+          providers = [ "neon-iot-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "iot-srv-dns";
+          providers = [ "neon-iot-srv-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "dmz-dns";
+          providers = [ "neon-dmz-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "unlock-dns";
+          providers = [ "neon-unlock-dns" ];
+          trafficType = "dns";
+        }
+        {
+          name = "tang";
+          providers = [ "neon-tang" ];
+          trafficType = "tang";
         }
       ];
       relations = [
@@ -514,6 +644,540 @@ in
         (allowTenantToWan "vlan2" 100)
         (allowTenantToWan "vlan7" 110)
         (allowTenantToWan "vlan8" 120)
+        {
+          id = "allow-clients-dns-to-dmz-dns";
+          priority = 78;
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "service";
+            name = "dmz-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-dns-to-clients-dns";
+          priority = 79;
+          from = {
+            kind = "service";
+            name = "dmz-dns";
+          };
+          to = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-dns-to-unlock-dns";
+          priority = 81;
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "service";
+            name = "unlock-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-to-clients-dns";
+          priority = 80;
+          from = {
+            kind = "tenant";
+            name = "neon-clients";
+          };
+          to = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-svc-dns";
+          priority = 81;
+          from = {
+            kind = "tenant";
+            name = "neon-svc";
+          };
+          to = {
+            kind = "service";
+            name = "svc-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-dmz-dns";
+          priority = 82;
+          from = {
+            kind = "tenant";
+            name = "neon-dmz";
+          };
+          to = {
+            kind = "service";
+            name = "dmz-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "deny-dmz-to-clients";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "neon-dmz";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-clients";
+          };
+          trafficType = "any";
+          action = "deny";
+        }
+        {
+          id = "allow-clients-to-dmz";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-clients";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-dmz";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-to-iot-dns";
+          priority = 86;
+          from = {
+            kind = "tenant";
+            name = "neon-iot";
+          };
+          to = {
+            kind = "service";
+            name = "iot-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-iot-srv-dns";
+          priority = 87;
+          from = {
+            kind = "tenant";
+            name = "neon-iot-srv";
+          };
+          to = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-unlock-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          to = {
+            kind = "service";
+            name = "tang";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-clients";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-svc";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-iot";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-iot-srv";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-dmz";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-tang";
+          priority = 85;
+          from = {
+            kind = "tenant";
+            name = "neon-mgmt";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "tang";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "neon-clients";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "neon-svc";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "neon-iot";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "neon-iot-srv";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "neon-dmz";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-tang-icmp";
+          priority = 84;
+          from = {
+            kind = "tenant";
+            name = "neon-mgmt";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "neon-clients";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "neon-svc";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "neon-iot";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "neon-iot-srv";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-dmz-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "neon-dmz";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-tang-traceroute";
+          priority = 83;
+          from = {
+            kind = "tenant";
+            name = "neon-mgmt";
+          };
+          to = {
+            kind = "tenant";
+            name = "neon-unlock";
+          };
+          trafficType = "traceroute";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-mgmt-dns";
+          priority = 88;
+          from = {
+            kind = "tenant";
+            name = "neon-mgmt";
+          };
+          to = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-dns-to-wan";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-dns-to-wan";
+          priority = 91;
+          from = {
+            kind = "service";
+            name = "svc-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-dns-to-wan";
+          priority = 93;
+          from = {
+            kind = "service";
+            name = "iot-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-dns-to-wan";
+          priority = 94;
+          from = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-dns-to-wan";
+          priority = 95;
+          from = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        (allowTenantToWan "neon-clients" 100)
+        (allowTenantToWan "neon-svc" 110)
+        (allowTenantToWan "neon-iot" 120)
+        (allowTenantToWan "neon-iot-srv" 130)
+        (allowTenantToWan "neon-mgmt" 140)
       ];
 
       interfaceTags = {
@@ -527,6 +1191,21 @@ in
         service-vlan3-dns = "vlan3-dns";
         service-vlan7-dns = "vlan7-dns";
         service-vlan8-dns = "vlan8-dns";
+        tenant-mgmt = "neon-mgmt";
+        tenant-svc = "neon-svc";
+        tenant-clients = "neon-clients";
+        tenant-iot = "neon-iot";
+        tenant-iot-srv = "neon-iot-srv";
+        tenant-dmz = "neon-dmz";
+        tenant-unlock = "neon-unlock";
+        service-mgmt-dns = "mgmt-dns";
+        service-svc-dns = "svc-dns";
+        service-clients-dns = "clients-dns";
+        service-iot-dns = "iot-dns";
+        service-iot-srv-dns = "iot-srv-dns";
+        service-dmz-dns = "dmz-dns";
+        service-unlock-dns = "unlock-dns";
+        service-tang = "tang";
       };
     };
 
@@ -653,6 +1332,139 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
+        {
+          id = "allow-clients-to-core-dns";
+          priority = 87;
+          from = {
+            kind = "tenant";
+            name = "neon-clients";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-dns-to-core-dns";
+          priority = 88;
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-to-core-dns";
+          priority = 89;
+          from = {
+            kind = "tenant";
+            name = "neon-mgmt";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-mgmt-dns-to-core-dns";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-svc-dns-to-core-dns";
+          priority = 89;
+          from = {
+            kind = "service";
+            name = "svc-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "deny-clients-dns-to-wan";
+          priority = 92;
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+        {
+          id = "deny-svc-dns-to-wan";
+          priority = 93;
+          from = {
+            kind = "service";
+            name = "svc-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "deny";
+        }
+        {
+          id = "allow-iot-dns-to-core-dns";
+          priority = 94;
+          from = {
+            kind = "service";
+            name = "iot-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-iot-srv-dns-to-core-dns";
+          priority = 95;
+          from = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          to = {
+            kind = "service";
+            name = "core-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
       ];
 
       bindings = [
@@ -755,6 +1567,171 @@ in
           ];
           directPublicFallback = false;
         }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-clients"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "svc-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "svc-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-svc"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "iot-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "iot-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-iot"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "iot-srv-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-iot-srv"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-mgmt"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
+          directPublicFallback = false;
+        }
       ];
     };
 
@@ -763,55 +1740,154 @@ in
     # schema models only one requester/authority pair. VLAN 3 therefore queries
     # VLAN 2 for the shared lan. namespace here, while a temporary NixOS override
     # expresses the reverse, exact-name VLAN 2 -> VLAN 3 authority lookup.
-    localDnsSharingIntent = {
-      namespace = "lan.";
-      authority = {
-        service = "vlan2-dns";
-        records = [
-          "vlan2-kea-local-data"
-          "vlan3-static-local-data"
-        ];
-      };
-      requester = {
-        service = "vlan3-dns";
-        allowedNamespaces = [
-          "lan."
-          "1.168.192.in-addr.arpa."
-        ];
-        recursion = false;
-        publicFallback = false;
-      };
-      relation = {
-        id = "allow-vlan3-dns-to-vlan2-dns";
-        from = {
-          kind = "service";
-          name = "vlan3-dns";
+    localDnsSharingIntent = [
+      {
+        namespace = "lan.";
+        authority = {
+          service = "vlan2-dns";
+          records = [
+            "vlan2-kea-local-data"
+            "vlan3-static-local-data"
+          ];
         };
-        to = {
-          kind = "service";
-          name = "vlan2-dns";
+        requester = {
+          service = "vlan3-dns";
+          allowedNamespaces = [
+            "lan."
+            "1.168.192.in-addr.arpa."
+          ];
+          recursion = false;
+          publicFallback = false;
         };
-        trafficType = "dns";
-        returnBehavior = "symmetric";
-        resolverPath = [
-          "access-vlan3"
-          "downstream-selector"
-          "access-vlan2"
-        ];
-      };
-      providerPolicy = {
-        source = "vlan3-dns";
-        action = "refuse_non_local";
-      };
-      lateralPolicy = {
-        source = "vlan2";
-        target = "vlan3-dns";
-        localData = true;
-        recursion = false;
-        transitiveEgress = false;
-        action = "refuse_non_local";
-      };
-    };
+        relation = {
+          id = "allow-vlan3-dns-to-vlan2-dns";
+          from = {
+            kind = "service";
+            name = "vlan3-dns";
+          };
+          to = {
+            kind = "service";
+            name = "vlan2-dns";
+          };
+          trafficType = "dns";
+          returnBehavior = "symmetric";
+          resolverPath = [
+            "access-vlan3"
+            "downstream-selector"
+            "access-vlan2"
+          ];
+        };
+        providerPolicy = {
+          source = "vlan3-dns";
+          action = "refuse_non_local";
+        };
+        lateralPolicy = {
+          source = "vlan2";
+          target = "vlan3-dns";
+          localData = true;
+          recursion = false;
+          transitiveEgress = false;
+          action = "refuse_non_local";
+        };
+      }
+      {
+        namespace = "home.arpa.";
+        authority = {
+          service = "clients-dns";
+          records = [
+            "clients-kea-local-data"
+            "dmz-static-local-data"
+          ];
+        };
+        requester = {
+          service = "dmz-dns";
+          allowedNamespaces = [
+            "home.arpa."
+            "30.3.10.in-addr.arpa."
+          ];
+          recursion = false;
+          publicFallback = false;
+        };
+        relation = {
+          id = "allow-dmz-dns-to-clients-dns";
+          from = {
+            kind = "service";
+            name = "dmz-dns";
+          };
+          to = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          trafficType = "dns";
+          returnBehavior = "symmetric";
+          resolverPath = [
+            "access-dmz"
+            "downstream-selector"
+            "access-clients"
+          ];
+        };
+        providerPolicy = {
+          source = "dmz-dns";
+          action = "refuse_non_local";
+        };
+        lateralPolicy = {
+          source = "neon-clients";
+          target = "dmz-dns";
+          localData = true;
+          recursion = false;
+          transitiveEgress = false;
+          action = "refuse_non_local";
+        };
+      }
+      {
+        namespace = "home.arpa.";
+        authority = {
+          service = "unlock-dns";
+          records = [
+            "unlock-static-local-data"
+          ];
+        };
+        requester = {
+          service = "clients-dns";
+          allowedNamespaces = [
+            "unlock.home.arpa."
+            "90.3.10.in-addr.arpa."
+          ];
+          recursion = false;
+          publicFallback = false;
+        };
+        relation = {
+          id = "allow-clients-dns-to-unlock-dns";
+          from = {
+            kind = "service";
+            name = "clients-dns";
+          };
+          to = {
+            kind = "service";
+            name = "unlock-dns";
+          };
+          trafficType = "dns";
+          returnBehavior = "symmetric";
+          resolverPath = [
+            "access-clients"
+            "downstream-selector"
+            "access-unlock"
+          ];
+        };
+        providerPolicy = {
+          source = "clients-dns";
+          action = "refuse_non_local";
+        };
+        lateralPolicy = {
+          source = "neon-unlock";
+          target = "clients-dns";
+          localData = true;
+          recursion = false;
+          transitiveEgress = false;
+          action = "refuse_non_local";
+        };
+      }
+    ];
 
     topology = {
       nodes = {
@@ -877,6 +1953,69 @@ in
             }
           ];
         };
+        access-mgmt = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-mgmt";
+            }
+          ];
+        };
+        access-svc = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-svc";
+            }
+          ];
+        };
+        access-clients = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-clients";
+            }
+          ];
+        };
+        access-iot = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-iot";
+            }
+          ];
+        };
+        access-iot-srv = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-iot-srv";
+            }
+          ];
+        };
+        access-dmz = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-dmz";
+            }
+          ];
+        };
+        access-unlock = {
+          role = "access";
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-unlock";
+            }
+          ];
+        };
       };
 
       links = [
@@ -907,6 +2046,34 @@ in
         [
           "downstream-selector"
           "access-vlan8"
+        ]
+        [
+          "downstream-selector"
+          "access-mgmt"
+        ]
+        [
+          "downstream-selector"
+          "access-svc"
+        ]
+        [
+          "downstream-selector"
+          "access-clients"
+        ]
+        [
+          "downstream-selector"
+          "access-iot"
+        ]
+        [
+          "downstream-selector"
+          "access-iot-srv"
+        ]
+        [
+          "downstream-selector"
+          "access-dmz"
+        ]
+        [
+          "downstream-selector"
+          "access-unlock"
         ]
       ];
     };
