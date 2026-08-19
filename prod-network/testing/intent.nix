@@ -2076,6 +2076,36 @@ in
         {
           requesterScope = {
             kind = "service";
+            name = "mgmt-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "mgmt-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "core-dns";
+            node = "core";
+          };
+          resolverPath = [
+            "access-mgmt"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
             name = "clients-vpn-dns";
           };
           advertisedResolver = {
