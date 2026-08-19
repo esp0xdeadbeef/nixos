@@ -122,6 +122,45 @@ let
     ];
   };
 
+  dmzLocalDns = addresses: records: {
+    forwarders = [ ];
+    outgoingInterfaces = addresses;
+    roles.recursion.outgoingInterfaces = addresses;
+    localZones = [
+      {
+        name = "dmz.home.arpa.";
+        type = "static";
+      }
+    ];
+    localRecords = records;
+    upstreamResolvers = [
+      {
+        dst = "10.3.60.1";
+        scope = "local-access";
+        source = "router-self";
+      }
+    ];
+  };
+
+  unlockDns = addresses: {
+    forwarders = [ ];
+    outgoingInterfaces = addresses;
+    roles.recursion.outgoingInterfaces = addresses;
+    localZones = [
+      {
+        name = "unlock.home.arpa.";
+        type = "static";
+      }
+    ];
+    localRecords = [
+      {
+        name = "tang.unlock.home.arpa.";
+        a = [ "10.3.90.10" ];
+        aaaa = [ "fd42:dead:beef:390::10" ];
+      }
+    ];
+  };
+
   protectedReservationSource = sourceFile: {
     schema = "gamp-protected-reservation-set-v1";
     sourceClass = "protected";
@@ -215,6 +254,25 @@ let
   upstreamPolicyVlan8Link = "p2p-policy-upstream-selector--access-access-vlan8--uplink-wan";
   policyDownstreamVlan8Link = "p2p-downstream-selector-policy--access-access-vlan8";
   downstreamAccessVlan8Link = "p2p-access-vlan8-downstream-selector";
+  upstreamPolicySvcLink = "p2p-policy-upstream-selector--access-access-svc--uplink-wan";
+  upstreamPolicyClientsLink = "p2p-policy-upstream-selector--access-access-clients--uplink-wan";
+  upstreamPolicyIotSrvLink = "p2p-policy-upstream-selector--access-access-iot-srv--uplink-wan";
+  upstreamPolicyIotLink = "p2p-policy-upstream-selector--access-access-iot--uplink-wan";
+  upstreamPolicyMgmtLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-wan";
+  policyDownstreamSvcLink = "p2p-downstream-selector-policy--access-access-svc";
+  policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
+  policyDownstreamDmzLink = "p2p-downstream-selector-policy--access-access-dmz";
+  policyDownstreamIotSrvLink = "p2p-downstream-selector-policy--access-access-iot-srv";
+  policyDownstreamIotLink = "p2p-downstream-selector-policy--access-access-iot";
+  policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
+  policyDownstreamMgmtLink = "p2p-downstream-selector-policy--access-access-mgmt";
+  downstreamAccessSvcLink = "p2p-access-svc-downstream-selector";
+  downstreamAccessClientsLink = "p2p-access-clients-downstream-selector";
+  downstreamAccessDmzLink = "p2p-access-dmz-downstream-selector";
+  downstreamAccessIotSrvLink = "p2p-access-iot-srv-downstream-selector";
+  downstreamAccessIotLink = "p2p-access-iot-downstream-selector";
+  downstreamAccessUnlockLink = "p2p-access-unlock-downstream-selector";
+  downstreamAccessMgmtLink = "p2p-access-mgmt-downstream-selector";
   sNebulaContainerAddress = "192.168.3.10";
   sNebulaContainerAddress6 = "fd42:dead:beef:3::1337:dead:beef";
   sLlmInferenceContainerAddress = "192.168.3.11";
@@ -248,6 +306,14 @@ let
             "${dnsRuntime.requesters.access-vlan7.ipv6}/128"
             "${dnsRuntime.requesters.access-vlan8.ipv4}/32"
             "${dnsRuntime.requesters.access-vlan8.ipv6}/128"
+            dnsRuntime.requesters.access-clients.clientIpv4
+            dnsRuntime.requesters.access-clients.clientIpv6
+            dnsRuntime.requesters.access-svc.clientIpv4
+            dnsRuntime.requesters.access-svc.clientIpv6
+            "${dnsRuntime.requesters.access-iot-srv.ipv4}/32"
+            "${dnsRuntime.requesters.access-iot-srv.ipv6}/128"
+            "${dnsRuntime.requesters.access-iot.ipv4}/32"
+            "${dnsRuntime.requesters.access-iot.ipv6}/128"
           ];
         };
 
@@ -330,6 +396,40 @@ let
       bridge = "rt-upstream-policy-vlan8";
       interfaceName = "policy-vlan8";
     };
+    policy-svc = p2pPort {
+      link = upstreamPolicySvcLink;
+      adapterName = "prod-us-svc";
+      bridge = "rt-upstream-policy-svc";
+      interfaceName = "policy-svc";
+    };
+
+    policy-clients = p2pPort {
+      link = upstreamPolicyClientsLink;
+      adapterName = "prod-us-clients";
+      bridge = "rt-upstream-policy-clients";
+      interfaceName = "policy-clients";
+    };
+
+    policy-iot-srv = p2pPort {
+      link = upstreamPolicyIotSrvLink;
+      adapterName = "prod-us-iot-srv";
+      bridge = "rt-upstream-policy-iot-srv";
+      interfaceName = "policy";
+    };
+
+    policy-iot = p2pPort {
+      link = upstreamPolicyIotLink;
+      adapterName = "prod-us-iot";
+      bridge = "rt-upstream-policy-iot";
+      interfaceName = "policy-iot";
+    };
+
+    policy-mgmt = p2pPort {
+      link = upstreamPolicyMgmtLink;
+      adapterName = "prod-us-mgmt";
+      bridge = "rt-upstream-policy-mgmt";
+      interfaceName = "policy-mgmt";
+    };
   };
 
   policy = mkNode "policy" {
@@ -388,6 +488,89 @@ let
       bridge = "rt-policy-downstream-vlan8";
       interfaceName = "downstr-vlan8";
     };
+    upstream-svc = p2pPort {
+      link = upstreamPolicySvcLink;
+      adapterName = "prod-p-us-svc";
+      bridge = "rt-upstream-policy-svc";
+      interfaceName = "upstream-svc";
+    };
+
+    upstream-clients = p2pPort {
+      link = upstreamPolicyClientsLink;
+      adapterName = "prod-p-us-clients";
+      bridge = "rt-upstream-policy-clients";
+      interfaceName = "upstream-clients";
+    };
+
+    upstream-iot-srv = p2pPort {
+      link = upstreamPolicyIotSrvLink;
+      adapterName = "prod-p-us-iot-srv";
+      bridge = "rt-upstream-policy-iot-srv";
+      interfaceName = "upstream-iot-srv";
+    };
+
+    upstream-iot = p2pPort {
+      link = upstreamPolicyIotLink;
+      adapterName = "prod-p-us-iot";
+      bridge = "rt-upstream-policy-iot";
+      interfaceName = "upstream-iot";
+    };
+
+    upstream-mgmt = p2pPort {
+      link = upstreamPolicyMgmtLink;
+      adapterName = "prod-p-us-mgmt";
+      bridge = "rt-upstream-policy-mgmt";
+      interfaceName = "upstream-mgmt";
+    };
+
+    downstream-svc = p2pPort {
+      link = policyDownstreamSvcLink;
+      adapterName = "prod-p-ds-svc";
+      bridge = "rt-policy-downstream-svc";
+      interfaceName = "downstream-svc";
+    };
+
+    downstream-clients = p2pPort {
+      link = policyDownstreamClientsLink;
+      adapterName = "prod-p-ds-clients";
+      bridge = "rt-policy-downstream-clients";
+      interfaceName = "downstream-clients";
+    };
+
+    downstream-dmz = p2pPort {
+      link = policyDownstreamDmzLink;
+      adapterName = "prod-p-ds-dmz";
+      bridge = "rt-policy-downstream-dmz";
+      interfaceName = "downstream-dmz";
+    };
+
+    downstream-iot-srv = p2pPort {
+      link = policyDownstreamIotSrvLink;
+      adapterName = "prod-p-ds-iot-srv";
+      bridge = "rt-policy-downstream-iot-srv";
+      interfaceName = "downstr-iot-srv";
+    };
+
+    downstream-iot = p2pPort {
+      link = policyDownstreamIotLink;
+      adapterName = "prod-p-ds-iot";
+      bridge = "rt-policy-downstream-iot";
+      interfaceName = "downstr-iot";
+    };
+
+    downstream-unlock = p2pPort {
+      link = policyDownstreamUnlockLink;
+      adapterName = "prod-p-ds-unlock";
+      bridge = "rt-policy-downstream-unlock";
+      interfaceName = "downstream-unlock";
+    };
+
+    downstream-mgmt = p2pPort {
+      link = policyDownstreamMgmtLink;
+      adapterName = "prod-p-ds-mgmt";
+      bridge = "rt-policy-downstream-mgmt";
+      interfaceName = "downstream-mgmt";
+    };
   };
 
   downstreamSelector = mkNode "downstream-selector" {
@@ -445,6 +628,103 @@ let
       adapterName = "prod-3e6b2f1d4c58";
       bridge = "rt-downstream-access-vlan8";
       interfaceName = "access-vlan8";
+    };
+    policy-svc = p2pPort {
+      link = policyDownstreamSvcLink;
+      adapterName = "prod-ds-p-svc";
+      bridge = "rt-policy-downstream-svc";
+      interfaceName = "policy-svc";
+    };
+
+    policy-clients = p2pPort {
+      link = policyDownstreamClientsLink;
+      adapterName = "prod-ds-p-clients";
+      bridge = "rt-policy-downstream-clients";
+      interfaceName = "policy-clients";
+    };
+
+    policy-dmz = p2pPort {
+      link = policyDownstreamDmzLink;
+      adapterName = "prod-ds-p-dmz";
+      bridge = "rt-policy-downstream-dmz";
+      interfaceName = "policy-dmz";
+    };
+
+    policy-iot-srv = p2pPort {
+      link = policyDownstreamIotSrvLink;
+      adapterName = "prod-ds-p-iot-srv";
+      bridge = "rt-policy-downstream-iot-srv";
+      interfaceName = "policy-iot-srv";
+    };
+
+    policy-iot = p2pPort {
+      link = policyDownstreamIotLink;
+      adapterName = "prod-ds-p-iot";
+      bridge = "rt-policy-downstream-iot";
+      interfaceName = "policy-iot";
+    };
+
+    policy-unlock = p2pPort {
+      link = policyDownstreamUnlockLink;
+      adapterName = "prod-ds-p-unlock";
+      bridge = "rt-policy-downstream-unlock";
+      interfaceName = "policy-unlock";
+    };
+
+    policy-mgmt = p2pPort {
+      link = policyDownstreamMgmtLink;
+      adapterName = "prod-ds-p-mgmt";
+      bridge = "rt-policy-downstream-mgmt";
+      interfaceName = "policy-mgmt";
+    };
+
+    access-svc = p2pPort {
+      link = downstreamAccessSvcLink;
+      adapterName = "prod-ds-a-svc";
+      bridge = "rt-downstream-access-svc";
+      interfaceName = "access-svc";
+    };
+
+    access-clients = p2pPort {
+      link = downstreamAccessClientsLink;
+      adapterName = "prod-ds-a-clients";
+      bridge = "rt-downstream-access-clients";
+      interfaceName = "access-clients";
+    };
+
+    access-dmz = p2pPort {
+      link = downstreamAccessDmzLink;
+      adapterName = "prod-ds-a-dmz";
+      bridge = "rt-downstream-access-dmz";
+      interfaceName = "access-dmz";
+    };
+
+    access-iot-srv = p2pPort {
+      link = downstreamAccessIotSrvLink;
+      adapterName = "prod-ds-a-iot-srv";
+      bridge = "rt-downstream-access-iot-srv";
+      interfaceName = "access-iot-srv";
+    };
+
+    access-iot = p2pPort {
+      link = downstreamAccessIotLink;
+      adapterName = "prod-ds-a-iot";
+      bridge = "rt-downstream-access-iot";
+      interfaceName = "access-iot";
+    };
+
+    access-unlock = p2pPort {
+      link = downstreamAccessUnlockLink;
+      adapterName = "prod-ds-a-unlock";
+      bridge = "rt-downstream-access-unlock";
+      interfaceName = "access-unlock";
+    };
+
+    access-mgmt = p2pPort {
+      link = downstreamAccessMgmtLink;
+      adapterName = "prod-ds-a-mgmt";
+      bridge = "rt-downstream-access-mgmt";
+      interfaceName = "access-mgmt";
     };
   };
 
@@ -660,6 +940,350 @@ let
         };
       };
     };
+
+  accessClients =
+    (mkNode "access-clients" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessClientsLink;
+        adapterName = "prod-a-clients-ds";
+        bridge = "rt-downstream-access-clients";
+        interfaceName = "access-clients";
+      };
+
+      tenant-clients = tenantPort {
+        logicalInterface = "tenant-clients";
+        bridge = "clients";
+        interfaceName = "clients";
+        addr4 = "10.3.30.1/24";
+        addr6 = "fd42:dead:beef:330::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-clients.ipv4
+            dnsRuntime.requesters.access-clients.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-clients = dhcp4Advertisement {
+            tenant = "neon-clients";
+            interface = "tenant-clients";
+            subnet = "10.3.30.0/24";
+            poolStart = "10.3.30.100";
+            poolEnd = "10.3.30.200";
+            router = "10.3.30.1";
+            leaseStatePath = "/var/lib/kea/clients.leases";
+            domain = "clients.home.arpa.";
+            reservations = reservationsFor "neon-clients";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-clients = slaacRa "tenant-clients";
+        };
+      };
+    };
+
+  accessSvc =
+    (mkNode "access-svc" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessSvcLink;
+        adapterName = "prod-a-svc-ds";
+        bridge = "rt-downstream-access-svc";
+        interfaceName = "access-svc";
+      };
+
+      tenant-svc = tenantPort {
+        logicalInterface = "tenant-svc";
+        bridge = "svc";
+        interfaceName = "svc";
+        addr4 = "10.3.20.1/24";
+        addr6 = "fd42:dead:beef:320::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-svc.ipv4
+            dnsRuntime.requesters.access-svc.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-svc = dhcp4Advertisement {
+            tenant = "neon-svc";
+            interface = "tenant-svc";
+            subnet = "10.3.20.0/24";
+            poolStart = "10.3.20.100";
+            poolEnd = "10.3.20.200";
+            router = "10.3.20.1";
+            leaseStatePath = "/var/lib/kea/svc.leases";
+            domain = "svc.home.arpa.";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-svc = slaacRa "tenant-svc";
+        };
+      };
+    };
+
+  accessDmz =
+    (mkNode "access-dmz" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessDmzLink;
+        adapterName = "prod-a-dmz-ds";
+        bridge = "rt-downstream-access-dmz";
+        interfaceName = "access-dmz";
+      };
+
+      tenant-dmz = tenantPort {
+        logicalInterface = "tenant-dmz";
+        bridge = "dmz";
+        interfaceName = "dmz";
+        addr4 = "10.3.60.1/24";
+        addr6 = "fd42:dead:beef:360::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = dmzLocalDns [
+          dnsRuntime.requesters.access-dmz.ipv4
+          dnsRuntime.requesters.access-dmz.ipv6
+        ] [ ];
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-dmz = dhcp4Advertisement {
+            tenant = "neon-dmz";
+            interface = "tenant-dmz";
+            subnet = "10.3.60.0/24";
+            poolStart = "10.3.60.100";
+            poolEnd = "10.3.60.200";
+            router = "10.3.60.1";
+            leaseStatePath = "/var/lib/kea/dmz.leases";
+            domain = "dmz.home.arpa.";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-dmz = slaacRa "tenant-dmz";
+        };
+      };
+    };
+
+  accessIotSrv =
+    (mkNode "access-iot-srv" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessIotSrvLink;
+        adapterName = "prod-a-iot-srv-ds";
+        bridge = "rt-downstream-access-iot-srv";
+        interfaceName = "access-iot-srv";
+      };
+
+      tenant-iot-srv = tenantPort {
+        logicalInterface = "tenant-iot-srv";
+        bridge = "iot-srv";
+        interfaceName = "iot-srv";
+        addr4 = "10.3.51.1/24";
+        addr6 = "fd42:dead:beef:351::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-iot-srv.ipv4
+            dnsRuntime.requesters.access-iot-srv.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-iot-srv = dhcp4Advertisement {
+            tenant = "neon-iot-srv";
+            interface = "tenant-iot-srv";
+            subnet = "10.3.51.0/24";
+            poolStart = "10.3.51.100";
+            poolEnd = "10.3.51.200";
+            router = "10.3.51.1";
+            leaseStatePath = "/var/lib/kea/iot-srv.leases";
+            domain = "iot-srv.home.arpa.";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-iot-srv = slaacRa "tenant-iot-srv";
+        };
+      };
+    };
+
+  accessIot =
+    (mkNode "access-iot" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessIotLink;
+        adapterName = "prod-a-iot-ds";
+        bridge = "rt-downstream-access-iot";
+        interfaceName = "access-iot";
+      };
+
+      tenant-iot = tenantPort {
+        logicalInterface = "tenant-iot";
+        bridge = "iot";
+        interfaceName = "iot";
+        addr4 = "10.3.50.1/24";
+        addr6 = "fd42:dead:beef:350::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-iot.ipv4
+            dnsRuntime.requesters.access-iot.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-iot = dhcp4Advertisement {
+            tenant = "neon-iot";
+            interface = "tenant-iot";
+            subnet = "10.3.50.0/24";
+            poolStart = "10.3.50.100";
+            poolEnd = "10.3.50.200";
+            router = "10.3.50.1";
+            leaseStatePath = "/var/lib/kea/iot.leases";
+            domain = "iot.home.arpa.";
+            reservations = reservationsFor "neon-iot";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-iot = slaacRa "tenant-iot";
+        };
+      };
+    };
+
+  accessUnlock =
+    (mkNode "access-unlock" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessUnlockLink;
+        adapterName = "prod-a-unlock-ds";
+        bridge = "rt-downstream-access-unlock";
+        interfaceName = "access-unlock";
+      };
+
+      tenant-unlock = tenantPort {
+        logicalInterface = "tenant-unlock";
+        bridge = "unlock";
+        interfaceName = "unlock";
+        addr4 = "10.3.90.1/24";
+        addr6 = "fd42:dead:beef:390::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = unlockDns [
+          dnsRuntime.requesters.access-unlock.ipv4
+          dnsRuntime.requesters.access-unlock.ipv6
+        ];
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-unlock = dhcp4Advertisement {
+            tenant = "neon-unlock";
+            interface = "tenant-unlock";
+            subnet = "10.3.90.0/24";
+            poolStart = "10.3.90.100";
+            poolEnd = "10.3.90.200";
+            router = "10.3.90.1";
+            leaseStatePath = "/var/lib/kea/unlock.leases";
+            domain = "unlock.home.arpa.";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-unlock = slaacRa "tenant-unlock";
+        };
+      };
+    };
+
+  accessMgmt =
+    (mkNode "access-mgmt" {
+      transit-downstream-selector = p2pPort {
+        link = downstreamAccessMgmtLink;
+        adapterName = "prod-a-mgmt-ds";
+        bridge = "rt-downstream-access-mgmt";
+        interfaceName = "access-mgmt";
+      };
+
+      tenant-mgmt = tenantPort {
+        logicalInterface = "tenant-mgmt";
+        bridge = "mgmt";
+        interfaceName = "mgmt";
+        addr4 = "10.3.10.1/24";
+        addr6 = "fd42:dead:beef:310::1/64";
+      };
+    })
+    // {
+      statePolicy = persistentDhcpState;
+
+      services = {
+        dns = accessDns {
+          addresses = [
+            dnsRuntime.requesters.access-mgmt.ipv4
+            dnsRuntime.requesters.access-mgmt.ipv6
+          ];
+        };
+      };
+
+      advertisements = {
+        dhcp4 = {
+          tenant-mgmt = dhcp4Advertisement {
+            tenant = "neon-mgmt";
+            interface = "tenant-mgmt";
+            subnet = "10.3.10.0/24";
+            poolStart = "10.3.10.100";
+            poolEnd = "10.3.10.200";
+            router = "10.3.10.1";
+            leaseStatePath = "/var/lib/kea/mgmt.leases";
+            domain = "mgmt.home.arpa.";
+          };
+        };
+
+        ipv6Ra = {
+          tenant-mgmt = slaacRa "tenant-mgmt";
+        };
+      };
+    };
 in
 {
   schemaVersion = 1;
@@ -697,6 +1321,40 @@ in
     vlan8-dns = {
       ipv4 = [ dnsRuntime.requesters.access-vlan8.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-vlan8.ipv6 ];
+    };
+    neon-mgmt-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-mgmt.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-mgmt.ipv6 ];
+    };
+
+    neon-svc-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-svc.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-svc.ipv6 ];
+    };
+
+    neon-clients-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-clients.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-clients.ipv6 ];
+    };
+
+    neon-iot-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-iot.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-iot.ipv6 ];
+    };
+
+    neon-iot-srv-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-iot-srv.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-iot-srv.ipv6 ];
+    };
+
+    neon-dmz-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-dmz.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-dmz.ipv6 ];
+    };
+
+    neon-unlock-dns = {
+      ipv4 = [ dnsRuntime.requesters.access-unlock.ipv4 ];
+      ipv6 = [ dnsRuntime.requesters.access-unlock.ipv6 ];
     };
   };
 
@@ -760,6 +1418,47 @@ in
             vlan = 8;
             parentUplink = "trunk";
           };
+          mgmt = {
+            name = "mgmt";
+            vlan = 10;
+            parentUplink = "trunk";
+          };
+
+          svc = {
+            name = "svc";
+            vlan = 20;
+            parentUplink = "trunk";
+          };
+
+          clients = {
+            name = "clients";
+            vlan = 30;
+            parentUplink = "trunk";
+          };
+
+          iot = {
+            name = "iot";
+            vlan = 50;
+            parentUplink = "trunk";
+          };
+
+          iot-srv = {
+            name = "iot-srv";
+            vlan = 51;
+            parentUplink = "trunk";
+          };
+
+          dmz = {
+            name = "dmz";
+            vlan = 60;
+            parentUplink = "trunk";
+          };
+
+          unlock = {
+            name = "unlock";
+            vlan = 90;
+            parentUplink = "trunk";
+          };
         };
 
         bridgeNetworks = {
@@ -776,6 +1475,25 @@ in
           rt-downstream-access-vlan8 = { };
           rt-policy-downstream-vlan8 = { };
           rt-upstream-policy-vlan8 = { };
+          rt-downstream-access-svc = { };
+          rt-downstream-access-clients = { };
+          rt-downstream-access-dmz = { };
+          rt-downstream-access-iot-srv = { };
+          rt-downstream-access-iot = { };
+          rt-downstream-access-unlock = { };
+          rt-downstream-access-mgmt = { };
+          rt-policy-downstream-svc = { };
+          rt-policy-downstream-clients = { };
+          rt-policy-downstream-dmz = { };
+          rt-policy-downstream-iot-srv = { };
+          rt-policy-downstream-iot = { };
+          rt-policy-downstream-unlock = { };
+          rt-policy-downstream-mgmt = { };
+          rt-upstream-policy-svc = { };
+          rt-upstream-policy-clients = { };
+          rt-upstream-policy-iot-srv = { };
+          rt-upstream-policy-iot = { };
+          rt-upstream-policy-mgmt = { };
         };
       };
     };
@@ -812,6 +1530,13 @@ in
       ${nodeName "access-vlan3"} = accessVlan3;
       ${nodeName "access-vlan7"} = accessVlan7;
       ${nodeName "access-vlan8"} = accessVlan8;
+      ${nodeName "access-clients"} = accessClients;
+      ${nodeName "access-svc"} = accessSvc;
+      ${nodeName "access-dmz"} = accessDmz;
+      ${nodeName "access-iot-srv"} = accessIotSrv;
+      ${nodeName "access-iot"} = accessIot;
+      ${nodeName "access-unlock"} = accessUnlock;
+      ${nodeName "access-mgmt"} = accessMgmt;
     };
   };
 
