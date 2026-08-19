@@ -1,5 +1,6 @@
 { inputs
 , lib
+, config
 , pkgs
 , relativeRepo
 , outputs
@@ -8,6 +9,13 @@
 let
   hostName = "s-router-neon";
   modelSource = relativeRepo.sourcePath "prod-network/testing";
+  deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
+  deviceIds =
+    map
+      (name: lib.removeSuffix ".sops.yaml" name)
+      (builtins.filter
+        (name: lib.hasSuffix ".sops.yaml" name)
+        (builtins.attrNames (builtins.readDir deviceDir)));
   qemuNetworkingOptions = [
     "-nic none"
     "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
@@ -56,6 +64,35 @@ in
   ];
 
   system.stateVersion = lib.mkForce "26.05";
+
+  # Per-device protected DHCP reservations (MACs). Encrypted to l-esp and
+  # s-router-neon; bound into the access containers so kea can serve the
+  # static vlan2 leases without the legacy full-lease JSON exports.
+  sops.secrets = lib.listToAttrs (
+    map
+      (id: {
+        name = "neon-device-${id}";
+        value = {
+          sopsFile = "${deviceDir}/${id}.sops.yaml";
+          key = "mac";
+          format = "yaml";
+          path = "/run/secrets/devices/${id}";
+        };
+      })
+      deviceIds
+  );
+
+  containers.access-vlan2.bindMounts = lib.listToAttrs (
+    map
+      (id: {
+        name = "/run/secrets/devices/${id}";
+        value = {
+          hostPath = config.sops.secrets."neon-device-${id}".path;
+          isReadOnly = true;
+        };
+      })
+      deviceIds
+  );
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 
