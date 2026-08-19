@@ -1258,7 +1258,7 @@ in
                   healthCheck = {
                     enable = true;
                     target4 = "1.1.1.1";
-                    interval = "60s";
+                    interval = "300s";
                   };
                 };
               };
