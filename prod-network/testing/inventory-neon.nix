@@ -201,6 +201,7 @@ let
     , poolEnd
     , router
     , leaseStatePath
+    , domain ? "lan."
     , reservationSource ? null
     , reservations ? null
     ,
@@ -215,7 +216,7 @@ let
       };
       inherit router;
       dnsServers = [ router ];
-      domain = "lan.";
+      inherit domain;
       leaseState.path = leaseStatePath;
     }
     // (if reservationSource == null then { } else { inherit reservationSource; })
@@ -223,7 +224,14 @@ let
 
   slaacRa = interface:
     let
-      plane = builtins.substring 7 (builtins.stringLength interface - 7) interface;
+      tenant = builtins.substring 7 (builtins.stringLength interface - 7) interface;
+      plane =
+        if builtins.substring 0 7 tenant == "cobalt-" then
+          builtins.substring 7 (builtins.stringLength tenant - 7) tenant
+        else if builtins.substring 0 5 tenant == "neon-" then
+          builtins.substring 5 (builtins.stringLength tenant - 5) tenant
+        else
+          tenant;
     in
     {
       enabled = true;
@@ -414,7 +422,7 @@ let
       link = upstreamPolicyIotSrvLink;
       adapterName = "prod-us-iot-srv";
       bridge = "rt-upstream-policy-iot-srv";
-      interfaceName = "policy";
+      interfaceName = "policy-iot-srv";
     };
 
     policy-iot = p2pPort {
@@ -950,8 +958,8 @@ let
         interfaceName = "access-clients";
       };
 
-      tenant-clients = tenantPort {
-        logicalInterface = "tenant-clients";
+      tenant-neon-clients = tenantPort {
+        logicalInterface = "tenant-neon-clients";
         bridge = "clients";
         interfaceName = "clients";
         addr4 = "10.3.30.1/24";
@@ -972,9 +980,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-clients = dhcp4Advertisement {
+          tenant-neon-clients = dhcp4Advertisement {
             tenant = "neon-clients";
-            interface = "tenant-clients";
+            interface = "tenant-neon-clients";
             subnet = "10.3.30.0/24";
             poolStart = "10.3.30.100";
             poolEnd = "10.3.30.200";
@@ -987,7 +995,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-clients = slaacRa "tenant-clients";
+          tenant-neon-clients = slaacRa "tenant-neon-clients";
         };
       };
     };
@@ -1001,8 +1009,8 @@ let
         interfaceName = "access-svc";
       };
 
-      tenant-svc = tenantPort {
-        logicalInterface = "tenant-svc";
+      tenant-neon-svc = tenantPort {
+        logicalInterface = "tenant-neon-svc";
         bridge = "svc";
         interfaceName = "svc";
         addr4 = "10.3.20.1/24";
@@ -1023,9 +1031,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-svc = dhcp4Advertisement {
+          tenant-neon-svc = dhcp4Advertisement {
             tenant = "neon-svc";
-            interface = "tenant-svc";
+            interface = "tenant-neon-svc";
             subnet = "10.3.20.0/24";
             poolStart = "10.3.20.100";
             poolEnd = "10.3.20.200";
@@ -1037,7 +1045,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-svc = slaacRa "tenant-svc";
+          tenant-neon-svc = slaacRa "tenant-neon-svc";
         };
       };
     };
@@ -1051,8 +1059,8 @@ let
         interfaceName = "access-dmz";
       };
 
-      tenant-dmz = tenantPort {
-        logicalInterface = "tenant-dmz";
+      tenant-neon-dmz = tenantPort {
+        logicalInterface = "tenant-neon-dmz";
         bridge = "dmz";
         interfaceName = "dmz";
         addr4 = "10.3.60.1/24";
@@ -1071,9 +1079,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-dmz = dhcp4Advertisement {
+          tenant-neon-dmz = dhcp4Advertisement {
             tenant = "neon-dmz";
-            interface = "tenant-dmz";
+            interface = "tenant-neon-dmz";
             subnet = "10.3.60.0/24";
             poolStart = "10.3.60.100";
             poolEnd = "10.3.60.200";
@@ -1084,7 +1092,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-dmz = slaacRa "tenant-dmz";
+          tenant-neon-dmz = slaacRa "tenant-neon-dmz";
         };
       };
     };
@@ -1098,8 +1106,8 @@ let
         interfaceName = "access-iot-srv";
       };
 
-      tenant-iot-srv = tenantPort {
-        logicalInterface = "tenant-iot-srv";
+      tenant-neon-iot-srv = tenantPort {
+        logicalInterface = "tenant-neon-iot-srv";
         bridge = "iot-srv";
         interfaceName = "iot-srv";
         addr4 = "10.3.51.1/24";
@@ -1120,9 +1128,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-iot-srv = dhcp4Advertisement {
+          tenant-neon-iot-srv = dhcp4Advertisement {
             tenant = "neon-iot-srv";
-            interface = "tenant-iot-srv";
+            interface = "tenant-neon-iot-srv";
             subnet = "10.3.51.0/24";
             poolStart = "10.3.51.100";
             poolEnd = "10.3.51.200";
@@ -1133,7 +1141,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-iot-srv = slaacRa "tenant-iot-srv";
+          tenant-neon-iot-srv = slaacRa "tenant-neon-iot-srv";
         };
       };
     };
@@ -1147,8 +1155,8 @@ let
         interfaceName = "access-iot";
       };
 
-      tenant-iot = tenantPort {
-        logicalInterface = "tenant-iot";
+      tenant-neon-iot = tenantPort {
+        logicalInterface = "tenant-neon-iot";
         bridge = "iot";
         interfaceName = "iot";
         addr4 = "10.3.50.1/24";
@@ -1169,9 +1177,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-iot = dhcp4Advertisement {
+          tenant-neon-iot = dhcp4Advertisement {
             tenant = "neon-iot";
-            interface = "tenant-iot";
+            interface = "tenant-neon-iot";
             subnet = "10.3.50.0/24";
             poolStart = "10.3.50.100";
             poolEnd = "10.3.50.200";
@@ -1184,7 +1192,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-iot = slaacRa "tenant-iot";
+          tenant-neon-iot = slaacRa "tenant-neon-iot";
         };
       };
     };
@@ -1198,8 +1206,8 @@ let
         interfaceName = "access-unlock";
       };
 
-      tenant-unlock = tenantPort {
-        logicalInterface = "tenant-unlock";
+      tenant-neon-unlock = tenantPort {
+        logicalInterface = "tenant-neon-unlock";
         bridge = "unlock";
         interfaceName = "unlock";
         addr4 = "10.3.90.1/24";
@@ -1218,9 +1226,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-unlock = dhcp4Advertisement {
+          tenant-neon-unlock = dhcp4Advertisement {
             tenant = "neon-unlock";
-            interface = "tenant-unlock";
+            interface = "tenant-neon-unlock";
             subnet = "10.3.90.0/24";
             poolStart = "10.3.90.100";
             poolEnd = "10.3.90.200";
@@ -1231,7 +1239,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-unlock = slaacRa "tenant-unlock";
+          tenant-neon-unlock = slaacRa "tenant-neon-unlock";
         };
       };
     };
@@ -1245,8 +1253,8 @@ let
         interfaceName = "access-mgmt";
       };
 
-      tenant-mgmt = tenantPort {
-        logicalInterface = "tenant-mgmt";
+      tenant-neon-mgmt = tenantPort {
+        logicalInterface = "tenant-neon-mgmt";
         bridge = "mgmt";
         interfaceName = "mgmt";
         addr4 = "10.3.10.1/24";
@@ -1267,9 +1275,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-mgmt = dhcp4Advertisement {
+          tenant-neon-mgmt = dhcp4Advertisement {
             tenant = "neon-mgmt";
-            interface = "tenant-mgmt";
+            interface = "tenant-neon-mgmt";
             subnet = "10.3.10.0/24";
             poolStart = "10.3.10.100";
             poolEnd = "10.3.10.200";
@@ -1280,7 +1288,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-mgmt = slaacRa "tenant-mgmt";
+          tenant-neon-mgmt = slaacRa "tenant-neon-mgmt";
         };
       };
     };
