@@ -8,6 +8,11 @@
 let
   hostName = "s-router-neon";
   modelSource = relativeRepo.sourcePath "prod-network/testing";
+  qemuNetworkingOptions = [
+    "-nic none"
+    "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
+    "-nic bridge,br=vmbr1,mac=52:54:00:12:34:57,model=virtio-net-pci"
+  ];
 in
 {
   _module.args.sRouterProdProfile = {
@@ -51,4 +56,6 @@ in
   ];
 
   system.stateVersion = lib.mkForce "26.05";
+
+  virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 }
