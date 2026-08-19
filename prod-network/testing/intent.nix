@@ -586,61 +586,6 @@ in
             ];
           };
         }
-        {
-          # TEMPORARY compiler projection: keep this legacy relation until the
-          # address-free recursiveDnsIntent can materialize the same fabric
-          # lane without removing unrelated IPv6 policy-route units. Access
-          # Unbound does not use public forwarders; inventory pins it to core.
-          id = "allow-vlan2-dns-to-wan";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          # See allow-vlan2-dns-to-wan: this preserves the compiler's VLAN 7
-          # route projection only; the rendered resolver points solely to core.
-          id = "allow-vlan7-dns-to-wan";
-          priority = 91;
-          from = {
-            kind = "service";
-            name = "vlan7-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          # See allow-vlan2-dns-to-wan: temporary compiler projection for VLAN 8.
-          id = "allow-vlan8-dns-to-wan";
-          priority = 93;
-          from = {
-            kind = "service";
-            name = "vlan8-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
         (allowTenantToWan "vlan2" 100)
         (allowTenantToWan "vlan7" 110)
         (allowTenantToWan "vlan8" 120)
@@ -1093,86 +1038,6 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
-        {
-          id = "allow-clients-dns-to-wan";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-dns-to-wan";
-          priority = 91;
-          from = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-dns-to-wan";
-          priority = 93;
-          from = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-dns-to-wan";
-          priority = 94;
-          from = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-dns-to-wan";
-          priority = 95;
-          from = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
         (allowTenantToWan "neon-clients" 100)
         (allowTenantToWan "neon-svc" 110)
         (allowTenantToWan "neon-iot" 120)
@@ -1209,19 +1074,14 @@ in
       };
     };
 
-    # Desired FS-540 recursive DNS contract. The active communication contract
-    # temporarily retains its legacy service-to-WAN relations because removing
-    # them also removes unrelated IPv6 policy-route units. Inventory points the
-    # access resolvers only at core; preserve these explicit service-origin
-    # relations as the address-free target contract for the future SMS closure.
-    #
-    # NOTE: allow-core-dns-to-wan is intentionally absent here. The legacy
-    # vlan2/7/8 resolver lanes (kept below) share the core-dns egress point
-    # with the new plane lanes, and the pinned forwarding model cannot
-    # normalize the combined hub-and-spoke graph (it renders an infinitely
-    # recursive policy-container Unbound config). Dropping the shared
-    # core-dns-to-wan relation lets legacy lanes keep their communication-
-    # contract service-to-WAN path while the new lanes are expressed here.
+    # FS-540 recursive DNS contract. Every access resolver (legacy vlan2/7/8
+    # and the new plane lanes) forwards to core-dns, and core-dns is the only
+    # modeled DNS egress surface to the WAN. Direct service-to-WAN DNS allows
+    # are intentionally absent from the communication contract: alongside
+    # allow-core-dns-to-wan they describe a second egress path for the same
+    # resolver, and the forwarding model's transitive egress closure cannot
+    # normalize that dual path (it renders a self-referential policy-container
+    # config). The inventory pins each access Unbound resolver to core-dns.
     recursiveDnsIntent = {
       services = [
         {
@@ -1233,6 +1093,21 @@ in
       ];
 
       relations = [
+        {
+          id = "allow-core-dns-to-wan";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "core-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
         {
           # VLAN 2 clients may query the internal core resolver directly. This
           # is a normal supported path: core remains bound only to its
