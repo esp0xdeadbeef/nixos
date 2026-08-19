@@ -200,7 +200,14 @@ let
     let
       # tenant-<plane> -> <plane>.home.arpa. (the RFC 8375 search domain,
       # not the legacy `lan.`)
-      plane = builtins.substring 7 (builtins.stringLength interface - 7) interface;
+      tenant = builtins.substring 7 (builtins.stringLength interface - 7) interface;
+      plane =
+        if builtins.substring 0 7 tenant == "cobalt-" then
+          builtins.substring 7 (builtins.stringLength tenant - 7) tenant
+        else if builtins.substring 0 5 tenant == "neon-" then
+          builtins.substring 5 (builtins.stringLength tenant - 5) tenant
+        else
+          tenant;
     in
     {
       enabled = true;
@@ -557,8 +564,8 @@ let
         interfaceName = "access-clients";
       };
 
-      tenant-clients = tenantPort {
-        logicalInterface = "tenant-clients";
+      tenant-cobalt-clients = tenantPort {
+        logicalInterface = "tenant-cobalt-clients";
         bridge = "clients";
         interfaceName = "clients";
         addr4 = "10.2.30.1/24";
@@ -579,9 +586,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-clients = dhcp4Advertisement {
+          tenant-cobalt-clients = dhcp4Advertisement {
             tenant = "cobalt-clients";
-            interface = "tenant-clients";
+            interface = "tenant-cobalt-clients";
             subnet = "10.2.30.0/24";
             poolStart = "10.2.30.100";
             poolEnd = "10.2.30.200";
@@ -594,7 +601,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-clients = slaacRa "tenant-clients";
+          tenant-cobalt-clients = slaacRa "tenant-cobalt-clients";
         };
       };
     };
@@ -607,8 +614,8 @@ let
         interfaceName = "access-svc";
       };
 
-      tenant-svc = tenantPort {
-        logicalInterface = "tenant-svc";
+      tenant-cobalt-svc = tenantPort {
+        logicalInterface = "tenant-cobalt-svc";
         bridge = "svc";
         interfaceName = "svc";
         addr4 = "10.2.20.1/24";
@@ -629,9 +636,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-svc = dhcp4Advertisement {
+          tenant-cobalt-svc = dhcp4Advertisement {
             tenant = "cobalt-svc";
-            interface = "tenant-svc";
+            interface = "tenant-cobalt-svc";
             subnet = "10.2.20.0/24";
             poolStart = "10.2.20.100";
             poolEnd = "10.2.20.200";
@@ -643,7 +650,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-svc = slaacRa "tenant-svc";
+          tenant-cobalt-svc = slaacRa "tenant-cobalt-svc";
         };
       };
     };
@@ -657,8 +664,8 @@ let
         interfaceName = "access-dmz";
       };
 
-      tenant-dmz = tenantPort {
-        logicalInterface = "tenant-dmz";
+      tenant-cobalt-dmz = tenantPort {
+        logicalInterface = "tenant-cobalt-dmz";
         bridge = "dmz";
         interfaceName = "dmz";
         addr4 = "10.2.60.1/24";
@@ -677,9 +684,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-dmz = dhcp4Advertisement {
+          tenant-cobalt-dmz = dhcp4Advertisement {
             tenant = "cobalt-dmz";
-            interface = "tenant-dmz";
+            interface = "tenant-cobalt-dmz";
             subnet = "10.2.60.0/24";
             poolStart = "10.2.60.100";
             poolEnd = "10.2.60.200";
@@ -690,7 +697,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-dmz = slaacRa "tenant-dmz";
+          tenant-cobalt-dmz = slaacRa "tenant-cobalt-dmz";
         };
       };
     };
@@ -704,8 +711,8 @@ let
         interfaceName = "access-iot-srv";
       };
 
-      tenant-iot-srv = tenantPort {
-        logicalInterface = "tenant-iot-srv";
+      tenant-cobalt-iot-srv = tenantPort {
+        logicalInterface = "tenant-cobalt-iot-srv";
         bridge = "iot-srv";
         interfaceName = "iot-srv";
         addr4 = "10.2.51.1/24";
@@ -726,9 +733,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-iot-srv = dhcp4Advertisement {
+          tenant-cobalt-iot-srv = dhcp4Advertisement {
             tenant = "cobalt-iot-srv";
-            interface = "tenant-iot-srv";
+            interface = "tenant-cobalt-iot-srv";
             subnet = "10.2.51.0/24";
             poolStart = "10.2.51.100";
             poolEnd = "10.2.51.200";
@@ -739,7 +746,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-iot-srv = slaacRa "tenant-iot-srv";
+          tenant-cobalt-iot-srv = slaacRa "tenant-cobalt-iot-srv";
         };
       };
     };
@@ -753,8 +760,8 @@ let
         interfaceName = "access-iot";
       };
 
-      tenant-iot = tenantPort {
-        logicalInterface = "tenant-iot";
+      tenant-cobalt-iot = tenantPort {
+        logicalInterface = "tenant-cobalt-iot";
         bridge = "iot";
         interfaceName = "iot";
         addr4 = "10.2.50.1/24";
@@ -775,9 +782,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-iot = dhcp4Advertisement {
+          tenant-cobalt-iot = dhcp4Advertisement {
             tenant = "cobalt-iot";
-            interface = "tenant-iot";
+            interface = "tenant-cobalt-iot";
             subnet = "10.2.50.0/24";
             poolStart = "10.2.50.100";
             poolEnd = "10.2.50.200";
@@ -790,7 +797,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-iot = slaacRa "tenant-iot";
+          tenant-cobalt-iot = slaacRa "tenant-cobalt-iot";
         };
       };
     };
@@ -804,8 +811,8 @@ let
         interfaceName = "access-clients-vpn";
       };
 
-      tenant-clients-vpn = tenantPort {
-        logicalInterface = "tenant-clients-vpn";
+      tenant-cobalt-clients-vpn = tenantPort {
+        logicalInterface = "tenant-cobalt-clients-vpn";
         bridge = "clients-vpn";
         interfaceName = "clients-vpn";
         addr4 = "10.2.31.1/24";
@@ -826,9 +833,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-clients-vpn = dhcp4Advertisement {
+          tenant-cobalt-clients-vpn = dhcp4Advertisement {
             tenant = "cobalt-clients-vpn";
-            interface = "tenant-clients-vpn";
+            interface = "tenant-cobalt-clients-vpn";
             subnet = "10.2.31.0/24";
             poolStart = "10.2.31.100";
             poolEnd = "10.2.31.200";
@@ -840,7 +847,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-clients-vpn = slaacRa "tenant-clients-vpn";
+          tenant-cobalt-clients-vpn = slaacRa "tenant-cobalt-clients-vpn";
         };
       };
     };
@@ -854,8 +861,8 @@ let
         interfaceName = "access-unlock";
       };
 
-      tenant-unlock = tenantPort {
-        logicalInterface = "tenant-unlock";
+      tenant-cobalt-unlock = tenantPort {
+        logicalInterface = "tenant-cobalt-unlock";
         bridge = "unlock";
         interfaceName = "unlock";
         addr4 = "10.2.90.1/24";
@@ -874,9 +881,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-unlock = dhcp4Advertisement {
+          tenant-cobalt-unlock = dhcp4Advertisement {
             tenant = "cobalt-unlock";
-            interface = "tenant-unlock";
+            interface = "tenant-cobalt-unlock";
             subnet = "10.2.90.0/24";
             poolStart = "10.2.90.100";
             poolEnd = "10.2.90.200";
@@ -887,7 +894,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-unlock = slaacRa "tenant-unlock";
+          tenant-cobalt-unlock = slaacRa "tenant-cobalt-unlock";
         };
       };
     };
@@ -901,8 +908,8 @@ let
         interfaceName = "access-mgmt";
       };
 
-      tenant-mgmt = tenantPort {
-        logicalInterface = "tenant-mgmt";
+      tenant-cobalt-mgmt = tenantPort {
+        logicalInterface = "tenant-cobalt-mgmt";
         bridge = "mgmt";
         interfaceName = "mgmt";
         addr4 = "10.2.10.1/24";
@@ -923,9 +930,9 @@ let
 
       advertisements = {
         dhcp4 = {
-          tenant-mgmt = dhcp4Advertisement {
+          tenant-cobalt-mgmt = dhcp4Advertisement {
             tenant = "cobalt-mgmt";
-            interface = "tenant-mgmt";
+            interface = "tenant-cobalt-mgmt";
             subnet = "10.2.10.0/24";
             poolStart = "10.2.10.100";
             poolEnd = "10.2.10.200";
@@ -936,7 +943,7 @@ let
         };
 
         ipv6Ra = {
-          tenant-mgmt = slaacRa "tenant-mgmt";
+          tenant-cobalt-mgmt = slaacRa "tenant-cobalt-mgmt";
         };
       };
     };
@@ -955,8 +962,8 @@ let
       interfaceName = "onyx";
     };
 
-    tenant-iot-srv = tenantPort {
-      logicalInterface = "tenant-iot-srv";
+    tenant-cobalt-iot-srv = tenantPort {
+      logicalInterface = "tenant-cobalt-iot-srv";
       bridge = "iot-srv";
       interfaceName = "iot-srv";
     };

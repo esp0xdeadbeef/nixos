@@ -1191,13 +1191,13 @@ in
         service-vlan3-dns = "vlan3-dns";
         service-vlan7-dns = "vlan7-dns";
         service-vlan8-dns = "vlan8-dns";
-        tenant-mgmt = "neon-mgmt";
-        tenant-svc = "neon-svc";
-        tenant-clients = "neon-clients";
-        tenant-iot = "neon-iot";
-        tenant-iot-srv = "neon-iot-srv";
-        tenant-dmz = "neon-dmz";
-        tenant-unlock = "neon-unlock";
+        tenant-neon-mgmt = "neon-mgmt";
+        tenant-neon-svc = "neon-svc";
+        tenant-neon-clients = "neon-clients";
+        tenant-neon-iot = "neon-iot";
+        tenant-neon-iot-srv = "neon-iot-srv";
+        tenant-neon-dmz = "neon-dmz";
+        tenant-neon-unlock = "neon-unlock";
         service-mgmt-dns = "mgmt-dns";
         service-svc-dns = "svc-dns";
         service-clients-dns = "clients-dns";
@@ -2848,11 +2848,11 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
-        (allowTenantToWan "clients" 100)
-        (allowTenantToWan "svc" 110)
-        (allowTenantToWan "iot" 120)
-        (allowTenantToWan "iot-srv" 130)
-        (allowTenantToWan "mgmt" 140)
+        (allowTenantToWan "cobalt-clients" 100)
+        (allowTenantToWan "cobalt-svc" 110)
+        (allowTenantToWan "cobalt-iot" 120)
+        (allowTenantToWan "cobalt-iot-srv" 130)
+        (allowTenantToWan "cobalt-mgmt" 140)
         {
           id = "allow-clients-vpn-to-onyx";
           priority = 85;
@@ -2887,14 +2887,14 @@ in
     };
 
     interfaceTags = {
-      tenant-svc = "cobalt-svc";
-      tenant-clients = "cobalt-clients";
-      tenant-iot = "cobalt-iot";
-      tenant-iot-srv = "cobalt-iot-srv";
-      tenant-dmz = "cobalt-dmz";
-      tenant-clients-vpn = "cobalt-clients-vpn";
-      tenant-unlock = "cobalt-unlock";
-      tenant-mgmt = "cobalt-mgmt";
+      tenant-cobalt-svc = "cobalt-svc";
+      tenant-cobalt-clients = "cobalt-clients";
+      tenant-cobalt-iot = "cobalt-iot";
+      tenant-cobalt-iot-srv = "cobalt-iot-srv";
+      tenant-cobalt-dmz = "cobalt-dmz";
+      tenant-cobalt-clients-vpn = "cobalt-clients-vpn";
+      tenant-cobalt-unlock = "cobalt-unlock";
+      tenant-cobalt-mgmt = "cobalt-mgmt";
       external-wan = "wan";
       service-svc-dns = "svc-dns";
       service-clients-dns = "clients-dns";
