@@ -779,6 +779,8 @@ let
             poolEnd = "192.168.1.200";
             router = "192.168.1.1";
             leaseStatePath = "/var/lib/kea/vlan2.leases";
+            reservations = reservationsFor "vlan2";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
@@ -841,7 +843,8 @@ let
             poolEnd = "192.168.3.200";
             router = "192.168.3.1";
             leaseStatePath = "/var/lib/kea/vlan3.leases";
-            reservationSource = protectedReservationSource "/run/secrets/s-router-prod-vlan3-reservations.json";
+            reservations = reservationsFor "vlan3";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
@@ -987,6 +990,8 @@ let
             router = "10.3.30.1";
             leaseStatePath = "/var/lib/kea/clients.leases";
             domain = "clients.home.arpa.";
+            reservations = reservationsFor "neon-clients";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
@@ -1036,6 +1041,7 @@ let
             router = "10.3.20.1";
             leaseStatePath = "/var/lib/kea/svc.leases";
             domain = "svc.home.arpa.";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
@@ -1181,6 +1187,8 @@ let
             router = "10.3.50.1";
             leaseStatePath = "/var/lib/kea/iot.leases";
             domain = "iot.home.arpa.";
+            reservations = reservationsFor "neon-iot";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
