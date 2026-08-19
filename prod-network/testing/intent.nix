@@ -1214,6 +1214,14 @@ in
     # them also removes unrelated IPv6 policy-route units. Inventory points the
     # access resolvers only at core; preserve these explicit service-origin
     # relations as the address-free target contract for the future SMS closure.
+    #
+    # NOTE: allow-core-dns-to-wan is intentionally absent here. The legacy
+    # vlan2/7/8 resolver lanes (kept below) share the core-dns egress point
+    # with the new plane lanes, and the pinned forwarding model cannot
+    # normalize the combined hub-and-spoke graph (it renders an infinitely
+    # recursive policy-container Unbound config). Dropping the shared
+    # core-dns-to-wan relation lets legacy lanes keep their communication-
+    # contract service-to-WAN path while the new lanes are expressed here.
     recursiveDnsIntent = {
       services = [
         {
@@ -1269,21 +1277,6 @@ in
           to = {
             kind = "service";
             name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-core-dns-to-wan";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "core-dns";
-          };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
           };
           trafficType = "dns";
           action = "allow";
