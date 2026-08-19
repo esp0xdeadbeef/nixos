@@ -58,4 +58,11 @@ in
   system.stateVersion = lib.mkForce "26.05";
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
+
+  # The neon renderer compiles the shared intent + combined inventory, and the
+  # pinned renderer leaks cobalt's onyx overlay termination into this host.
+  # Neon's own intent declares no onyx overlay; keep the stray container from
+  # auto-starting (and demanding AirVPN secrets) until the renderer stops
+  # leaking cross-site overlays.
+  containers.core-vpn-onyx.autoStart = lib.mkForce false;
 }
