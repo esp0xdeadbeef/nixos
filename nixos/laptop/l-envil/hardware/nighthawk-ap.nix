@@ -12,13 +12,13 @@ let
 
   ctrl = "/run/nh-ap";
 
-  nhClients = "nh-clients";
-  nhClientsVpn = "nh-clients-vpn";
+  nhClients = "nh-c0";
+  nhClientsVpn = "nh-c1";
 
-  vlanClients = "br-cobalt-lan.30";
-  vlanClientsVpn = "br-cobalt-lan.31";
-  brClients = "br-nh-clients";
-  brClientsVpn = "br-nh-clients-vpn";
+  vlanClients = "nh-vl30";
+  vlanClientsVpn = "nh-vl31";
+  brClients = "nh-br30";
+  brClientsVpn = "nh-br31";
 
   hostapdConf = pkgs.writeShellScript "nh-ap-conf" ''
     set -euo pipefail
