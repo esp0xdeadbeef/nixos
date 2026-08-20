@@ -40,6 +40,16 @@
 
   local.network.private.enable = false;
 
+  # mt7925u (Netgear A8000 AXE3000, 0846:9072) firmware reports a hw_path
+  # without the 5GHz bit and no 6GHz capability; force the bands so the
+  # tri-band chip exposes 2.4/5/6 GHz for AP use.
+  boot.kernelPatches = [
+    {
+      name = "mt7925-force-5ghz";
+      patch = ./patches/mt7925-force-5ghz.patch;
+    }
+  ];
+
   warnings = [
     "l-envil: systemd-hibernate.service disables systemd's user.slice freezer because hibernate froze immediately after freezing user.slice; remove this once the upstream/systemd sleep-stack issue is fixed."
   ];
