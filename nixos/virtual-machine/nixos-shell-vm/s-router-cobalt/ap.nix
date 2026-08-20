@@ -217,85 +217,127 @@ let
     EOF
   '';
 in
+let
+  apVaps = [
+    { iface = wifiIf; bridge = "clients"; gw = "10.2.30.1"; }
+    { iface = "${wifiIf}-1"; bridge = "clients-vpn"; gw = "10.2.31.1"; }
+    { iface = unlockIf; bridge = "unlock"; gw = "10.2.90.1"; }
+    { iface = mgmtIf; bridge = "mgmt"; gw = "10.2.10.1"; }
+    { iface = nighthawkIf; bridge = "clients"; gw = "10.2.30.1"; }
+    { iface = "${nighthawkIf}-1"; bridge = "clients-vpn"; gw = "10.2.31.1"; }
+    { iface = nighthawkUnlockIf; bridge = "unlock"; gw = "10.2.90.1"; }
+    { iface = nighthawkMgmtIf; bridge = "mgmt"; gw = "10.2.10.1"; }
+  ];
+  mkApUnit = vap: {
+    name = "ap-${vap.iface}";
+    value = {
+      description = "WiFi AP ${vap.iface} on bridge ${vap.bridge}";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "ap-conf.service" "ap-vap.service" ];
+      requires = [ "ap-conf.service" "ap-vap.service" ];
+      path = [
+        pkgs.coreutils
+        pkgs.gnugrep
+        pkgs.iproute2
+      ];
+      serviceConfig = {
+        ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${vap.iface}.conf";
+        Restart = "always";
+        RestartSec = 3;
+      };
+      preStart = ''
+        for _ in $(seq 1 30); do
+          ${pkgs.iproute2}/bin/ip link show ${vap.bridge} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "state UP" && break
+          sleep 1
+        done
+        ${pkgs.iproute2}/bin/ip link show ${vap.bridge} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "state UP" || exit 1
+        ${pkgs.iproute2}/bin/ip route get ${vap.gw} >/dev/null 2>&1 || exit 1
+      '';
+    };
+  };
+in
 {
-  systemd.services.ap-vap = {
-    description = "Create the ALFA AP and scan VAPs";
-    wantedBy = [ "multi-user.target" ];
-    before = [ "ap.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
+  systemd.services = {
+    ap-conf = {
+      description = "Generate hostapd AP configs";
+      wantedBy = [ "multi-user.target" ];
+      path = [
+        pkgs.coreutils
+        pkgs.gawk
+        pkgs.gnugrep
+        pkgs.iproute2
+        pkgs.iw
+        pkgs.yq-go
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = hostapdConf;
+        RuntimeDirectory = "ap";
+      };
     };
-    script = ''
-      alfa_phy=$(cat /sys/class/net/${wifiIf}/phy80211/name 2>/dev/null || echo phy0)
-      nh_phy=$(cat /sys/class/net/${nighthawkIf}/phy80211/name 2>/dev/null || echo phy1)
-      for _ in $(seq 1 30); do
-        if [ -d /sys/class/net/${wifiIf}-1 ]; then
-          break
-        fi
-        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${wifiIf}-1 type __ap 2>/dev/null || true
-        sleep 1
-      done
-      for _ in $(seq 1 30); do
-        if [ -d /sys/class/net/${unlockIf} ]; then
-          break
-        fi
-        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${unlockIf} type __ap 2>/dev/null || true
-        sleep 1
-      done
-      for _ in $(seq 1 30); do
-        if [ -d /sys/class/net/${mgmtIf} ]; then
-          break
-        fi
-        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${mgmtIf} type __ap 2>/dev/null || true
-        sleep 1
-      done
-      for _ in $(seq 1 30); do
-        if [ -d /sys/class/net/${scanIf} ]; then
-          break
-        fi
-        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${scanIf} type station 2>/dev/null || true
-        sleep 1
-      done
-      for _ in $(seq 1 30); do
-        if [ -d /sys/class/net/${nighthawkIf}-1 ]; then
-          break
-        fi
-        ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkIf}-1 type __ap 2>/dev/null || true
-        sleep 1
-      done
-      for _ in $(seq 1 30); do
-        if [ -d /sys/class/net/${nighthawkUnlockIf} ]; then
-          break
-        fi
-        ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkUnlockIf} type __ap 2>/dev/null || true
-        sleep 1
-      done
-      for _ in $(seq 1 30); do
-        if [ -d /sys/class/net/${nighthawkMgmtIf} ]; then
-          break
-        fi
-        ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkMgmtIf} type __ap 2>/dev/null || true
-        sleep 1
-      done
-    '';
-  };
 
-  systemd.services.ap = {
-    description = "ALFA USB access point";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "ap-vap.service" ];
-    requires = [ "ap-vap.service" ];
-    path = [
-      pkgs.coreutils
-      pkgs.gawk
-      pkgs.gnugrep
-    ];
-    serviceConfig = {
-      ExecStartPre = hostapdConf;
-      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf /run/ap/${unlockIf}.conf /run/ap/${mgmtIf}.conf /run/ap/${nighthawkIf}.conf /run/ap/${nighthawkIf}-1.conf /run/ap/${nighthawkUnlockIf}.conf /run/ap/${nighthawkMgmtIf}.conf";
-      Restart = "always";
-      RuntimeDirectory = "ap";
+    ap-vap = {
+      description = "Create the ALFA AP and scan VAPs";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "ap-*.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        alfa_phy=$(cat /sys/class/net/${wifiIf}/phy80211/name 2>/dev/null || echo phy0)
+        nh_phy=$(cat /sys/class/net/${nighthawkIf}/phy80211/name 2>/dev/null || echo phy1)
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${wifiIf}-1 ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${wifiIf}-1 type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${unlockIf} ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${unlockIf} type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${mgmtIf} ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${mgmtIf} type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${scanIf} ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${scanIf} type station 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${nighthawkIf}-1 ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkIf}-1 type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${nighthawkUnlockIf} ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkUnlockIf} type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${nighthawkMgmtIf} ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkMgmtIf} type __ap 2>/dev/null || true
+          sleep 1
+        done
+      '';
     };
-  };
+  } // lib.listToAttrs (map mkApUnit apVaps);
 }
