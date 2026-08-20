@@ -154,7 +154,7 @@ let
     channel=36
     wmm_enabled=1
     country_code=NL
-    ieee80211ac=1
+    ieee80211ax=1
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
@@ -172,7 +172,7 @@ let
     channel=36
     wmm_enabled=1
     country_code=NL
-    ieee80211ac=1
+    ieee80211ax=1
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
@@ -190,7 +190,7 @@ let
     channel=36
     wmm_enabled=1
     country_code=NL
-    ieee80211ac=1
+    ieee80211ax=1
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
@@ -208,7 +208,7 @@ let
     channel=36
     wmm_enabled=1
     country_code=NL
-    ieee80211ac=1
+    ieee80211ax=1
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
