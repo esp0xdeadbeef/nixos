@@ -16,6 +16,9 @@ let
   unlockIf = "wlan0-2";
   mgmtIf = "wlan0-3";
   scanIf = "wlan0-scan";
+  nighthawkIf = "wlan1";
+  nighthawkUnlockIf = "wlan1-2";
+  nighthawkMgmtIf = "wlan1-3";
   ctrl = "/run/ap";
 
   ssidList = inputs.wifi-ssids.outPath + "/ssids.txt";
@@ -137,6 +140,81 @@ let
     wpa_passphrase=$pass4
     bridge=mgmt
     EOF
+
+    # Nighthawk AXE3000 (mt7925u) second radio on 5GHz. Same SSIDs and PSKs,
+    # so clients roam between the 2.4GHz ALFA and this 5GHz radio.
+    cat > /run/ap/${nighthawkIf}.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${nighthawkIf}
+    driver=nl80211
+    ssid=$ssid1
+    hw_mode=a
+    channel=36
+    wmm_enabled=1
+    country_code=NL
+    ieee80211ac=1
+    wpa=2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass1
+    bridge=clients
+    EOF
+    cat > /run/ap/${nighthawkIf}-1.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${nighthawkIf}-1
+    driver=nl80211
+    ssid=$ssid2
+    hw_mode=a
+    channel=36
+    wmm_enabled=1
+    country_code=NL
+    ieee80211ac=1
+    wpa=2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass2
+    bridge=clients-vpn
+    EOF
+    cat > /run/ap/${nighthawkUnlockIf}.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${nighthawkUnlockIf}
+    driver=nl80211
+    ssid=$ssid3
+    hw_mode=a
+    channel=36
+    wmm_enabled=1
+    country_code=NL
+    ieee80211ac=1
+    wpa=2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass3
+    bridge=unlock
+    EOF
+    cat > /run/ap/${nighthawkMgmtIf}.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${nighthawkMgmtIf}
+    driver=nl80211
+    ssid=$ssid4
+    hw_mode=a
+    channel=36
+    wmm_enabled=1
+    country_code=NL
+    ieee80211ac=1
+    wpa=2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass4
+    bridge=mgmt
+    EOF
   '';
 in
 {
@@ -177,6 +255,27 @@ in
         ${pkgs.iw}/bin/iw phy phy0 interface add ${scanIf} type station 2>/dev/null || true
         sleep 1
       done
+      for _ in $(seq 1 30); do
+        if [ -d /sys/class/net/${nighthawkIf}-1 ]; then
+          break
+        fi
+        ${pkgs.iw}/bin/iw phy phy1 interface add ${nighthawkIf}-1 type __ap 2>/dev/null || true
+        sleep 1
+      done
+      for _ in $(seq 1 30); do
+        if [ -d /sys/class/net/${nighthawkUnlockIf} ]; then
+          break
+        fi
+        ${pkgs.iw}/bin/iw phy phy1 interface add ${nighthawkUnlockIf} type __ap 2>/dev/null || true
+        sleep 1
+      done
+      for _ in $(seq 1 30); do
+        if [ -d /sys/class/net/${nighthawkMgmtIf} ]; then
+          break
+        fi
+        ${pkgs.iw}/bin/iw phy phy1 interface add ${nighthawkMgmtIf} type __ap 2>/dev/null || true
+        sleep 1
+      done
     '';
   };
 
@@ -192,7 +291,7 @@ in
     ];
     serviceConfig = {
       ExecStartPre = hostapdConf;
-      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf /run/ap/${unlockIf}.conf /run/ap/${mgmtIf}.conf";
+      ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${wifiIf}.conf /run/ap/${wifiIf}-1.conf /run/ap/${unlockIf}.conf /run/ap/${mgmtIf}.conf /run/ap/${nighthawkIf}.conf /run/ap/${nighthawkIf}-1.conf /run/ap/${nighthawkUnlockIf}.conf /run/ap/${nighthawkMgmtIf}.conf";
       Restart = "always";
       RuntimeDirectory = "ap";
     };
