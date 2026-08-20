@@ -17,6 +17,7 @@ let
   mgmtIf = "wlan0-3";
   scanIf = "wlan0-scan";
   nighthawkIf = "wlan1";
+  nighthawkClientsIf = "wlan1-0";
   nighthawkUnlockIf = "wlan1-2";
   nighthawkMgmtIf = "wlan1-3";
   ctrl = "/run/ap";
