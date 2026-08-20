@@ -21,6 +21,32 @@ let
   vaps = [
     { iface = "wlan0-0"; net = "cobalt-clients"; bridge = "ap-clients"; channel = 36; extra = ""; }
     { iface = "wlan0-1"; net = "cobalt-clients-vpn"; bridge = "ap-clients-vpn"; channel = 36; extra = ""; }
+    {
+      iface = "wlan0-2";
+      net = "cobalt-clients";
+      bridge = "ap-clients";
+      channel = 37;
+      extra = ''
+        op_class=133
+        ieee80211ax=1
+        he_oper_chwidth=1
+        he_oper_centr_freq_seg0_idx=39
+        sae_pwe=2
+      '';
+    }
+    {
+      iface = "wlan0-3";
+      net = "cobalt-clients-vpn";
+      bridge = "ap-clients-vpn";
+      channel = 37;
+      extra = ''
+        op_class=133
+        ieee80211ax=1
+        he_oper_chwidth=1
+        he_oper_centr_freq_seg0_idx=39
+        sae_pwe=2
+      '';
+    }
   ];
 
   hostapdConf = pkgs.writeShellScript "make-ap-hostapd-conf" ''
