@@ -1,0 +1,28 @@
+Fix mt7925u AP-mode TX headroom underflow (kernel panic).
+
+mt7925_usb_sdio_tx_prepare_skb() writes the TXWI at skb->data -
+MT_SDIO_TXD_SIZE and then skb_push()es it, but unlike the sibling
+mt7921_usb_sdio_tx_prepare_skb() it never calls skb_cow_head() first. When
+mac80211 hands the driver a skb without enough headroom (the beacon path in
+AP mode), skb_push() walks below skb->head and trips skb_under_panic():
+
+  skbuff: skb_under_panic: text:ffffffffc0fadea9 len:409 put:
+  kernel BUG at net/core/skbuff.c:212!
+  Call Trace:
+   mt7925_usb_sdio_tx_prepare_skb+0xc9/0x170 [mt7925_common]
+   mt76u_tx_queue_skb+0x8d/0x1f0 [mt76_usb]
+
+Guarantee the headroom up front, exactly as mt7921 does.
+
+--- a/drivers/net/wireless/mediatek/mt76/mt7925/mac.c
++++ b/drivers/net/wireless/mediatek/mt76/mt7925/mac.c
+@@ -1422,6 +1422,10 @@ int mt7925_usb_sdio_tx_prepare_skb(struct mt76_dev *mdev, void *txwi_ptr,
+ 	if (unlikely(tx_info->skb->len <= ETH_HLEN))
+ 		return -EINVAL;
+ 
++	err = skb_cow_head(skb, MT_SDIO_TXD_SIZE + MT_SDIO_HDR_SIZE);
++	if (err)
++		return err;
++
+ 	if (!wcid)
+ 		wcid = &dev->mt76.global_wcid;
