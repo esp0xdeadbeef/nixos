@@ -280,7 +280,6 @@ in
     ap-vap = {
       description = "Create the ALFA AP and scan VAPs";
       wantedBy = [ "multi-user.target" ];
-      before = [ "ap-*.service" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
