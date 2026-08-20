@@ -94,6 +94,18 @@ in
       deviceIds
   );
 
+  containers.access-vlan3.bindMounts = lib.listToAttrs (
+    map
+      (id: {
+        name = "/run/secrets/devices/${id}";
+        value = {
+          hostPath = config.sops.secrets."neon-device-${id}".path;
+          isReadOnly = true;
+        };
+      })
+      deviceIds
+  );
+
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 
   # The neon renderer compiles the shared intent + combined inventory, and the
