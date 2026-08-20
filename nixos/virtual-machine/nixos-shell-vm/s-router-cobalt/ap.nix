@@ -185,8 +185,6 @@ let
   apVaps = [
     { iface = wifiIf; bridge = "unlock"; }
     { iface = "${wifiIf}-1"; bridge = "mgmt"; }
-    { iface = nighthawkClientsIf; bridge = "clients"; }
-    { iface = "${nighthawkIf}-1"; bridge = "clients-vpn"; }
   ];
   mkApUnit = vap: {
     name = "ap-${vap.iface}";
