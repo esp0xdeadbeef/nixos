@@ -43,6 +43,10 @@ in
       name = "mt7925-multi-ap";
       patch = ../../../../patches/mt7925-multi-ap.patch;
     }
+    {
+      name = "mt7925-multi-band-ap";
+      patch = ../../../../patches/mt7925-multi-band-ap.patch;
+    }
   ];
 
   boot.kernelParams = [ "net.ifnames=0" ];

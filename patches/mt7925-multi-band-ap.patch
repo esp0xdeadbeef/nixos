@@ -1,0 +1,30 @@
+Allow multi-band AP operation (concurrent 5GHz + 6GHz BSSes) on mt7921/mt7925.
+
+The channel-context multi-channel (MCC) combination only allows P2P_GO, so
+an AP vif is forced into the single-channel combination and can never be
+placed on a second channel. The mt7925 silicon drives concurrent links on
+different channels (MLO), so add AP to the MCC limits and widen the
+interface budget so two BSSes on 5GHz and two on 6GHz can coexist.
+
+--- a/drivers/net/wireless/mediatek/mt76/mt792x_core.c
++++ b/drivers/net/wireless/mediatek/mt76/mt792x_core.c
+@@ -36,7 +36,8 @@ static const struct ieee80211_iface_limit if_limits_chanctx_mcc[] = {
+ 	},
+ 	{
+-		.max = 1,
+-		.types = BIT(NL80211_IFTYPE_P2P_GO)
++		.max = 2,
++		.types = BIT(NL80211_IFTYPE_AP) |
++			 BIT(NL80211_IFTYPE_P2P_GO)
+ 	},
+ 	{
+ 		.max = 1,
+@@ -64,7 +65,7 @@ static const struct ieee80211_iface_combination if_comb_chanctx[] = {
+ 	{
+ 		.limits = if_limits_chanctx_mcc,
+ 		.n_limits = ARRAY_SIZE(if_limits_chanctx_mcc),
+-		.max_interfaces = 3,
++		.max_interfaces = 4,
+ 		.num_different_channels = 2,
+ 		.beacon_int_infra_match = false,
+ 	},
