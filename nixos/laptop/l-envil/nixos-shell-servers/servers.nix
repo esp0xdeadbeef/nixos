@@ -9,6 +9,7 @@ let
     inputs.nixos-shell-vm-manager.packages.${pkgs.stdenv.hostPlatform.system}."qga-systemd-health";
   qgaSocket = "/run/nixos-shell-vm-manager/s-router-cobalt/qga.sock";
   tangQgaSocket = "/run/nixos-shell-vm-manager/s-tang/qga.sock";
+  apQgaSocket = "/run/nixos-shell-vm-manager/s-ap-nighthawk/qga.sock";
 in
 {
   services.nixosShellVmManager = {
@@ -72,6 +73,33 @@ in
         "none"
         "-nic"
         "bridge,br=br-cobalt-lan,model=virtio-net-pci"
+      ];
+      runner.stopGraceSeconds = 30;
+    };
+
+    instances.s-ap-nighthawk = {
+      description = "cobalt Nighthawk AP (mt7925u) on the cobalt trunk";
+      image = self.nixosConfigurations.s-ap-nighthawk.config.system.build.nixos-shell;
+      activation.startOnBoot = true;
+      healthCheck = {
+        command = lib.escapeShellArgs [
+          (lib.getExe guestAgentHealth)
+          apQgaSocket
+        ];
+        timeoutSeconds = 10;
+        retries = 60;
+        intervalSeconds = 2;
+      };
+      runner.qemuArguments = [
+        "-chardev"
+        "socket,id=qga0,path=${apQgaSocket},server=on,wait=off"
+        "-device"
+        "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        "-usb"
+        "-device"
+        "qemu-xhci,id=xhci"
+        "-device"
+        "usb-host,vendorid=0x0846,productid=0x9072,bus=xhci.0"
       ];
       runner.stopGraceSeconds = 30;
     };
