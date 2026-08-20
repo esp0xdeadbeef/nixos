@@ -789,11 +789,11 @@
         "nixpkgs-network": "nixpkgs-network_11"
       },
       "locked": {
-        "lastModified": 1787092817,
-        "narHash": "sha256-zo5QAJwkiHd0R3CQVUJyh33RgTT10Tn0fjEwg/+LwU0=",
+        "lastModified": 1787186580,
+        "narHash": "sha256-1KjKH8jtxPpl3cyRf0ORsf9Wwje1j4kABqWafFh8fFM=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "e90b14e8277d9d863c305af031b920c411eb473f",
+        "rev": "b6e6ae88c8c39591926cbd421860dd6b65164f99",
         "type": "github"
       },
       "original": {
