@@ -179,7 +179,13 @@
   s-nebula-container = {
     hostname = "s-nebula-container";
     scopes = {
-      vlan2 = 7;
+      vlan3 = 10;
+    };
+  };
+  s-llm-inference-container = {
+    hostname = "s-llm-inference-container";
+    scopes = {
+      vlan3 = 11;
     };
   };
   s-router-access = {
