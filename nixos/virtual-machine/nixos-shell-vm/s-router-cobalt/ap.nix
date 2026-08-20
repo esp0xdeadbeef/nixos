@@ -251,7 +251,7 @@ let
           sleep 1
         done
         ${pkgs.iproute2}/bin/ip link show ${vap.bridge} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "state UP" || exit 1
-        ${pkgs.iproute2}/bin/ip route get ${vap.gw} >/dev/null 2>&1 || exit 1
+        [ -n "$(ls /sys/class/net/${vap.bridge}/brif/ 2>/dev/null)" ] || exit 1
       '';
     };
   };
