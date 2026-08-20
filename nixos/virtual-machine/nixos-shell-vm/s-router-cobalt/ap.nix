@@ -316,6 +316,13 @@ in
           sleep 1
         done
         for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${nighthawkClientsIf} ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkClientsIf} type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
           if [ -d /sys/class/net/${nighthawkIf}-1 ]; then
             break
           fi
