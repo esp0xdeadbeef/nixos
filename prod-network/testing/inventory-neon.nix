@@ -333,6 +333,17 @@ let
             usePeerDns = false;
             mtu = 1492;
             credentials = pppoeCredentials;
+            ipv6 = {
+              mode = "dhcpv6-pd";
+              defaultRoute = true;
+              iaid = 1;
+              prefixDelegationRequestId = 1;
+              duidMode = "persistent";
+              resolverMode = "disabled";
+              ipv4Mode = "disabled";
+              routerSolicitation = false;
+              fallbackPolicy = "none";
+            };
           };
         };
       };
