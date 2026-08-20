@@ -32,8 +32,10 @@ in
   networking.hostName = lib.mkForce hostName;
 
   # The ALFA AP needs the rt2800usb firmware (rt2870/rt3070) and the
-  # Nighthawk needs the mt7925 firmware.
+  # Nighthawk needs the mt7925 firmware. The cobalt VM has no NVIDIA GPU,
+  # so it can run linux_latest (7.2) which has a working mt7925u driver.
   hardware.enableAllFirmware = true;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
 
   imports = [
     ./ap.nix
