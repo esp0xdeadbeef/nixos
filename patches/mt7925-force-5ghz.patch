@@ -1,37 +1,14 @@
-Force the mt7925u (Netgear A8000 AXE3000, 0846:9072) 5/6 GHz bands. The
-firmware reports a hw_path capability bitmap without the 5 GHz bit and does
-not send the 6 GHz NIC capability TLV, even though the MT7925 silicon is
-tri-band. Without these the driver only registers NL80211_BAND_2GHZ and the
-adapter can never be used as a 5/6 GHz AP. Force both flags so the wiphy
-exposes the full 2.4/5/6 GHz band set.
+Force the mt7925u (Netgear A8000 AXE3000, 0846:9072) 5 GHz band. Some
+firmware builds report a hw_path capability bitmap without the 5 GHz bit
+even though the MT7925 silicon is tri-band, which leaves only
+NL80211_BAND_2GHZ registered and makes 5 GHz AP mode impossible. Force the
+flag so the wiphy exposes the 5 GHz band.
 
 --- a/drivers/net/wireless/mediatek/mt76/mt7925/mcu.c
 +++ b/drivers/net/wireless/mediatek/mt76/mt7925/mcu.c
-@@ -905,9 +905,13 @@ mt7925_mcu_parse_phy_cap(struct mt792x_dev *dev, char *data)
- 	cap = (struct mt7925_mcu_phy_cap *)data;
- 
- 	mdev->phy.antenna_mask = BIT(cap->nss) - 1;
- 	mdev->phy.chainmask = mdev->phy.antenna_mask;
+@@ -908,3 +908,5 @@ mt7925_mcu_parse_phy_cap(struct mt792x_dev *dev, char *data)
  	mdev->phy.cap.has_2ghz = cap->hw_path & BIT(WF0_24G);
  	mdev->phy.cap.has_5ghz = cap->hw_path & BIT(WF0_5G);
-+	/* Some mt7925u devices (Netgear A8000 AXE3000, 0846:9072) report a
-+	 * hw_path without the 5 GHz bit even though the silicon is tri-band.
-+	 */
++	/* Some 0846:9072 firmware reports a 2.4 GHz-only hw_path. */
 +	mdev->phy.cap.has_5ghz = true;
  }
- 
- static void
-@@ -971,6 +975,10 @@ mt7925_mcu_get_nic_capability(struct mt792x_dev *dev)
- 		switch (le16_to_cpu(tlv->tag)) {
- 		case MT_NIC_CAP_6G:
- 			mphy->cap.has_6ghz = !!tlv->data[0];
- 			break;
-@@ -976,6 +984,9 @@ mt7925_mcu_get_nic_capability(struct mt792x_dev *dev)
- 		}
- 	}
-+
-+	/* The same 0846:9072 firmware does not report the 6 GHz capability. */
-+	mphy->cap.has_6ghz = true;
- 
- out:
- 	kfree_skb(skb);
