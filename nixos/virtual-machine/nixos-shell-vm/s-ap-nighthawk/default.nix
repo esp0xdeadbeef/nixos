@@ -35,6 +35,10 @@ in
       name = "mt7925-force-5ghz";
       patch = ../../../../patches/mt7925-force-5ghz.patch;
     }
+    {
+      name = "mt7925-tx-headroom";
+      patch = ../../../../patches/mt7925-tx-headroom.patch;
+    }
   ];
 
   boot.kernelParams = [ "net.ifnames=0" ];
