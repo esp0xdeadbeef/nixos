@@ -46,7 +46,7 @@
   boot.kernelPatches = [
     {
       name = "mt7925-force-5ghz";
-      patch = ./patches/mt7925-force-5ghz.patch;
+      patch = ../../../patches/mt7925-force-5ghz.patch;
     }
   ];
 
