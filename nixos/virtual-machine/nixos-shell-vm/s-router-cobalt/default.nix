@@ -31,8 +31,11 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
-  # The ALFA AP container needs the rt2800usb firmware (rt2870/rt3070).
+  # The ALFA AP needs the rt2800usb firmware (rt2870/rt3070) and the
+  # Nighthawk needs the mt7925 firmware. Uncompressed: the mt7925u driver
+  # fails to parse the zstd-compressed firmware and only brings up 2.4GHz.
   hardware.enableAllFirmware = true;
+  hardware.firmwareCompression = "none";
 
   imports = [
     ./ap.nix
