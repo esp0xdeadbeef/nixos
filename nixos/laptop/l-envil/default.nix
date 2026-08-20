@@ -27,7 +27,6 @@
     ./hardware/audio-and-bluetooth.nix
     ./hardware/bootloader.nix
     ./hardware/cobalt-bridges.nix
-    ./hardware/nighthawk-ap.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/nvidia.nix
