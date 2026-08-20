@@ -224,7 +224,7 @@ let
     { iface = "${wifiIf}-1"; bridge = "clients-vpn"; gw = "10.2.31.1"; }
     { iface = unlockIf; bridge = "unlock"; gw = "10.2.90.1"; }
     { iface = mgmtIf; bridge = "mgmt"; gw = "10.2.10.1"; }
-    { iface = nighthawkIf; bridge = "clients"; gw = "10.2.30.1"; }
+    { iface = nighthawkClientsIf; bridge = "clients"; gw = "10.2.30.1"; }
     { iface = "${nighthawkIf}-1"; bridge = "clients-vpn"; gw = "10.2.31.1"; }
     { iface = nighthawkUnlockIf; bridge = "unlock"; gw = "10.2.90.1"; }
     { iface = nighthawkMgmtIf; bridge = "mgmt"; gw = "10.2.10.1"; }
