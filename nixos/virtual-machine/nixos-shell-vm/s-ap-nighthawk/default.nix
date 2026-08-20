@@ -39,6 +39,10 @@ in
 
   boot.kernelParams = [ "net.ifnames=0" ];
 
+  networking.useNetworkd = true;
+  networking.useDHCP = false;
+  networking.networkmanager.enable = false;
+
   systemd.network.enable = true;
 
   systemd.network.netdevs = {
