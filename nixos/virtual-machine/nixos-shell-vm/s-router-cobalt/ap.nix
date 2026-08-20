@@ -79,7 +79,7 @@ let
     logger_syslog_level=0
     interface=${wifiIf}
     driver=nl80211
-    ssid=$ssid1
+    ssid=$ssid3
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -87,8 +87,8 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase=$pass1
-    bridge=clients
+    wpa_passphrase=$pass3
+    bridge=unlock
     EOF
     cat > /run/ap/${wifiIf}-1.conf <<EOF
     ctrl_interface=${ctrl}
@@ -96,7 +96,7 @@ let
     logger_syslog_level=0
     interface=${wifiIf}-1
     driver=nl80211
-    ssid=$ssid2
+    ssid=$ssid4
     hw_mode=g
     channel=$ch
     wmm_enabled=1
@@ -104,8 +104,8 @@ let
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
-    wpa_passphrase=$pass2
-    bridge=clients-vpn
+    wpa_passphrase=$pass4
+    bridge=mgmt
     EOF
     cat > /run/ap/${unlockIf}.conf <<EOF
     ctrl_interface=${ctrl}
@@ -142,20 +142,20 @@ let
     bridge=mgmt
     EOF
 
-    # Nighthawk AXE3000 (mt7925u) second radio on 5GHz. Same SSIDs and PSKs,
-    # so clients roam between the 2.4GHz ALFA and this 5GHz radio.
-    cat > /run/ap/${nighthawkIf}.conf <<EOF
+    # Nighthawk AXE3000 (mt7925u) second radio on 5GHz for clients and
+    # clients-vpn. No HE/VHT flags: mt7925u AP mode in this kernel panics
+    # with the higher rate-control paths, plain 5GHz AP mode is stable.
+    cat > /run/ap/${nighthawkClientsIf}.conf <<EOF
     ctrl_interface=${ctrl}
     logger_stdout_level=0
     logger_syslog_level=0
-    interface=${nighthawkIf}
+    interface=${nighthawkClientsIf}
     driver=nl80211
     ssid=$ssid1
     hw_mode=a
     channel=36
     wmm_enabled=1
     country_code=NL
-    ieee80211ax=1
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
@@ -173,57 +173,20 @@ let
     channel=36
     wmm_enabled=1
     country_code=NL
-    ieee80211ax=1
     wpa=2
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=CCMP
     wpa_passphrase=$pass2
     bridge=clients-vpn
     EOF
-    cat > /run/ap/${nighthawkUnlockIf}.conf <<EOF
-    ctrl_interface=${ctrl}
-    logger_stdout_level=0
-    logger_syslog_level=0
-    interface=${nighthawkUnlockIf}
-    driver=nl80211
-    ssid=$ssid3
-    hw_mode=a
-    channel=36
-    wmm_enabled=1
-    country_code=NL
-    ieee80211ax=1
-    wpa=2
-    wpa_key_mgmt=WPA-PSK
-    wpa_pairwise=CCMP
-    wpa_passphrase=$pass3
-    bridge=unlock
-    EOF
-    cat > /run/ap/${nighthawkMgmtIf}.conf <<EOF
-    ctrl_interface=${ctrl}
-    logger_stdout_level=0
-    logger_syslog_level=0
-    interface=${nighthawkMgmtIf}
-    driver=nl80211
-    ssid=$ssid4
-    hw_mode=a
-    channel=36
-    wmm_enabled=1
-    country_code=NL
-    ieee80211ax=1
-    wpa=2
-    wpa_key_mgmt=WPA-PSK
-    wpa_pairwise=CCMP
-    wpa_passphrase=$pass4
-    bridge=mgmt
-    EOF
   '';
 in
 let
   apVaps = [
-    { iface = wifiIf; bridge = "clients"; gw = "10.2.30.1"; }
-    { iface = "${wifiIf}-1"; bridge = "clients-vpn"; gw = "10.2.31.1"; }
-    { iface = unlockIf; bridge = "unlock"; gw = "10.2.90.1"; }
-    { iface = mgmtIf; bridge = "mgmt"; gw = "10.2.10.1"; }
+    { iface = wifiIf; bridge = "unlock"; }
+    { iface = "${wifiIf}-1"; bridge = "mgmt"; }
+    { iface = nighthawkClientsIf; bridge = "clients"; }
+    { iface = "${nighthawkIf}-1"; bridge = "clients-vpn"; }
   ];
   mkApUnit = vap: {
     name = "ap-${vap.iface}";
