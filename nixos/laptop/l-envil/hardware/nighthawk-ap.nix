@@ -181,8 +181,6 @@ in
     after = [ "sops-install-secrets.service" ];
     path = [
       pkgs.coreutils
-      pkgs.gawk
-      pkgs.gnugrep
       pkgs.yq-go
     ];
     serviceConfig = {
