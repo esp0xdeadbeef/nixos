@@ -54,10 +54,7 @@
 
     "10-br-cobalt-lan" = {
       matchConfig.Name = "br-cobalt-lan";
-      networkConfig.VLAN = [
-        "nh-vl30"
-        "nh-vl31"
-      ];
+      networkConfig = { };
     };
 
     "10-br-cobalt-wan" = {
