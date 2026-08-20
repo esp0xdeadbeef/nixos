@@ -1,0 +1,33 @@
+Allow multiple concurrent AP interfaces on mt7921/mt7925.
+
+The shared mt792x interface-combination table caps NL80211_IFTYPE_AP at 1,
+so mac80211's ieee80211_check_combinations() rejects a second AP vif with
+-EBUSY before the firmware ever sees it. The mt7925 silicon and firmware
+support several BSSes (MT792x_MAX_INTERFACES = 4 is the vif budget), so a
+single hardcoded AP limit makes multi-SSID AP mode impossible:
+
+  hostapd: Could not set interface wlan0-1 flags (UP): Device or resource busy
+
+Raise the AP limit to the driver's interface budget in both the default and
+the single-channel channel-context combinations.
+
+--- a/drivers/net/wireless/mediatek/mt76/mt792x_core.c
++++ b/drivers/net/wireless/mediatek/mt76/mt792x_core.c
+@@ -14,6 +14,6 @@ static const struct ieee80211_iface_limit if_limits[] = {
+ 	},
+ 	{
+-		.max = 1,
++		.max = MT792x_MAX_INTERFACES,
+ 		.types = BIT(NL80211_IFTYPE_AP)
+ 	}
+ };
+@@ -52,8 +52,8 @@ static const struct ieee80211_iface_limit if_limits_chanctx_scc[] = {
+ 	},
+ 	{
+-		.max = 1,
++		.max = MT792x_MAX_INTERFACES,
+ 		.types = BIT(NL80211_IFTYPE_AP)
+ 	},
+ 	{
+ 		.max = 1,
+ 		.types = BIT(NL80211_IFTYPE_P2P_DEVICE)
