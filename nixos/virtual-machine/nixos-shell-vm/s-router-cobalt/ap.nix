@@ -227,53 +227,55 @@ in
       RemainAfterExit = true;
     };
     script = ''
+      alfa_phy=$(cat /sys/class/net/${wifiIf}/phy80211/name 2>/dev/null || echo phy0)
+      nh_phy=$(cat /sys/class/net/${nighthawkIf}/phy80211/name 2>/dev/null || echo phy1)
       for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${wifiIf}-1 ]; then
           break
         fi
-        ${pkgs.iw}/bin/iw phy phy0 interface add ${wifiIf}-1 type __ap 2>/dev/null || true
+        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${wifiIf}-1 type __ap 2>/dev/null || true
         sleep 1
       done
       for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${unlockIf} ]; then
           break
         fi
-        ${pkgs.iw}/bin/iw phy phy0 interface add ${unlockIf} type __ap 2>/dev/null || true
+        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${unlockIf} type __ap 2>/dev/null || true
         sleep 1
       done
       for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${mgmtIf} ]; then
           break
         fi
-        ${pkgs.iw}/bin/iw phy phy0 interface add ${mgmtIf} type __ap 2>/dev/null || true
+        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${mgmtIf} type __ap 2>/dev/null || true
         sleep 1
       done
       for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${scanIf} ]; then
           break
         fi
-        ${pkgs.iw}/bin/iw phy phy0 interface add ${scanIf} type station 2>/dev/null || true
+        ${pkgs.iw}/bin/iw phy "$alfa_phy" interface add ${scanIf} type station 2>/dev/null || true
         sleep 1
       done
       for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${nighthawkIf}-1 ]; then
           break
         fi
-        ${pkgs.iw}/bin/iw phy phy1 interface add ${nighthawkIf}-1 type __ap 2>/dev/null || true
+        ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkIf}-1 type __ap 2>/dev/null || true
         sleep 1
       done
       for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${nighthawkUnlockIf} ]; then
           break
         fi
-        ${pkgs.iw}/bin/iw phy phy1 interface add ${nighthawkUnlockIf} type __ap 2>/dev/null || true
+        ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkUnlockIf} type __ap 2>/dev/null || true
         sleep 1
       done
       for _ in $(seq 1 30); do
         if [ -d /sys/class/net/${nighthawkMgmtIf} ]; then
           break
         fi
-        ${pkgs.iw}/bin/iw phy phy1 interface add ${nighthawkMgmtIf} type __ap 2>/dev/null || true
+        ${pkgs.iw}/bin/iw phy "$nh_phy" interface add ${nighthawkMgmtIf} type __ap 2>/dev/null || true
         sleep 1
       done
     '';
