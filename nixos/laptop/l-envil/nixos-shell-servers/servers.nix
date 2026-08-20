@@ -37,6 +37,10 @@ in
         "-usb"
         "-device"
         "qemu-xhci,id=xhci"
+        "-device"
+        "usb-host,vendorid=0x148f,productid=0x3070,bus=xhci.0"
+        "-device"
+        "usb-host,vendorid=0x0846,productid=0x9072,bus=xhci.0"
       ];
       storage.persistentDisk = {
         enable = true;
