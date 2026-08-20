@@ -40,10 +40,6 @@
 
   local.network.private.enable = false;
 
-  # mt7925u (Netgear A8000 AXE3000) 5/6GHz support needs a much newer mt76
-  # driver than the default 6.18 kernel ships.
-  boot.kernelPackages = pkgs.linuxPackages_latest;
-
   warnings = [
     "l-envil: systemd-hibernate.service disables systemd's user.slice freezer because hibernate froze immediately after freezing user.slice; remove this once the upstream/systemd sleep-stack issue is fixed."
   ];
