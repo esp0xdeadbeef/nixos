@@ -232,12 +232,17 @@ let
           builtins.substring 5 (builtins.stringLength tenant - 5) tenant
         else
           tenant;
+      # The legacy tenant VLANs keep the lan. local namespace shared with
+      # their DHCPv4 domain-name and Unbound local-zone. Only the plane-named
+      # lanes (neon-*, cobalt-*) advertise a home.arpa. search domain.
+      legacyLanTenant = builtins.elem tenant [ "vlan2" "vlan3" "vlan7" "vlan8" ];
+      dnsSearchDomain = if legacyLanTenant then "lan." else "${plane}.home.arpa.";
     in
     {
       enabled = true;
       inherit interface;
       rdnss = [ "router-self" ];
-      dnssl = [ "${plane}.home.arpa." ];
+      dnssl = [ dnsSearchDomain ];
       managed = false;
       otherConfig = false;
       onLink = true;
@@ -1384,6 +1389,24 @@ in
 
       ${prodHost} = {
         wanUplink = "upstream-core";
+
+        # Binds the intent hostManagement requirement (interface vlan2) to the
+        # host's lan2 bridge with a DHCPv4-only acquisition that never touches
+        # the host resolver or default route.
+        hostManagement = {
+          logicalInterface = "vlan2";
+          link = {
+            kind = "bridge";
+            name = "lan2";
+          };
+          addressAcquisition = {
+            ipv4 = "dhcp";
+            ipv6 = "disabled";
+            acceptRA = false;
+            useDns = false;
+            defaultRoute = false;
+          };
+        };
 
         uplinks = {
           upstream-core = {
