@@ -50,7 +50,19 @@
       name = "mt7925-force-5ghz";
       patch = ../../../patches/mt7925-force-5ghz.patch;
     }
+    {
+      # The FRITZ!SFP XGS-PON reports a non-standard SFF identifier, so the
+      # stock ixgbe driver rejects it at probe. Force-accept it as a generic
+      # SFP (see patches/ixgbe-allow-unsupported-sfp.patch).
+      name = "ixgbe-allow-unsupported-sfp";
+      patch = ../../../patches/ixgbe-allow-unsupported-sfp.patch;
+    }
   ];
+
+  # Enable the patched ixgbe path for the FRITZ!SFP in the Thunderbolt
+  # 82599ES SFP+ cage. Merged (not forced) so the nvidia modprobe options
+  # set elsewhere are preserved.
+  boot.extraModprobeConfig = lib.mkAfter "options ixgbe allow_unsupported_sfp=1";
 
   warnings = [
     "l-envil: systemd-hibernate.service disables systemd's user.slice freezer because hibernate froze immediately after freezing user.slice; remove this once the upstream/systemd sleep-stack issue is fixed."

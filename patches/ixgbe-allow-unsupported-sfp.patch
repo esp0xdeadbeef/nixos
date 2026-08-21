@@ -1,0 +1,38 @@
+ixgbe: accept non-SFP-identified modules when allow_unsupported_sfp is set
+
+The AVM FRITZ!SFP XGS-PON is a 10G module, but its non-standard SFF
+identifier byte makes ixgbe_identify_sfp_module() return -EOPNOTSUPP
+before ever reaching the allow_unsupported_sfp check. When
+allow_unsupported_sfp is set, treat any identifier as SFP and skip the
+10G-compliance-code rejection, so the module is handled as a generic SFP
+and can link at 10G.
+
+Signed-off-by: esp0xdeadbeef <esp0xdeadbeef@gmail.com>
+diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_phy.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_phy.c
+--- a/drivers/net/ethernet/intel/ixgbe/ixgbe_phy.c
++++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_phy.c
+@@ -1559,8 +1559,12 @@
+ 		goto err_read_i2c_eeprom;
+ 
+ 	if (identifier != IXGBE_SFF_IDENTIFIER_SFP) {
+-		hw->phy.type = ixgbe_phy_sfp_unsupported;
+-		return -EOPNOTSUPP;
++		if (hw->allow_unsupported_sfp) {
++			identifier = IXGBE_SFF_IDENTIFIER_SFP;
++		} else {
++			hw->phy.type = ixgbe_phy_sfp_unsupported;
++			return -EOPNOTSUPP;
++		}
+ 	}
+ 	status = hw->phy.ops.read_i2c_eeprom(hw,
+ 					     IXGBE_SFF_1GBE_COMP_CODES,
+@@ -1768,7 +1772,8 @@
+ 	      hw->phy.sfp_type == ixgbe_sfp_type_1g_sx_core0 ||
+ 	      hw->phy.sfp_type == ixgbe_sfp_type_1g_sx_core1 ||
+ 	      hw->phy.sfp_type == ixgbe_sfp_type_1g_bx_core0 ||
+-	      hw->phy.sfp_type == ixgbe_sfp_type_1g_bx_core1)) {
++	      hw->phy.sfp_type == ixgbe_sfp_type_1g_bx_core1) &&
++	    !hw->allow_unsupported_sfp) {
+ 		hw->phy.type = ixgbe_phy_sfp_unsupported;
+ 		return -EOPNOTSUPP;
+ 	}
