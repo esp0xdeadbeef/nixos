@@ -1,14 +1,55 @@
-Force the mt7925u (Netgear A8000 AXE3000, 0846:9072) 5 GHz band. Some
-firmware builds report a hw_path capability bitmap without the 5 GHz bit
-even though the MT7925 silicon is tri-band, which leaves only
-NL80211_BAND_2GHZ registered and makes 5 GHz AP mode impossible. Force the
-flag so the wiphy exposes the 5 GHz band.
+wifi: mt76: mt7925: force 5 GHz band on Netgear A8000
 
+The Netgear A8000 (0846:9072) MT7925U adapter reports a hw_path
+capability bitmap without the 5 GHz bit even though the MT7925 silicon
+is tri-band.  The driver consequently only registers NL80211_BAND_2GHZ,
+which makes 5 GHz AP mode impossible on this adapter.
+
+Key the workaround on the specific USB device by setting a quirk during
+probe instead of unconditionally forcing the 5 GHz band for every
+MT7925.
+
+Signed-off-by: esp0xdeadbeef <esp0xdeadbeef@gmail.com>
+diff --git a/drivers/net/wireless/mediatek/mt76/mt7925/mcu.c b/drivers/net/wireless/mediatek/mt76/mt7925/mcu.c
+index 647efa9..c2e083b 100644
 --- a/drivers/net/wireless/mediatek/mt76/mt7925/mcu.c
 +++ b/drivers/net/wireless/mediatek/mt76/mt7925/mcu.c
-@@ -908,3 +908,5 @@ mt7925_mcu_parse_phy_cap(struct mt792x_dev *dev, char *data)
+@@ -907,6 +907,13 @@ mt7925_mcu_parse_phy_cap(struct mt792x_dev *dev, char *data)
+ 	mdev->phy.chainmask = mdev->phy.antenna_mask;
  	mdev->phy.cap.has_2ghz = cap->hw_path & BIT(WF0_24G);
  	mdev->phy.cap.has_5ghz = cap->hw_path & BIT(WF0_5G);
-+	/* Some 0846:9072 firmware reports a 2.4 GHz-only hw_path. */
-+	mdev->phy.cap.has_5ghz = true;
++
++	/* The Netgear A8000 (0846:9072) firmware reports a hw_path without
++	 * the 5 GHz bit even though the MT7925 silicon is tri-band, which
++	 * leaves only NL80211_BAND_2GHZ registered and breaks 5 GHz AP mode.
++	 */
++	if (dev->quirk_force_5ghz)
++		mdev->phy.cap.has_5ghz = true;
  }
+ 
+ static void
+diff --git a/drivers/net/wireless/mediatek/mt76/mt7925/usb.c b/drivers/net/wireless/mediatek/mt76/mt7925/usb.c
+index bf040f3..0abcd2d 100644
+--- a/drivers/net/wireless/mediatek/mt76/mt7925/usb.c
++++ b/drivers/net/wireless/mediatek/mt76/mt7925/usb.c
+@@ -184,6 +184,8 @@ static int mt7925u_probe(struct usb_interface *usb_intf,
+ 	dev = container_of(mdev, struct mt792x_dev, mt76);
+ 	dev->fw_features = features;
+ 	dev->hif_ops = &hif_ops;
++	if (id->idVendor == 0x0846 && id->idProduct == 0x9072)
++		dev->quirk_force_5ghz = true;
+ 
+ 	udev = usb_get_dev(udev);
+ 	usb_reset_device(udev);
+diff --git a/drivers/net/wireless/mediatek/mt76/mt792x.h b/drivers/net/wireless/mediatek/mt76/mt792x.h
+index f2c8b9e..0e014f9 100644
+--- a/drivers/net/wireless/mediatek/mt76/mt792x.h
++++ b/drivers/net/wireless/mediatek/mt76/mt792x.h
+@@ -235,6 +235,7 @@ struct mt792x_dev {
+ 	bool hif_idle:1;
+ 	bool hif_resumed:1;
+ 	bool regd_change:1;
++	bool quirk_force_5ghz:1;
+ 	wait_queue_head_t wait;
+ 
+ 	struct work_struct init_work;
