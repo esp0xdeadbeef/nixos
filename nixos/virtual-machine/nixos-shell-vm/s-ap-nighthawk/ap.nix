@@ -18,31 +18,14 @@ let
   );
 
   # (iface, network, bridge, channel, extra hostapd lines)
+  #
+  # The mt7925u firmware exposes a single 5/6GHz radio: 5GHz and 6GHz cannot
+  # be driven concurrently (the second channel context is rejected with
+  # -EBUSY). Ship the two SSIDs on 5GHz (WiFi 6) as the stable default; the
+  # 6GHz (WiFi 6E/7) VAPs are configurable but mutually exclusive with 5GHz.
   vaps = [
     { iface = "wlan0-0"; net = "cobalt-clients"; bridge = "ap-clients"; channel = 36; extra = ""; }
     { iface = "wlan0-1"; net = "cobalt-clients-vpn"; bridge = "ap-clients-vpn"; channel = 36; extra = ""; }
-    {
-      iface = "wlan0-2";
-      net = "cobalt-clients";
-      bridge = "ap-clients";
-      channel = 37;
-      extra = ''
-        op_class=131
-        ieee80211ax=1
-        sae_pwe=2
-      '';
-    }
-    {
-      iface = "wlan0-3";
-      net = "cobalt-clients-vpn";
-      bridge = "ap-clients-vpn";
-      channel = 37;
-      extra = ''
-        op_class=131
-        ieee80211ax=1
-        sae_pwe=2
-      '';
-    }
   ];
 
   hostapdConf = pkgs.writeShellScript "make-ap-hostapd-conf" ''
