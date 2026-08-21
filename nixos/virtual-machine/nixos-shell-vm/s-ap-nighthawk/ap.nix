@@ -27,10 +27,8 @@ let
       bridge = "ap-clients";
       channel = 37;
       extra = ''
-        op_class=133
+        op_class=131
         ieee80211ax=1
-        he_oper_chwidth=1
-        he_oper_centr_freq_seg0_idx=39
         sae_pwe=2
       '';
     }
@@ -40,10 +38,8 @@ let
       bridge = "ap-clients-vpn";
       channel = 37;
       extra = ''
-        op_class=133
+        op_class=131
         ieee80211ax=1
-        he_oper_chwidth=1
-        he_oper_centr_freq_seg0_idx=39
         sae_pwe=2
       '';
     }
