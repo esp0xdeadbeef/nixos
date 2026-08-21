@@ -23,9 +23,24 @@ let
   # be driven concurrently (the second channel context is rejected with
   # -EBUSY). Ship the two SSIDs on 5GHz (WiFi 6) as the stable default; the
   # 6GHz (WiFi 6E/7) VAPs are configurable but mutually exclusive with 5GHz.
+  # 80 MHz channel width with 802.11n/ac/ax so the 5GHz link can actually
+  # exceed ~200 Mbit/s (plain hw_mode=a without HT/VHT/HE caps the rate).
+  # Channel 36 primary, 80 MHz centre = channel 42.
+  fiveGhzExtra = ''
+    ieee80211n=1
+    ht_capab=[HT40+][SHORT-GI-20][SHORT-GI-40]
+    ieee80211ac=1
+    vht_oper_chwidth=1
+    vht_oper_centr_freq_seg0_idx=42
+    vht_capab=[SHORT-GI-80][MAX-MPDU-11454]
+    ieee80211ax=1
+    he_oper_chwidth=1
+    he_oper_centr_freq_seg0_idx=42
+  '';
+
   vaps = [
-    { iface = "wlan0-0"; net = "cobalt-clients"; bridge = "ap-clients"; channel = 36; extra = ""; }
-    { iface = "wlan0-1"; net = "cobalt-clients-vpn"; bridge = "ap-clients-vpn"; channel = 36; extra = ""; }
+    { iface = "wlan0-0"; net = "cobalt-clients"; bridge = "ap-clients"; channel = 36; extra = fiveGhzExtra; }
+    { iface = "wlan0-1"; net = "cobalt-clients-vpn"; bridge = "ap-clients-vpn"; channel = 36; extra = fiveGhzExtra; }
   ];
 
   hostapdConf = pkgs.writeShellScript "make-ap-hostapd-conf" ''
