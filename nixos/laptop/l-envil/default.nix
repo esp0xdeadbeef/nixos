@@ -41,8 +41,10 @@
   local.network.private.enable = false;
 
   # mt7925u (Netgear A8000 AXE3000, 0846:9072) firmware reports a hw_path
-  # without the 5GHz bit and no 6GHz capability; force the bands so the
-  # tri-band chip exposes 2.4/5/6 GHz for AP use.
+  # without the 5GHz bit even though the MT7925 silicon is tri-band, which
+  # leaves only 2.4GHz registered and makes 5GHz AP mode impossible. The
+  # patch keys the workaround on this specific USB device (set during probe)
+  # instead of forcing the band for every MT7925.
   boot.kernelPatches = [
     {
       name = "mt7925-force-5ghz";
