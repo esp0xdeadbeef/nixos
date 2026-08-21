@@ -21,9 +21,10 @@ let
     builtins.readFile (relativeRepo.sourcePath "library/01-general/network/wifi-ssid-derive.sh")
   );
 
-  # Force 160MHz on channel 36 (needs DFS for 52-64). When false, the scan
-  # picks the least-congested 80MHz/160MHz plan instead.
-  force160 = true;
+  # 160MHz on channel 36 needs DFS radar detection on 52-64, which the
+  # mt7925u client firmware/driver does not implement (start_dfs_cac fails),
+  # so 80MHz is the ceiling. Keep the knob so a DFS-capable radio could opt in.
+  force160 = false;
 
   # (iface, network, bridge) -- channel/width are chosen by the scan at runtime.
   vaps = [
