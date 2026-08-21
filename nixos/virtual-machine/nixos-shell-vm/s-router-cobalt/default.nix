@@ -155,56 +155,63 @@ in
     ))
   ];
 
-  # The cobalt WAN uplink spoofs the ISP CPE's WAN MAC so it can replace the
-  # ISP router directly on the ONT. The MAC is a SOPS secret (plan §6: not
-  # committed). Apply it to eth1 (the br-cobalt-wan virtio NIC) before
-  # systemd-networkd creates eth1.300 / br-wan, so the VLAN subinterface and
-  # the bridge inherit it and the WAN DHCP DISCOVER carries it.
-  systemd.services.cobalt-wan-mac = {
-    description = "Apply spoofed WAN MAC to eth1 before networkd";
-    wantedBy = [ "sysinit.target" ];
-    before = [ "systemd-networkd.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    path = [
-      pkgs.coreutils
-      pkgs.gnugrep
-      pkgs.iproute2
-    ];
-    script = ''
-      set -euo pipefail
-
-      macSecret="/run/secrets/cobalt-wan-mac"
-      if [ ! -r "$macSecret" ]; then
-        echo "[network] ERROR: $macSecret is not readable" >&2
-        exit 1
-      fi
-
-      mac="$(tr -d '[:space:]' < "$macSecret")"
-      if ! printf '%s\n' "$mac" | grep -Eq '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$'; then
-        echo "[network] ERROR: $macSecret does not contain a valid MAC address" >&2
-        exit 1
-      fi
-
-      for _ in $(seq 1 40); do
-        if ip link show eth1 >/dev/null 2>&1; then
-          ip link set dev eth1 down || true
-          ip link set dev eth1 address "$mac"
-          exit 0
-        fi
-        sleep 0.25
-      done
-
-      echo "[network] ERROR: eth1 did not appear before networkd startup" >&2
-      exit 1
-    '';
+  # The cobalt WAN DHCP client runs inside the `core` container on its `wan`
+  # veth (attached to br-wan). The ISP binds the service to the CPE's WAN
+  # MAC, so that veth must advertise the cloned MAC (plan §6: SOPS secret,
+  # not committed). Apply it in the core container before its
+  # systemd-networkd starts DHCP on the interface.
+  containers.core.bindMounts."/run/secrets/cobalt-wan-mac" = {
+    hostPath = config.sops.secrets."cobalt-wan-mac".path;
+    isReadOnly = true;
   };
 
-  systemd.services.systemd-networkd = {
-    after = [ "cobalt-wan-mac.service" ];
-    requires = [ "cobalt-wan-mac.service" ];
+  containers.core.config = {
+    systemd.services.core-wan-mac = {
+      description = "Apply spoofed WAN MAC to wan before networkd";
+      wantedBy = [ "sysinit.target" ];
+      before = [ "systemd-networkd.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      path = [
+        pkgs.coreutils
+        pkgs.gnugrep
+        pkgs.iproute2
+      ];
+      script = ''
+        set -euo pipefail
+
+        macSecret="/run/secrets/cobalt-wan-mac"
+        if [ ! -r "$macSecret" ]; then
+          echo "[network] ERROR: $macSecret is not readable" >&2
+          exit 1
+        fi
+
+        mac="$(tr -d '[:space:]' < "$macSecret")"
+        if ! printf '%s\n' "$mac" | grep -Eq '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$'; then
+          echo "[network] ERROR: $macSecret does not contain a valid MAC address" >&2
+          exit 1
+        fi
+
+        for _ in $(seq 1 40); do
+          if ip link show wan >/dev/null 2>&1; then
+            ip link set dev wan down || true
+            ip link set dev wan address "$mac"
+            exit 0
+          fi
+          sleep 0.25
+        done
+
+        echo "[network] ERROR: wan did not appear before networkd startup" >&2
+        exit 1
+      '';
+    };
+
+    systemd.services.systemd-networkd = {
+      after = [ "core-wan-mac.service" ];
+      requires = [ "core-wan-mac.service" ];
+    };
   };
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
