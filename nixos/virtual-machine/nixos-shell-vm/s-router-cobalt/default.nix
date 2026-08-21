@@ -118,6 +118,13 @@ in
         key = "";
         path = "/run/secrets/cobalt-wifi";
       };
+
+      "cobalt-wan-mac" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wan-mac.yaml";
+        key = "mac";
+        format = "yaml";
+        path = "/run/secrets/cobalt-wan-mac";
+      };
     };
 
   containers.access-clients.bindMounts = lib.mkMerge [
@@ -147,6 +154,58 @@ in
         deviceIds
     ))
   ];
+
+  # The cobalt WAN uplink spoofs the ISP CPE's WAN MAC so it can replace the
+  # ISP router directly on the ONT. The MAC is a SOPS secret (plan §6: not
+  # committed). Apply it to eth1 (the br-cobalt-wan virtio NIC) before
+  # systemd-networkd creates eth1.300 / br-wan, so the VLAN subinterface and
+  # the bridge inherit it and the WAN DHCP DISCOVER carries it.
+  systemd.services.cobalt-wan-mac = {
+    description = "Apply spoofed WAN MAC to eth1 before networkd";
+    wantedBy = [ "sysinit.target" ];
+    before = [ "systemd-networkd.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [
+      pkgs.coreutils
+      pkgs.gnugrep
+      pkgs.iproute2
+    ];
+    script = ''
+      set -euo pipefail
+
+      macSecret="/run/secrets/cobalt-wan-mac"
+      if [ ! -r "$macSecret" ]; then
+        echo "[network] ERROR: $macSecret is not readable" >&2
+        exit 1
+      fi
+
+      mac="$(tr -d '[:space:]' < "$macSecret")"
+      if ! printf '%s\n' "$mac" | grep -Eq '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$'; then
+        echo "[network] ERROR: $macSecret does not contain a valid MAC address" >&2
+        exit 1
+      fi
+
+      for _ in $(seq 1 40); do
+        if ip link show eth1 >/dev/null 2>&1; then
+          ip link set dev eth1 down || true
+          ip link set dev eth1 address "$mac"
+          exit 0
+        fi
+        sleep 0.25
+      done
+
+      echo "[network] ERROR: eth1 did not appear before networkd startup" >&2
+      exit 1
+    '';
+  };
+
+  systemd.services.systemd-networkd = {
+    after = [ "cobalt-wan-mac.service" ];
+    requires = [ "cobalt-wan-mac.service" ];
+  };
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 }
