@@ -568,6 +568,41 @@ in
             ];
           };
         }
+        {
+          id = "allow-wan-to-s-nebula-container-ipv6";
+          priority = 95;
+          from = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          to = {
+            kind = "service";
+            name = "s-nebula-container";
+          };
+          trafficType = "nebula";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-nebula-container";
+            targetEndpoint = "s-nebula-container";
+            targetPort = 4242;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "preserve-source";
+            translationMode = "none";
+            family = "ipv6";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 4242;
+              }
+              {
+                protocol = "tcp";
+                publicPort = 4242;
+              }
+            ];
+          };
+        }
         (allowTenantToWan "vlan2" 100)
         (allowTenantToWan "vlan7" 110)
         (allowTenantToWan "vlan8" 120)
