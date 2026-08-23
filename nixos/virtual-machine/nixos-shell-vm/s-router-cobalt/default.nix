@@ -55,6 +55,8 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model;
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;
+      intentFileName = "intent-cobalt.nix";
+      inventoryFileName = "inventory-cobalt.nix";
       inherit system;
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-cobalt/default.nix";
     })

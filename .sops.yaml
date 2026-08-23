@@ -288,7 +288,7 @@ creation_rules:
           - *s-router-prod
           - *s-router-neon
 
-  - path_regex: '^prod-network/s-router-neon/secrets/runtime\.yaml$'
+  - path_regex: '^prod-network/testing/secrets/runtime\.yaml$'
     encrypted_regex: ".*"
     key_groups:
       - age:
@@ -297,7 +297,7 @@ creation_rules:
           - *s-router-prod
           - *s-router-neon
 
-  - path_regex: '^prod-network/s-router-neon/secrets/(vlan[23]-reservations|vlan2-reservation-names)\.json\.age$'
+  - path_regex: '^prod-network/testing/secrets/(vlan[23]-reservations|vlan2-reservation-names)\.json\.age$'
     input_type: binary
     output_type: binary
     key_groups:
