@@ -57,7 +57,8 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model;
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;
-      inventoryFileName = "inventory-all.nix";
+      intentFileName = "intent-neon.nix";
+      inventoryFileName = "inventory-neon.nix";
       system = "x86_64-linux";
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-neon/default.nix";
     })
@@ -107,11 +108,4 @@ in
   );
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
-
-  # The neon renderer compiles the shared intent + combined inventory, and the
-  # pinned renderer leaks cobalt's onyx overlay termination into this host.
-  # Neon's own intent declares no onyx overlay; keep the stray container from
-  # auto-starting (and demanding AirVPN secrets) until the renderer stops
-  # leaking cross-site overlays.
-  containers.core-vpn-onyx.autoStart = lib.mkForce false;
 }
