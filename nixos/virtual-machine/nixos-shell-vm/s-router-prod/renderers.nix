@@ -10,13 +10,14 @@
 , wireguardRendererInput ? inputs.network-renderer-wireguard
 , hostName ? "s-router-prod"
 , inventoryFileName ? "inventory-all.nix"
+, intentFileName ? "intent.nix"
 ,
 }:
 
 { ... }:
 
 let
-  intentPath = "${modelSource}/intent.nix";
+  intentPath = "${modelSource}/${intentFileName}";
   inventoryPath = "${modelSource}/${inventoryFileName}";
 
   cpmLib = controlPlaneModelInput.libBySystem.${system};
