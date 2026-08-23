@@ -368,6 +368,11 @@ in
           trafficType = "icmp";
         }
         {
+          name = "vlan2-gateway-icmp";
+          providers = [ "vlan2-dns" ];
+          trafficType = "icmp";
+        }
+        {
           name = "mgmt-dns";
           providers = [ "neon-mgmt-dns" ];
           trafficType = "dns";
@@ -498,6 +503,21 @@ in
           to = {
             kind = "service";
             name = "s-nebula-container-icmp";
+          };
+          trafficType = "icmp";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-vlan2-to-vlan2-gateway-icmp";
+          priority = 82;
+          from = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          to = {
+            kind = "service";
+            name = "vlan2-gateway-icmp";
           };
           trafficType = "icmp";
           action = "allow";
