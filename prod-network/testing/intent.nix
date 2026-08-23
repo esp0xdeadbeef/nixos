@@ -1773,6 +1773,27 @@ in
       }
     ];
 
+    ipv6 = {
+      pd = {
+        uplink = "wan";
+        delegatedPrefixLength = 48;
+        perTenantPrefixLength = 64;
+      };
+      tenants = {
+        vlan2 = { mode = "slaac"; };
+        vlan3 = { mode = "slaac"; };
+        vlan7 = { mode = "slaac"; };
+        vlan8 = { mode = "slaac"; };
+        neon-mgmt = { mode = "slaac"; };
+        neon-svc = { mode = "slaac"; };
+        neon-clients = { mode = "slaac"; };
+        neon-iot = { mode = "slaac"; };
+        neon-iot-srv = { mode = "slaac"; };
+        neon-dmz = { mode = "slaac"; };
+        neon-unlock = { mode = "slaac"; };
+      };
+    };
+
     topology = {
       nodes = {
         core = {
@@ -1781,7 +1802,7 @@ in
           uplinks = {
             wan = {
               ipv4 = [ "0.0.0.0/0" ];
-              ipv6 = [ "::/0" ];
+              ipv6 = [ "2::/3" ];
             };
           };
         };
