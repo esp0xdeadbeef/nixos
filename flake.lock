@@ -693,28 +693,22 @@
     "network-forwarding-model": {
       "inputs": {
         "network-compiler": [
-          "network-control-plane-model-prod",
-          "network-labs",
           "network-compiler"
         ],
         "network-labs": [
-          "network-control-plane-model-prod",
-          "network-labs",
-          "network-labs-source"
+          "network-labs"
         ],
         "nixpkgs": [
-          "network-control-plane-model-prod",
-          "network-labs",
           "nixpkgs"
         ],
         "nixpkgs-network": "nixpkgs-network_8"
       },
       "locked": {
-        "lastModified": 1784591161,
-        "narHash": "sha256-oNhcUVUXazWSsT/XMRXnWvFO8da8DqwfMfHrbem3gHc=",
+        "lastModified": 1787508344,
+        "narHash": "sha256-TbyRv6lXtJYWW/PPmbyDD5NxDKVFPZvLYdujitGeEF0=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "46853d5fb8c7458fedf90ed6f9a39967b25736f7",
+        "rev": "643a91396c6ed595af29466c3c464b60c4c4d7e2",
         "type": "github"
       },
       "original": {
