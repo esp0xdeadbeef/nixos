@@ -45,7 +45,6 @@ in
 
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     "${modelSource}/runtime-secrets.nix"
-    ./neon-boot-diag.nix
 
     (import ../s-router-prod/renderers.nix {
       inherit
