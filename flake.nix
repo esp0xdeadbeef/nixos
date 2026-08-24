@@ -112,40 +112,40 @@
     };
 
     network-compiler-prod = {
-      url = "github:esp0xdeadbeef/network-compiler/d4f15004ae306951a63e02d5d5dfba8e4e7f46f0";
+      url = "github:esp0xdeadbeef/network-compiler/6c513bbc4cb0d5f73690d4164a92a01544e90c2e";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-forwarding-model-prod = {
-      url = "github:esp0xdeadbeef/network-forwarding-model/5ff6b41bd69a952b15b4c424eb9eca38c8655ada";
+      url = "github:esp0xdeadbeef/network-forwarding-model/1136741a313e3b8b0d5433dcf7fec4984d2a6619";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-prod";
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/39ae8ed0d2fc8395418cc1b36039eb0e4b846e8a";
+      url = "github:esp0xdeadbeef/network-control-plane-model/6f0bbc650470637cd8d1c4962c3f6f4a45f21b4e";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
     };
 
     network-realization-schema-prod = {
-      url = "github:esp0xdeadbeef/network-realization-schema/a033ad80648c64b4c51f1842f3da0c3fc440eeb6";
+      url = "github:esp0xdeadbeef/network-realization-schema/782509c1c35c6319b0fd5a39d6658fe27a91aba3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-realization-model-prod = {
-      url = "github:esp0xdeadbeef/network-realization-model/3e9e1f1169120493f0272e20c9ab8d34f5c3ce8c";
+      url = "github:esp0xdeadbeef/network-realization-model/a97b1a0b81796537133d3086ae77fef3084db863";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-realization-schema.follows = "network-realization-schema-prod";
     };
 
     nixos-network-compiler-prod = {
-      url = "github:esp0xdeadbeef/nixos-network-compiler/c6902dcf07da770de6dcf0981847b20bf97f67b1";
+      url = "github:esp0xdeadbeef/nixos-network-compiler/6c513bbc4cb0d5f73690d4164a92a01544e90c2e";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-renderer-nixos-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/dc7082c7ed60ec14e3b4d4539b34dfcbdb94c60b";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/7264bd5b68b41dbfc701be47684e31ed033f4a4d";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";

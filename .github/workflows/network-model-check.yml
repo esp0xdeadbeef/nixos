@@ -28,13 +28,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          # These two renderers compile the shared prod-network/testing model
-          # (intent.nix + combined inventory) through the CPM, realization
-          # model, and NixOS renderer. Evaluating their toplevel derivations
-          # is the cheapest way to catch an infinitely-recursive rendered
-          # config (e.g. a forwarding-model normalization cycle) before it
-          # reaches a host rebuild.
-          for host in s-router-neon s-router-cobalt; do
+          # These renderers compile the shared prod-network/testing model
+          # (intent.nix + per-site intent/inventory shims) through the CPM,
+          # realization model, and NixOS renderer. Evaluating their toplevel
+          # derivations is the cheapest way to catch an infinitely-recursive
+          # rendered config (e.g. a forwarding-model normalization cycle)
+          # before it reaches a host rebuild. s-router-neon and s-router-cobalt
+          # track the unpinned network-* main inputs; s-router-prod renders the
+          # same neon site against the pinned -prod inputs.
+          for host in s-router-neon s-router-cobalt s-router-prod; do
             echo "::group::Checking ${host}"
             nix derivation show \
               ".#nixosConfigurations.${host}.config.system.build.toplevel" \
