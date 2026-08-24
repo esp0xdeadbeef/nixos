@@ -10,7 +10,7 @@
 let
   prodInventory = import (relativeRepo.module "prod-network/current/inventory.nix");
   prodVlan3DnsRecords =
-    prodInventory.realization.nodes."esp0xdeadbeef-site-a-access-vlan3".services.dns.localRecords;
+    prodInventory.realization.nodes."esp0xdeadbeef-neon-access-vlan3".services.dns.localRecords;
   prodVlan3DnsRecord = builtins.head prodVlan3DnsRecords;
   prodVlan3DnsName = lib.removeSuffix "." prodVlan3DnsRecord.name;
   prodVlan3DnsIpv4 = builtins.head prodVlan3DnsRecord.a;

@@ -8,8 +8,8 @@
 }:
 let
   hostName = "s-router-prod";
-  modelSource = relativeRepo.sourcePath "prod-network/testing";
-  deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
+  modelSource = relativeRepo.sourcePath "prod-network/current";
+  deviceDir = relativeRepo.sourcePath "prod-network/current/secrets/devices";
   deviceIds =
     map
       (name: lib.removeSuffix ".sops.yaml" name)
@@ -60,8 +60,8 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
       networkRealizationModelInput = inputs.network-realization-model-prod;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
-      intentFileName = "intent-neon.nix";
-      inventoryFileName = "inventory-neon.nix";
+      intentFileName = "intent.nix";
+      inventoryFileName = "inventory.nix";
       system = "x86_64-linux";
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
     })
