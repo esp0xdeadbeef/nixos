@@ -9,7 +9,7 @@
 , nixosRendererInput ? inputs.network-renderer-nixos
 , wireguardRendererInput ? inputs.network-renderer-wireguard
 , hostName ? "s-router-prod"
-, inventoryFileName ? "inventory-all.nix"
+, inventoryFileName ? "inventory.nix"
 , intentFileName ? "intent.nix"
 ,
 }:
@@ -97,7 +97,7 @@ let
                 (overlayName:
                   let pc = overlays.${overlayName}.providerContract or null;
                   in
-                  if pc == null then [ ] else [ { name = overlayName; value = pc; } ])
+                  if pc == null then [ ] else [{ name = overlayName; value = pc; }])
                 (builtins.attrNames overlays))
             (builtins.attrNames sites))
         (builtins.attrNames (inventory.controlPlane.sites or { }));
@@ -121,7 +121,7 @@ let
                     pc = overlays.${overlayName}.providerContract or null;
                     vpn = if builtins.isAttrs pc && builtins.isAttrs (pc.interfaces or null) then pc.interfaces.vpn or null else null;
                   in
-                  if vpn == null then [ ] else [ { name = overlayName; value = { interface = vpn; }; } ])
+                  if vpn == null then [ ] else [{ name = overlayName; value = { interface = vpn; }; }])
                 (builtins.attrNames overlays))
             (builtins.attrNames sites))
         (builtins.attrNames (inventory.controlPlane.sites or { }));
