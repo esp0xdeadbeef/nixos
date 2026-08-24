@@ -1,12 +1,21 @@
 { inputs
 , lib
+, config
+, pkgs
 , relativeRepo
+, outputs
 , ...
 }:
 let
   hostName = "s-router-prod";
-  system = "x86_64-linux";
-  modelSource = relativeRepo.sourcePath "prod-network/current";
+  modelSource = relativeRepo.sourcePath "prod-network/testing";
+  deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
+  deviceIds =
+    map
+      (name: lib.removeSuffix ".sops.yaml" name)
+      (builtins.filter
+        (name: lib.hasSuffix ".sops.yaml" name)
+        (builtins.attrNames (builtins.readDir deviceDir)));
   qemuNetworkingOptions = [
     "-nic none"
     "-nic bridge,br=vmbr4,mac=52:54:00:12:34:56,model=virtio-net-pci"
@@ -17,50 +26,90 @@ in
   _module.args.sRouterProdProfile = {
     inherit modelSource;
     labSelector = null;
-    productionSelector = hostName;
+    productionSelector = "s-router-prod";
   };
 
-  warnings = map (reason: "s-router-prod compatibility override: ${reason}") [
-    "QEMU NICs override the generic VM definition to preserve the production vmbr4/vmbr1 handoff and both legacy MAC addresses"
-    "TEMPORARY NETWORK-RENDERER PROTECTED NAME-PUBLICATION OVERRIDE (vlan2-reservation-dns.nix): the native reservation name-publication contract rejects intentional multi-address hostnames; remove this file when network-* accepts that cardinality and renders protected runtime A/PTR data without exposing names through evaluation or the Nix store"
-    "TEMPORARY NETWORK-* VLAN 3 DNS AUTHORITY OVERRIDE (vlan3-dns-authority-override.nix plus vlan2-reservation-dns.nix filtering): VLAN 2 must query VLAN 3 Unbound for VLAN 3-owned names instead of duplicating their A/AAAA records locally; the protected VLAN 2 publisher must suppress those A records while retaining DHCP and PTR data. Remove both pieces when network-* supports multiple directional, relation-bound local namespace authorities, derives local publication from modeled provider endpoints, and prevents requester-side reservation publication from shadowing the authority"
-    "TEMPORARY NETWORK-RENDERER HOST MANAGEMENT OVERRIDE (vlan2-management-override.nix): VLAN 2 host management DHCPv4 remains local because hostManagement is not yet materialized by the pinned network-* stack; remove this file when network-* renders host DHCPv4 with UseDNS=false, while retaining the renderer-native VLAN 2 to VLAN 3 policy and ICMP path"
-    "TEMPORARY NETWORK-RENDERER CORE DNS PATH OVERRIDE (dns-core-path-route-override.nix): the rendered policy tables copy equal-prefix core service routes across VLAN 2, VLAN 3, and VLAN 7, so DNS can leave through the wrong tenant lane and be dropped; remove this file when the network-* service-route closure keeps core DNS on each requester's relation-bound upstream lane"
-    "TEMPORARY NETWORK-* NEBULA INGRESS PATH OVERRIDE (nebula-ingress-path-route-override.nix): the rendered policy tables copy the core-owned Nebula SNAT return route across tenant lanes, so policy rejects public UDP/TCP 4242 before forwarding; remove this file when network-* emits symmetric relation-bound forward and return policy routes for public ingress"
-    "TEMPORARY NETWORK-RENDERER IPv6 PATH-MTU OVERRIDE (vlan2-ipv6-path-mtu-override.nix): VLAN 2 advertises the core PPPoE MTU of 1492 because network-renderer-nixos does not yet propagate uplink path MTU into access router advertisements; remove this file when the rendered RA owns AdvLinkMTU, while retaining the renderer-native inet-family TCP MSS clamp"
-    "TEMPORARY NETWORK-* IPv6 UPLINK/INGRESS OVERRIDE (ipv6.nix): DHCPv6-PD acquisition and protected Nebula IPv6 ingress remain local compatibility glue; remove the local services, runtime address set, and nftables rules when the intent/compiler/renderer natively model PD plus an explicit scoped IPv6 public-ingress relation"
-    "TEMPORARY NETWORK-RENDERER VLAN 3 LOCAL-DATA RACE OVERRIDE (vlan3-unbound-local-data-race-override.nix): the renderer emits gen-s-router-prod-vlan3-unbound-local-data.service with Before=unbound.service but no RuntimeDirectory, so its ln races unbound's runtime directory and fails at boot; remove this file when network-renderer-nixos gives the generator its own RuntimeDirectory"
-  ];
+  networking.hostName = lib.mkForce hostName;
+
+  local.users.deadbeefSops.enable = false;
+
+  users.users.deadbeef = {
+    isNormalUser = true;
+    hashedPassword = "!";
+    shell = pkgs.zsh;
+  };
+  programs.zsh.enable = true;
 
   imports = [
+    outputs.nixosModules.containerNetworkDefaults
+
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     "${modelSource}/runtime-secrets.nix"
-    ./ipv6.nix
-    ./dns-core-path-route-override.nix
-    ./forwarding-invariants.nix
-    ./nebula-ingress-path-route-override.nix
-    ./vlan2-ipv6-path-mtu-override.nix
-    ./vlan2-reservation-dns.nix
-    ./vlan3-dns-authority-override.nix
-    ./vlan3-unbound-local-data-race-override.nix
-    ./vlan2-management-override.nix
+
     (import ./renderers.nix {
       inherit
         inputs
         lib
-        hostName
         modelSource
         ;
 
+      hostName = "s-router-prod";
+      # s-router-prod is the pinned production render of the neon site:
+      # it consumes the -prod network-* inputs in flake.lock for stability,
+      # while s-router-neon tracks the same model against main for testing.
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
       networkRealizationModelInput = inputs.network-realization-model-prod;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
-      inherit system;
+      intentFileName = "intent-neon.nix";
+      inventoryFileName = "inventory-neon.nix";
+      system = "x86_64-linux";
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod/default.nix";
     })
-
-    ./legacy-parity-contract.nix
   ];
+
+  system.stateVersion = lib.mkForce "26.05";
+
+  # Per-device protected DHCP reservations (MACs). Encrypted to l-esp,
+  # s-router-cobalt, s-router-prod, and s-router-neon; bound into the access
+  # containers so kea can serve the static vlan2 leases without the legacy
+  # full-lease JSON exports.
+  sops.secrets = lib.listToAttrs (
+    map
+      (id: {
+        name = "prod-device-${id}";
+        value = {
+          sopsFile = "${deviceDir}/${id}.sops.yaml";
+          key = "mac";
+          format = "yaml";
+          path = "/run/secrets/devices/${id}";
+        };
+      })
+      deviceIds
+  );
+
+  containers.access-vlan2.bindMounts = lib.listToAttrs (
+    map
+      (id: {
+        name = "/run/secrets/devices/${id}";
+        value = {
+          hostPath = config.sops.secrets."prod-device-${id}".path;
+          isReadOnly = true;
+        };
+      })
+      deviceIds
+  );
+
+  containers.access-vlan3.bindMounts = lib.listToAttrs (
+    map
+      (id: {
+        name = "/run/secrets/devices/${id}";
+        value = {
+          hostPath = config.sops.secrets."prod-device-${id}".path;
+          isReadOnly = true;
+        };
+      })
+      deviceIds
+  );
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 }
