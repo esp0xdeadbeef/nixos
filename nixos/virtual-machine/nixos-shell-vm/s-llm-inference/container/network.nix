@@ -6,6 +6,12 @@ in
 {
   networking.useDHCP = false;
   networking.useNetworkd = true;
+  # The shared nixos-container profile enables NetworkManager (mkDefault true).
+  # This container owns its VLAN interface exclusively through systemd-networkd;
+  # leaving NetworkManager running starts a second DHCPv4 client on veth3 with a
+  # different client-id, which defeats the MAC-based DHCP reservation for the
+  # pinned MAC.
+  networking.networkmanager.enable = false;
 
   systemd.services.s-llm-inference-veth-mac = {
     description = "Apply pinned MAC address to veth3 before DHCP";
