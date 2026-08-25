@@ -22,7 +22,7 @@ domains, do this in order:
    or be covered by the shared certificate.
 6. Mark any new SOPS files with `git add -N` before evaluating flakes.
 7. Activate local Home Manager for aerc/Geary, then deploy `s-gamma`.
-8. Verify DNS, mail maps, certificate SANs, and basic auth.
+8. Verify DNS, mail maps, and certificate SANs.
 
 ## Theory7 checklist
 
@@ -194,16 +194,15 @@ curl -I https://<new-canonical-domain>/
 curl -I https://<old-canonical-domain>/
 ```
 
-During preview, an unauthenticated check on the canonical domain must return
-`401` with `Basic realm="preview"`. Redirect domains are deliberately public:
-they return the redirect interstitial without credentials and then navigate to
-the canonical target. Do not weaken auth on the canonical host to test this.
+The canonical domain and redirect domains are all public: unauthenticated checks
+return `200` for the canonical site and the redirect interstitial for redirect
+domains, which then navigate to the canonical target.
 
 The derived `WEB_SITE_DOMAIN` also owns temporary host-specific backend tooling such as
 `/__preview/logo-inspectie/`. Changing the canonical domain moves that explicit
-nginx endpoint to the new host. Verify that it returns `401` on the canonical
-host while preview auth is active and `404` on every redirect domain; a `30x` to
-the tool on the canonical host means the isolation is incomplete.
+nginx endpoint to the new host. Verify that it is served on the canonical host
+and returns `404` on every redirect domain; a `30x` to the tool on the canonical
+host means the isolation is incomplete.
 
 New untracked SOPS files are not visible to flake evaluation. Mark them with
 intent-to-add before evaluating or deploying:
@@ -275,39 +274,11 @@ ssh root@<server> "cat /persist/var/lib/acme/s-gamma-mail/fullchain.pem" |
   openssl x509 -noout -subject -ext subjectAltName
 ```
 
-## Basic auth
+## Public access
 
-The canonical website must stay behind preview auth until the release date. Do
-not remove the global nginx `auth_basic` settings in
-`profiles/nixos/web/server/default.nix`. The `security.txt` endpoints and hosts
-listed in encrypted `WEB_REDIRECT_DOMAINS` are the intentional exceptions.
-
-The runtime nginx include renders host-level `off` entries only for the encrypted
-redirect-domain list; concrete domains stay out of Nix source:
-
-```nginx
-map "$scheme:$host" $managed_web_preview_realm {
-  default $managed_web_preview_path_realm;
-  "http:<redirect-domain>" off;
-  "https:<redirect-domain>" off;
-}
-```
-
-This is the intended path-only exception:
-
-```nginx
-map $uri $managed_web_preview_path_realm {
-  default "preview";
-  /.well-known/security.txt off;
-  /security.txt off;
-}
-```
-
-Check the generated runtime include after deploying:
-
-```bash
-ssh root@<server> "sed -n '1,80p' /run/s-gamma/nginx/http.conf"
-```
+The canonical website and redirect domains are public. The nginx preview basic
+auth gate was removed from `profiles/nixos/web/server/default.nix`; no
+`auth_basic` directive or htpasswd remains.
 
 Verify before finishing:
 
@@ -324,12 +295,12 @@ curl -k -sS -o /dev/null -D - --resolve <domain>:443:<server-ip> https://<domain
 curl -k -sS -o /dev/null -D - --resolve <domain>:443:<server-ip> https://<domain>/.well-known/security.txt
 ```
 
-Expected during preview:
+Expected:
 
 ```text
-https://<canonical-domain>/                       -> 401 with Basic realm="preview"
+https://<canonical-domain>/                       -> 200
 https://<canonical-domain>/.well-known/security.txt -> 200
-https://<redirect-domain>/any/nonexistent/file    -> 200 HTML, no WWW-Authenticate
+https://<redirect-domain>/any/nonexistent/file    -> 200 HTML
 ```
 
 ## Runtime privilege checks
@@ -339,7 +310,7 @@ verify the service user and the rendered credential boundary:
 
 ```bash
 ssh root@<server> 'systemctl show s-gamma-webpage.service -p User -p Group'
-ssh root@<server> 'stat -c "%U:%G %a %n" /run/s-gamma/webpage /run/s-gamma/webpage/env /run/s-gamma/nginx/http.conf /run/s-gamma/nginx/htpasswd'
+ssh root@<server> 'stat -c "%U:%G %a %n" /run/s-gamma/webpage /run/s-gamma/webpage/env /run/s-gamma/nginx/http.conf'
 ssh root@<server> 'sudo -u s-gamma-webpage test -r /run/s-gamma/webpage/env'
 ssh root@<server> 'sudo -u nginx test ! -r /run/s-gamma/webpage/env'
 ssh root@<server> 'sudo -u nginx test -r /run/s-gamma/nginx/http.conf'
