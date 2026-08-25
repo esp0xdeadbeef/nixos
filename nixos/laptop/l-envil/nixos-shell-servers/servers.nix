@@ -10,6 +10,7 @@ let
   qgaSocket = "/run/nixos-shell-vm-manager/s-router-cobalt/qga.sock";
   tangQgaSocket = "/run/nixos-shell-vm-manager/s-tang/qga.sock";
   apQgaSocket = "/run/nixos-shell-vm-manager/s-ap-nighthawk/qga.sock";
+  nebulaQgaSocket = "/run/nixos-shell-vm-manager/s-nebula-cobalt/qga.sock";
 in
 {
   services.nixosShellVmManager = {
@@ -47,6 +48,33 @@ in
         size = "20G";
       };
       runner.stopGraceSeconds = 60;
+    };
+
+    instances.s-nebula-cobalt = {
+      description = "cobalt nebula lighthouse (nixos-shell)";
+      image = self.nixosConfigurations.s-nebula-cobalt.config.system.build.nixos-shell;
+      activation.startOnBoot = true;
+      healthCheck = {
+        command = lib.escapeShellArgs [
+          (lib.getExe guestAgentHealth)
+          nebulaQgaSocket
+        ];
+        timeoutSeconds = 10;
+        retries = 60;
+        intervalSeconds = 2;
+      };
+      runner.qemuArguments = [
+        "-chardev"
+        "socket,id=qga0,path=${nebulaQgaSocket},server=on,wait=off"
+        "-device"
+        "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+      ];
+      storage.persistentDisk = {
+        enable = true;
+        fileName = "state.qcow2";
+        size = "4G";
+      };
+      runner.stopGraceSeconds = 30;
     };
 
     instances.s-tang = {
