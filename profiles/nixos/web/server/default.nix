@@ -36,10 +36,7 @@ let
   nginxHttpConfPath = config.sops.secrets.${cfg.secretNames.nginxHttpConf}.path;
   webContactEnvPath = config.sops.secrets.${cfg.secretNames.contactEnv}.path;
   webRedirectEnvPath = config.sops.secrets.${cfg.secretNames.redirectEnv}.path;
-  nginxPreviewUsernamePath = config.sops.secrets.${cfg.secretNames.previewUsername}.path;
-  nginxPreviewPasswordPath = config.sops.secrets.${cfg.secretNames.previewPassword}.path;
   nginxRuntimeDir = "${runtimeRoot}/nginx";
-  nginxHtpasswdPath = "${nginxRuntimeDir}/htpasswd";
   nginxRenderedHttpConfPath = "${nginxRuntimeDir}/http.conf";
   nginxGeneratedMailboxConfPath = "${nginxRuntimeDir}/mailbox-domains.conf";
   emptyMailboxPathList = pkgs.writeText "${hostName}-empty-mailbox-env-paths" "";
@@ -295,17 +292,6 @@ in
         description = "SOPS secret key containing webpage redirect env.";
       };
 
-      previewUsername = lib.mkOption {
-        type = lib.types.str;
-        default = "web/preview/username";
-        description = "SOPS secret key containing preview basic-auth username.";
-      };
-
-      previewPassword = lib.mkOption {
-        type = lib.types.str;
-        default = "web/preview/password";
-        description = "SOPS secret key containing preview basic-auth password.";
-      };
     };
   };
 
@@ -375,27 +361,6 @@ in
           ];
         };
 
-        ${cfg.secretNames.previewUsername} = {
-          sopsFile = cfg.sopsFile;
-          owner = "root";
-          group = "root";
-          mode = "0400";
-          restartUnits = [
-            nginxRuntimeConfigUnit
-            "nginx.service"
-          ];
-        };
-
-        ${cfg.secretNames.previewPassword} = {
-          sopsFile = cfg.sopsFile;
-          owner = "root";
-          group = "root";
-          mode = "0400";
-          restartUnits = [
-            nginxRuntimeConfigUnit
-            "nginx.service"
-          ];
-        };
       }
       // builtins.listToAttrs (
         map
@@ -445,7 +410,6 @@ in
         pkgs.coreutils
         pkgs.gawk
         pkgs.gnugrep
-        pkgs.openssl
       ];
       environment = {
         WEB_NGINX_RAW_CONF = nginxHttpConfPath;
@@ -453,13 +417,10 @@ in
         WEB_REDIRECT_ENV = webRedirectEnvPath;
         WEB_NGINX_RENDERED_CONF = nginxRenderedHttpConfPath;
         WEB_NGINX_GENERATED_MAILBOX_CONF = nginxGeneratedMailboxConfPath;
-        WEB_PREVIEW_USERNAME_FILE = nginxPreviewUsernamePath;
-        WEB_PREVIEW_PASSWORD_FILE = nginxPreviewPasswordPath;
         WEB_MAILBOX_SET_ENV_PATH_LIST = mailboxSetEnvPathList;
         WEB_TLS_FULLCHAIN = mailTlsFullchainPath;
         WEB_TLS_KEY = mailTlsKeyPath;
         WEB_NGINX_RUNTIME_DIR = nginxRuntimeDir;
-        WEB_NGINX_HTPASSWD = nginxHtpasswdPath;
         WEBPAGE_UPSTREAM = "http://${webpageHost}:${toString webpagePort}";
         WEB_NGINX_USER = "nginx";
         WEB_NGINX_GROUP = "nginx";
@@ -473,8 +434,6 @@ in
       preStart = waitForReadableFiles "nginx runtime" [
         "${webpageSourceDir}/deploy/prepare-nginx-runtime.sh"
         nginxHttpConfPath
-        nginxPreviewUsernamePath
-        nginxPreviewPasswordPath
         webContactEnvPath
         webRedirectEnvPath
         mailTlsFullchainPath
@@ -609,15 +568,6 @@ in
           'referer="$http_referer" user_agent="$http_user_agent"';
         access_log /var/log/nginx/access.log managed_web_host_combined;
 
-        map $uri $managed_web_preview_path_realm {
-          default "preview";
-          /.well-known/security.txt off;
-          /security.txt off;
-        }
-
-        auth_basic $managed_web_preview_realm;
-        auth_basic_user_file ${nginxHtpasswdPath};
-
         include ${nginxRenderedHttpConfPath};
       '';
     };
@@ -636,7 +586,6 @@ in
       preStart = lib.mkBefore (waitForReadableFiles "nginx" [
         nginxRenderedHttpConfPath
         nginxGeneratedMailboxConfPath
-        nginxHtpasswdPath
       ]);
       serviceConfig.TimeoutStartSec = "5min";
     };

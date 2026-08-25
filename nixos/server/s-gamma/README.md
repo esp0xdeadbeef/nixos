@@ -1,7 +1,7 @@
 # s-gamma runtime configuration
 
 This host keeps concrete mail domains, mailbox names, personal names, public
-hostnames, address literals, DNS zones, TLS material, and preview credentials
+hostnames, address literals, DNS zones, and TLS material
 out of the public Nix module. Those values belong in SOPS-managed runtime files
 or in provider control panels.
 
@@ -28,8 +28,6 @@ dns/zone_001
 dns/zone_002
 web/contact/env
 web/nginx/http_conf
-web/preview/username
-web/preview/password
 web/redirects/env
 ```
 
@@ -202,8 +200,8 @@ NETWORK_INTERFACE=...
 ```
 
 DNS and nginx runtime config are included from SOPS-managed files. Put zone
-names, record targets, address literals, `server_name` values, backend targets,
-and preview auth config there instead of in public Nix. Add another
+names, record targets, address literals, `server_name` values, and backend
+targets there instead of in public Nix. Add another
 `dns/zone_NNN` secret when the authoritative server must serve an additional
 zone, and include it from the SOPS-managed Knot config.
 
@@ -390,7 +388,7 @@ The backend runs as the dedicated `<host>-webpage` system user, not as `nginx`.
 SOPS source files remain `root:root 0400`. A root-owned one-shot renderer reads
 mail and web secrets, writes only an explicit allowlist to
 `/run/<host>/webpage/env`, and makes that file readable only by the backend.
-Nginx receives only its generated HTTP include and htpasswd under
+Nginx receives only its generated HTTP include under
 `/run/<host>/nginx`; it cannot read the backend env, mailbox/account source
 secrets, DeepSeek key, or SMTP credential. Generated SVGs are public preview
 state, while discussions and slogans are mode `0700` state owned by the backend
@@ -421,17 +419,15 @@ systemctl start "$(hostname)-webpage-sync.service"
 ```
 
 `<host>-webpage.service` runs the backend as `<host>-webpage` from
-`/persist/srv/www/app` on localhost. Nginx reverse proxies to it and owns the
-preview access gate. Preserve that service identity during manual debugging;
-running the backend as `nginx` defeats the credential boundary, while running it
-as root can hide permission errors.
+`/persist/srv/www/app` on localhost. Nginx reverse proxies to it. Preserve that
+service identity during manual debugging; running the backend as `nginx` defeats
+the credential boundary, while running it as root can hide permission errors.
 
-Expected live behavior during migration:
+Expected live behavior:
 
 ```text
 http://<web-host>/   -> HTTPS redirect without page content
-https://<web-host>/  -> gated without preview credentials
-https://<web-host>/  -> page content with preview credentials
+https://<web-host>/  -> page content
 ```
 
 ## Operational checks
@@ -458,4 +454,3 @@ Cutover checklist:
 - verify authoritative DNS, reverse DNS, and mail ports before MX cutover
 - publish DS data only through the registrar or registry path
 - verify DNSSEC with external resolvers after the parent DS is visible
-- keep web preview gated until the public page may be indexed
