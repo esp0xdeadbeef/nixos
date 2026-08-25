@@ -56,6 +56,7 @@
     };
     network = {
       cobalt-wifi-client = import ./nixos/network/cobalt-wifi-client.nix;
+      nebula-lighthouse = import ./nixos/network/nebula-lighthouse.nix;
       nebula-mesh = import ./nixos/network/nebula-mesh.nix;
       private = import ./nixos/network/private.nix;
       router-vlan2-runtime-contract = import ./nixos/network/router-vlan2-runtime-contract.nix;
