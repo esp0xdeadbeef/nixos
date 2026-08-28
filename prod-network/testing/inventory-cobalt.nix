@@ -956,10 +956,24 @@ let
       interfaceName = "upstream-selector";
     };
 
-    onyx = uplinkPort {
+    onyx = {
+      external = true;
       uplink = "onyx";
-      bridge = "br-onyx";
-      interfaceName = "onyx";
+      attach = bridgeAttach "br-onyx";
+      interface = {
+        name = "onyx";
+        wan = {
+          egress = {
+            ipv6 = {
+              translation = {
+                mode = "nat66";
+                translatedPrefixes = [ "fd42:dead:feed:c1e::/64" ];
+                egressAuthority = true;
+              };
+            };
+          };
+        };
+      };
     };
 
     tenant-cobalt-iot-srv = tenantPort {
@@ -1250,11 +1264,11 @@ in
                 nat = {
                   ipv4 = {
                     enable = true;
-                    sourceCidrs = [ "10.2.30.0/24" "10.2.31.0/24" ];
+                    sourceCidrs = [ "10.2.31.0/24" ];
                   };
                   ipv6 = {
                     enable = true;
-                    sourceCidrs = [ "fd42:dead:beef:230::/64" "fd42:dead:beef:231::/64" ];
+                    sourceCidrs = [ "fd42:dead:beef:231::/64" ];
                   };
                 };
                 publicIngress = [ ];
