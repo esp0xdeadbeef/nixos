@@ -1823,6 +1823,9 @@ in
             wan = {
               ipv4 = [ "0.0.0.0/0" ];
               ipv6 = [ "2000::/3" ];
+              egress.ipv4.translation = {
+                mode = "nat44";
+              };
             };
           };
         };
@@ -3335,6 +3338,9 @@ in
           uplinks = {
             wan = {
               ipv4 = [ "0.0.0.0/0" ];
+              egress.ipv4.translation = {
+                mode = "nat44";
+              };
             };
           };
         };
