@@ -3344,7 +3344,11 @@ in
           uplinks = {
             onyx = {
               ipv4 = [ "0.0.0.0/0" ];
-              ipv6 = [ "fd42:dead:feed:c1e::/64" ];
+              ipv6 = [ "::/0" ];
+              egress.ipv6.translation = {
+                mode = "nat66";
+                translatedPrefixes = [ "fd42:dead:feed:c1e::/64" ];
+              };
             };
           };
           attachments = [
