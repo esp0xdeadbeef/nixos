@@ -34,3 +34,36 @@
  
  # Only set from _tmp if we didn't already set from hash_inputs
  if not hash_inputs and _tmp:
+@@ -263,15 +269,24 @@
+ 
+ if config['read_status'] is True:
+     print ("port status:")
+-    
+-    _tmp_line = 58  # Port 1 starts on line 59
+ 
+-    for p in range (1, 9):
+-        _p_status = _status_check_list[_tmp_line].replace('<td class="def " sel="select">', "")
+-    
+-        print ("Port %d   %s" % (p, _p_status))
+-        
+-        _tmp_line += 14
++    # Port status lives on status.htm. On GS108PEv3 that page renders one
++    # <tr class="portID"> per port with no closing </tr>, so the original
++    # line-offset parser does not apply; parse each port block instead.
++    req = urllib.request.Request("http://%s/status.htm" % config['switch_addr'])
++    req.add_header("Cookie", "GS108SID=%s" % config['auth_cookie'])
++    _status_html = urllib.request.urlopen(req).read().decode("utf-8")
++    time.sleep(config['sleep_between_calls'])
++
++    for _chunk in re.split(r'<tr class="portID">', _status_html)[1:]:
++        _port_m = re.search(r'name="port(\d+)"', _chunk)
++        if not _port_m:
++            continue
++        _vals = re.findall(r'<input type="hidden" value="([^"]*)"', _chunk)
++        # hidden values: [port, status, speed-select, link-speed, flow, stats]
++        _port_status = _vals[1] if len(_vals) > 1 else "?"
++        _port_link = _vals[3] if len(_vals) > 3 else "?"
++        print ("Port %s   %s  %s" % (_port_m.group(1), _port_status, _port_link))
+ 
+ #
+ # If specified, post the desired status to the desired port:
