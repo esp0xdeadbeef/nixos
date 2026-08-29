@@ -9,8 +9,8 @@
 let
   inherit (lib) mkMerge;
 
-  nameAirvpn = "airvpn";
-  nameMullvad = "mullvad";
+  nameOnyx = "onyx";
+  nameJade = "jade";
   vlan2 = "veth2";
   vlan4 = "veth4";
   vlan5 = "veth5";
