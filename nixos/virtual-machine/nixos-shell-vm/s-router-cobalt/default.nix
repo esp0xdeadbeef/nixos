@@ -115,6 +115,42 @@ in
         path = "/run/secrets/onyx-dns";
       };
 
+      "cobalt-opal-private-key" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-opal-fields.yaml";
+        key = "privateKey";
+        path = "/run/secrets/opal-private-key";
+      };
+
+      "cobalt-opal-endpoint" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-opal-fields.yaml";
+        key = "endpoint";
+        path = "/run/secrets/opal-endpoint";
+      };
+
+      "cobalt-opal-preshared-key" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-opal-fields.yaml";
+        key = "presharedKey";
+        path = "/run/secrets/opal-preshared-key";
+      };
+
+      "cobalt-opal-public-key" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-opal-fields.yaml";
+        key = "publicKey";
+        path = "/run/secrets/opal-public-key";
+      };
+
+      "cobalt-opal-address" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-opal-fields.yaml";
+        key = "address";
+        path = "/run/secrets/opal-address";
+      };
+
+      "cobalt-opal-dns" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-opal-fields.yaml";
+        key = "dns";
+        path = "/run/secrets/opal-dns";
+      };
+
       "cobalt-wifi" = {
         sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
         key = "";

@@ -222,6 +222,7 @@ let
 
   coreUpstreamLink = "p2p-core-upstream-selector";
   coreVpnOnyxUpstreamLink = "p2p-core-vpn-onyx-upstream-selector";
+  coreVpnOpalUpstreamLink = "p2p-core-vpn-opal-upstream-selector";
   upstreamPolicyClientsLink = "p2p-policy-upstream-selector--access-access-clients--uplink-wan";
   upstreamPolicyIotSrvLink = "p2p-policy-upstream-selector--access-access-iot-srv--uplink-wan";
   policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
@@ -237,6 +238,7 @@ let
   policyDownstreamIotLink = "p2p-downstream-selector-policy--access-access-iot";
   downstreamAccessIotLink = "p2p-access-iot-downstream-selector";
   upstreamPolicyClientsVpnLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-onyx";
+  upstreamPolicyClientsVpnOpalLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-opal";
   policyDownstreamClientsVpnLink = "p2p-downstream-selector-policy--access-access-clients-vpn";
   downstreamAccessClientsVpnLink = "p2p-access-clients-vpn-downstream-selector";
   policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
@@ -298,6 +300,13 @@ let
       interfaceName = "core-vpn-onyx";
     };
 
+    core-vpn-opal = p2pPort {
+      link = coreVpnOpalUpstreamLink;
+      adapterName = "cb-us-cvo2";
+      bridge = "rt-core-vpn-opal-upstream-selector";
+      interfaceName = "core-vpn-opal";
+    };
+
     policy-clients = p2pPort {
       link = upstreamPolicyClientsLink;
       adapterName = "cb-us-p2";
@@ -331,6 +340,13 @@ let
       adapterName = "cb-us-p9";
       bridge = "rt-upstream-policy-clients-vpn";
       interfaceName = "policy-clients-vpn";
+    };
+
+    policy-clients-vpn-opal = p2pPort {
+      link = upstreamPolicyClientsVpnOpalLink;
+      adapterName = "cb-us-p11";
+      bridge = "rt-upstream-policy-clients-vpn-opal";
+      interfaceName = "policy-clients-vpn-opal";
     };
 
     policy-mgmt = p2pPort {
@@ -375,6 +391,13 @@ let
       adapterName = "cb-p-us9";
       bridge = "rt-upstream-policy-clients-vpn";
       interfaceName = "upstream-clients-vpn";
+    };
+
+    upstream-clients-vpn-opal = p2pPort {
+      link = upstreamPolicyClientsVpnOpalLink;
+      adapterName = "cb-p-us11";
+      bridge = "rt-upstream-policy-clients-vpn-opal";
+      interfaceName = "upstream-clients-vpn-opal";
     };
 
     upstream-mgmt = p2pPort {
@@ -968,6 +991,27 @@ let
       interfaceName = "iot-srv";
     };
   };
+
+  vpnOpal = mkNode "core-vpn-opal" {
+    upstream-selector = p2pPort {
+      link = coreVpnOpalUpstreamLink;
+      adapterName = "cb-cvo2-us";
+      bridge = "rt-core-vpn-opal-upstream-selector";
+      interfaceName = "upstream-selector";
+    };
+
+    opal = uplinkPort {
+      uplink = "opal";
+      bridge = "br-opal";
+      interfaceName = "opal";
+    };
+
+    tenant-cobalt-iot-srv = tenantPort {
+      logicalInterface = "tenant-cobalt-iot-srv";
+      bridge = "iot-srv";
+      interfaceName = "iot-srv";
+    };
+  };
 in
 {
   schemaVersion = 1;
@@ -1065,6 +1109,19 @@ in
             upstream = "onyx";
           };
 
+          opal = {
+            bridge = "br-opal";
+            parent = "opal-wg";
+            ipv4 = {
+              method = "none";
+            };
+            ipv6 = {
+              method = "none";
+              egressAuthority = true;
+            };
+            upstream = "opal";
+          };
+
           trunk = {
             parent = "eth0";
             bridge = "br-lan-trunk";
@@ -1125,6 +1182,7 @@ in
         bridgeNetworks = {
           rt-core-upstream-selector = { };
           rt-core-vpn-onyx-upstream-selector = { };
+          rt-core-vpn-opal-upstream-selector = { };
           rt-downstream-access-svc = { };
           rt-downstream-access-clients = { };
           rt-downstream-access-dmz = { };
@@ -1142,6 +1200,7 @@ in
           rt-downstream-access-clients-vpn = { };
           rt-policy-downstream-clients-vpn = { };
           rt-upstream-policy-clients-vpn = { };
+          rt-upstream-policy-clients-vpn-opal = { };
           rt-downstream-access-unlock = { };
           rt-policy-downstream-unlock = { };
           rt-downstream-access-mgmt = { };
@@ -1185,6 +1244,7 @@ in
       ${nodeName "access-unlock"} = accessUnlock;
       ${nodeName "access-mgmt"} = accessMgmt;
       ${nodeName "core-vpn-onyx"} = vpnOnyx;
+      ${nodeName "core-vpn-opal"} = vpnOpal;
     };
   };
 
@@ -1248,6 +1308,86 @@ in
                 lan = {
                   ipv4.address = "10.1.1.2/32";
                   ipv6.address = "fd42:dead:beef:2900::2/128";
+                };
+                wan = {
+                  ipv4.method = "auto";
+                  ipv6.method = "auto";
+                };
+                dns.mode = "default";
+                firewall.mode = null;
+                nat = {
+                  ipv4 = {
+                    enable = true;
+                    sourceCidrs = [ "10.2.31.0/24" ];
+                  };
+                  ipv6 = {
+                    enable = true;
+                    sourceCidrs = [ "fd42:dead:beef:231::/64" ];
+                  };
+                };
+                publicIngress = [ ];
+                portForwards = [ ];
+                services = {
+                  dhcp4.enable = false;
+                  ra.enable = false;
+                  healthCheck = {
+                    enable = true;
+                    target4 = "1.1.1.1";
+                    interval = "300s";
+                  };
+                };
+              };
+              runtimeNodes = { };
+            };
+
+            opal = {
+              provider = "wireguard";
+              providerBootstrapDns = {
+                forwarders = [
+                  "10.128.0.1"
+                  "fd7d:76ee:e68f:a993::1"
+                ];
+              };
+              providerContract = {
+                id = "opal";
+                provider = {
+                  class = "commercial-imported";
+                  mode = "egress-only";
+                  prefixAuthority = "host-only-128";
+                };
+                interfaces = {
+                  wan = "iot-srv";
+                  lan = "up-sel";
+                  vpn = "overlay-opal";
+                };
+                profile = {
+                  mode = "generated-peer";
+                  generatedPeer = {
+                    privateKeyFile = "/run/secrets/opal-private-key";
+                    addressesFile = "/run/secrets/opal-address";
+                    dnsFile = "/run/secrets/opal-dns";
+                    mtu = 1320;
+                    peers = [
+                      {
+                        publicKeyFile = "/run/secrets/opal-public-key";
+                        endpointFile = "/run/secrets/opal-endpoint";
+                        presharedKeyFile = "/run/secrets/opal-preshared-key";
+                        allowedIPs = [
+                          "0.0.0.0/0"
+                          "::/0"
+                        ];
+                        persistentKeepalive = 15;
+                      }
+                    ];
+                  };
+                };
+                runtime = {
+                  uuidFile = "/run/network-renderer-wireguard/opal.uuid";
+                  generatedConfigPath = "/run/network-renderer-wireguard/opal.conf";
+                };
+                lan = {
+                  ipv4.address = "10.1.1.13/32";
+                  ipv6.address = "fd42:dead:beef:2900::d/128";
                 };
                 wan = {
                   ipv4.method = "auto";
