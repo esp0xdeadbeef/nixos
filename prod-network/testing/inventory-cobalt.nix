@@ -237,8 +237,7 @@ let
   upstreamPolicyIotLink = "p2p-policy-upstream-selector--access-access-iot--uplink-wan";
   policyDownstreamIotLink = "p2p-downstream-selector-policy--access-access-iot";
   downstreamAccessIotLink = "p2p-access-iot-downstream-selector";
-  upstreamPolicyClientsVpnLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-onyx";
-  upstreamPolicyClientsVpnOpalLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-opal";
+  upstreamPolicyClientsVpnLink = "p2p-policy-upstream-selector--access-access-clients-vpn";
   policyDownstreamClientsVpnLink = "p2p-downstream-selector-policy--access-access-clients-vpn";
   downstreamAccessClientsVpnLink = "p2p-access-clients-vpn-downstream-selector";
   policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
@@ -342,13 +341,6 @@ let
       interfaceName = "policy-clients-vpn";
     };
 
-    policy-clients-vpn-opal = p2pPort {
-      link = upstreamPolicyClientsVpnOpalLink;
-      adapterName = "cb-us-p11";
-      bridge = "rt-upstream-policy-clients-vpn-opal";
-      interfaceName = "policy-clients-vpn-opal";
-    };
-
     policy-mgmt = p2pPort {
       link = upstreamPolicyMgmtLink;
       adapterName = "cb-us-p10";
@@ -391,13 +383,6 @@ let
       adapterName = "cb-p-us9";
       bridge = "rt-upstream-policy-clients-vpn";
       interfaceName = "upstream-clients-vpn";
-    };
-
-    upstream-clients-vpn-opal = p2pPort {
-      link = upstreamPolicyClientsVpnOpalLink;
-      adapterName = "cb-p-us11";
-      bridge = "rt-upstream-policy-clients-vpn-opal";
-      interfaceName = "upstream-clients-vpn-opal";
     };
 
     upstream-mgmt = p2pPort {
@@ -1200,7 +1185,6 @@ in
           rt-downstream-access-clients-vpn = { };
           rt-policy-downstream-clients-vpn = { };
           rt-upstream-policy-clients-vpn = { };
-          rt-upstream-policy-clients-vpn-opal = { };
           rt-downstream-access-unlock = { };
           rt-policy-downstream-unlock = { };
           rt-downstream-access-mgmt = { };
