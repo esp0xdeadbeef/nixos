@@ -993,11 +993,11 @@
         "nixpkgs-network": "nixpkgs-network_15"
       },
       "locked": {
-        "lastModified": 1788026689,
-        "narHash": "sha256-m65uF0OkxOtJLcXURTI6UywmPUAccxR69Y8/4Nu5uuA=",
+        "lastModified": 1788047914,
+        "narHash": "sha256-be79twcWPdXb8OOVY7wKC/d3ka35vQYiu2xnwXtZw3Y=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "881f02b536eb42dc3b362f9f57b8bc6acd9e6b8e",
+        "rev": "b50bd2c94ce7ab962d7ad473cf756a6997f04c6b",
         "type": "github"
       },
       "original": {
