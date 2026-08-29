@@ -80,6 +80,17 @@ let
     }
 
     {
+      name = "bgp";
+      match = [
+        {
+          proto = "tcp";
+          dports = [ 179 ];
+          family = "any";
+        }
+      ];
+    }
+
+    {
       name = "nebula";
       match = [
         {
