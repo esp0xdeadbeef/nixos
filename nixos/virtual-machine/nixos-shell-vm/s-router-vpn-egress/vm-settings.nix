@@ -1,8 +1,7 @@
-{
-  lib,
-  config,
-  pkgs,
-  ...
+{ lib
+, config
+, pkgs
+, ...
 }:
 
 {
@@ -18,8 +17,12 @@
 
   virtualisation.qemu.networkingOptions = lib.mkForce [
     "-nic none" # disable NAT.
-    "-nic bridge,br=vmbr0,mac=BA:24:11:8D:19:5D,model=virtio-net-pci"
-    "-nic bridge,br=vmbr4,mac=BC:24:11:1D:1E:B9,model=virtio-net-pci"
+    # NIC MACs are identity-bearing and live in secrets/s-router-vpn-egress.yaml
+    # (vmbr0-mac, vmbr4-mac). QEMU auto-generates at launch; if the pinned
+    # identities are required again, read the secret and pass mac=<value> here
+    # through a launch wrapper.
+    "-nic bridge,br=vmbr0,model=virtio-net-pci"
+    "-nic bridge,br=vmbr4,model=virtio-net-pci"
   ];
 
   #services.openssh.permitRootLogin = lib.mkForce "yes";
