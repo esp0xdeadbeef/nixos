@@ -3362,12 +3362,9 @@ in
             onyx = {
               ipv4 = [ "0.0.0.0/0" ];
               ipv6 = [ "::/0" ];
-              egress = {
-                mode = "bgp";
-                ipv6.translation = {
-                  mode = "nat66";
-                  translatedPrefixes = [ "fd42:dead:feed:c1e::/64" ];
-                };
+              egress.ipv6.translation = {
+                mode = "nat66";
+                translatedPrefixes = [ "fd42:dead:feed:c1e::/64" ];
               };
             };
           };
