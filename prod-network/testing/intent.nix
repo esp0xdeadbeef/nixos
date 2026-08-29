@@ -2793,7 +2793,7 @@ in
         (allowTenantToWan "cobalt-iot-srv" 130)
         (allowTenantToWan "cobalt-mgmt" 140)
         {
-          id = "allow-clients-vpn-to-onyx";
+          id = "allow-clients-vpn-to-vpn-uplinks";
           priority = 85;
           from = {
             kind = "tenant";
@@ -2801,7 +2801,7 @@ in
           };
           to = {
             kind = "external";
-            uplinks = [ "onyx" ];
+            uplinks = [ "onyx" "opal" ];
           };
           action = "allow";
           returnBehavior = "symmetric";
@@ -2812,6 +2812,22 @@ in
           from = {
             kind = "external";
             name = "onyx";
+          };
+          to = {
+            kind = "external";
+            name = "wan";
+            uplinks = [ "wan" ];
+          };
+          trafficType = "wireguard-1637";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-opal-uplink-to-wan";
+          priority = 141;
+          from = {
+            kind = "external";
+            name = "opal";
           };
           to = {
             kind = "external";
@@ -3376,6 +3392,26 @@ in
           ];
         };
 
+        core-vpn-opal = {
+          role = "core";
+          uplinks = {
+            opal = {
+              ipv4 = [ "0.0.0.0/0" ];
+              ipv6 = [ "::/0" ];
+              egress.ipv6.translation = {
+                mode = "nat66";
+                translatedPrefixes = [ "fd42:dead:feed:c1f::/64" ];
+              };
+            };
+          };
+          attachments = [
+            {
+              kind = "tenant";
+              name = "cobalt-iot-srv";
+            }
+          ];
+        };
+
         upstream-selector = {
           role = "upstream-selector";
         };
@@ -3479,6 +3515,10 @@ in
           "upstream-selector"
         ]
         [
+          "core-vpn-opal"
+          "upstream-selector"
+        ]
+        [
           "upstream-selector"
           "policy"
         ]
@@ -3526,6 +3566,14 @@ in
         {
           name = "onyx";
           terminateOn = [ "core-vpn-onyx" ];
+          underlayAccess = {
+            kind = "tenant";
+            name = "cobalt-iot-srv";
+          };
+        }
+        {
+          name = "opal";
+          terminateOn = [ "core-vpn-opal" ];
           underlayAccess = {
             kind = "tenant";
             name = "cobalt-iot-srv";
