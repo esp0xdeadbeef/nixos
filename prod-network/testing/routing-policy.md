@@ -70,19 +70,19 @@ The endpoint plane has two egress paths:
 | tenant        | subnet         | VLAN | egress                    |
 | ------------- | -------------- | ---- | ------------------------- |
 | `clients`     | `10.2.30.0/24` | 30   | WAN (provider)               |
-| `clients-vpn` | `10.2.31.0/24` | 31   | onyx overlay (AirVPN)     |
+| `clients-vpn` | `10.2.31.0/24` | 31   | onyx overlay               |
 
-- `clients-vpn` egresses through the AirVPN WireGuard tunnel (`onyx`,
-  terminated on `core-vpn-onyx`) instead of the WAN. Its traffic is SNAT'd to
+- `clients-vpn` egresses through the onyx WireGuard tunnel
+  (terminated on `core-vpn-onyx`) instead of the WAN. Its traffic is SNAT'd to
   the onyx egress ULA pool, so the site's public WAN address and WAN DNS are
   never used for this plane.
 - IPv4: masquerade on `overlay-onyx` for `10.2.31.0/24`. IPv6: NAT66
   masquerade for `fd42:dead:beef:231::/64` (the clients-vpn ULA); the source
-  is rewritten to the WireGuard tunnel address so AirVPN routes it. Both are
+  is rewritten to the WireGuard tunnel address so onyx routes it. Both are
   modeled in the inventory `nat` block (no explicit `toAddress` — the
   masquerade uses the tunnel address).
 - The onyx underlay is `iot-srv` (VLAN 51). That carries only the WG
-  handshake/transport to the AirVPN endpoint — never client egress.
+  handshake/transport to the onyx endpoint — never client egress.
 - `clients-vpn` recursion is pinned through the tunnel (no WAN resolver leak),
   see the DNS section below.
 
@@ -107,14 +107,14 @@ instead of the underlay. Chain:
 
 ```
 client → access 10.2.31.1 (unbound) → core-vpn-onyx 10.1.0.14 (unbound, iterative)
-       → overlay-onyx → AirVPN DNS
+       → overlay-onyx → onyx DNS
 ```
 
 ### Client-side (l-portal)
 
 l-portal's USB Ethernet (`enu1u1`) is a plain DHCP/SLAAC client of whichever
 cobalt access VLAN the switch port lands on — VLAN 31 `clients-vpn` for the
-AirVPN egress test, VLAN 30 `clients` otherwise. NetworkManager owns `enu1u1`
+onyx egress test, VLAN 30 `clients` otherwise. NetworkManager owns `enu1u1`
 outright: the hardcoded `cobalt-vpn` / `cobalt-clients` NM profiles and their
 source-route rules were dropped in favour of default DHCP/SLAAC behaviour, so
 no client-side routing config is needed.
