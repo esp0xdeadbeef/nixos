@@ -14,7 +14,7 @@
 #
 # Physical port map (verified by disable-port probe + traffic capture):
 #   1 -> l-envil USB  (enp0s13f0u4u4u3)  WAN (VLAN 300)
-#   2 -> onyx egress test device (04:17:b6:64:35:ed)  untagged clients-vpn (VLAN 31)
+#   2 -> onyx egress test device (l-portal-usb)  untagged clients-vpn (VLAN 31)
 #   3 -> l-envil dock (enp170s0)         LAN trunk (20/30/31/50/51/60)
 #   4 -> ISP router                      WAN (VLAN 300)
 #   5 -> l-portal USB (enu1u1)           untagged clients-vpn (VLAN 31)
@@ -38,7 +38,7 @@ model = "gs108ev3"     # TODO: GS108PEv3 driver
 [switches.cobalt-switch.ports]
 # WAN -> l-envil USB: mgmt VLAN 1 untagged + cobalt WAN container tags VLAN 300
 1 = { pvid = 1, vlans = ["1U", "300T"] }
-# clients-vpn (VLAN 31) — onyx egress test device (MAC 04:17:b6:64:35:ed)
+# clients-vpn (VLAN 31) — onyx egress test device (l-portal-usb)
 2 = { pvid = 31, vlans = ["31U"] }
 # LAN trunk -> l-envil dock: mgmt VLAN 1 untagged, tenant VLANs tagged
 3 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T", "90T"] }
