@@ -1248,11 +1248,12 @@ in
               provider = "wireguard";
               providerBootstrapDns = {
                 # Bootstrap resolver for the WireGuard endpoint hostname before
-                # the tunnel is up. Must be public/direct (not the tunnel DNS,
-                # which is only reachable through the tunnel, and not the
-                # recursive tenant resolver).
+                # the tunnel is up. Reference the site's own underlay resolver
+                # ("self" = the access-iot-srv tenant gateway) rather than the
+                # tunnel DNS, which is only reachable through the tunnel itself.
                 forwarders = [
-                  "1.1.1.1"
+                  dnsRuntime.requesters.access-iot-srv.ipv4
+                  dnsRuntime.requesters.access-iot-srv.ipv6
                 ];
               };
               providerContract = {
@@ -1331,11 +1332,12 @@ in
               provider = "wireguard";
               providerBootstrapDns = {
                 # Bootstrap resolver for the WireGuard endpoint hostname before
-                # the tunnel is up. Must be public/direct (not the tunnel DNS,
-                # which is only reachable through the tunnel, and not the
-                # recursive tenant resolver).
+                # the tunnel is up. Reference the site's own underlay resolver
+                # ("self" = the access-iot-srv tenant gateway) rather than the
+                # tunnel DNS, which is only reachable through the tunnel itself.
                 forwarders = [
-                  "1.1.1.1"
+                  dnsRuntime.requesters.access-iot-srv.ipv4
+                  dnsRuntime.requesters.access-iot-srv.ipv6
                 ];
               };
               providerContract = {
