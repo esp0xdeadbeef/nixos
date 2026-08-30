@@ -2876,6 +2876,12 @@ in
           addressAuthority = "model-allocated-service-prefix";
           trafficType = "dns";
         }
+        {
+          name = "opal-dns";
+          providerNode = "core-vpn-opal";
+          addressAuthority = "model-allocated-service-prefix";
+          trafficType = "dns";
+        }
       ];
 
       relations = [
@@ -2904,6 +2910,36 @@ in
           to = {
             kind = "external";
             uplinks = [ "onyx" ];
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-vpn-to-opal-dns";
+          priority = 86;
+          from = {
+            kind = "tenant";
+            name = "cobalt-clients-vpn";
+          };
+          to = {
+            kind = "service";
+            name = "opal-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-opal-dns-to-opal";
+          priority = 90;
+          from = {
+            kind = "service";
+            name = "opal-dns";
+          };
+          to = {
+            kind = "external";
+            uplinks = [ "opal" ];
           };
           trafficType = "dns";
           action = "allow";
@@ -3067,6 +3103,21 @@ in
           to = {
             kind = "service";
             name = "onyx-dns";
+          };
+          trafficType = "dns";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-clients-vpn-dns-to-opal-dns";
+          priority = 96;
+          from = {
+            kind = "service";
+            name = "clients-vpn-dns";
+          };
+          to = {
+            kind = "service";
+            name = "opal-dns";
           };
           trafficType = "dns";
           action = "allow";
@@ -3250,6 +3301,36 @@ in
           egressSurface = {
             kind = "external";
             uplinks = [ "onyx" ];
+          };
+          returnBehavior = "symmetric";
+          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          directPublicFallback = false;
+        }
+        {
+          requesterScope = {
+            kind = "service";
+            name = "clients-vpn-dns";
+          };
+          advertisedResolver = {
+            kind = "service";
+            name = "clients-vpn-dns";
+          };
+          resolverSource = "local-recursive";
+          upstreamResolver = {
+            kind = "service";
+            name = "opal-dns";
+            node = "core-vpn-opal";
+          };
+          resolverPath = [
+            "access-clients-vpn"
+            "downstream-selector"
+            "policy"
+            "upstream-selector"
+            "core-vpn-opal"
+          ];
+          egressSurface = {
+            kind = "external";
+            uplinks = [ "opal" ];
           };
           returnBehavior = "symmetric";
           allowedAddressFamilies = [ "ipv4" "ipv6" ];
