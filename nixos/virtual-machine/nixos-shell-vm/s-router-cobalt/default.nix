@@ -253,4 +253,24 @@ in
   };
 
   virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
+
+  # The 14 router containers all boot in parallel on VM start. Under that
+  # parallel CPU/IO load a single container's systemd boot can exceed the
+  # nixpkgs default TimeoutStartSec of 1 minute, which makes systemd-nspawn
+  # time out and restart the container in a loop. Give them a generous start
+  # timeout so a cold boot completes without the restart storm.
+  containers.access-clients.timeoutStartSec = "10min";
+  containers.access-clients-vpn.timeoutStartSec = "10min";
+  containers.access-dmz.timeoutStartSec = "10min";
+  containers.access-iot.timeoutStartSec = "10min";
+  containers.access-iot-srv.timeoutStartSec = "10min";
+  containers.access-mgmt.timeoutStartSec = "10min";
+  containers.access-svc.timeoutStartSec = "10min";
+  containers.access-unlock.timeoutStartSec = "10min";
+  containers.core.timeoutStartSec = "10min";
+  containers.core-vpn-onyx.timeoutStartSec = "10min";
+  containers.core-vpn-opal.timeoutStartSec = "10min";
+  containers.downstream-selector.timeoutStartSec = "10min";
+  containers.policy.timeoutStartSec = "10min";
+  containers.upstream-selector.timeoutStartSec = "10min";
 }
