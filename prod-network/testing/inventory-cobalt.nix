@@ -1247,9 +1247,12 @@ in
             onyx = {
               provider = "wireguard";
               providerBootstrapDns = {
+                # Bootstrap resolver for the WireGuard endpoint hostname before
+                # the tunnel is up. Must be public/direct (not the tunnel DNS,
+                # which is only reachable through the tunnel, and not the
+                # recursive tenant resolver).
                 forwarders = [
-                  "10.128.0.1"
-                  "fd7d:76ee:e68f:a993::1"
+                  "1.1.1.1"
                 ];
               };
               providerContract = {
@@ -1327,9 +1330,12 @@ in
             opal = {
               provider = "wireguard";
               providerBootstrapDns = {
+                # Bootstrap resolver for the WireGuard endpoint hostname before
+                # the tunnel is up. Must be public/direct (not the tunnel DNS,
+                # which is only reachable through the tunnel, and not the
+                # recursive tenant resolver).
                 forwarders = [
-                  "10.128.0.1"
-                  "fd7d:76ee:e68f:a993::1"
+                  "1.1.1.1"
                 ];
               };
               providerContract = {
