@@ -25,6 +25,10 @@
 
   sops.secrets."deepseek-api".sopsFile = relativeRepo.sourcePath "secrets/l-esp-default-deadbeef.yaml";
 
+  # l-esp-default.yaml is root-only; the cobalt lighthouse public IP is
+  # kept in the deadbeef-scoped file instead.
+  sops.secrets."nebula-cobalt-lighthouse-public-ip".sopsFile = relativeRepo.sourcePath "secrets/l-esp-default-deadbeef.yaml";
+
   hardware.nvidia.prime = {
     intelBusId = "PCI:00:02:0";
     nvidiaBusId = "PCI:01:00:0";

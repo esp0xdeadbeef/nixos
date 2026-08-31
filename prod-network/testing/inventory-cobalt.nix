@@ -1046,6 +1046,10 @@ in
       ipv4 = [ dnsRuntime.requesters.access-unlock.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-unlock.ipv6 ];
     };
+
+    s-nebula-cobalt-lighthouse = {
+      ipv4 = [ "10.2.20.2" ];
+    };
   };
 
   deployment = {
