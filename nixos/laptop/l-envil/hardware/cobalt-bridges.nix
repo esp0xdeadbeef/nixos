@@ -27,14 +27,20 @@
   networking.useDHCP = lib.mkForce false;
 
   # The cobalt bridges are pure L2 (no host IP), so they never become
-  # "online". Succeed once any real interface (Wi-Fi) is online instead.
+  # "online". Mark the wired members + bridges as not-required so
+  # systemd-networkd-wait-online (and NM's wait-online) do not block the
+  # host switch; l-envil's only real uplink is Wi-Fi (NetworkManager).
   systemd.network.wait-online = {
     anyInterface = true;
     ignoredInterfaces = [
+      "wan0"
+      "enp170s0"
       "br-cobalt-lan"
       "br-cobalt-wan"
     ];
   };
+
+  systemd.services.NetworkManager-wait-online.enable = false;
 
   # Pure L2 bridges: no IP on the host. The cobalt VM owns all addressing
   # (VLAN 300 tagged DHCP on the WAN side, LAN trunk on the dock side).
@@ -57,21 +63,25 @@
   systemd.network.networks = {
     "10-enp170s0" = {
       matchConfig.Name = "enp170s0";
+      linkConfig.RequiredForOnline = "no";
       networkConfig.Bridge = "br-cobalt-lan";
     };
 
     "10-wan0" = {
       matchConfig.Name = "wan0";
+      linkConfig.RequiredForOnline = "no";
       networkConfig.Bridge = "br-cobalt-wan";
     };
 
     "10-br-cobalt-lan" = {
       matchConfig.Name = "br-cobalt-lan";
+      linkConfig.RequiredForOnline = "no";
       networkConfig = { };
     };
 
     "10-br-cobalt-wan" = {
       matchConfig.Name = "br-cobalt-wan";
+      linkConfig.RequiredForOnline = "no";
       networkConfig = { };
     };
   };
