@@ -18,19 +18,19 @@ let
   envVar = name: field: "${envName name}_${field}";
 
   mkEnvLines = lib.concatMapStrings
-    (name: ''
-      printf '%s=%s\n' '${envVar name "SSID"}' "$(${deriveSsid} "$seed" '${name}' ${ssidList} "$used")" >> /run/cobalt-wifi.env
-      printf '%s=%s\n' '${envVar name "PSK"}' "$(${pkgs.yq-go}/bin/yq -r '.["${name}"].psk' /run/secrets/cobalt-wifi)" >> /run/cobalt-wifi.env
+    (net: ''
+      printf '%s=%s\n' '${envVar net.name "SSID"}' "$(${deriveSsid} "$seed" '${net.name}' ${ssidList} "$used")" >> /run/cobalt-wifi.env
+      printf '%s=%s\n' '${envVar net.name "PSK"}' "$(${pkgs.yq-go}/bin/yq -r '.["${net.name}"].psk' /run/secrets/cobalt-wifi)" >> /run/cobalt-wifi.env
     '')
     cfg.networks;
 
   mkProfile =
-    name:
+    net:
     {
-      inherit name;
+      name = net.name;
       value = {
         connection = {
-          id = name;
+          id = net.name;
           type = "wifi";
           autoconnect = true;
           autoconnect-priority = cfg.autoconnectPriority;
@@ -38,11 +38,11 @@ let
         };
         wifi = {
           mode = "infrastructure";
-          ssid = "$" + envVar name "SSID";
+          ssid = "$" + envVar net.name "SSID";
         };
         wifi-security = {
-          key-mgmt = "wpa-psk;sae";
-          psk = "$" + envVar name "PSK";
+          key-mgmt = net.keyMgmt;
+          psk = "$" + envVar net.name "PSK";
         };
         ipv4.method = "auto";
         ipv6.method = "auto";
@@ -56,13 +56,23 @@ in
     };
 
     networks = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
+      type = lib.types.listOf (lib.types.submodule {
+        options = {
+          name = lib.mkOption {
+            type = lib.types.str;
+            description = "Network key in secrets/s-router-cobalt-wifi.yaml (unlock is intentionally excluded).";
+          };
+          keyMgmt = lib.mkOption {
+            type = lib.types.str;
+            description = "NetworkManager wifi-security.key-mgmt. The 5GHz Nighthawk radios are SAE (WPA3); the 2.4GHz ALFA is WPA2-PSK.";
+          };
+        };
+      });
       default = [
-        "cobalt-clients"
-        "cobalt-clients-vpn"
-        "cobalt-mgmt"
+        { name = "cobalt-clients"; keyMgmt = "sae"; }
+        { name = "cobalt-clients-vpn"; keyMgmt = "sae"; }
+        { name = "cobalt-mgmt"; keyMgmt = "wpa-psk"; }
       ];
-      description = "Network keys in secrets/s-router-cobalt-wifi.yaml (unlock is intentionally excluded).";
     };
 
     autoconnectPriority = lib.mkOption {
