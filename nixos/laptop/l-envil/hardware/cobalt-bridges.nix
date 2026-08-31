@@ -26,19 +26,10 @@
   # fights them (and would DHCP on the cobalt's WAN USB). Disable it.
   networking.useDHCP = lib.mkForce false;
 
-  # The cobalt bridges are pure L2 (no host IP), so they never become
-  # "online". Mark the wired members + bridges as not-required so
-  # systemd-networkd-wait-online (and NM's wait-online) do not block the
-  # host switch; l-envil's only real uplink is Wi-Fi (NetworkManager).
-  systemd.network.wait-online = {
-    anyInterface = true;
-    ignoredInterfaces = [
-      "wan0"
-      "enp170s0"
-      "br-cobalt-lan"
-      "br-cobalt-wan"
-    ];
-  };
+  # The cobalt bridges are pure L2 (no host IP) and l-envil's only real
+  # uplink is Wi-Fi (NetworkManager). The networkd wait-online has nothing
+  # meaningful to wait for, so do not let it block the host switch.
+  systemd.network.wait-online.enable = false;
 
   systemd.services.NetworkManager-wait-online.enable = false;
 
