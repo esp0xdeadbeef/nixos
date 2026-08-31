@@ -2846,11 +2846,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1788134823,
-        "narHash": "sha256-w2Sa9sj4NvFKHv3s9QhNOc2REvB1hkYmD+umEgSwI1M=",
+        "lastModified": 1788136049,
+        "narHash": "sha256-qKZv9KHDmBfh3H6IGZxvk6RpQTzi+rMlPsrVcUdOVIQ=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "0635b75132c6303a32e962e26b0240995b63f564",
+        "rev": "fc0a92656d73364509fc4d6b2248b7b1f058c460",
         "type": "github"
       },
       "original": {
@@ -3368,11 +3368,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1788131229,
-        "narHash": "sha256-v3za2V2rHJhykeiCVLcnAuvoj9pwxhiSvbPpMjrrRTo=",
+        "lastModified": 1788136104,
+        "narHash": "sha256-aGkBNjF9NQZXdtzX8yACK0wTlLTyVqETmm427HlG9SM=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-wireguard",
-        "rev": "50a4b0d7b6829dae6a693a27fdcc72fe911b0659",
+        "rev": "dab6e54dfcb20651c4e790e6e2741df2679205bf",
         "type": "github"
       },
       "original": {
