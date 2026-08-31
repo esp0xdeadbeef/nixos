@@ -42,6 +42,8 @@ const OIDS = [
   "user_account", // accounts (admin, group)
   "login_privilege", // per-account page allowlist + privilege
   "ethctl", // ethernet ports
+  "RDM_OID_ETH_LINK", // ethernet link status (MACs)
+  "LanPortInfo", // LAN port info (MACs)
   "MultiWan",
   "policy_route",
   "nat",
