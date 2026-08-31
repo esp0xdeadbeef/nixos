@@ -6,12 +6,25 @@
   # of NM so systemd-networkd can enslave them into pure L2 bridges.
   networking.networkmanager.unmanaged = [
     "enp170s0"
-    "enp0s13f0u4u4u3"
+    "wan0"
     "br-cobalt-lan"
     "br-cobalt-wan"
   ];
 
+  # The USB NIC's bus path renumbers across replugs (enp0s13f0u4u4u3 ->
+  # enp0s13f0u3u1 ...), which broke the bridge. Pin it by its USB product
+  # identity (Linksys USB3GIGV1) to a stable name so the cobalt WAN bridge
+  # survives replugs/reboots.
+  systemd.network.links."10-wan0" = {
+    matchConfig.Property = "ID_VENDOR_ID=13b1 ID_MODEL_ID=0041";
+    linkConfig.Name = "wan0";
+  };
+
   systemd.network.enable = true;
+
+  # The networkd + NM own the NICs; the global scripted DHCP client only
+  # fights them (and would DHCP on the cobalt's WAN USB). Disable it.
+  networking.useDHCP = lib.mkForce false;
 
   # The cobalt bridges are pure L2 (no host IP), so they never become
   # "online". Succeed once any real interface (Wi-Fi) is online instead.
@@ -47,8 +60,8 @@
       networkConfig.Bridge = "br-cobalt-lan";
     };
 
-    "10-enp0s13f0u4u4u3" = {
-      matchConfig.Name = "enp0s13f0u4u4u3";
+    "10-wan0" = {
+      matchConfig.Name = "wan0";
       networkConfig.Bridge = "br-cobalt-wan";
     };
 
