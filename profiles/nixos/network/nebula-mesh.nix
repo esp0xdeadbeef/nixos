@@ -7,7 +7,9 @@ let
   certSecret = "nebula-host-crt";
   keySecret = "nebula-host-key";
   publicIpSecret = "nebula-lighthouse-public-ip";
+  cobaltPublicIpSecret = "nebula-cobalt-lighthouse-public-ip";
   lighthouseAddress = "100.64.0.1";
+  cobaltLighthouseAddress = "100.64.0.2";
   renderedConfig = "nebula-mesh.json";
   serviceName = "nebula-mesh";
   restartUnits = [ "${serviceName}.service" ];
@@ -43,6 +45,7 @@ in
       inherit restartUnits;
     };
     ${publicIpSecret}.restartUnits = restartUnits;
+    ${cobaltPublicIpSecret}.restartUnits = restartUnits;
   };
 
   sops.templates.${renderedConfig} = {
@@ -56,13 +59,16 @@ in
         "192.168.3.10:4242"
         "${config.sops.placeholder.${publicIpSecret}}:4242"
       ];
+      static_host_map.${cobaltLighthouseAddress} = [
+        "${config.sops.placeholder.${cobaltPublicIpSecret}}:4242"
+      ];
       lighthouse = {
         am_lighthouse = false;
-        hosts = [ lighthouseAddress ];
+        hosts = [ lighthouseAddress cobaltLighthouseAddress ];
       };
       relay = {
         am_relay = false;
-        relays = [ lighthouseAddress ];
+        relays = [ lighthouseAddress cobaltLighthouseAddress ];
         use_relays = true;
       };
       listen = {
