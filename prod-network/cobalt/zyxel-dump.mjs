@@ -30,7 +30,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const HOST = process.env.ZYXEL_HOST ?? "https://192.168.1.1";
 const PASSWORD = process.env.ZYXEL_PASSWORD ?? "";
 const USERNAME = process.env.ZYXEL_USERNAME ?? "admin";
-const OUT = process.env.ZYXEL_DUMP_OUT ?? path.join(process.cwd(), "prod-network", "cobalt", "zyxel-config-dump.json");
+const OUT = process.env.ZYXEL_DUMP_OUT ?? "/tmp/zyxel-config-dump.json";
 
 // The config objects worth capturing (a stable, non-secret subset).
 const OIDS = [
