@@ -60,6 +60,7 @@ in
         "${config.sops.placeholder.${publicIpSecret}}:4242"
       ];
       static_host_map.${cobaltLighthouseAddress} = [
+        "10.2.20.2:4242"
         "${config.sops.placeholder.${cobaltPublicIpSecret}}:4242"
       ];
       lighthouse = {
