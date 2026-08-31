@@ -74,10 +74,12 @@ in
       linkConfig.RequiredForOnline = false;
     };
 
-    # Host management on the mgmt tenant.
+    # Host management on the mgmt tenant (via the ap-mgmt bridge so the
+    # mgmt WiFi SSID and the host share the same VLAN 10 L2).
     "10-mgmt" = {
       matchConfig.Name = "mgmt";
-      networkConfig.DHCP = "yes";
+      networkConfig.Bridge = "ap-mgmt";
+      linkConfig.RequiredForOnline = false;
     };
 
     "10-unlock" = {
@@ -92,7 +94,7 @@ in
     };
     "20-ap-mgmt" = {
       matchConfig.Name = "ap-mgmt";
-      networkConfig = { };
+      networkConfig.DHCP = "yes";
     };
   };
 
