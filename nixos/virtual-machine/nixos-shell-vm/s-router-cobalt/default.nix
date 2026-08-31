@@ -32,12 +32,7 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
-  # The ALFA AP needs the rt2800usb firmware (rt2870/rt3070).
-  hardware.enableAllFirmware = true;
-
   imports = [
-    ./ap.nix
-
     outputs.nixosModules.containerNetworkDefaults
 
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
