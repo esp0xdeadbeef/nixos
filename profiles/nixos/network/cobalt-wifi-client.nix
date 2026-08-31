@@ -41,7 +41,7 @@ let
           ssid = "$" + envVar name "SSID";
         };
         wifi-security = {
-          key-mgmt = "wpa-psk";
+          key-mgmt = "wpa-psk;sae";
           psk = "$" + envVar name "PSK";
         };
         ipv4.method = "auto";
