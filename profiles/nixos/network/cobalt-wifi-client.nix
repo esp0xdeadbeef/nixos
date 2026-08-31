@@ -33,7 +33,7 @@ let
           id = net.name;
           type = "wifi";
           autoconnect = true;
-          autoconnect-priority = cfg.autoconnectPriority;
+          autoconnect-priority = net.priority;
           permissions = "";
         };
         wifi = {
@@ -66,19 +66,18 @@ in
             type = lib.types.str;
             description = "NetworkManager wifi-security.key-mgmt. The 5GHz Nighthawk radios are SAE (WPA3); the 2.4GHz ALFA is WPA2-PSK.";
           };
+          priority = lib.mkOption {
+            type = lib.types.int;
+            default = -10;
+            description = "NetworkManager autoconnect-priority. Higher wins; negative keeps manually-added (0) connections preferred.";
+          };
         };
       });
       default = [
-        { name = "cobalt-clients"; keyMgmt = "sae"; }
-        { name = "cobalt-clients-vpn"; keyMgmt = "sae"; }
-        { name = "cobalt-mgmt"; keyMgmt = "wpa-psk"; }
+        { name = "cobalt-clients"; keyMgmt = "sae"; priority = -10; }
+        { name = "cobalt-clients-vpn"; keyMgmt = "sae"; priority = -20; }
+        { name = "cobalt-mgmt"; keyMgmt = "wpa-psk"; priority = -20; }
       ];
-    };
-
-    autoconnectPriority = lib.mkOption {
-      type = lib.types.int;
-      default = -10;
-      description = "NetworkManager autoconnect priority. Negative so a currently-connected network wins over these declarative networks.";
     };
   };
 
