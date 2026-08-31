@@ -1082,6 +1082,11 @@ in
               enable = true;
               dhcp = true;
               method = "dhcp";
+              # Provider-facing identity: key the lease on the cloned WAN MAC
+              # and do not announce a hostname (the provider CPE sends neither a
+              # client-id nor a hostname).
+              clientIdentifier = "mac";
+              sendHostname = false;
             };
           };
 
