@@ -38,12 +38,12 @@
       vlanConfig.Id = 10;
     };
 
-    "10-svc" = {
+    "10-dmz" = {
       netdevConfig = {
-        Name = "svc";
+        Name = "dmz";
         Kind = "vlan";
       };
-      vlanConfig.Id = 20;
+      vlanConfig.Id = 60;
     };
   };
 
@@ -52,7 +52,7 @@
       matchConfig.Name = "eth0";
       vlan = [
         "mgmt"
-        "svc"
+        "dmz"
       ];
       linkConfig.RequiredForOnline = false;
     };
@@ -63,12 +63,12 @@
       networkConfig.DHCP = "yes";
     };
 
-    # The lighthouse listens on the svc tenant; the cobalt router forwards
+    # The lighthouse listens on the dmz tenant; the cobalt router forwards
     # nebula (UDP 4242) here from the fake-ISP WAN surface. Static address so
     # the intent's public-ingress endpoint stays stable.
-    "10-svc" = {
-      matchConfig.Name = "svc";
-      address = [ "10.2.20.2/24" ];
+    "10-dmz" = {
+      matchConfig.Name = "dmz";
+      address = [ "10.2.60.10/24" ];
       networkConfig = {
         IPv6AcceptRA = "yes";
       };

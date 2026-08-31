@@ -2138,6 +2138,12 @@ in
           tenant = "cobalt-unlock";
           ipv4 = [ "10.2.90.1" ];
         }
+        {
+          kind = "host";
+          name = "s-nebula-cobalt-lighthouse";
+          tenant = "cobalt-svc";
+          ipv4 = [ "10.2.20.2" ];
+        }
       ];
     };
 
@@ -2194,6 +2200,11 @@ in
           name = "mgmt-dns";
           providers = [ "cobalt-mgmt-dns" ];
           trafficType = "dns";
+        }
+        {
+          name = "s-nebula-cobalt-lighthouse";
+          providers = [ "s-nebula-cobalt-lighthouse" ];
+          trafficType = "nebula";
         }
       ];
 
@@ -2738,6 +2749,42 @@ in
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
+        }
+        {
+          id = "allow-wan-to-s-nebula-cobalt-lighthouse";
+          priority = 95;
+          from = {
+            kind = "external";
+            uplinks = [ "wan" ];
+          };
+          to = {
+            kind = "service";
+            name = "s-nebula-cobalt-lighthouse";
+          };
+          trafficType = "nebula";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-nebula-cobalt-lighthouse";
+            targetEndpoint = "s-nebula-cobalt-lighthouse";
+            targetPort = 4242;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 4242;
+              }
+              {
+                protocol = "tcp";
+                publicPort = 4242;
+              }
+            ];
+          };
         }
         {
           id = "allow-iot-dns-to-wan";
