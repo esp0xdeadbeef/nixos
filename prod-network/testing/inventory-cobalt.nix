@@ -1084,8 +1084,9 @@ in
               method = "dhcp";
               # Provider-facing identity: key the lease on the cloned WAN MAC
               # (chaddr) and do not announce a hostname or DHCP client-id
-              # (the provider CPE sends none of those).
-              clientIdentifier = "none";
+              # (the provider CPE sends none of those). systemd-networkd always
+              # sends a client-id, so use udhcpc (-C) instead.
+              dhcpClient = "udhcpc";
               sendHostname = false;
             };
           };
