@@ -10,6 +10,7 @@ let
   qgaSocket = "/run/nixos-shell-vm-manager/s-router-cobalt/qga.sock";
   tangQgaSocket = "/run/nixos-shell-vm-manager/s-tang/qga.sock";
   apQgaSocket = "/run/nixos-shell-vm-manager/s-ap-nighthawk/qga.sock";
+  alfaQgaSocket = "/run/nixos-shell-vm-manager/s-ap-alfa/qga.sock";
   nebulaQgaSocket = "/run/nixos-shell-vm-manager/s-nebula-cobalt/qga.sock";
 in
 {
@@ -36,11 +37,6 @@ in
         "socket,id=qga0,path=${qgaSocket},server=on,wait=off"
         "-device"
         "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
-        "-usb"
-        "-device"
-        "qemu-xhci,id=xhci"
-        "-device"
-        "usb-host,vendorid=0x148f,productid=0x3070,bus=xhci.0"
       ];
       storage.persistentDisk = {
         enable = true;
@@ -128,6 +124,33 @@ in
         "qemu-xhci,id=xhci"
         "-device"
         "usb-host,vendorid=0x0846,productid=0x9072,bus=xhci.0"
+      ];
+      runner.stopGraceSeconds = 30;
+    };
+
+    instances.s-ap-alfa = {
+      description = "cobalt ALFA 2.4GHz AP (rt2800usb) on the cobalt trunk";
+      image = self.nixosConfigurations.s-ap-alfa.config.system.build.nixos-shell;
+      activation.startOnBoot = true;
+      healthCheck = {
+        command = lib.escapeShellArgs [
+          (lib.getExe guestAgentHealth)
+          alfaQgaSocket
+        ];
+        timeoutSeconds = 10;
+        retries = 60;
+        intervalSeconds = 2;
+      };
+      runner.qemuArguments = [
+        "-chardev"
+        "socket,id=qga0,path=${alfaQgaSocket},server=on,wait=off"
+        "-device"
+        "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        "-usb"
+        "-device"
+        "qemu-xhci,id=xhci"
+        "-device"
+        "usb-host,vendorid=0x148f,productid=0x3070,bus=xhci.0"
       ];
       runner.stopGraceSeconds = 30;
     };
