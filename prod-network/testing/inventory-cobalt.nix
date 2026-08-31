@@ -696,7 +696,7 @@ let
             tenant = "cobalt-dmz";
             interface = "tenant-cobalt-dmz";
             subnet = "10.2.60.0/24";
-            poolStart = "10.2.60.100";
+            poolStart = "10.2.20.20";
             poolEnd = "10.2.60.200";
             router = "10.2.60.1";
             leaseStatePath = "/var/lib/kea/dmz.leases";
