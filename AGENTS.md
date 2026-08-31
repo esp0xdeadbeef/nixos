@@ -31,6 +31,13 @@ progress. Before reverting, stashing, or resetting anything:
 If the diagnosis is uncertain, capture the diff and show it before touching
 anything; do not guess-and-nuke.
 
+### Branch upstream
+
+- The `gh` repo always points to `main` (its default branch); keep it that way.
+- `✗ no-upstream` in the zsh prompt just flags that the current branch has no
+  upstream tracking branch. Fix it by pointing the branch at `main`:
+  `git branch --set-upstream-to=origin/main`.
+
 ## Commit Messages
 
 Conventional commits: `type(scope): description`
