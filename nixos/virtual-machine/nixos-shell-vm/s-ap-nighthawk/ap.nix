@@ -63,16 +63,13 @@ let
         c149=''${c149:-0}
         c160=$((c3680 + c5264))
 
-        # Prefer 160MHz on channel 36 when its whole span is no busier than the
-        # non-DFS 80MHz plan on 149; otherwise use 80MHz on the quieter of 36/149.
+        # 160MHz on channel 36 spans the DFS range 52-64, which the mt7925u
+        # firmware cannot CAC (start_dfs_cac fails). Only select 160MHz when
+        # force160 is enabled; otherwise fall straight to 80MHz.
         if [ "${if force160 then "1" else "0"}" = "1" ]; then
           channel=36; vht_w=2; vht_c=50; he_w=2; he_c=50
           dfs=$'ieee80211h=1\nieee80211d=1'
           echo "ap-conf: FORCED 160MHz ch36 (c160=$c160 c149=$c149)" >&2
-        elif [ "$c160" -le "$c149" ]; then
-          channel=36; vht_w=2; vht_c=50; he_w=2; he_c=50
-          dfs=$'ieee80211h=1\nieee80211d=1'
-          echo "ap-conf: 160MHz ch36 (c160=$c160 c149=$c149)" >&2
         elif [ "$c3680" -le "$c149" ]; then
           channel=36; vht_w=1; vht_c=42; he_w=1; he_c=42
           dfs=""
