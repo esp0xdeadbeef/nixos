@@ -64,11 +64,12 @@
     };
 
     # The lighthouse listens on the svc tenant; the cobalt router forwards
-    # nebula (UDP 4242) here from the fake-ISP WAN surface.
+    # nebula (UDP 4242) here from the fake-ISP WAN surface. Static address so
+    # the intent's public-ingress endpoint stays stable.
     "10-svc" = {
       matchConfig.Name = "svc";
+      address = [ "10.2.20.2/24" ];
       networkConfig = {
-        DHCP = "yes";
         IPv6AcceptRA = "yes";
       };
     };
