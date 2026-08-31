@@ -2149,7 +2149,7 @@ in
 
     hostManagement = {
       required = true;
-      interface = "vlan300";
+      interface = "vlan10";
       purpose = "hardware-management";
     };
 

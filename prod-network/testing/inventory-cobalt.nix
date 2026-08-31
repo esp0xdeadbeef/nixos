@@ -1058,10 +1058,10 @@ in
         wanUplink = "upstream-core";
 
         hostManagement = {
-          logicalInterface = "vlan300";
+          logicalInterface = "vlan10";
           link = {
             kind = "bridge";
-            name = "br-wan";
+            name = "mgmt";
           };
           addressAcquisition = {
             ipv4 = "dhcp";
