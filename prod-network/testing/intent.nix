@@ -91,6 +91,17 @@ let
     }
 
     {
+      name = "bfd";
+      match = [
+        {
+          proto = "udp";
+          dports = [ 3784 ];
+          family = "any";
+        }
+      ];
+    }
+
+    {
       name = "nebula";
       match = [
         {
@@ -129,22 +140,20 @@ let
     }
   ];
 
-  allowTenantToWan =
-    tenant: priority:
-    {
-      id = "allow-${tenant}-to-wan";
-      inherit priority;
-      from = {
-        kind = "tenant";
-        name = tenant;
-      };
-      to = {
-        kind = "external";
-        uplinks = [ "wan" ];
-      };
-      action = "allow";
-      returnBehavior = "symmetric";
+  allowTenantToWan = tenant: priority: {
+    id = "allow-${tenant}-to-wan";
+    inherit priority;
+    from = {
+      kind = "tenant";
+      name = tenant;
     };
+    to = {
+      kind = "external";
+      uplinks = [ "wan" ];
+    };
+    action = "allow";
+    returnBehavior = "symmetric";
+  };
 
   runtimeIpv6Prefix = tenant: slot: {
     allocation = "runtime";
@@ -1811,17 +1820,39 @@ in
         perTenantPrefixLength = 64;
       };
       tenants = {
-        vlan2 = { mode = "slaac"; };
-        vlan3 = { mode = "slaac"; };
-        vlan7 = { mode = "slaac"; };
-        vlan8 = { mode = "slaac"; };
-        neon-mgmt = { mode = "slaac"; };
-        neon-svc = { mode = "slaac"; };
-        neon-clients = { mode = "slaac"; };
-        neon-iot = { mode = "slaac"; };
-        neon-iot-srv = { mode = "slaac"; };
-        neon-dmz = { mode = "slaac"; };
-        neon-unlock = { mode = "slaac"; };
+        vlan2 = {
+          mode = "slaac";
+        };
+        vlan3 = {
+          mode = "slaac";
+        };
+        vlan7 = {
+          mode = "slaac";
+        };
+        vlan8 = {
+          mode = "slaac";
+        };
+        neon-mgmt = {
+          mode = "slaac";
+        };
+        neon-svc = {
+          mode = "slaac";
+        };
+        neon-clients = {
+          mode = "slaac";
+        };
+        neon-iot = {
+          mode = "slaac";
+        };
+        neon-iot-srv = {
+          mode = "slaac";
+        };
+        neon-dmz = {
+          mode = "slaac";
+        };
+        neon-unlock = {
+          mode = "slaac";
+        };
       };
     };
 
@@ -2848,7 +2879,10 @@ in
           };
           to = {
             kind = "external";
-            uplinks = [ "onyx" "opal" ];
+            uplinks = [
+              "onyx"
+              "opal"
+            ];
           };
           action = "allow";
           returnBehavior = "symmetric";
@@ -3200,7 +3234,10 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
           directPublicFallback = false;
         }
         {
@@ -3230,7 +3267,10 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
           directPublicFallback = false;
         }
         {
@@ -3260,7 +3300,10 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
           directPublicFallback = false;
         }
         {
@@ -3290,7 +3333,10 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
           directPublicFallback = false;
         }
         {
@@ -3320,7 +3366,10 @@ in
             uplinks = [ "wan" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
           directPublicFallback = false;
         }
         {
@@ -3350,7 +3399,10 @@ in
             uplinks = [ "onyx" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
           directPublicFallback = false;
         }
         {
@@ -3380,7 +3432,10 @@ in
             uplinks = [ "opal" ];
           };
           returnBehavior = "symmetric";
-          allowedAddressFamilies = [ "ipv4" "ipv6" ];
+          allowedAddressFamilies = [
+            "ipv4"
+            "ipv6"
+          ];
           directPublicFallback = false;
         }
       ];
