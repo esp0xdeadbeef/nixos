@@ -2999,11 +2999,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1788274697,
-        "narHash": "sha256-P2A2EV4+jlLqEVthl5BUefO3eBUhFY0OZpojtX/h+7I=",
+        "lastModified": 1788275050,
+        "narHash": "sha256-8eC1auJXGx6BrswkQtWK+s2YiCLSQI0qcMFuVUDRmtc=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "d0ce33828d25c2430d95460ec4e3f21dc9c813f9",
+        "rev": "974ac01140466ebd808adc03369ffe1561c8a31e",
         "type": "github"
       },
       "original": {
