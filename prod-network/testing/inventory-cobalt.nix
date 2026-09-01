@@ -1095,6 +1095,9 @@ in
               # sends a client-id, so use udhcpc (-C) instead.
               dhcpClient = "udhcpc";
               sendHostname = false;
+              # Request the DNS option (6) from the provider so the resolver
+              # can bootstrap its root trust anchor off the provider DNS.
+              dhcpOptions = [ "dns" ];
               # Clone the CPE's WAN MAC so the lease stays keyed on the same
               # hardware address as the original router. The MAC lives in SOPS,
               # not the public inventory.
