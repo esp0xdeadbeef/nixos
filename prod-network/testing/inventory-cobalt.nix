@@ -1068,7 +1068,7 @@ in
             ipv6 = "disabled";
             acceptRA = false;
             useDns = false;
-            defaultRoute = false;
+            defaultRoute = true;
           };
         };
 
