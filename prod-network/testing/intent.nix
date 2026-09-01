@@ -3506,9 +3506,16 @@ in
             onyx = {
               ipv4 = [ "0.0.0.0/0" ];
               ipv6 = [ "::/0" ];
-              egress.ipv6.translation = {
-                mode = "nat66";
-                translatedPrefixes = [ "fd42:dead:feed:c1e::/64" ];
+              egress = {
+                mode = "bgp";
+                bgp = {
+                  asn = 65534;
+                  topology = "policy-rr";
+                };
+                ipv6.translation = {
+                  mode = "nat66";
+                  translatedPrefixes = [ "fd42:dead:feed:c1e::/64" ];
+                };
               };
             };
           };
@@ -3526,9 +3533,16 @@ in
             opal = {
               ipv4 = [ "0.0.0.0/0" ];
               ipv6 = [ "::/0" ];
-              egress.ipv6.translation = {
-                mode = "nat66";
-                translatedPrefixes = [ "fd42:dead:feed:c1f::/64" ];
+              egress = {
+                mode = "bgp";
+                bgp = {
+                  asn = 65534;
+                  topology = "policy-rr";
+                };
+                ipv6.translation = {
+                  mode = "nat66";
+                  translatedPrefixes = [ "fd42:dead:feed:c1f::/64" ];
+                };
               };
             };
           };
