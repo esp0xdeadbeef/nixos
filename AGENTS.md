@@ -15,6 +15,34 @@ doing it right takes longer, take that time. In particular:
 - A complete fix that lands later is better than a shortcut that ships today
   and needs revisiting in prod.
 
+## Network layer discipline (network-* repos and this repo's network work)
+
+The GAMP specs are the contract. "It renders / it works" is not evidence
+you placed a behavior in the right layer.
+
+- Before touching any network code or network config, READ
+  `~/github/network-codex-agent/GAMP/URS/README.md` and
+  `~/github/network-codex-agent/GAMP/FS/README.md` — the files themselves,
+  not a summary — and state in your plan which spec sentence assigns the
+  behavior to the layer you are about to edit (compiler / forwarding-model /
+  control-plane-model / realization-model / renderer).
+- Verify the layer's real input contract from the code entry points (what it
+  consumes and emits), not from the docs alone. Docs that contradict the code
+  are a finding, not a license to follow the code.
+- If the URS/FS does not state the responsibility, or states it incorrectly:
+  ADD OR FIX THE REQUIREMENT IN THE URS/FS FIRST, in the same change, with
+  the descriptive-category sentence — then implement against it. Do not
+  invent layer behavior the spec does not assign, and do not "just make it
+  work" in the wrong layer because the spec is silent.
+- Network meaning (routes, routing style, loopbacks, NAT/NAT66, DNS policy,
+  firewall allows, prefixes) computed in a layer the spec assigns to another
+  layer is a bug. Cite the authorizing FS/URS sentence in the commit message.
+- The intent/realization split is non-negotiable: routing style and topology
+  choices are intent (FS-481); ASNs, peer addresses and other realization
+  facts are inventory. Never smuggle one into the other.
+- Do not parse intent shapes (nodes/uplinks/egress) in downstream layers;
+  consume the upstream layer's normalized output.
+
 ## Git safety (applies to every repo, not just network-*)
 
 Never discard work to "get back to a baseline". The working tree is the
