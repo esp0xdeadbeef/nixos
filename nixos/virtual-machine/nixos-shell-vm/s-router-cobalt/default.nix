@@ -26,20 +26,20 @@ let
   ];
 
   vpnFields = [
-    "privateKey"
-    "endpoint"
-    "presharedKey"
-    "publicKey"
-    "address"
-    "dns"
+    { field = "privateKey"; path = "private-key"; }
+    { field = "endpoint"; path = "endpoint"; }
+    { field = "presharedKey"; path = "preshared-key"; }
+    { field = "publicKey"; path = "public-key"; }
+    { field = "address"; path = "address"; }
+    { field = "dns"; path = "dns"; }
   ];
 
-  vpnSecrets = name: field: {
-    name = "cobalt-${name}-${field}";
+  vpnSecrets = name: entry: {
+    name = "cobalt-${name}-${entry.path}";
     value = {
       sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-${name}-fields.yaml";
-      key = field;
-      path = "/run/secrets/${name}-${field}";
+      key = entry.field;
+      path = "/run/secrets/${name}-${entry.path}";
     };
   };
 
