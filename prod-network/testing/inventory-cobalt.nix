@@ -1246,13 +1246,6 @@ in
     sites = {
       esp0xdeadbeef = {
         cobalt = {
-          routing = {
-            bgp = {
-              asn = 65534;
-              topology = "policy-rr";
-            };
-          };
-
           overlays = {
             onyx = {
               provider = "wireguard";
