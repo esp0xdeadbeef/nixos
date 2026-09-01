@@ -1,22 +1,22 @@
-{
-  inputs,
-  lib,
-  config,
-  pkgs,
-  relativeRepo,
-  outputs,
-  ...
+{ inputs
+, lib
+, config
+, pkgs
+, relativeRepo
+, outputs
+, ...
 }:
 let
   hostName = "s-router-cobalt";
   system = "x86_64-linux";
   modelSource = relativeRepo.sourcePath "prod-network/testing";
   deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
-  deviceIds = map (name: lib.removeSuffix ".sops.yaml" name) (
-    builtins.filter (name: lib.hasSuffix ".sops.yaml" name) (
-      builtins.attrNames (builtins.readDir deviceDir)
-    )
-  );
+  deviceIds =
+    map
+      (name: lib.removeSuffix ".sops.yaml" name)
+      (builtins.filter
+        (name: lib.hasSuffix ".sops.yaml" name)
+        (builtins.attrNames (builtins.readDir deviceDir)));
 
   # The access containers that publish the per-device MAC reservations to
   # their DHCP server.
@@ -26,30 +26,12 @@ let
   ];
 
   vpnFields = [
-    {
-      field = "privateKey";
-      path = "private-key";
-    }
-    {
-      field = "endpoint";
-      path = "endpoint";
-    }
-    {
-      field = "presharedKey";
-      path = "preshared-key";
-    }
-    {
-      field = "publicKey";
-      path = "public-key";
-    }
-    {
-      field = "address";
-      path = "address";
-    }
-    {
-      field = "dns";
-      path = "dns";
-    }
+    { field = "privateKey"; path = "private-key"; }
+    { field = "endpoint"; path = "endpoint"; }
+    { field = "presharedKey"; path = "preshared-key"; }
+    { field = "publicKey"; path = "public-key"; }
+    { field = "address"; path = "address"; }
+    { field = "dns"; path = "dns"; }
   ];
 
   vpnSecrets = name: entry: {
@@ -63,8 +45,8 @@ let
 
   qemuNetworkingOptions = [
     "-nic none"
-    "-nic bridge,br=br-cobalt-lan,model=virtio-net-pci,mac=52:54:00:cb:01:01"
-    "-nic bridge,br=br-cobalt-wan,model=virtio-net-pci,mac=52:54:00:cb:01:02"
+    "-nic bridge,br=br-cobalt-lan,model=virtio-net-pci"
+    "-nic bridge,br=br-cobalt-wan,model=virtio-net-pci"
   ];
 in
 {
@@ -105,21 +87,22 @@ in
 
   sops.secrets =
     (lib.listToAttrs (
-      map (id: {
-        name = "cobalt-device-${id}";
-        value = {
-          sopsFile = "${deviceDir}/${id}.sops.yaml";
-          key = "mac";
-          format = "yaml";
-          path = "/run/secrets/devices/${id}";
-        };
-      }) deviceIds
+      map
+        (id: {
+          name = "cobalt-device-${id}";
+          value = {
+            sopsFile = "${deviceDir}/${id}.sops.yaml";
+            key = "mac";
+            format = "yaml";
+            path = "/run/secrets/devices/${id}";
+          };
+        })
+        deviceIds
     ))
     // (lib.listToAttrs (
-      builtins.concatMap (name: map (vpnSecrets name) vpnFields) [
-        "onyx"
-        "opal"
-      ]
+      builtins.concatMap
+        (name: map (vpnSecrets name) vpnFields)
+        [ "onyx" "opal" ]
     ))
     // {
       "cobalt-wifi" = {
@@ -142,13 +125,15 @@ in
     (lib.genAttrs deviceSecretAccessContainers (name: {
       bindMounts = lib.mkMerge [
         (lib.listToAttrs (
-          map (id: {
-            name = "/run/secrets/devices/${id}";
-            value = {
-              hostPath = config.sops.secrets."cobalt-device-${id}".path;
-              isReadOnly = true;
-            };
-          }) deviceIds
+          map
+            (id: {
+              name = "/run/secrets/devices/${id}";
+              value = {
+                hostPath = config.sops.secrets."cobalt-device-${id}".path;
+                isReadOnly = true;
+              };
+            })
+            deviceIds
         ))
       ];
     }))
