@@ -1,3 +1,9 @@
+# Testing model intent (both sites).
+#
+# prod-network/testing is a self-contained, independent model. It is not a
+# fork of prod-network/current and does not track it; the two directories have
+# diverged deliberately (e.g. the cobalt VPN cores here use the ::/0 + NAT66
+# translatedPrefixes form and include core-vpn-opal).
 let
   traceroutePorts = builtins.genList (x: 33434 + x) 90;
 
