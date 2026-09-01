@@ -15,11 +15,11 @@ let
   };
 
   p2pPort =
-    { link
-    , adapterName
-    , bridge
-    , interfaceName
-    ,
+    {
+      link,
+      adapterName,
+      bridge,
+      interfaceName,
     }:
     {
       inherit link adapterName;
@@ -30,10 +30,10 @@ let
     };
 
   uplinkPort =
-    { uplink
-    , bridge
-    , interfaceName
-    ,
+    {
+      uplink,
+      bridge,
+      interfaceName,
     }:
     {
       external = true;
@@ -45,12 +45,12 @@ let
     };
 
   tenantPort =
-    { logicalInterface
-    , bridge
-    , interfaceName
-    , addr4 ? null
-    , addr6 ? null
-    ,
+    {
+      logicalInterface,
+      bridge,
+      interfaceName,
+      addr4 ? null,
+      addr6 ? null,
     }:
     {
       inherit logicalInterface;
@@ -63,14 +63,12 @@ let
       // (if addr6 == null then { } else { inherit addr6; });
     };
 
-  mkNode =
-    name: ports:
-    {
-      host = prodHost;
-      platform = "nixos-container";
-      logicalNode = logicalNode name;
-      inherit ports;
-    };
+  mkNode = name: ports: {
+    host = prodHost;
+    platform = "nixos-container";
+    logicalNode = logicalNode name;
+    inherit ports;
+  };
 
   persistentDhcpState = {
     persistence = {
@@ -82,9 +80,9 @@ let
   };
 
   accessDns =
-    { addresses
-    , localRecords ? [ ]
-    ,
+    {
+      addresses,
+      localRecords ? [ ],
     }:
     {
       forwarders = [
@@ -143,9 +141,11 @@ let
 
   cobaltReservations = import ./cobalt-reservations.nix;
 
-  reservationsFor = vlan:
+  reservationsFor =
+    vlan:
     builtins.map
-      (deviceId:
+      (
+        deviceId:
         let
           device = cobaltReservations.${deviceId};
         in
@@ -162,23 +162,26 @@ let
             secretRef = deviceId;
           };
         }
-        // (if device ? hostname && device.hostname != null then { hostname = device.hostname; } else { }))
-      (builtins.filter
-        (deviceId: cobaltReservations.${deviceId}.scopes ? ${vlan})
-        (builtins.attrNames cobaltReservations));
+        // (if device ? hostname && device.hostname != null then { hostname = device.hostname; } else { })
+      )
+      (
+        builtins.filter (deviceId: cobaltReservations.${deviceId}.scopes ? ${vlan}) (
+          builtins.attrNames cobaltReservations
+        )
+      );
 
   dhcp4Advertisement =
-    { tenant
-    , interface
-    , subnet
-    , poolStart
-    , poolEnd
-    , router
-    , leaseStatePath
-    , domain ? "clients.home.arpa."
-    , reservations ? null
-    , reservationSource ? null
-    ,
+    {
+      tenant,
+      interface,
+      subnet,
+      poolStart,
+      poolEnd,
+      router,
+      leaseStatePath,
+      domain ? "clients.home.arpa.",
+      reservations ? null,
+      reservationSource ? null,
     }:
     {
       inherit interface;
@@ -196,7 +199,8 @@ let
     // (if reservations == null then { } else { inherit reservations; })
     // (if reservationSource == null then { } else { inherit reservationSource; });
 
-  slaacRa = interface:
+  slaacRa =
+    interface:
     let
       # tenant-<plane> -> <plane>.home.arpa. (the RFC 8375 search domain,
       # not the legacy `lan.`)
@@ -684,10 +688,13 @@ let
       statePolicy = persistentDhcpState;
 
       services = {
-        dns = localDns [
-          dnsRuntime.requesters.access-dmz.ipv4
-          dnsRuntime.requesters.access-dmz.ipv6
-        ] [ ];
+        dns =
+          localDns
+            [
+              dnsRuntime.requesters.access-dmz.ipv4
+              dnsRuntime.requesters.access-dmz.ipv6
+            ]
+            [ ];
       };
 
       advertisements = {
@@ -1211,28 +1218,28 @@ in
 
   realization = {
     fabricLinks = {
-      "${nodeName "downstream-selector"}" = builtins.mapAttrs
-        (_: port: {
-          kind = "selector-fabric-link";
-          link = port.link;
-          transport.hostFacing = false;
-        })
-        downstreamSelector.ports;
+      "${nodeName "downstream-selector"}" = builtins.mapAttrs (_: port: {
+        kind = "selector-fabric-link";
+        link = port.link;
+        transport.hostFacing = false;
+      }) downstreamSelector.ports;
 
-      "${nodeName "upstream-selector"}" = builtins.mapAttrs
-        (_: port: {
-          kind = "selector-fabric-link";
-          link = port.link;
-          transport.hostFacing = false;
-        })
-        upstreamSelector.ports;
+      "${nodeName "upstream-selector"}" = builtins.mapAttrs (_: port: {
+        kind = "selector-fabric-link";
+        link = port.link;
+        transport.hostFacing = false;
+      }) upstreamSelector.ports;
     };
 
     nodes = {
       ${nodeName "core"} = core;
-      ${nodeName "upstream-selector"} = upstreamSelector // { ports = { }; };
+      ${nodeName "upstream-selector"} = upstreamSelector // {
+        ports = { };
+      };
       ${nodeName "policy"} = policy;
-      ${nodeName "downstream-selector"} = downstreamSelector // { ports = { }; };
+      ${nodeName "downstream-selector"} = downstreamSelector // {
+        ports = { };
+      };
       ${nodeName "access-clients"} = accessClients;
       ${nodeName "access-svc"} = accessSvc;
       ${nodeName "access-dmz"} = accessDmz;
@@ -1327,8 +1334,6 @@ in
                   ra.enable = false;
                   healthCheck = {
                     enable = true;
-                    target4 = "1.1.1.1";
-                                        interval = "30s";
                   };
                 };
               };
@@ -1411,8 +1416,6 @@ in
                   ra.enable = false;
                   healthCheck = {
                     enable = true;
-                    target4 = "1.1.1.1";
-                                        interval = "30s";
                   };
                 };
               };
