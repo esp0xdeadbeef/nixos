@@ -2,8 +2,8 @@
 # IPv4-only WAN (DHCP on VLAN 300, no public PD). The access fabric still
 # carries ULA IPv6 internally because the pinned network stack requires
 # IPv6 router-advertisement data on access nodes.
-# Keep distinct from prod-network/current/dns-runtime-addresses.nix so the
-# combined inventory can index endpoints without address collisions.
+# The cobalt site uses a distinct ULA/loopback allocation from the neon site,
+# so the combined inventory can index endpoints without collisions.
 {
   resolver = {
     node = "core";

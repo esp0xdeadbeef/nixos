@@ -1,6 +1,8 @@
-# DNS runtime addresses extended from the production set with the IOT
-# (VLAN 8) access entry. Keep the production values as the primary
-# reference; any change here must also be reflected in ../current/.
+# Neon-site DNS runtime addresses for the independent testing model.
+#
+# prod-network/testing is self-contained and does not mirror
+# prod-network/current; this file is the authoritative neon DNS runtime
+# address set for the testing model.
 {
   resolver = {
     node = "core";
