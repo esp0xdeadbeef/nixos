@@ -346,7 +346,7 @@
         else
           { };
 
-      overlaysList = builtins.attrValues (builtins.removeAttrs repoOverlays [ "impermanence-module" ]);
+      overlaysList = builtins.attrValues repoOverlays;
 
     in
     {
