@@ -1107,34 +1107,6 @@ in
         (allowTenantToWan "neon-iot-srv" 130)
         (allowTenantToWan "neon-mgmt" 140)
       ];
-
-      interfaceTags = {
-        tenant-vlan2 = "vlan2";
-        tenant-vlan3 = "vlan3";
-        tenant-vlan7 = "vlan7";
-        tenant-vlan8 = "vlan8";
-        external-wan = "wan";
-        service-s-nebula-container = "s-nebula-container";
-        service-vlan2-dns = "vlan2-dns";
-        service-vlan3-dns = "vlan3-dns";
-        service-vlan7-dns = "vlan7-dns";
-        service-vlan8-dns = "vlan8-dns";
-        tenant-neon-mgmt = "neon-mgmt";
-        tenant-neon-svc = "neon-svc";
-        tenant-neon-clients = "neon-clients";
-        tenant-neon-iot = "neon-iot";
-        tenant-neon-iot-srv = "neon-iot-srv";
-        tenant-neon-dmz = "neon-dmz";
-        tenant-neon-unlock = "neon-unlock";
-        service-mgmt-dns = "mgmt-dns";
-        service-svc-dns = "svc-dns";
-        service-clients-dns = "clients-dns";
-        service-iot-dns = "iot-dns";
-        service-iot-srv-dns = "iot-srv-dns";
-        service-dmz-dns = "dmz-dns";
-        service-unlock-dns = "unlock-dns";
-        service-tang = "tang";
-      };
     };
 
     # FS-540 recursive DNS contract. Every access resolver (legacy vlan2/7/8
@@ -2926,27 +2898,6 @@ in
           returnBehavior = "symmetric";
         }
       ];
-    };
-
-    interfaceTags = {
-      tenant-cobalt-svc = "cobalt-svc";
-      tenant-cobalt-clients = "cobalt-clients";
-      tenant-cobalt-iot = "cobalt-iot";
-      tenant-cobalt-iot-srv = "cobalt-iot-srv";
-      tenant-cobalt-dmz = "cobalt-dmz";
-      tenant-cobalt-clients-vpn = "cobalt-clients-vpn";
-      tenant-cobalt-unlock = "cobalt-unlock";
-      tenant-cobalt-mgmt = "cobalt-mgmt";
-      external-wan = "wan";
-      service-svc-dns = "svc-dns";
-      service-clients-dns = "clients-dns";
-      service-clients-vpn-dns = "clients-vpn-dns";
-      service-iot-dns = "iot-dns";
-      service-iot-srv-dns = "iot-srv-dns";
-      service-dmz-dns = "dmz-dns";
-      service-tang = "tang";
-      service-mgmt-dns = "mgmt-dns";
-      service-unlock-dns = "unlock-dns";
     };
 
     recursiveDnsIntent = {
