@@ -88,5 +88,6 @@
 
   environment.systemPackages = [
     pkgs.ethtool
+    pkgs.python3
   ];
 }
