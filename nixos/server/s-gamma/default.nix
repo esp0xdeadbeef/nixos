@@ -56,6 +56,7 @@ in
     "nebula-host-crt"
     "nebula-host-key"
     "nebula-lighthouse-public-ip"
+    "nebula-cobalt-lighthouse-public-ip"
   ]
     (_: {
       sopsFile = nebulaSopsFile;
