@@ -323,6 +323,13 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-prod
+  - path_regex: '^(secrets/)*s-router-neon.*\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-neon
   - path_regex: '^(secrets/)*s-router-cobalt-wifi\.ya?ml$'
     encrypted_regex: ".*"
     key_groups:

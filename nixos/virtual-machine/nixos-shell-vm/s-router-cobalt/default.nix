@@ -43,10 +43,15 @@ let
     };
   };
 
-  qemuNetworkingOptions = [
-    "-nic none"
-    "-nic bridge,br=br-cobalt-lan,model=virtio-net-pci"
-    "-nic bridge,br=br-cobalt-wan,model=virtio-net-pci"
+  vmNics = [
+    {
+      nicId = "lan-trunk";
+      bridge = "br-cobalt-lan";
+    }
+    {
+      nicId = "wan";
+      bridge = "br-cobalt-wan";
+    }
   ];
 in
 {
@@ -78,7 +83,7 @@ in
       nixosRendererInput = inputs.network-renderer-nixos;
       intentFileName = "intent-cobalt.nix";
       inventoryFileName = "inventory-cobalt.nix";
-      inherit system;
+      inherit system vmNics;
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-cobalt/default.nix";
     })
   ];
@@ -148,6 +153,4 @@ in
       };
     }
   ];
-
-  virtualisation.qemu.networkingOptions = lib.mkForce qemuNetworkingOptions;
 }
