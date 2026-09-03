@@ -108,7 +108,7 @@
       open-webui = import ./nixos/llm/open-webui.nix;
     };
     impermanence = {
-      module = args@{ config, lib, outputs, pkgs, ... }:
+      module = { config, lib, pkgs, relativeRepo, ... }:
         let
           persistPath = "/persist";
           persistConfigs = config.environment.persistence or { };
@@ -118,7 +118,7 @@
         in
         {
           imports = [
-            ((outputs.overlays.impermanence-module pkgs pkgs).impermanenceNixosModule args)
+            (relativeRepo.module "library/01-general/impermanence/nixos.nix")
           ];
 
           config = lib.mkIf usesPersist {
