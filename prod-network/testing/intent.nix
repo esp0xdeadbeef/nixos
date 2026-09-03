@@ -2163,7 +2163,25 @@ in
     };
 
     communicationContract = {
-      inherit trafficTypes;
+      trafficTypes =
+        trafficTypes
+        ++ [
+          {
+            name = "nebula-ipv4";
+            match = [
+              {
+                proto = "udp";
+                dports = [ 4242 ];
+                family = "ipv4";
+              }
+              {
+                proto = "tcp";
+                dports = [ 4242 ];
+                family = "ipv4";
+              }
+            ];
+          }
+        ];
       services = [
         {
           name = "svc-dns";
@@ -2213,7 +2231,7 @@ in
         {
           name = "s-nebula-cobalt-lighthouse";
           providers = [ "s-nebula-cobalt-lighthouse" ];
-          trafficType = "nebula";
+          trafficType = "nebula-ipv4";
         }
       ];
 
@@ -2770,7 +2788,7 @@ in
             kind = "service";
             name = "s-nebula-cobalt-lighthouse";
           };
-          trafficType = "nebula";
+          trafficType = "nebula-ipv4";
           action = "allow";
           publicIngressTupleAuthority = {
             sourceScope = "internet";
@@ -3518,6 +3536,9 @@ in
             onyx = {
               ipv4 = [ "0.0.0.0/0" ];
               ipv6 = [ "::/0" ];
+              egress.ipv4.translation = {
+                mode = "nat44";
+              };
               egress.ipv6.translation = {
                 mode = "nat66";
                 translatedPrefixes = [ "fd42:dead:feed:c1e::/64" ];
@@ -3538,6 +3559,9 @@ in
             opal = {
               ipv4 = [ "0.0.0.0/0" ];
               ipv6 = [ "::/0" ];
+              egress.ipv4.translation = {
+                mode = "nat44";
+              };
               egress.ipv6.translation = {
                 mode = "nat66";
                 translatedPrefixes = [ "fd42:dead:feed:c1f::/64" ];
