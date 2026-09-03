@@ -98,7 +98,7 @@ Conventional commits: `type(scope): description`
 │   └── virtual-machine/    #   VM hosts (nixos-shell-vm/, dedicated-vm/, etc.)
 │       └── {vm-name}/
 ├── library/                # Importable NixOS modules
-│   └── 01-general/         #   Feature modules (packages/, network/, desktop/, etc.)
+│   └── 01-general/         #   Feature modules (packages/, network/, desktop/, impermanence/, etc.)
 ├── modules/                # Custom NixOS & HM modules (unused if using library/)
 ├── overlays/               # Package overlays and patches
 │   ├── default.nix         #   Aggregates all overlays
@@ -106,7 +106,6 @@ Conventional commits: `type(scope): description`
 │   ├── modifications.nix   #   Patched packages (xlayoutdisplay, libvirt, etc.)
 │   ├── unstable-packages.nix  # pkgs.unstable with ollama/python workarounds
 │   ├── nixpkgs-25_11-packages.nix  # pkgs.nixpkgs-25_11 for ruby 3.3 compat
-│   ├── impermanence-module.nix     # Patched impermanence NixOS module wrapper
 │   └── legcord-unstable-overwrite.nix  # legcord from unstable
 ├── pkgs/                   # Custom package derivations
 ├── patches/                # Patch files referenced by overlays
