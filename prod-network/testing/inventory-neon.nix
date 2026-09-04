@@ -1,5 +1,5 @@
 let
-  prodHost = "s-router-prod";
+  prodHost = "s-router-neon";
   externalIspHost = "external-isp";
   dnsRuntime = import ./dns-runtime-addresses.nix;
   nodeName = shortName: "esp0xdeadbeef-neon-${shortName}";
@@ -89,14 +89,6 @@ let
     ,
     }:
     {
-      # TEMPORARY FS-540 SMS projection: the target intent is address-free, but
-      # the pinned compiler cannot consume its service-to-service relation
-      # without changing unrelated route materialization. Keep the core service
-      # endpoint explicit here until that SMS row is fixed upstream.
-      forwarders = [
-        dnsRuntime.resolver.ipv4
-        dnsRuntime.resolver.ipv6
-      ];
       outgoingInterfaces = addresses;
       roles.recursion.outgoingInterfaces = addresses;
       inherit localRecords;
@@ -308,10 +300,6 @@ let
     // {
       services = {
         dns = {
-          listen = [
-            dnsRuntime.resolver.ipv4
-            dnsRuntime.resolver.ipv6
-          ];
           allowFrom = [
             dnsRuntime.requesters.access-vlan2.clientIpv4
             dnsRuntime.requesters.access-vlan2.clientIpv6
