@@ -1302,11 +1302,6 @@ in
   schemaVersion = 1;
 
   endpoints = {
-    core-dns = {
-      ipv4 = [ dnsRuntime.resolver.ipv4 ];
-      ipv6 = [ dnsRuntime.resolver.ipv6 ];
-    };
-
     vlan2-dns = {
       ipv4 = [ dnsRuntime.requesters.access-vlan2.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-vlan2.ipv6 ];
