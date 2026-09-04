@@ -276,6 +276,57 @@ let
       name = "s-test";
       description = "s-test (nixos-shell)";
     }
+    {
+      name = "s-router-cobalt";
+      description = "cobalt site router (nixos-shell)";
+      storageSize = "20G";
+    }
+    {
+      name = "s-nebula-cobalt";
+      description = "cobalt nebula lighthouse (nixos-shell)";
+      storageSize = "4G";
+      stopGraceSeconds = 30;
+    }
+    {
+      name = "s-tang";
+      description = "cobalt Tang (NBDE) server";
+      persistentDisk = false;
+      stopGraceSeconds = 30;
+      qemuArguments = [
+        # Drop the nixos-shell default user-mode NAT NIC; the Tang host only
+        # needs the cobalt trunk (mgmt VLAN 10 + unlock VLAN 90).
+        "-net"
+        "none"
+        "-nic"
+        "bridge,br=br-cobalt-lan,model=virtio-net-pci"
+      ];
+    }
+    {
+      name = "s-ap-nighthawk";
+      description = "cobalt Nighthawk AP (mt7925u) on the cobalt trunk";
+      persistentDisk = false;
+      stopGraceSeconds = 30;
+      qemuArguments = [
+        "-usb"
+        "-device"
+        "qemu-xhci,id=xhci"
+        "-device"
+        "usb-host,vendorid=0x0846,productid=0x9072,bus=xhci.0"
+      ];
+    }
+    {
+      name = "s-ap-alfa";
+      description = "cobalt ALFA 2.4GHz AP (rt2800usb) on the cobalt trunk";
+      persistentDisk = false;
+      stopGraceSeconds = 30;
+      qemuArguments = [
+        "-usb"
+        "-device"
+        "qemu-xhci,id=xhci"
+        "-device"
+        "usb-host,vendorid=0x148f,productid=0x3070,bus=xhci.0"
+      ];
+    }
   ];
 
   vmNames = map (vm: vm.name) vms;
@@ -302,7 +353,7 @@ let
         size = vm.storageSize or "100G";
       };
       runner = {
-        stopGraceSeconds = 60;
+        stopGraceSeconds = vm.stopGraceSeconds or 60;
         qemuArguments = qgaArgumentsFor vm.name ++ (vm.qemuArguments or [ ]);
       }
       // lib.optionalAttrs (vm ? runnerRelativePath)
