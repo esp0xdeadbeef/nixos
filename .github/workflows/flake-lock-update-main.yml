@@ -69,7 +69,13 @@ jobs:
                             map
                               (name: {
                                 inherit name;
-                                value.enable = lib.mkForce (builtins.elem name carrierInstances);
+                                value.enable = lib.mkForce (
+                                  builtins.elem name carrierInstances
+                                  || (
+                                    carrierInstances == [ ]
+                                    && name == builtins.head instanceNames
+                                  )
+                                );
                               })
                               instanceNames
                           );
