@@ -5,13 +5,6 @@
 # The cobalt site uses a distinct ULA/loopback allocation from the neon site,
 # so the combined inventory can index endpoints without collisions.
 {
-  resolver = {
-    node = "core";
-    service = "core-dns";
-    ipv4 = "10.1.0.8";
-    ipv6 = "fd42:dead:beef:2900::8";
-  };
-
   requesters = {
     access-svc = {
       ipv4 = "10.2.20.1";
