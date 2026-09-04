@@ -1001,11 +1001,6 @@ in
   schemaVersion = 1;
 
   endpoints = {
-    cobalt-core-dns = {
-      ipv4 = [ dnsRuntime.resolver.ipv4 ];
-      ipv6 = [ dnsRuntime.resolver.ipv6 ];
-    };
-
     cobalt-svc-dns = {
       ipv4 = [ dnsRuntime.requesters.access-svc.ipv4 ];
       ipv6 = [ dnsRuntime.requesters.access-svc.ipv6 ];
