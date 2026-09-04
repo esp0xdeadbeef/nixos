@@ -31,7 +31,7 @@ in
   _module.args.sRouterProdProfile = {
     inherit modelSource;
     labSelector = null;
-    productionSelector = "s-router-prod";
+    productionSelector = hostName;
   };
 
   networking.hostName = lib.mkForce hostName;
@@ -58,7 +58,7 @@ in
         modelSource
         ;
 
-      hostName = "s-router-prod";
+      hostName = hostName;
       controlPlaneModelInput = inputs.network-control-plane-model;
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;

@@ -85,10 +85,6 @@ let
       localRecords ? [ ],
     }:
     {
-      forwarders = [
-        dnsRuntime.resolver.ipv4
-        dnsRuntime.resolver.ipv6
-      ];
       outgoingInterfaces = addresses;
       roles.recursion.outgoingInterfaces = addresses;
       inherit localRecords;
@@ -268,10 +264,6 @@ let
     // {
       services = {
         dns = {
-          listen = [
-            dnsRuntime.resolver.ipv4
-            dnsRuntime.resolver.ipv6
-          ];
           allowFrom = [
             dnsRuntime.requesters.access-clients.clientIpv4
             dnsRuntime.requesters.access-clients.clientIpv6
