@@ -39,6 +39,8 @@
     };
     nix = {
       flake-inputs = import ./nixos/nix/flake-inputs.nix;
+      remote-builder-server = import ./nixos/nix/remote-builder-server.nix;
+      remote-builder-client = import ./nixos/nix/remote-builder-client.nix;
     };
     shell = {
       fish = import ./nixos/shell/fish.nix;

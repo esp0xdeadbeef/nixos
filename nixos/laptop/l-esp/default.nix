@@ -12,6 +12,7 @@
     profiles.nixos.vm-host.nixos-shell
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm-clients.agents-all
+    profiles.nixos.nix.remote-builder-client
 
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p16s-intel-gen2
 
