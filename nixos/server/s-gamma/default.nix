@@ -19,6 +19,7 @@ in
     profiles.nixos.mail.mailbox-sets
     profiles.nixos.network.nebula-mesh
     profiles.nixos.users.deadbeef-ssh
+    profiles.nixos.nix.remote-builder-client
     inputs.sops-nix.nixosModules.sops
 
     ./base.nix

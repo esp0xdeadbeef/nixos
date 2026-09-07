@@ -15,6 +15,7 @@
     profiles.nixos.containers.firefox-vnc
     profiles.nixos.ssh.password-login
     profiles.nixos.users.sudo-nopasswd
+    profiles.nixos.nix.remote-builder-client
 
     inputs.disko.nixosModules.disko
     inputs.nixos-hardware.nixosModules.common-cpu-intel

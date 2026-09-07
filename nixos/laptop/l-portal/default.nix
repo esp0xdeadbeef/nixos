@@ -27,6 +27,7 @@ in
     profiles.nixos.ssh.password-login
     profiles.nixos.users.deadbeef-sops
     profiles.nixos.users.sudo-nopasswd
+    profiles.nixos.nix.remote-builder-client
 
     inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops

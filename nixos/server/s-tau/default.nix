@@ -1,8 +1,16 @@
 { lib
 , pkgs
 , profiles
+, relativeRepo
 , ...
 }:
+let
+  # Public keys of the dedicated remote-builder identities for the hosts allowed
+  # to offload builds to this builder. Each client generates this once with
+  # `sudo ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_remote-builder` and
+  # commits the resulting .pub here (see profiles.nixos.nix.remote-builder-client).
+  remoteBuilderKeyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/remote-builder/${host}.pub");
+in
 {
   imports = [
     profiles.nixos.server.dell-vm-host
@@ -11,12 +19,25 @@
     profiles.nixos.llm-clients.agents
     profiles.nixos.network.nebula-mesh
     profiles.nixos.virtualization.pci-passthrough
+    profiles.nixos.nix.remote-builder-server
 
     ./libvirt.nix
     ./nixos-shell-servers
     ./hardware
     ./connect-nas
   ];
+
+  local.nix.remoteBuilderServer = {
+    enable = true;
+    emulateSystems = [ "aarch64-linux" ];
+    clients = {
+      # TODO: commit l-esp's id_remote-builder.pub when it is back online.
+      l-envil.key = remoteBuilderKeyFor "l-envil";
+      l-portal.key = remoteBuilderKeyFor "l-portal";
+      s-gamma.key = remoteBuilderKeyFor "s-gamma";
+      # l-esp.key = remoteBuilderKeyFor "l-esp";
+    };
+  };
 
   boot.swraid = {
     # Disko creates the LUKS container on this mdraid array; the initrd must
