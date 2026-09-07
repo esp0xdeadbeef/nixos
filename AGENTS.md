@@ -105,8 +105,7 @@ Conventional commits: `type(scope): description`
 │   ├── additions.nix       #   Custom packages from ./pkgs
 │   ├── modifications.nix   #   Patched packages (xlayoutdisplay, libvirt, etc.)
 │   ├── unstable-packages.nix  # pkgs.unstable with ollama/python workarounds
-│   ├── nixpkgs-25_11-packages.nix  # pkgs.nixpkgs-25_11 for ruby 3.3 compat
-│   └── legcord-unstable-overwrite.nix  # legcord from unstable
+│   └── nixpkgs-25_11-packages.nix  # pkgs.nixpkgs-25_11 for ruby 3.3 compat
 ├── pkgs/                   # Custom package derivations
 ├── patches/                # Patch files referenced by overlays
 ├── profiles/               # Composable config profiles
