@@ -9,6 +9,9 @@
         "s-ap-nighthawk"
         "s-ap-alfa"
       ];
+      # The GPU-backed inference VM lives on s-tau; l-envil only runs the
+      # local ollama/open-webui stack and does not build this VM image.
+      excludeInstances = [ "s-llm-inference" ];
     })
   ];
 }

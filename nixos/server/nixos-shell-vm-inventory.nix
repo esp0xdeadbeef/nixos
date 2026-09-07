@@ -1,4 +1,6 @@
-{ startOnBootInstances ? [ "s-test" ] }:
+{ startOnBootInstances ? [ "s-test" ]
+, excludeInstances ? [ ]
+}:
 { config
 , inputs
 , lib
@@ -329,8 +331,10 @@ let
     }
   ];
 
-  vmNames = map (vm: vm.name) vms;
-  unknownStartOnBootInstances = lib.subtractLists vmNames startOnBootInstances;
+  allVmNames = map (vm: vm.name) vms;
+  keptVms = builtins.filter (vm: !(builtins.elem vm.name excludeInstances)) vms;
+  unknownStartOnBootInstances = lib.subtractLists allVmNames startOnBootInstances;
+  unknownExcludeInstances = lib.subtractLists allVmNames excludeInstances;
 
   mkInstance = vm: {
     inherit (vm) name;
@@ -375,13 +379,17 @@ in
       assertion = unknownStartOnBootInstances == [ ];
       message = "Unknown nixos-shell start-on-boot instances: ${lib.concatStringsSep ", " unknownStartOnBootInstances}";
     }
+    {
+      assertion = unknownExcludeInstances == [ ];
+      message = "Unknown nixos-shell excluded instances: ${lib.concatStringsSep ", " unknownExcludeInstances}";
+    }
   ];
 
   services.nixosShellVmManager = {
     enable = true;
     maxConcurrentBuilds = 1;
     persistentDirectory = "/persist/vm-persists";
-    instances = lib.listToAttrs (map mkInstance vms);
+    instances = lib.listToAttrs (map mkInstance keptVms);
   };
 
   system.build.vmImages = lib.mapAttrs (_: instance: instance.image) (
