@@ -155,7 +155,7 @@ in
   ];
   virtualisation = lib.mkForce {
     cores = 4;
-    memorySize = 2 * 1024;
+    memorySize = 6 * 1024;
     diskSize = 20 * 1024;
   };
 
