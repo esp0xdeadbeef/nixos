@@ -7,6 +7,7 @@
   networking.networkmanager.unmanaged = [
     "enp170s0"
     "wan0"
+    "ens1f0"
     "br-cobalt-lan"
     "br-cobalt-wan"
   ];
@@ -60,6 +61,15 @@
 
     "10-wan0" = {
       matchConfig.Name = "wan0";
+      linkConfig.RequiredForOnline = "no";
+      networkConfig.Bridge = "br-cobalt-wan";
+    };
+
+    # The FRITZ!SFP XGS-PON SFP+ port rides the same WAN bridge as the USB
+    # ONT so both can feed the cobalt router's WAN. It only carries L2 after
+    # the ONU reaches O5; while down it contributes nothing to the bridge.
+    "10-ens1f0" = {
+      matchConfig.Name = "ens1f0";
       linkConfig.RequiredForOnline = "no";
       networkConfig.Bridge = "br-cobalt-wan";
     };
