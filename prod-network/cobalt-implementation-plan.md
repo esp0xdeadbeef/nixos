@@ -162,8 +162,44 @@ so disabling a data-plane port never cut the management channel.
 
 ## 8. Switch provisioning (Netgear GS108PEv3)
 
-Switch: **NETGEAR GS108PEv3**, management at `192.168.1.47` (DHCP), firmware
-`V2.06.10EN`. Admin password is a secret (set via `PROSAFE_VLAN_PASSWORD`).
+Switch: **NETGEAR GS108PEv3**, firmware `V2.06.10EN`. After a factory reset it
+is unmanaged by DHCP: nothing on this path runs a DHCP server, so it stays at
+its **factory-static management IP `192.168.0.239`** (it does not drift to a
+lease such as the old `192.168.1.47`, which no longer applies after reset).
+Admin password is a secret (set via `PROSAFE_VLAN_PASSWORD`).
+
+### Reaching the switch (out-of-band management)
+
+The switch's trunk side rides the LAN/dock NIC that `br-cobalt-lan` carries
+(enslaved declaratively in `l-envil/hardware/cobalt-bridges.nix`). The switch
+keeps its factory mgmt IP because nothing on this L2 runs a DHCP server for
+it, so reach it out-of-band by putting a transient `/24` helper address on
+`br-cobalt-lan` (it is the same L2 your management station shares with the
+switch):
+
+```sh
+# l-envil host. The dock NIC that carries the switch (the LAN dock NIC, at the
+# time of writing `enp0s13f0u3u2`) is already enslaved into br-cobalt-lan;
+# add only the transient mgmt helper IP on the bridge, then ping the factory
+# mgmt IP. The /24 is dedicated to switch management and is not persisted.
+sudo ip addr add 192.168.0.2/24 dev br-cobalt-lan
+ping -c3 192.168.0.239
+```
+
+### First boot after a factory reset (mandatory default-password gate)
+
+A freshly reset GS108PEv3 forces a default-password change before the normal
+admin UI / `prosafe-vlan` login can proceed, so `prosafe-vlan change-password`
+will fail against it until that gate is cleared. Clear it with the headless
+bootstrap (no secret is ever printed):
+
+```sh
+export PROSAFE_VLAN_PASSWORD="$(sops --decrypt --extract '["password"]' secrets/cobalt-switch-gs108pev3.yaml)"
+COBALT_SWITCH_ADDRESS=192.168.0.239 nix run .#cobalt-switch-bootstrap
+# -> "switch default password changed (status 200)"
+```
+
+After that the normal management flows accept the secret password.
 
 Applied VLAN config (see `prod-network/cobalt/switch-vlan.toml`):
 
@@ -190,12 +226,16 @@ Tooling (all in the flake):
   This chains: (if needed) factory-default password change → enable 802.1Q →
   apply VLAN config.
 
-- Change the admin password explicitly (regular `user.cgi` flow):
+- Change the admin password explicitly (regular `user.cgi` flow). Reach the
+  switch first (see "Reaching the switch" above) and target `192.168.0.239`;
+  the old password is the previous one already on the box (factory
+  `password` only on a unit that has never been flashed — otherwise run the
+  bootstrap step first):
 
   ```sh
   export PROSAFE_VLAN_NEW_PASSWORD="$(sops --decrypt --extract '["password"]' secrets/cobalt-switch-gs108pev3.yaml)"
-  export PROSAFE_VLAN_OLD_PASSWORD='…'
-  nix run .#prosafe-vlan -- change-password -a 192.168.1.47 -m gs108ev3
+  export PROSAFE_VLAN_OLD_PASSWORD='…'   # or the factory default on a reset unit
+  nix run .#prosafe-vlan -- change-password -a 192.168.0.239 -m gs108ev3
   ```
 
 ## 9. Implementation status
