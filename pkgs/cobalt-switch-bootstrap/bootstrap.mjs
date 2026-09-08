@@ -13,7 +13,7 @@
 
 import { createContext, runInContext } from "node:vm";
 
-const SWITCH = process.env.COBALT_SWITCH_ADDRESS || "192.168.1.47";
+const SWITCH = process.env.COBALT_SWITCH_ADDRESS || "192.168.0.239";
 const NEW_PASSWORD = process.env.PROSAFE_VLAN_PASSWORD;
 const BASE = `http://${SWITCH}`;
 

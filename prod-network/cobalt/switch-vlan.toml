@@ -1,6 +1,8 @@
 # Cobalt site — Netgear switch 802.1Q VLAN provisioning.
 #
-# Switch: NETGEAR GS108PEv3 (8-port), management at 192.168.1.47 (DHCP).
+# Switch: NETGEAR GS108PEv3 (8-port), management at the factory-static
+# 192.168.0.239 (no DHCP server serves this switch, so it keeps the factory mgmt
+# IP after a reset and must be reached out-of-band).
 #
 # The switch is just an 802.1Q trunk; WAN vs LAN is decided by the router:
 #   VLAN 300  = WAN
@@ -26,9 +28,15 @@
 # - Enable the switch's "Advanced 802.1Q VLAN" mode via the web UI first; the
 #   tool does not enable it for you.
 # - The admin password is a secret; do not commit the real value.
+# - The switch's trunk wire rides the LAN dock NIC that br-cobalt-lan carries;
+#   reach it out-of-band by adding a transient mgmt helper IP on that bridge
+#   (e.g. `ip addr add 192.168.0.2/24 dev br-cobalt-lan`) so 192.168.0.239 is
+#   link-local, then run the apply/change-password against 192.168.0.239. A
+#   freshly reset unit must first boot past the mandatory default-password gate
+#   via .#cobalt-switch-bootstrap.
 
 [switches.cobalt-switch]
-address = "192.168.1.47"
+address = "192.168.0.239"
 # The admin password is a secret and must not be committed. Pass it via the
 # PROSAFE_VLAN_PASSWORD environment variable:
 #

@@ -5,7 +5,7 @@
   # NetworkManager in charge of Wi-Fi, but take these two wired interfaces out
   # of NM so systemd-networkd can enslave them into pure L2 bridges.
   networking.networkmanager.unmanaged = [
-    "enp170s0"
+    "enp0s13f0u3u2"
     "wan0"
     "ens1f0"
     "br-cobalt-lan"
@@ -53,8 +53,8 @@
   };
 
   systemd.network.networks = {
-    "10-enp170s0" = {
-      matchConfig.Name = "enp170s0";
+    "10-enp0s13f0u3u2" = {
+      matchConfig.Name = "enp0s13f0u3u2";
       linkConfig.RequiredForOnline = "no";
       networkConfig.Bridge = "br-cobalt-lan";
     };
