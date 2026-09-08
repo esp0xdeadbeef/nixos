@@ -59,7 +59,7 @@ let
     "hf.co/huihui-ai/Huihui-Qwen3.6-35B-A3B-abliterated-MTP-GGUF:Q2_K"
 
     # Very large coding model; primarily system-RAM bound on a P100.
-    "hf.co/ymsf/Huihui-Qwen3-Coder-Next-Abliterated-GGUF:Q4_K_M"
+    "hf.co/mradermacher/Huihui-Qwen3-Coder-Next-Abliterated-GGUF:Q4_K_M"
 
     # Offensive-security abliterated 35B. The HF proxy rejects the
     # explicit Q4_K tag for this repository, so use "latest", which
