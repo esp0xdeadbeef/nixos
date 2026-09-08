@@ -36,16 +36,11 @@ address = "192.168.1.47"
 model = "gs108ev3"     # TODO: GS108PEv3 driver
 
 [switches.cobalt-switch.ports]
-# WAN -> l-envil USB: mgmt VLAN 1 untagged + cobalt WAN container tags VLAN 300
-1 = { pvid = 1, vlans = ["1U", "300T"] }
-# clients (VLAN 30) — l-portal-usb
-2 = { pvid = 30, vlans = ["30U"] }
-# LAN trunk -> l-envil dock: mgmt VLAN 1 untagged, tenant VLANs tagged
-3 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T", "90T"] }
-# WAN -> ISP router: untagged VLAN 300 (ISP router is untagged)
-4 = { pvid = 300, vlans = ["300U"] }
-# portal access -> l-portal USB (enu1u1): untagged clients-vpn (VLAN 31) — onyx egress
-5 = { pvid = 31, vlans = ["31U"] }
+1 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T", "90T"] }
+2 = { pvid = 1, vlans = ["1U"] }
+3 = { pvid = 1, vlans = ["1U"] }
+4 = { pvid = 1, vlans = ["1U"] }
+5 = { pvid = 30, vlans = ["30U"] }
 6 = { pvid = 1, vlans = ["1U"] }
 7 = { pvid = 1, vlans = ["1U"] }
 8 = { pvid = 1, vlans = ["1U"] }
