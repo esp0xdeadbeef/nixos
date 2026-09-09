@@ -31,6 +31,7 @@ in
     ./dns.nix
     ./hardware.nix
     ./mail.nix
+    ./meet.nix
     ./ssh.nix
     ./upgrade.nix
     ./web.nix
