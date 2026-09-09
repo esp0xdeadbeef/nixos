@@ -164,7 +164,7 @@ let
       add_domain "$MAIL_FQDN"
 
       for domain in $(words "''${MAIL_TLS_DOMAINS:-}"); do
-        add_domain "$domain"
+        add_optional_domain "$domain"
       done
 
       while IFS= read -r entry; do
