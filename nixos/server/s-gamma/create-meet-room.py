@@ -7,28 +7,97 @@ a fresh UUID. An iCalendar (.ics) event is written alongside so the meeting
 can be imported / invited to calendar clients.
 
 Usage examples
-    meet-create-room --start '2026-09-21 14:00' --subject 'Uitleg'
-    meet-create-room --start '2026-09-21T14:00:00Z' --duration 5400
-    meet-create-room --subject 'Vandaag'                 # from now, 1 week
+    meet-create-room --title "Kickoff" --date "2026-09-21" --duration "full day"
+    meet-create-room --title "Review" --date "2026-09-21 15:00" --duration "1 hour"
+    meet-create-room --title "Planning" --date "2026-10-01" --duration "2 weeks"
 """
 import argparse
 import json
 import os
+import re
 import sys
 import uuid
 import datetime as _dt
 
 
-def parse_dt(s: str) -> _dt.datetime:
-    """Parse a naive or UTC/Z datetime string into an aware UTC datetime."""
+DURATION_RE = re.compile(
+    r"^(?:(?P<num>\d+(?:\.\d+)?)\s*)?(?P<unit>seconds?|mins?|minutes?|hours?|days?|weeks?|months?)$",
+    re.IGNORECASE,
+)
+
+
+UNIT_SECONDS = {
+    "second": 1,
+    "minute": 60,
+    "hour": 3600,
+    "day": 86400,
+    "week": 604800,
+    "month": 2592000,
+}
+
+
+def parse_human_duration(s: str) -> int:
+    """Parse '1 hour', '90 minutes', '2 weeks', 'full day' -> seconds."""
+    s = s.strip().lower()
+    if re.fullmatch(r"full\s*days?", s):
+        return int(UNIT_SECONDS["day"])
+    m = DURATION_RE.match(s)
+    if not m:
+        raise ValueError(f"could not parse duration: '{s}'")
+    gd = m.groupdict()
+    num_str = gd["num"]
+    num = float(num_str) if num_str else 1.0
+    unit = gd["unit"].rstrip("s")  # normalize plurals
+    if unit == "month":
+        raise ValueError("duration in months is ambiguous; use days/weeks")
+    secs = int(num * UNIT_SECONDS[unit])
+    if secs <= 0:
+        raise ValueError(f"duration must be positive: '{s}'")
+    return secs
+
+
+def parse_start(s: str) -> _dt.datetime:
+    """Parse a start that is either a date (full day) or a date + time.
+
+    Accepted forms (UTC):
+        'YYYY-MM-DD'            -> 00:00 that day (full-day meeting)
+        'YYYY-MM-DD HH:MM'
+        'YYYY-MM-DDTHH:MM[:SS][Z]'
+    """
     s = s.strip()
+    dt = None
+    # Full-day date only (no time component)
+    try:
+        dt = _dt.datetime.strptime(s, "%Y-%m-%d")
+        return dt.replace(tzinfo=_dt.timezone.utc)
+    except ValueError:
+        pass
+    # space-separated date + time
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = _dt.datetime.strptime(s, fmt)
+            return dt.replace(tzinfo=_dt.timezone.utc)
+        except ValueError:
+            pass
+    # ISO date/time (handles trailing Z)
     if s.endswith(("Z", "z")):
         s = s[:-1] + "+00:00"
-    dt = _dt.datetime.fromisoformat(s)
-    if dt.tzinfo is None:
-        # Interpret a bare wall-clock time as UTC (the host runs in UTC).
-        dt = dt.replace(tzinfo=_dt.timezone.utc)
-    return dt.astimezone(_dt.timezone.utc)
+    try:
+        dt = _dt.datetime.fromisoformat(s)
+    except ValueError:
+        dt = None
+    if dt is not None:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_dt.timezone.utc)
+        return dt.astimezone(_dt.timezone.utc)
+    raise ValueError(f"could not parse meeting date: '{s}'")
+
+
+ALL_DAY = "FULL_DAY"
+
+
+def is_all_day(dt: _dt.datetime) -> bool:
+    return getattr(dt, "_allday", False)
 
 
 def fmt_ics(dt: _dt.datetime) -> str:
@@ -52,29 +121,41 @@ def escape_ics(value: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(prog="meet-create-room")
     ap.add_argument(
-        "--start",
-        help="Meeting start, ISO-8601, e.g. '2026-09-21 14:00' or "
-             "'2026-09-21T14:00:00Z'. If omitted the room is usable now.",
+        "--title",
+        required=True,
+        help="Meeting title (required); used as the calendar SUMMARY.",
     )
     ap.add_argument(
-        "--subject",
-        default=os.environ.get("MEET_ROOM_SUBJECT", ""),
-        help="Invite/SUMMARY text (default empty).",
+        "--date",
+        required=True,
+        help="Meeting start date; a bare date '2026-09-21' is a full-day "
+             "meeting starting 00:00 UTC, or give a time "
+             "'2026-09-21 15:00' / '2026-09-21T15:00:00Z'.",
     )
     ap.add_argument(
         "--duration",
-        type=int,
-        default=int(os.environ.get("MEET_ROOM_DURATION", "3600")),
-        help="Meeting length in seconds (default 3600). Close = start + duration.",
-    )
-    ap.add_argument(
-        "--ttl",
-        type=int,
-        default=int(os.environ.get("MEET_ROOM_TTL", "604800")),
-        help="Seconds from now the room stays open when no --start is given "
-             "(default 604800 = 1 week).",
+        required=True,
+        help="Meeting length as natural text, e.g. '1 hour', '90 minutes', "
+             "'2 hours', 'full day', '2 weeks'. Room closes at start + this.",
     )
     args = ap.parse_args()
+
+    try:
+        meeting_start = parse_start(args.date)
+    except ValueError as e:
+        ap.error(str(e))
+    try:
+        duration_secs = parse_human_duration(args.duration)
+    except ValueError as e:
+        ap.error(str(e))
+
+    title = args.title.strip()
+    if not title:
+        ap.error("--title must not be empty")
+
+    meeting_end = meeting_start + _dt.timedelta(seconds=duration_secs)
+    start = meeting_start
+    expires = meeting_end  # room valid from creation until meeting end
 
     hostname = os.environ.get("MEET_HOSTNAME") or "meet"
     admin_user = os.environ.get("MEET_ADMIN_USERNAME") or ""
@@ -83,15 +164,6 @@ def main() -> int:
 
     with open(hash_file) as f:
         admin_hash = json.load(f)  # pbkdf2 password object
-
-    now = _dt.datetime.now(_dt.timezone.utc)
-    start = now
-    expires = now
-    if args.start:
-        start = parse_dt(args.start)
-        expires = start + _dt.timedelta(seconds=args.duration)
-    else:
-        expires = start + _dt.timedelta(seconds=args.ttl)
 
     if not admin_user:
         with open(os.path.join("/run/secrets", "meet", "admin_username")) as f:
@@ -115,8 +187,9 @@ def main() -> int:
             "password": {"type": "wildcard"},
             "permissions": "present",
         },
+        # No "not-before": the room is joinable as soon as it exists, so
+        # people who get the link early can join/test ahead of the invite.
         "allow-recording": True,
-        "not-before": fmt_rfc3339(start),
         "expires": fmt_rfc3339(expires),
     }
 
@@ -127,7 +200,18 @@ def main() -> int:
     os.chmod(json_path, 0o640)
     set_owner(json_path, "galene")
 
+    now = _dt.datetime.now(_dt.timezone.utc)
     meet_url = f"https://{hostname}/group/{room}/"
+    desc_lines = [
+        title,
+        f"When: {start.strftime('%A %d %B %Y')} {start:%H:%M} - {expires:%H:%M} (UTC)",
+        "",
+        f"Join the meeting: {meet_url}",
+        "",
+        "Everyone can join with the link and any display name (no login).",
+        "The room is open from now until the meeting end time.",
+    ]
+    description_txt = "\n".join(desc_lines)
 
     # iCalendar (.ics) event: start..expires, URL in LOCATION.
     ics = "\r\n".join(
@@ -140,9 +224,10 @@ def main() -> int:
             f"DTSTAMP:{fmt_ics(now)}",
             f"DTSTART:{fmt_ics(start)}",
             f"DTEND:{fmt_ics(expires)}",
-            f"SUMMARY:{escape_ics(args.subject or 'Online meeting')}",
-            f"DESCRIPTION:Join the meeting: {meet_url}",
+            f"SUMMARY:{escape_ics(title)}",
+            f"DESCRIPTION:{escape_ics(description_txt)}",
             f"LOCATION:{meet_url}",
+            f"URL:{meet_url}",
             "END:VEVENT",
             "END:VCALENDAR",
             "",
@@ -158,6 +243,7 @@ def main() -> int:
     print(f"start:   {fmt_rfc3339(start)}")
     print(f"expires: {fmt_rfc3339(expires)}")
     print(f"ics:     {ics_path}")
+    print(f"title:   {title}")
     return 0
 
 
