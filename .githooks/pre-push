@@ -157,9 +157,14 @@ def add_pattern(patterns: set[str], value: str, *, split_words: bool = False) ->
 
 
 def add_ip_candidate(secret_ips: set[ipaddress._BaseAddress], value: str) -> None:
-    for token in IP_TOKEN_RE.findall(value):
+    for match in IP_TOKEN_RE.finditer(value):
+        token = match.group(0)
         candidate = token.strip(".:%")
         if not candidate or ("." not in candidate and ":" not in candidate):
+            continue
+        # A value followed by '/' is a CIDR prefix (e.g. 2000::/3), which is a
+        # documentation or routing range, not a single sensitive endpoint.
+        if value[match.end():match.end() + 1] == "/":
             continue
         try:
             address = ipaddress.ip_address(candidate)
@@ -239,7 +244,7 @@ def scan_blob(
     *,
     patterns: set[str],
     forbidden_ipv4: ipaddress.IPv4Address,
-    forbidden_ipv6_network: ipaddress.IPv6Network,
+    forbidden_ipv6_network: ipaddress.IPv6Network | None,
     secret_ips: set[ipaddress._BaseAddress],
     expected_sops: bool,
 ) -> set[tuple[str, int, str]]:
@@ -266,7 +271,10 @@ def scan_blob(
             address = ipaddress.ip_address(match.group(0))
         except ValueError:
             continue
-        if address in forbidden_ipv6_network or address in secret_ips:
+        if (
+            forbidden_ipv6_network is not None
+            and address in forbidden_ipv6_network
+        ) or address in secret_ips:
             findings.add((location, line_number(text, match.start()), "private address"))
             if len(findings) >= MAX_FINDINGS:
                 break
@@ -396,7 +404,7 @@ def main() -> int:
             public_ipv6 = discover_public_address(repo, 6)
             public_ipv6_network = ipaddress.ip_network(f"{public_ipv6}/64", strict=False)
         except Exception:
-            public_ipv6_network = ipaddress.IPv6Network("::/128")
+            public_ipv6_network = None
         patterns, secret_ips = derive_private_denylist(repo)
         commits = commits_to_scan(repo, updates)
 
@@ -435,6 +443,26 @@ def main() -> int:
                     forbidden_ipv6_network=public_ipv6_network,
                     secret_ips=secret_ips,
                     expected_sops=is_expected_sops_file(path),
+                )
+            )
+
+        # Commit objects hold the message plus author/committer identities, which
+        # are pushed and visible on the forge even though no blob contains them.
+        for commit in sorted(commits):
+            cache_key = f"commit:{commit}"
+            if cache_key in scanned_blobs:
+                continue
+            scanned_blobs.add(cache_key)
+            data = git(repo, "cat-file", "commit", commit)
+            findings.update(
+                scan_blob(
+                    data,
+                    f"{commit[:12]}:commit-object",
+                    patterns=patterns,
+                    forbidden_ipv4=public_ipv4,
+                    forbidden_ipv6_network=public_ipv6_network,
+                    secret_ips=secret_ips,
+                    expected_sops=False,
                 )
             )
 
