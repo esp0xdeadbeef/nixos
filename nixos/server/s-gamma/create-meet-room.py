@@ -10,6 +10,9 @@ Usage examples
     meet-create-room --title "Kickoff" --date "2026-09-21" --duration "full day"
     meet-create-room --title "Review" --date "2026-09-21 15:00" --duration "1 hour"
     meet-create-room --title "Planning" --date "2026-10-01" --duration "2 weeks"
+
+A start without an explicit timezone is Dutch local time (Europe/Amsterdam)
+and is converted to UTC in the generated .ics.
 """
 import argparse
 import json
@@ -18,6 +21,10 @@ import re
 import sys
 import uuid
 import datetime as _dt
+from zoneinfo import ZoneInfo
+
+
+LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 
 DURATION_RE = re.compile(
@@ -57,40 +64,37 @@ def parse_human_duration(s: str) -> int:
 
 
 def parse_start(s: str) -> _dt.datetime:
-    """Parse a start that is either a date (full day) or a date + time.
+    """Parse a start time, interpreted as Dutch local time.
 
-    Accepted forms (UTC):
-        'YYYY-MM-DD'            -> 00:00 that day (full-day meeting)
-        'YYYY-MM-DD HH:MM'
-        'YYYY-MM-DDTHH:MM[:SS][Z]'
+    Naive input is taken as Europe/Amsterdam local time, so `--date
+    "2026-09-21 15:00"` means 15:00 in the Netherlands (CEST/CET as
+    appropriate), not 15:00 UTC. An explicit UTC/offset form
+    (`...Z`, `...+02:00`) is respected as given.
     """
     s = s.strip()
-    dt = None
     # Full-day date only (no time component)
     try:
         dt = _dt.datetime.strptime(s, "%Y-%m-%d")
-        return dt.replace(tzinfo=_dt.timezone.utc)
+        return dt.replace(tzinfo=LOCAL_TZ)
     except ValueError:
         pass
-    # space-separated date + time
+    # space-separated date + time (local time)
     for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
         try:
             dt = _dt.datetime.strptime(s, fmt)
-            return dt.replace(tzinfo=_dt.timezone.utc)
+            return dt.replace(tzinfo=LOCAL_TZ)
         except ValueError:
             pass
-    # ISO date/time (handles trailing Z)
+    # ISO date/time (handles trailing Z and explicit offsets)
     if s.endswith(("Z", "z")):
         s = s[:-1] + "+00:00"
     try:
         dt = _dt.datetime.fromisoformat(s)
     except ValueError:
-        dt = None
-    if dt is not None:
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=_dt.timezone.utc)
-        return dt.astimezone(_dt.timezone.utc)
-    raise ValueError(f"could not parse meeting date: '{s}'")
+        raise ValueError(f"could not parse meeting date: '{s}'")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=LOCAL_TZ)
+    return dt
 
 
 ALL_DAY = "FULL_DAY"
@@ -129,8 +133,9 @@ def main() -> int:
         "--date",
         required=True,
         help="Meeting start date; a bare date '2026-09-21' is a full-day "
-             "meeting starting 00:00 UTC, or give a time "
-             "'2026-09-21 15:00' / '2026-09-21T15:00:00Z'.",
+             "meeting starting 00:00 Europe/Amsterdam, or give a time in "
+             "Dutch local time '2026-09-21 15:00' (or an explicit UTC/offset "
+             "form '2026-09-21T15:00:00Z').",
     )
     ap.add_argument(
         "--duration",
@@ -153,9 +158,9 @@ def main() -> int:
     if not title:
         ap.error("--title must not be empty")
 
-    meeting_end = meeting_start + _dt.timedelta(seconds=duration_secs)
-    start = meeting_start
-    expires = meeting_end  # room valid from creation until meeting end
+    start = meeting_start.astimezone(_dt.timezone.utc)
+    expires = start + _dt.timedelta(seconds=duration_secs)
+    local_end = expires.astimezone(LOCAL_TZ)
 
     hostname = os.environ.get("MEET_HOSTNAME") or "meet"
     admin_user = os.environ.get("MEET_ADMIN_USERNAME") or ""
@@ -204,7 +209,9 @@ def main() -> int:
     meet_url = f"https://{hostname}/group/{room}/"
     desc_lines = [
         title,
-        f"When: {start.strftime('%A %d %B %Y')} {start:%H:%M} - {expires:%H:%M} (UTC)",
+        f"When: {meeting_start.strftime('%A %d %B %Y')} "
+        f"{meeting_start:%H:%M}-{local_end:%H:%M} {meeting_start.tzname()} "
+        f"({start:%H:%M}-{expires:%H:%M} UTC)",
         "",
         f"Join the meeting: {meet_url}",
         "",
