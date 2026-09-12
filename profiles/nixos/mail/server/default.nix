@@ -355,18 +355,24 @@ in
 
         install -d -m 0755 -o root -g root /var/dkim
 
-        found=0
-        for key in /var/dkim/*.key; do
-          [ -e "$key" ] || continue
-          found=1
-          chown rspamd:rspamd "$key"
-          chmod 0400 "$key"
-        done
+        # One DKIM key pair is shared by every hosted domain (the published
+        # mail._domainkey records are identical). Migrate an existing
+        # per-domain key to the shared name if needed.
+        if [ ! -e /var/dkim/mail.key ]; then
+          for key in /var/dkim/*.mail.key; do
+            [ -e "$key" ] || continue
+            cp -a "$key" /var/dkim/mail.key
+            break
+          done
+        fi
 
-        if [ "$found" -eq 0 ]; then
+        if [ ! -e /var/dkim/mail.key ]; then
           echo "rspamd: no DKIM key found in /var/dkim" >&2
           exit 1
         fi
+
+        chown rspamd:rspamd /var/dkim/mail.key
+        chmod 0400 /var/dkim/mail.key
       '';
     };
 
@@ -527,7 +533,7 @@ in
         allow_username_mismatch = true;
 
         selector = "mail";
-        path = "/var/dkim/$domain.$selector.key";
+        path = "/var/dkim/mail.key";
       '';
 
       locals."dmarc.conf".text = ''
