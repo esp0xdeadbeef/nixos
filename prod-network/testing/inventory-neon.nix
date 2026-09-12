@@ -1,5 +1,6 @@
+{ hostName ? "s-router-neon" }:
 let
-  prodHost = "s-router-neon";
+  prodHost = hostName;
   externalIspHost = "external-isp";
   dnsRuntime = import ./dns-runtime-addresses.nix;
   nodeName = shortName: "esp0xdeadbeef-neon-${shortName}";

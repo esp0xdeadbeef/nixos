@@ -1,5 +1,6 @@
+{ hostName ? "s-router-cobalt" }:
 let
-  prodHost = "s-router-cobalt";
+  prodHost = hostName;
   dnsRuntime = import ./dns-runtime-addresses-cobalt.nix;
   nodeName = shortName: "esp0xdeadbeef-cobalt-${shortName}";
 

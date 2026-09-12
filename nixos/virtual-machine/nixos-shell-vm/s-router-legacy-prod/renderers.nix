@@ -21,11 +21,18 @@ let
   intentPath = "${modelSource}/${intentFileName}";
   inventoryPath = "${modelSource}/${inventoryFileName}";
 
+  # The inventory model is a function of the deployment host so the model does
+  # not hardcode which router renders it. Apply this router's hostName and
+  # hand the CPM the resolved attrset via a store file (its path loader would
+  # otherwise call the function with an empty argument set).
+  inventory = import inventoryPath { inherit hostName; };
+  inventoryExport = builtins.toFile "inventory.json" (builtins.toJSON inventory);
+
   cpmLib = controlPlaneModelInput.libBySystem.${system};
 
   cpmBuilt = cpmLib.compileAndBuildFromPaths {
     inputPath = intentPath;
-    inherit inventoryPath;
+    inventoryPath = inventoryExport;
   };
   cpmForRenderer = controlPlaneTransform cpmBuilt;
 
@@ -146,7 +153,6 @@ let
 
   providerContracts =
     let
-      inventory = import inventoryPath;
       entries = lib.concatMap
         (enterpriseName:
           let sites = inventory.controlPlane.sites.${enterpriseName} or { };
@@ -168,7 +174,6 @@ let
 
   wgInventory =
     let
-      inventory = import inventoryPath;
       entries = lib.concatMap
         (enterpriseName:
           let sites = inventory.controlPlane.sites.${enterpriseName} or { };
@@ -193,8 +198,7 @@ let
   renderer-contract = {
     inherit canonicalBundle controlPlaneArtifact render-nixos;
     cpm = cpmForRenderer;
-    inventory = import inventoryPath;
-    inherit intentPath inventoryPath;
+    inherit inventory intentPath inventoryPath;
   };
 in
 {
