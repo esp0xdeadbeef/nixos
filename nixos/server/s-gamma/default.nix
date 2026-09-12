@@ -30,6 +30,7 @@ in
     ./cert.nix
     ./dns.nix
     ./hardware.nix
+    ./health.nix
     ./mail.nix
     ./meet.nix
     ./ssh.nix

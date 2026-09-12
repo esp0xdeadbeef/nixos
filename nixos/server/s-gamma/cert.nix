@@ -253,6 +253,7 @@ let
             --http.port ":80" \
             "''${domain_args[@]}" \
             renew \
+            --reuse-key \
             --days 99999 \
             --ari-disable \
             --no-random-sleep \
@@ -263,7 +264,8 @@ let
             --http \
             --http.port ":80" \
             "''${domain_args[@]}" \
-            run
+            run \
+            --private-key "$cert_key"
         else
           lego \
             --path "$lego_dir" \

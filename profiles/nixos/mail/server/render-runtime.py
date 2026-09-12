@@ -83,9 +83,10 @@ def apply_mailbox_aliases(
     catchall_password_hash: str,
     catchall_owner_home: str,
     mailbox_aliases: str,
+    primary_logins: set[str],
+    passwd_entries: dict[str, str],
     valias: Path,
     vaccounts_raw: Path,
-    passwd_file: Path,
     valias_domains_raw: Path,
 ) -> None:
     if not mailbox_aliases:
@@ -96,26 +97,30 @@ def apply_mailbox_aliases(
             continue
 
         alias_localpart, _, targets = alias_spec.partition("=")
+        alias_address = expand_address(domain, alias_localpart)
+
+        # A real account must not be shadowed by an alias: Postfix checks
+        # virtual_alias_maps before virtual_mailbox_maps, so an alias for an
+        # account hides the mailbox and duplicates the Dovecot passwd login.
+        if alias_address in primary_logins:
+            continue
 
         # Fall back to catchall if no explicit targets
         if not targets or targets == alias_spec:
             if not catchall_password_hash:
                 continue
             catchall_addr = expand_address(first_domain, catchall_target)
-            alias_address = expand_address(domain, alias_localpart)
             write_address_domain(alias_address, valias_domains_raw)
-            with open(valias, "a") as va, open(vaccounts_raw, "a") as vr, open(
-                passwd_file, "a"
-            ) as pf:
+            with open(valias, "a") as va, open(vaccounts_raw, "a") as vr:
                 va.write(f"{alias_address} {catchall_addr}\n")
                 vr.write(f"{alias_address} {catchall_addr}\n")
-                pf.write(
-                    f"{alias_address}:{catchall_password_hash}::::"
-                    f"{catchall_owner_home}::mail=maildir:{catchall_owner_home}/mail\n"
-                )
+            passwd_entries.setdefault(
+                alias_address,
+                f"{alias_address}:{catchall_password_hash}::::"
+                f"{catchall_owner_home}::mail=maildir:{catchall_owner_home}/mail",
+            )
         else:
             # Comma-separated targets -> Postfix recipient list
-            alias_address = expand_address(domain, alias_localpart)
             write_address_domain(alias_address, valias_domains_raw)
 
             expanded: list[str] = []
@@ -190,6 +195,10 @@ def main() -> None:
         f.write_text("")
 
     first_domain = ""
+    canonical_domain = ""
+    canonical_mail_host = ""
+    primary_logins: set[str] = set()
+    passwd_entries: dict[str, str] = {}
 
     with open(args.mailbox_set_env_list) as msel:
         for line in msel:
@@ -206,6 +215,11 @@ def main() -> None:
             account_ids = os.environ.pop("MAILBOX_ACCOUNTS", "")
             catchall_target = os.environ.pop("MAILBOX_CATCHALL", "")
             mailbox_aliases_str = os.environ.pop("MAILBOX_ALIASES", "")
+            mail_host = os.environ.pop("MAILBOX_MAIL_HOST", "")
+            is_default_set = bool(
+                os.environ.pop("MAILBOX_DEFAULT_ACCOUNT", "")
+                or os.environ.pop("MAILBOX_DEFAULT_ADDRESS", "")
+            )
 
             if not domain:
                 die(f"mailbox set is missing MAILBOX_DOMAIN: {mailbox_set_path}")
@@ -213,6 +227,9 @@ def main() -> None:
                 die(f"mailbox set is missing MAILBOX_ACCOUNTS: {mailbox_set_path}")
             if not first_domain:
                 first_domain = domain
+            if is_default_set and not canonical_domain:
+                canonical_domain = domain
+                canonical_mail_host = mail_host or f"mail.{domain}"
 
             with open(vdomains_raw, "a") as f:
                 f.write(f"{domain}\n")
@@ -257,28 +274,28 @@ def main() -> None:
                 )
                 password_hash = result.stdout.strip()
 
-                with open(vmailbox, "a") as vm, open(vaccounts_raw, "a") as vr, open(
-                    passwd_file, "a"
-                ) as pf:
+                with open(vmailbox, "a") as vm, open(vaccounts_raw, "a") as vr:
                     vm.write(f"{address} {address}\n")
                     vr.write(f"{address} {address}\n")
-                    pf.write(f"{address}:{password_hash}::::::\n")
+                passwd_entries[address] = f"{address}:{password_hash}::::::"
+                primary_logins.add(address)
 
                 for alias in aliases_str.replace(",", " ").split():
                     alias = alias.strip()
                     if not alias:
                         continue
                     alias_address = expand_address(domain, alias)
+                    if alias_address in primary_logins:
+                        continue
                     write_address_domain(alias_address, valias_domains_raw)
-                    with open(valias, "a") as va, open(vaccounts_raw, "a") as vr, open(
-                        passwd_file, "a"
-                    ) as pf:
+                    with open(valias, "a") as va, open(vaccounts_raw, "a") as vr:
                         va.write(f"{alias_address} {address}\n")
                         vr.write(f"{alias_address} {address}\n")
-                        pf.write(
-                            f"{alias_address}:{password_hash}::::"
-                            f"{owner_home}::mail=maildir:{owner_home}/mail\n"
-                        )
+                    passwd_entries.setdefault(
+                        alias_address,
+                        f"{alias_address}:{password_hash}::::"
+                        f"{owner_home}::mail=maildir:{owner_home}/mail",
+                    )
 
                 if catchall_target:
                     catchall_check = expand_address(first_domain, catchall_target)
@@ -293,19 +310,33 @@ def main() -> None:
                 catchall_password_hash=catchall_password_hash,
                 catchall_owner_home=catchall_owner_home,
                 mailbox_aliases=mailbox_aliases_str,
+                primary_logins=primary_logins,
+                passwd_entries=passwd_entries,
                 valias=valias,
                 vaccounts_raw=vaccounts_raw,
-                passwd_file=passwd_file,
                 valias_domains_raw=valias_domains_raw,
             )
 
             if catchall_target:
                 catchall_address = expand_address(first_domain, catchall_target)
                 with open(valias, "a") as f:
+                    # Single inbox: every address in this domain is redirected to
+                    # the canonical account's mailbox (MAILBOX_CATCHALL).
                     f.write(f"@{domain} {catchall_address}\n")
 
     if not first_domain:
         die("no mailbox set domains were configured")
+
+    # Emit each Dovecot login once. Primary accounts win over aliases; this
+    # already happened for the aliases above, so a plain dict is enough here.
+    with open(passwd_file, "w") as pf:
+        for passwd_line in passwd_entries.values():
+            pf.write(f"{passwd_line}\n")
+
+    if not canonical_domain:
+        canonical_domain = first_domain
+    if not canonical_mail_host:
+        canonical_mail_host = os.environ.get("MAIL_FQDN") or f"mail.{canonical_domain}"
 
     # vdomains
     seen: set[str] = set()
@@ -413,13 +444,13 @@ def main() -> None:
             "-c",
             "/var/lib/postfix/conf",
             "-e",
-            f"myhostname = {os.environ['MAIL_FQDN']}",
-            f"mydomain = {first_domain}",
-            f"myorigin = {first_domain}",
+            f"myhostname = {canonical_mail_host}",
+            f"mydomain = {canonical_domain}",
+            f"myorigin = {canonical_domain}",
             f"smtp_bind_address = {os.environ['PUBLIC_IPV4']}",
             f"smtp_bind_address6 = {os.environ['WEB_IPV6']}",
-            f"smtp_helo_name = {os.environ['MAIL_FQDN']}",
-            f"smtpd_banner = {os.environ['MAIL_FQDN']} ESMTP",
+            f"smtp_helo_name = {canonical_mail_host}",
+            f"smtpd_banner = {canonical_mail_host} ESMTP",
             f"virtual_mailbox_domains = hash:{vdomains}",
             f"virtual_alias_domains = hash:{valias_domains}",
             f"virtual_mailbox_maps = hash:{vmailbox}",
