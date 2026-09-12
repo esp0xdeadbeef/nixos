@@ -307,6 +307,23 @@ Mail certificate hostnames are SOPS-driven. Set `MAIL_TLS_DOMAINS` in the mail
 server env secret when the mail certificate needs more names than `MAIL_FQDN`.
 `MAIL_ACME_EMAIL` is optional; it defaults to `postmaster@$MAIL_FQDN`.
 
+The outbound Postfix identity follows the single mailbox set carrying
+`MAILBOX_DEFAULT_ACCOUNT`/`MAILBOX_DEFAULT_ADDRESS`: that set's
+`MAILBOX_MAIL_HOST` is announced as `myhostname`, `smtp_helo_name` and
+`smtpd_banner`, and its `MAILBOX_DOMAIN` becomes `mydomain`/`myorigin`.
+`MAIL_FQDN` stays the ACME/primary name. Keep the reverse DNS (PTR) of the
+sending addresses aligned with that `MAILBOX_MAIL_HOST` so forward-confirmed
+reverse DNS (FCrDNS) passes for outbound mail.
+
+`MAILBOX_CATCHALL` redirects mail for addresses in that domain that are neither
+accounts nor explicit aliases to `<catchall>@<canonical-domain>`. Because
+Postfix checks `virtual_alias_maps` before `virtual_mailbox_maps`, the renderer
+emits an identity alias (`address address`) for every real account so the
+catch-all cannot shadow it; role aliases such as `abuse@` and unknown addresses
+still fall through to the catch-all. Mail for domains that are not hosted is
+rejected by `smtpd_relay_restrictions` (`reject_unauth_destination`), so the
+server is not an open relay.
+
 ## Module layout
 
 - `network.nix`: provider address SOPS env and runtime address setup
