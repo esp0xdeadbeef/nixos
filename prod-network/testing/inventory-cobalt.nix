@@ -15,11 +15,11 @@ let
   };
 
   p2pPort =
-    {
-      link,
-      adapterName,
-      bridge,
-      interfaceName,
+    { link
+    , adapterName
+    , bridge
+    , interfaceName
+    ,
     }:
     {
       inherit link adapterName;
@@ -30,10 +30,10 @@ let
     };
 
   uplinkPort =
-    {
-      uplink,
-      bridge,
-      interfaceName,
+    { uplink
+    , bridge
+    , interfaceName
+    ,
     }:
     {
       external = true;
@@ -45,12 +45,12 @@ let
     };
 
   tenantPort =
-    {
-      logicalInterface,
-      bridge,
-      interfaceName,
-      addr4 ? null,
-      addr6 ? null,
+    { logicalInterface
+    , bridge
+    , interfaceName
+    , addr4 ? null
+    , addr6 ? null
+    ,
     }:
     {
       inherit logicalInterface;
@@ -80,9 +80,9 @@ let
   };
 
   accessDns =
-    {
-      addresses,
-      localRecords ? [ ],
+    { addresses
+    , localRecords ? [ ]
+    ,
     }:
     {
       outgoingInterfaces = addresses;
@@ -167,17 +167,16 @@ let
       );
 
   dhcp4Advertisement =
-    {
-      tenant,
-      interface,
-      subnet,
-      poolStart,
-      poolEnd,
-      router,
-      leaseStatePath,
-      domain ? "clients.home.arpa.",
-      reservations ? null,
-      reservationSource ? null,
+    { tenant
+    , interface
+    , subnet
+    , poolStart
+    , poolEnd
+    , router
+    , leaseStatePath
+    , reservations ? null
+    , reservationSource ? null
+    ,
     }:
     {
       inherit interface;
@@ -189,36 +188,20 @@ let
       };
       inherit router;
       dnsServers = [ router ];
-      inherit domain;
       leaseState.path = leaseStatePath;
     }
     // (if reservations == null then { } else { inherit reservations; })
     // (if reservationSource == null then { } else { inherit reservationSource; });
 
-  slaacRa =
-    interface:
-    let
-      # tenant-<plane> -> <plane>.home.arpa. (the RFC 8375 search domain,
-      # not the legacy `lan.`)
-      tenant = builtins.substring 7 (builtins.stringLength interface - 7) interface;
-      plane =
-        if builtins.substring 0 7 tenant == "cobalt-" then
-          builtins.substring 7 (builtins.stringLength tenant - 7) tenant
-        else if builtins.substring 0 5 tenant == "neon-" then
-          builtins.substring 5 (builtins.stringLength tenant - 5) tenant
-        else
-          tenant;
-    in
-    {
-      enabled = true;
-      inherit interface;
-      rdnss = [ "router-self" ];
-      dnssl = [ "${plane}.home.arpa." ];
-      managed = false;
-      otherConfig = false;
-      onLink = true;
-      autonomous = true;
-    };
+  slaacRa = interface: {
+    enabled = true;
+    inherit interface;
+    rdnss = [ "router-self" ];
+    managed = false;
+    otherConfig = false;
+    onLink = true;
+    autonomous = true;
+  };
 
   coreUpstreamLink = "p2p-core-upstream-selector";
   coreVpnOnyxUpstreamLink = "p2p-core-vpn-onyx-upstream-selector";
@@ -598,7 +581,6 @@ let
             poolEnd = "10.2.30.200";
             router = "10.2.30.1";
             leaseStatePath = "/var/lib/kea/clients.leases";
-            domain = "clients.home.arpa.";
             reservations = reservationsFor "cobalt-clients";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
@@ -648,7 +630,6 @@ let
             poolEnd = "10.2.20.200";
             router = "10.2.20.1";
             leaseStatePath = "/var/lib/kea/svc.leases";
-            domain = "svc.home.arpa.";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
@@ -699,7 +680,6 @@ let
             poolEnd = "10.2.60.200";
             router = "10.2.60.1";
             leaseStatePath = "/var/lib/kea/dmz.leases";
-            domain = "dmz.home.arpa.";
           };
         };
 
@@ -748,7 +728,6 @@ let
             poolEnd = "10.2.51.200";
             router = "10.2.51.1";
             leaseStatePath = "/var/lib/kea/iot-srv.leases";
-            domain = "iot-srv.home.arpa.";
           };
         };
 
@@ -797,7 +776,6 @@ let
             poolEnd = "10.2.50.200";
             router = "10.2.50.1";
             leaseStatePath = "/var/lib/kea/iot.leases";
-            domain = "iot.home.arpa.";
             reservations = reservationsFor "cobalt-iot";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
@@ -848,7 +826,6 @@ let
             poolEnd = "10.2.31.200";
             router = "10.2.31.1";
             leaseStatePath = "/var/lib/kea/clients-vpn.leases";
-            domain = "clients-vpn.home.arpa.";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
@@ -896,7 +873,6 @@ let
             poolEnd = "10.2.90.200";
             router = "10.2.90.1";
             leaseStatePath = "/var/lib/kea/unlock.leases";
-            domain = "unlock.home.arpa.";
           };
         };
 
@@ -945,7 +921,6 @@ let
             poolEnd = "10.2.10.200";
             router = "10.2.10.1";
             leaseStatePath = "/var/lib/kea/mgmt.leases";
-            domain = "mgmt.home.arpa.";
           };
         };
 
@@ -1208,17 +1183,21 @@ in
 
   realization = {
     fabricLinks = {
-      "${nodeName "downstream-selector"}" = builtins.mapAttrs (_: port: {
-        kind = "selector-fabric-link";
-        link = port.link;
-        transport.hostFacing = false;
-      }) downstreamSelector.ports;
+      "${nodeName "downstream-selector"}" = builtins.mapAttrs
+        (_: port: {
+          kind = "selector-fabric-link";
+          link = port.link;
+          transport.hostFacing = false;
+        })
+        downstreamSelector.ports;
 
-      "${nodeName "upstream-selector"}" = builtins.mapAttrs (_: port: {
-        kind = "selector-fabric-link";
-        link = port.link;
-        transport.hostFacing = false;
-      }) upstreamSelector.ports;
+      "${nodeName "upstream-selector"}" = builtins.mapAttrs
+        (_: port: {
+          kind = "selector-fabric-link";
+          link = port.link;
+          transport.hostFacing = false;
+        })
+        upstreamSelector.ports;
     };
 
     nodes = {

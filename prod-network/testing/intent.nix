@@ -190,6 +190,7 @@ in
         {
           kind = "tenant";
           name = "vlan2";
+          dnsDomain = "lan.";
           ipv4 = "192.168.1.0/24";
           ipv6 = "fd42:1::/64";
           routedPrefixes = [
@@ -199,6 +200,7 @@ in
         {
           kind = "tenant";
           name = "vlan3";
+          dnsDomain = "lan.";
           ipv4 = "192.168.3.0/24";
           ipv6 = "fd42:dead:beef:3::/64";
           routedPrefixes = [
@@ -208,6 +210,7 @@ in
         {
           kind = "tenant";
           name = "vlan7";
+          dnsDomain = "lan.";
           ipv4 = "192.168.2.0/24";
           ipv6 = "fd42:dead:beef:7::/64";
           routedPrefixes = [
@@ -217,6 +220,7 @@ in
         {
           kind = "tenant";
           name = "vlan8";
+          dnsDomain = "lan.";
           ipv4 = "192.168.8.0/24";
           ipv6 = "fd42:dead:beef:8::/64";
           routedPrefixes = [
@@ -226,42 +230,49 @@ in
         {
           kind = "tenant";
           name = "neon-mgmt";
+          dnsDomain = "mgmt.home.arpa.";
           ipv4 = "10.3.10.0/24";
           ipv6 = "fd42:dead:beef:310::/64";
         }
         {
           kind = "tenant";
           name = "neon-svc";
+          dnsDomain = "svc.home.arpa.";
           ipv4 = "10.3.20.0/24";
           ipv6 = "fd42:dead:beef:320::/64";
         }
         {
           kind = "tenant";
           name = "neon-clients";
+          dnsDomain = "clients.home.arpa.";
           ipv4 = "10.3.30.0/24";
           ipv6 = "fd42:dead:beef:330::/64";
         }
         {
           kind = "tenant";
           name = "neon-iot";
+          dnsDomain = "iot.home.arpa.";
           ipv4 = "10.3.50.0/24";
           ipv6 = "fd42:dead:beef:350::/64";
         }
         {
           kind = "tenant";
           name = "neon-iot-srv";
+          dnsDomain = "iot-srv.home.arpa.";
           ipv4 = "10.3.51.0/24";
           ipv6 = "fd42:dead:beef:351::/64";
         }
         {
           kind = "tenant";
           name = "neon-dmz";
+          dnsDomain = "dmz.home.arpa.";
           ipv4 = "10.3.60.0/24";
           ipv6 = "fd42:dead:beef:360::/64";
         }
         {
           kind = "tenant";
           name = "neon-unlock";
+          dnsDomain = "unlock.home.arpa.";
           ipv4 = "10.3.90.0/24";
           ipv6 = "fd42:dead:beef:390::/64";
         }
@@ -2045,48 +2056,56 @@ in
         {
           kind = "tenant";
           name = "cobalt-svc";
+          dnsDomain = "svc.home.arpa.";
           ipv4 = "10.2.20.0/24";
           ipv6 = "fd42:dead:beef:220::/64";
         }
         {
           kind = "tenant";
           name = "cobalt-clients";
+          dnsDomain = "clients.home.arpa.";
           ipv4 = "10.2.30.0/24";
           ipv6 = "fd42:dead:beef:230::/64";
         }
         {
           kind = "tenant";
           name = "cobalt-iot";
+          dnsDomain = "iot.home.arpa.";
           ipv4 = "10.2.50.0/24";
           ipv6 = "fd42:dead:beef:250::/64";
         }
         {
           kind = "tenant";
           name = "cobalt-iot-srv";
+          dnsDomain = "iot-srv.home.arpa.";
           ipv4 = "10.2.51.0/24";
           ipv6 = "fd42:dead:beef:251::/64";
         }
         {
           kind = "tenant";
           name = "cobalt-dmz";
+          dnsDomain = "dmz.home.arpa.";
           ipv4 = "10.2.60.0/24";
           ipv6 = "fd42:dead:beef:260::/64";
         }
         {
           kind = "tenant";
           name = "cobalt-clients-vpn";
+          dnsDomain = "clients-vpn.home.arpa.";
           ipv4 = "10.2.31.0/24";
           ipv6 = "fd42:dead:beef:231::/64";
         }
         {
           kind = "tenant";
           name = "cobalt-unlock";
+          dnsDomain = "unlock.home.arpa.";
           ipv4 = "10.2.90.0/24";
           ipv6 = "fd42:dead:beef:290::/64";
         }
         {
           kind = "tenant";
           name = "cobalt-mgmt";
+          dnsDomain = "mgmt.home.arpa.";
           ipv4 = "10.2.10.0/24";
           ipv6 = "fd42:dead:beef:210::/64";
         }

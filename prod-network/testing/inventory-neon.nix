@@ -193,7 +193,6 @@ let
     , poolEnd
     , router
     , leaseStatePath
-    , domain ? "lan."
     , reservationSource ? null
     , reservations ? null
     ,
@@ -208,38 +207,20 @@ let
       };
       inherit router;
       dnsServers = [ router ];
-      inherit domain;
       leaseState.path = leaseStatePath;
     }
     // (if reservationSource == null then { } else { inherit reservationSource; })
     // (if reservations == null then { } else { inherit reservations; });
 
-  slaacRa = interface:
-    let
-      tenant = builtins.substring 7 (builtins.stringLength interface - 7) interface;
-      plane =
-        if builtins.substring 0 7 tenant == "cobalt-" then
-          builtins.substring 7 (builtins.stringLength tenant - 7) tenant
-        else if builtins.substring 0 5 tenant == "neon-" then
-          builtins.substring 5 (builtins.stringLength tenant - 5) tenant
-        else
-          tenant;
-      # The legacy tenant VLANs keep the lan. local namespace shared with
-      # their DHCPv4 domain-name and Unbound local-zone. Only the plane-named
-      # lanes (neon-*, cobalt-*) advertise a home.arpa. search domain.
-      legacyLanTenant = builtins.elem tenant [ "vlan2" "vlan3" "vlan7" "vlan8" ];
-      dnsSearchDomain = if legacyLanTenant then "lan." else "${plane}.home.arpa.";
-    in
-    {
-      enabled = true;
-      inherit interface;
-      rdnss = [ "router-self" ];
-      dnssl = [ dnsSearchDomain ];
-      managed = false;
-      otherConfig = false;
-      onLink = true;
-      autonomous = true;
-    };
+  slaacRa = interface: {
+    enabled = true;
+    inherit interface;
+    rdnss = [ "router-self" ];
+    managed = false;
+    otherConfig = false;
+    onLink = true;
+    autonomous = true;
+  };
 
   pppoeCredentials = {
     usernameFile = "/run/secrets/pppoe-username";
@@ -993,7 +974,6 @@ let
             poolEnd = "10.3.30.200";
             router = "10.3.30.1";
             leaseStatePath = "/var/lib/kea/clients.leases";
-            domain = "clients.home.arpa.";
             reservations = reservationsFor "neon-clients";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
@@ -1044,7 +1024,6 @@ let
             poolEnd = "10.3.20.200";
             router = "10.3.20.1";
             leaseStatePath = "/var/lib/kea/svc.leases";
-            domain = "svc.home.arpa.";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
@@ -1092,7 +1071,6 @@ let
             poolEnd = "10.3.60.200";
             router = "10.3.60.1";
             leaseStatePath = "/var/lib/kea/dmz.leases";
-            domain = "dmz.home.arpa.";
           };
         };
 
@@ -1141,7 +1119,6 @@ let
             poolEnd = "10.3.51.200";
             router = "10.3.51.1";
             leaseStatePath = "/var/lib/kea/iot-srv.leases";
-            domain = "iot-srv.home.arpa.";
           };
         };
 
@@ -1190,7 +1167,6 @@ let
             poolEnd = "10.3.50.200";
             router = "10.3.50.1";
             leaseStatePath = "/var/lib/kea/iot.leases";
-            domain = "iot.home.arpa.";
             reservations = reservationsFor "neon-iot";
             reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
@@ -1239,7 +1215,6 @@ let
             poolEnd = "10.3.90.200";
             router = "10.3.90.1";
             leaseStatePath = "/var/lib/kea/unlock.leases";
-            domain = "unlock.home.arpa.";
           };
         };
 
@@ -1288,7 +1263,6 @@ let
             poolEnd = "10.3.10.200";
             router = "10.3.10.1";
             leaseStatePath = "/var/lib/kea/mgmt.leases";
-            domain = "mgmt.home.arpa.";
           };
         };
 
