@@ -2,9 +2,10 @@
 
 # Dedicated 2.4GHz AP VM for the ALFA AWUS036NHA (rt2800usb, 148f:3070). The
 # device is passed through via USB; this VM bridges the unlock (VLAN 90),
-# mgmt (VLAN 10) and clients (VLAN 30) WiFi clients onto the cobalt LAN trunk.
-# The clients BSS reuses the same SSID/PSK/SAE as the Nighthawk's 5GHz BSS, so
-# a client sees one SSID on both bands across the two radios.
+# mgmt (VLAN 10), clients (VLAN 30) and clients-vpn (VLAN 31) WiFi clients onto
+# the cobalt LAN trunk. The clients/clients-vpn BSSes reuse the same
+# SSID/PSK/SAE as the Nighthawk's 5GHz BSSes, so a client sees one SSID on both
+# bands across the two radios.
 let
   hostName = "s-ap-alfa";
 in
@@ -59,6 +60,13 @@ in
       };
       vlanConfig.Id = 30;
     };
+    "10-clients-vpn" = {
+      netdevConfig = {
+        Name = "clients-vpn";
+        Kind = "vlan";
+      };
+      vlanConfig.Id = 31;
+    };
     "20-ap-unlock" = {
       netdevConfig = {
         Name = "ap-unlock";
@@ -77,6 +85,12 @@ in
         Kind = "bridge";
       };
     };
+    "20-ap-clients-vpn" = {
+      netdevConfig = {
+        Name = "ap-clients-vpn";
+        Kind = "bridge";
+      };
+    };
   };
 
   systemd.network.networks = {
@@ -86,6 +100,7 @@ in
         "mgmt"
         "unlock"
         "clients"
+        "clients-vpn"
       ];
       linkConfig.RequiredForOnline = false;
     };
@@ -110,12 +125,22 @@ in
       linkConfig.RequiredForOnline = false;
     };
 
+    "10-clients-vpn" = {
+      matchConfig.Name = "clients-vpn";
+      networkConfig.Bridge = "ap-clients-vpn";
+      linkConfig.RequiredForOnline = false;
+    };
+
     "20-ap-unlock" = {
       matchConfig.Name = "ap-unlock";
       networkConfig = { };
     };
     "20-ap-clients" = {
       matchConfig.Name = "ap-clients";
+      networkConfig = { };
+    };
+    "20-ap-clients-vpn" = {
+      matchConfig.Name = "ap-clients-vpn";
       networkConfig = { };
     };
     "20-ap-mgmt" = {
