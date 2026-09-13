@@ -8,6 +8,9 @@
 let
   hostName = builtins.baseNameOf (builtins.dirOf __curPos.file);
   keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
+  # Public keys of the dedicated remote-builder identities for the hosts allowed
+  # to offload builds to this builder (see profiles.nixos.nix.remote-builder-client).
+  remoteBuilderKeyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/remote-builder/${host}.pub");
 in
 {
   imports = [
@@ -28,6 +31,7 @@ in
     profiles.nixos.users.deadbeef-sops
     profiles.nixos.users.sudo-nopasswd
     profiles.nixos.nix.remote-builder-client
+    profiles.nixos.nix.remote-builder-server
 
     inputs.disko.nixosModules.disko
     inputs.sops-nix.nixosModules.sops
@@ -67,6 +71,30 @@ in
   };
 
   networking.hostName = hostName;
+
+  local.nix.remoteBuilderServer = {
+    enable = true;
+    # l-portal is the fleet's native aarch64 builder (ThinkPad X13s, Snapdragon
+    # 8cx Gen 3). No binfmt: it serves aarch64 directly. It is the weakest host
+    # (8 cores, 14 GiB, passively cooled), so it is capped to ~2 build cores.
+    clients = {
+      l-envil.key = remoteBuilderKeyFor "l-envil";
+      l-esp.key = remoteBuilderKeyFor "l-esp";
+      s-gamma.key = remoteBuilderKeyFor "s-gamma";
+      s-sigma.key = remoteBuilderKeyFor "s-sigma";
+      s-tau.key = remoteBuilderKeyFor "s-tau";
+    };
+  };
+
+  local.nix.remoteBuilderClient.excludeBuilders = [ "l-portal-builder" ];
+
+  # Limit the daemon to ~2 build cores: at most 2 concurrent single-core jobs
+  # for local and offloaded builds alike, leaving the rest of the SoC free for
+  # the portal's own duties.
+  nix.settings = {
+    max-jobs = 2;
+    cores = 1;
+  };
   networking.networkmanager.enable = true;
   services.udev.extraRules =
     let
