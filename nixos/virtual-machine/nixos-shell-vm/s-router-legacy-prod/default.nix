@@ -49,6 +49,7 @@ in
     (import ./renderers.nix {
       inherit
         inputs
+        relativeRepo
         lib
         modelSource
         ;
