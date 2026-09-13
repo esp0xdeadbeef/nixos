@@ -1,4 +1,4 @@
-{ hostName ? "s-router-prod" }:
+{ hostName ? "s-router-neon" }:
 let
   prodHost = hostName;
   externalIspHost = "external-isp";

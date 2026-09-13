@@ -158,18 +158,18 @@
     # Frozen legacy production stack: the previous s-router-prod render
     # (prod-network/current), retained as s-router-legacy-prod.
     network-compiler-legacy-prod = {
-      url = "github:esp0xdeadbeef/network-compiler/6c513bbc4cb0d5f73690d4164a92a01544e90c2e";
+      url = "github:esp0xdeadbeef/network-compiler/f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-forwarding-model-legacy-prod = {
-      url = "github:esp0xdeadbeef/network-forwarding-model/1136741a313e3b8b0d5433dcf7fec4984d2a6619";
+      url = "github:esp0xdeadbeef/network-forwarding-model/5f6a6cd12a68650fc9fb920981ecf0d2f5dd8f73";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-legacy-prod";
     };
 
     network-control-plane-model-legacy-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/6f0bbc650470637cd8d1c4962c3f6f4a45f21b4e";
+      url = "github:esp0xdeadbeef/network-control-plane-model/5f32cfe04b25e1619a12cd24365ac9165a648c8c";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-legacy-prod";
     };
@@ -186,12 +186,12 @@
     };
 
     nixos-network-compiler-legacy-prod = {
-      url = "github:esp0xdeadbeef/nixos-network-compiler/6c513bbc4cb0d5f73690d4164a92a01544e90c2e";
+      url = "github:esp0xdeadbeef/nixos-network-compiler/f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-renderer-nixos-legacy-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/7264bd5b68b41dbfc701be47684e31ed033f4a4d";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/d78c529e95127bef2b19f990c1dd6faadc22f3e5";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-legacy-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-legacy-prod";

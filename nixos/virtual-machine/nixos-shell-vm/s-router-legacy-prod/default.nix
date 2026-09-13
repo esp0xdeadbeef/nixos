@@ -7,7 +7,7 @@
 , ...
 }:
 let
-  hostName = "s-router-prod";
+  hostName = "s-router-legacy-prod";
   modelSource = relativeRepo.sourcePath "prod-network/current";
   deviceDir = relativeRepo.sourcePath "prod-network/current/secrets/devices";
   deviceIds =
@@ -26,7 +26,7 @@ in
   _module.args.sRouterProdProfile = {
     inherit modelSource;
     labSelector = null;
-    productionSelector = "s-router-prod";
+    productionSelector = hostName;
   };
 
   networking.hostName = lib.mkForce hostName;
@@ -53,15 +53,15 @@ in
         modelSource
         ;
 
-      hostName = "s-router-prod";
+      hostName = hostName;
       # s-router-legacy-prod is the previous pinned production render of the
       # neon site (prod-network/current): it consumes the -legacy-prod
       # network-* inputs in flake.lock.
       controlPlaneModelInput = inputs.network-control-plane-model-legacy-prod;
       networkRealizationModelInput = inputs.network-realization-model-legacy-prod;
       nixosRendererInput = inputs.network-renderer-nixos-legacy-prod;
-      intentFileName = "intent.nix";
-      inventoryFileName = "inventory.nix";
+      intentFileName = "intent-neon.nix";
+      inventoryFileName = "inventory-neon.nix";
       system = "x86_64-linux";
       selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-legacy-prod/default.nix";
     })
@@ -69,14 +69,13 @@ in
 
   system.stateVersion = lib.mkForce "26.05";
 
-  # Per-device protected DHCP reservations (MACs). Encrypted to l-esp,
-  # s-router-cobalt, s-router-prod, and s-router-neon; bound into the access
-  # containers so kea can serve the static vlan2 leases without the legacy
-  # full-lease JSON exports.
+  # Per-device protected DHCP reservations (MACs). Encrypted to l-esp and
+  # s-router-legacy-prod; bound into the access containers so kea can serve
+  # the static vlan2 leases without the legacy full-lease JSON exports.
   sops.secrets = lib.listToAttrs (
     map
       (id: {
-        name = "prod-device-${id}";
+        name = "legacy-device-${id}";
         value = {
           sopsFile = "${deviceDir}/${id}.sops.yaml";
           key = "mac";
@@ -92,7 +91,7 @@ in
       (id: {
         name = "/run/secrets/devices/${id}";
         value = {
-          hostPath = config.sops.secrets."prod-device-${id}".path;
+          hostPath = config.sops.secrets."legacy-device-${id}".path;
           isReadOnly = true;
         };
       })
@@ -104,7 +103,7 @@ in
       (id: {
         name = "/run/secrets/devices/${id}";
         value = {
-          hostPath = config.sops.secrets."prod-device-${id}".path;
+          hostPath = config.sops.secrets."legacy-device-${id}".path;
           isReadOnly = true;
         };
       })
