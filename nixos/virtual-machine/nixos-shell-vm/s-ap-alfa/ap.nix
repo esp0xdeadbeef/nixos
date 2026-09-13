@@ -59,11 +59,14 @@ let
     used=/run/ap/used-ssids
     rm -f "$used"
     # Derive clients first (empty dedupe file) so it matches the Nighthawk's
-    # 5GHz cobalt-clients SSID exactly, then the ALFA-local mgmt plane.
+    # 5GHz cobalt-clients SSID exactly, then clients-vpn (same order as the
+    # Nighthawk), then the ALFA-local mgmt plane.
     ssid_clients=$(${deriveSsid} "$seed" cobalt-clients ${ssidList} "$used")
+    ssid_cvpn=$(${deriveSsid} "$seed" cobalt-clients-vpn ${ssidList} "$used")
     ssid_unlock=$("$YQ" -r '.cobalt-unlock.ssid' "$SEC")
     ssid_mgmt=$(${deriveSsid} "$seed" cobalt-mgmt ${ssidList} "$used")
     pass_clients=$("$YQ" -r '.cobalt-clients.psk' "$SEC")
+    pass_cvpn=$("$YQ" -r '.cobalt-clients-vpn.psk' "$SEC")
     pass_unlock=$("$YQ" -r '.cobalt-unlock.psk' "$SEC")
     pass_mgmt=$("$YQ" -r '.cobalt-mgmt.psk' "$SEC")
 
@@ -119,12 +122,31 @@ let
     ieee80211w=2
     bridge=ap-clients
     EOF
+    cat > /run/ap/${wifiIf}-3.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${wifiIf}-3
+    driver=nl80211
+    ssid=$ssid_cvpn
+    hw_mode=g
+    channel=$ch
+    wmm_enabled=1
+    country_code=NL
+    wpa=2
+    wpa_key_mgmt=SAE
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass_cvpn
+    ieee80211w=2
+    bridge=ap-clients-vpn
+    EOF
   '';
 
   apVaps = [
     { iface = wifiIf; bridge = "ap-unlock"; }
     { iface = "${wifiIf}-1"; bridge = "ap-mgmt"; }
     { iface = "${wifiIf}-2"; bridge = "ap-clients"; }
+    { iface = "${wifiIf}-3"; bridge = "ap-clients-vpn"; }
   ];
   mkApUnit =
     vap: {
@@ -198,6 +220,13 @@ in
             break
           fi
           ${pkgs.iw}/bin/iw phy "$phy" interface add ${wifiIf}-2 type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${wifiIf}-3 ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$phy" interface add ${wifiIf}-3 type __ap 2>/dev/null || true
           sleep 1
         done
         for _ in $(seq 1 30); do
