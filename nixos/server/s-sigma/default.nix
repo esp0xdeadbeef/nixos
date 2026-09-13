@@ -30,13 +30,12 @@ in
     enable = true;
     emulateSystems = [ "aarch64-linux" ];
     clients = {
-      # TODO: commit l-esp's id_remote-builder.pub when it is back online.
       l-envil.key = remoteBuilderKeyFor "l-envil";
+      l-esp.key = remoteBuilderKeyFor "l-esp";
       l-portal.key = remoteBuilderKeyFor "l-portal";
       s-gamma.key = remoteBuilderKeyFor "s-gamma";
       # Peer servers rebuild each other, so each trusts the other's remote-builder identity.
       s-tau.key = remoteBuilderKeyFor "s-tau";
-      # l-esp.key = remoteBuilderKeyFor "l-esp";
     };
   };
 

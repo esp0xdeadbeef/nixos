@@ -53,12 +53,11 @@ in
     # l-envil is an x86_64 laptop and intentionally does not emulate aarch64
     # here; aarch64 offloads stay on the dedicated s-sigma/s-tau builders.
     clients = {
+      l-esp.key = remoteBuilderKeyFor "l-esp";
       l-portal.key = remoteBuilderKeyFor "l-portal";
       s-gamma.key = remoteBuilderKeyFor "s-gamma";
       s-sigma.key = remoteBuilderKeyFor "s-sigma";
       s-tau.key = remoteBuilderKeyFor "s-tau";
-      # TODO: commit l-esp's id_remote-builder.pub when it is back online.
-      # l-esp.key = remoteBuilderKeyFor "l-esp";
     };
   };
 
