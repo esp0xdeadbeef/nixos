@@ -512,19 +512,22 @@ in
           returnBehavior = "symmetric";
         }
         {
-          # VLAN 3's local resolver may query only VLAN 2's DNS service. The
-          # resolver runtime narrows this further to the lan. namespaces, and
-          # VLAN 2 serves this source with refuse_non_local so it cannot borrow
-          # VLAN 2's recursive path to core/the Internet.
-          id = "allow-vlan3-dns-to-vlan2-dns";
+          # VLAN 2's resolver may query only VLAN 3's DNS service for the
+          # shared lan. namespace. The resolver runtime narrows this further to
+          # that namespace, and VLAN 3 serves this source with refuse_non_local
+          # so VLAN 2 cannot borrow VLAN 3's recursive path to core/the
+          # Internet. VLAN 3 owns the lan. records (192.168.3.x endpoints), so
+          # it is the namespace authority; VLAN 2 resolves them through the
+          # canonical staged path rather than holding a copy.
+          id = "allow-vlan2-dns-to-vlan3-dns";
           priority = 79;
           from = {
             kind = "service";
-            name = "vlan3-dns";
+            name = "vlan2-dns";
           };
           to = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "vlan3-dns";
           };
           trafficType = "dns";
           action = "allow";
