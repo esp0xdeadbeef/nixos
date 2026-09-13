@@ -63,14 +63,14 @@ in
 
   local.nix.remoteBuilderClient.excludeBuilders = [ "l-envil-builder" ];
 
-  # The i9-13900H only has 14 cores (20 threads) and is also used interactively.
-  # The stock `max-jobs = auto` (20 here) and `cores = 0` (all cores per build)
-  # fully throttle the box during `nixos-rebuild switch`, so cap both. This is
-  # daemon-wide: it applies to local builds as well as builds offloaded here by
-  # the other hosts' remote-builder clients.
+  # Temporarily capped to a single build core: the FRITZ!SFP XGS-PON adapter in
+  # the Thunderbolt SFP+ cage draws enough current that saturating the i9-13900H
+  # trips the power supply. This is daemon-wide, so it limits both local builds
+  # and builds offloaded here by the other hosts' remote-builder clients. Raise
+  # back to max-jobs = 4 / cores = 4 once the power supply is fixed.
   nix.settings = {
-    max-jobs = 4;
-    cores = 4;
+    max-jobs = 1;
+    cores = 1;
   };
 
   local.network.private.enable = false;

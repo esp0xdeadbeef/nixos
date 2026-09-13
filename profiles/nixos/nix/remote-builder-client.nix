@@ -111,9 +111,11 @@ in
           address = "100.64.0.13";
           systems = [ "x86_64-linux" ];
           # i9-13900H: 14 cores / 20 threads, also used interactively and for
-          # local LLM workloads. Cap concurrent jobs well below the server
-          # builders' 8 so offloads do not saturate the laptop.
-          maxJobs = 4;
+          # local LLM workloads. Temporarily capped to a single job: the SFP+
+          # adapter currently in the Thunderbolt cage draws enough current to
+          # trip the power supply when builds saturate the box. Raise back to 4
+          # once the power supply is fixed.
+          maxJobs = 1;
         };
         l-esp-builder = {
           address = "100.64.0.10";
