@@ -58,8 +58,12 @@ let
     seed=$("$YQ" -r '.seed' "$SEC")
     used=/run/ap/used-ssids
     rm -f "$used"
+    # Derive clients first (empty dedupe file) so it matches the Nighthawk's
+    # 5GHz cobalt-clients SSID exactly, then the ALFA-local mgmt plane.
+    ssid_clients=$(${deriveSsid} "$seed" cobalt-clients ${ssidList} "$used")
     ssid_unlock=$("$YQ" -r '.cobalt-unlock.ssid' "$SEC")
     ssid_mgmt=$(${deriveSsid} "$seed" cobalt-mgmt ${ssidList} "$used")
+    pass_clients=$("$YQ" -r '.cobalt-clients.psk' "$SEC")
     pass_unlock=$("$YQ" -r '.cobalt-unlock.psk' "$SEC")
     pass_mgmt=$("$YQ" -r '.cobalt-mgmt.psk' "$SEC")
 
@@ -97,11 +101,30 @@ let
     wpa_passphrase=$pass_mgmt
     bridge=ap-mgmt
     EOF
+    cat > /run/ap/${wifiIf}-2.conf <<EOF
+    ctrl_interface=${ctrl}
+    logger_stdout_level=0
+    logger_syslog_level=0
+    interface=${wifiIf}-2
+    driver=nl80211
+    ssid=$ssid_clients
+    hw_mode=g
+    channel=$ch
+    wmm_enabled=1
+    country_code=NL
+    wpa=2
+    wpa_key_mgmt=SAE
+    wpa_pairwise=CCMP
+    wpa_passphrase=$pass_clients
+    ieee80211w=2
+    bridge=ap-clients
+    EOF
   '';
 
   apVaps = [
     { iface = wifiIf; bridge = "ap-unlock"; }
     { iface = "${wifiIf}-1"; bridge = "ap-mgmt"; }
+    { iface = "${wifiIf}-2"; bridge = "ap-clients"; }
   ];
   mkApUnit =
     vap: {
@@ -168,6 +191,13 @@ in
             break
           fi
           ${pkgs.iw}/bin/iw phy "$phy" interface add ${wifiIf}-1 type __ap 2>/dev/null || true
+          sleep 1
+        done
+        for _ in $(seq 1 30); do
+          if [ -d /sys/class/net/${wifiIf}-2 ]; then
+            break
+          fi
+          ${pkgs.iw}/bin/iw phy "$phy" interface add ${wifiIf}-2 type __ap 2>/dev/null || true
           sleep 1
         done
         for _ in $(seq 1 30); do
