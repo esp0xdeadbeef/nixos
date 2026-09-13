@@ -77,6 +77,4 @@ in
     render-wireguard
     renderer-contract.sops-for-renderers
   ];
-
-  _module.args.sRouterNixosRenderers = renderer-contract;
 }
