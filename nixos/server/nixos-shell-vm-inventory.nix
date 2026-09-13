@@ -259,7 +259,23 @@ let
     {
       name = "s-router-legacy-prod";
       description = "Legacy production router fallback VM (nixos-shell)";
-      runnerRelativePath = "bin/run-s-router-prod-vm";
+      activation.rolloutCandidateOnGuestShutdown = true;
+      healthCheck = {
+        command = lib.escapeShellArgs (
+          [
+            (lib.getExe guestAgentHealth)
+            (qgaSocketFor "s-router-legacy-prod")
+            "/run/current-system/sw/bin/bash"
+            "-c"
+            routerHealthCommand
+            "qga-systemd-health"
+          ]
+          ++ routerCriticalUnits
+        );
+        timeoutSeconds = 120;
+        retries = 60;
+        intervalSeconds = 3;
+      };
     }
     {
       name = "s-router-test-clients";
