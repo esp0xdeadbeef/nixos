@@ -125,18 +125,10 @@ let
     in
     builtins.listToAttrs entries;
 
-  renderer-contract = {
-    inherit canonicalBundle render-nixos;
-    inherit inventory intentPath inventoryPath;
-  };in
+in
 {
   imports = [
     render-nixos
     render-wireguard
   ];
-
-  _module.args.sRouterProdRenderers = renderer-contract;
-  _module.args.sRouterProdModelSource = {
-    inherit intentPath inventoryPath;
-  };
 }
