@@ -221,7 +221,9 @@ let
   upstreamPolicyIotLink = "p2p-policy-upstream-selector--access-access-iot--uplink-wan";
   policyDownstreamIotLink = "p2p-downstream-selector-policy--access-access-iot";
   downstreamAccessIotLink = "p2p-access-iot-downstream-selector";
-  upstreamPolicyClientsVpnLink = "p2p-policy-upstream-selector--access-access-clients-vpn";
+  # FS-370: access-clients-vpn is a multi-uplink access (onyx, opal); one lane per uplink.
+  upstreamPolicyClientsVpnOnyxLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-onyx";
+  upstreamPolicyClientsVpnOpalLink = "p2p-policy-upstream-selector--access-access-clients-vpn--uplink-opal";
   policyDownstreamClientsVpnLink = "p2p-downstream-selector-policy--access-access-clients-vpn";
   downstreamAccessClientsVpnLink = "p2p-access-clients-vpn-downstream-selector";
   policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
@@ -314,11 +316,18 @@ let
       interfaceName = "policy-iot";
     };
 
-    policy-clients-vpn = p2pPort {
-      link = upstreamPolicyClientsVpnLink;
+    policy-clients-vpn-onyx = p2pPort {
+      link = upstreamPolicyClientsVpnOnyxLink;
       adapterName = "cb-us-p9";
       bridge = "rt-upstream-policy-clients-vpn";
-      interfaceName = "policy-clients-vpn";
+      interfaceName = "policy-clients-vpn-onyx";
+    };
+
+    policy-clients-vpn-opal = p2pPort {
+      link = upstreamPolicyClientsVpnOpalLink;
+      adapterName = "cb-us-p9b";
+      bridge = "rt-upstream-policy-clients-vpn";
+      interfaceName = "policy-clients-vpn-opal";
     };
 
     policy-mgmt = p2pPort {
@@ -358,11 +367,18 @@ let
       interfaceName = "upstream-iot";
     };
 
-    upstream-clients-vpn = p2pPort {
-      link = upstreamPolicyClientsVpnLink;
+    upstream-clients-vpn-onyx = p2pPort {
+      link = upstreamPolicyClientsVpnOnyxLink;
       adapterName = "cb-p-us9";
       bridge = "rt-upstream-policy-clients-vpn";
-      interfaceName = "upstream-clients-vpn";
+      interfaceName = "upstream-clients-vpn-onyx";
+    };
+
+    upstream-clients-vpn-opal = p2pPort {
+      link = upstreamPolicyClientsVpnOpalLink;
+      adapterName = "cb-p-us9b";
+      bridge = "rt-upstream-policy-clients-vpn";
+      interfaceName = "upstream-clients-vpn-opal";
     };
 
     upstream-mgmt = p2pPort {
