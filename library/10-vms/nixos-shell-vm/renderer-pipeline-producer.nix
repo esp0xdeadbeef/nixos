@@ -42,6 +42,33 @@ let
       rootLockIdentity,
       controlPlaneTransform ? cpm: cpm,
     }:
+    (realizeAll {
+      inherit
+        controlPlaneModelInput
+        networkRealizationModelInput
+        system
+        intentPath
+        inventory
+        hostName
+        rootLockIdentity
+        controlPlaneTransform
+        ;
+    }).bundle;
+
+  # As realizeBundle, but also returns the CPM output so a host profile can read
+  # platform-neutral deployment facts (for example deploymentHosts) without
+  # calling the CPM itself.
+  realizeAll =
+    {
+      controlPlaneModelInput,
+      networkRealizationModelInput,
+      system,
+      intentPath,
+      inventory,
+      hostName,
+      rootLockIdentity,
+      controlPlaneTransform ? cpm: cpm,
+    }:
     let
       resolvedInventory = realizeInventory { inventoryInput = inventory; inherit hostName; };
       cpmLib = controlPlaneModelInput.libBySystem.${system};
@@ -63,18 +90,22 @@ let
           source = "network-control-plane-model";
         };
       };
-    in
-    networkRealizationModelInput.lib.realize {
-      input = controlPlaneArtifact;
-      requestScope = {
-        kind = "complete-artifact";
-        identity = hostName;
+      bundle = networkRealizationModelInput.lib.realize {
+        input = controlPlaneArtifact;
+        requestScope = {
+          kind = "complete-artifact";
+          identity = hostName;
+        };
+        inherit rootLockIdentity;
+        producerRevision =
+          networkRealizationModelInput.rev
+            or networkRealizationModelInput.dirtyRev
+            or "uncommitted";
       };
-      inherit rootLockIdentity;
-      producerRevision =
-        networkRealizationModelInput.rev
-          or networkRealizationModelInput.dirtyRev
-          or "uncommitted";
+    in
+    {
+      inherit bundle;
+      cpm = cpmForRenderer;
     };
 
   # VM NIC platform binding, built from the host profile's vmNics list. Kept
@@ -135,6 +166,7 @@ let
 in
 {
   inherit
+    realizeAll
     realizeBundle
     realizeInventory
     vmNicsPlatformBinding
