@@ -20,7 +20,7 @@ in
     profiles.nixos.network.router-vlan2-runtime-contract
 
     (import ./renderers.nix {
-      inherit inputs lib;
+      inherit inputs lib relativeRepo;
       inherit labSource;
 
       system = "x86_64-linux";
