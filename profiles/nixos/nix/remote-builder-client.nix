@@ -115,6 +115,22 @@ in
           # builders' 8 so offloads do not saturate the laptop.
           maxJobs = 4;
         };
+        l-esp-builder = {
+          address = "100.64.0.10";
+          systems = [ "x86_64-linux" ];
+          # i7-12850HX: 16 cores / 24 threads, interactive laptop. Same cap as
+          # l-envil.
+          maxJobs = 4;
+        };
+        l-portal-builder = {
+          address = "100.64.0.14";
+          # The only native aarch64 builder (ThinkPad X13s). It does not emulate,
+          # so it serves aarch64 only. Weakest host: 8 cores / 14 GiB, capped to
+          # 2 jobs; speedFactor 1 so clients prefer the emulating servers.
+          systems = [ "aarch64-linux" ];
+          maxJobs = 2;
+          speedFactor = 1;
+        };
       };
       description = "Remote builders to offload to, keyed by an SSH alias.";
     };
