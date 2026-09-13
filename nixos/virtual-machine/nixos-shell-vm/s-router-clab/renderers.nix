@@ -1,5 +1,6 @@
 { inputs
 , lib
+, relativeRepo
 , labSource
 , selectorFile
 , system
@@ -15,53 +16,40 @@ let
   inventoryPath = "${labPath}/inventory-${hostName}.nix";
   sops = "${labPath}/sops-routing-${hostName}.nix";
 
-  cpmLib = inputs.network-control-plane-model.libBySystem.${system};
-
-  cpmBuilt = cpmLib.compileAndBuildFromPaths {
-    inputPath = intentPath;
-    inherit inventoryPath;
+  # FS-982: the host profile imports renderer output; bundle production lives
+  # behind the producer boundary, not in the host profile.
+  producer = import (relativeRepo.module "library/10-vms/nixos-shell-vm/renderer-pipeline-producer.nix") {
+    inherit lib;
   };
 
-  controlPlaneArtifact =
-    let
-      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmBuilt);
-    in
-    {
-      kind = "network-control-plane-artifact";
-      artifactIdentity = artifactDigest;
-      inherit artifactDigest;
-      control_plane_model = cpmBuilt;
-      authorityConflicts = [ ];
-      provenance = {
-        producer = "nixos/${hostName}";
-        source = "network-control-plane-model";
-      };
-    };
+  inventory = import inventoryPath;
 
-  canonicalBundle = inputs.network-realization-model.lib.realize {
-    input = controlPlaneArtifact;
-    requestScope = {
-      kind = "complete-artifact";
-      identity = hostName;
-    };
+  realized = producer.realizeAll {
+    inherit
+      system
+      intentPath
+      inventory
+      hostName
+      ;
+    controlPlaneModelInput = inputs.network-control-plane-model;
+    networkRealizationModelInput = inputs.network-realization-model;
     rootLockIdentity = builtins.hashString "sha256" (builtins.readFile ../../../../flake.lock);
-    producerRevision =
-      inputs.network-realization-model.rev
-        or inputs.network-realization-model.dirtyRev
-        or "uncommitted";
   };
+
+  canonicalBundle = realized.bundle;
 
   rendererInput = {
     inherit hostName;
     bundle = canonicalBundle;
-    # Management VLAN from CPM deployment hosts (URS: inventory → CPM → renderer)
+    # Management VLAN from CPM deployment hosts (URS: inventory -> CPM -> renderer)
     managementVlan =
       let
-        hostDeploy = if cpmBuilt ? deploymentHosts then cpmBuilt.deploymentHosts.${hostName} or null else null;
+        hostDeploy =
+          if realized.cpm ? deploymentHosts then realized.cpm.deploymentHosts.${hostName} or null else null;
       in
       if hostDeploy != null && hostDeploy ? uplinks then hostDeploy.uplinks.management or null else null;
     rendererInventoryJsonPath = builtins.toFile "renderer-inventory-${hostName}.json"
-      (builtins.toJSON (import inventoryPath));
+      (builtins.toJSON inventory);
     # CPM_GAP: CPM does not yet emit bridgeControl for host-level bridges.
     bridgeControl = {
       dhcpServer = false;
@@ -80,26 +68,12 @@ let
   render-wireguard =
     inputs.network-renderer-wireguard.libBySystem.${system}.renderer.canonical.hostModule
       rendererInput;
-
-  renderer-contract = {
-    inherit
-      canonicalBundle
-      controlPlaneArtifact
-      render-clab
-      render-nebula
-      render-wireguard
-      ;
-    cpm = cpmBuilt;
-    sops-for-renderers = sops;
-  };
 in
 {
   imports = [
     render-clab
     render-nebula
     render-wireguard
-    renderer-contract.sops-for-renderers
+    sops
   ];
-
-  _module.args.sRouterClabLabRenderers = renderer-contract;
 }
