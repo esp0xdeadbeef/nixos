@@ -10,7 +10,9 @@
 , ...
 }:
 let
-  prodInventory = import (relativeRepo.module "prod-network/current/inventory.nix");
+  prodInventory = import (relativeRepo.module "prod-network/current/inventory-neon.nix") {
+    hostName = "s-router-prod";
+  };
   prodVlan3DnsRecords =
     prodInventory.realization.nodes."esp0xdeadbeef-neon-access-vlan3".services.dns.localRecords;
   prodVlan3DnsRecord = builtins.head prodVlan3DnsRecords;
