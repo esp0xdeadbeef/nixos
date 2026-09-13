@@ -1593,49 +1593,52 @@ in
       ];
     };
 
-    # Desired local namespace-sharing contract. VLAN 3 queries VLAN 2 for the
-    # shared lan. namespace; the CPM propagates VLAN 3's static records to the
-    # VLAN 2 authority so VLAN 2 clients resolve them locally without a reverse
-    # VLAN 2 -> VLAN 3 forwarding path.
+    # Desired local namespace-sharing contract. vlan3 owns its static lan.
+    # records (s-nebula-container etc.) and acts as the namespace authority;
+    # vlan2 is the requester and reaches those records through the modeled
+    # forward zone and the canonical staged path
+    # (access-vlan2 -> downstream-selector -> access-vlan3). Namespace
+    # authority is never transferred by a sharing relationship: the authority
+    # answers authoritatively only for its own records (FS-560), and the
+    # requester resolves the rest through the forward relation (FS-540).
     localDnsSharingIntent = [
       {
         namespace = "lan.";
         authority = {
-          service = "vlan2-dns";
+          service = "vlan3-dns";
           records = [
-            "vlan2-kea-local-data"
             "vlan3-static-local-data"
           ];
         };
         requester = {
-          service = "vlan3-dns";
+          service = "vlan2-dns";
           allowedNamespaces = [
             "lan."
-            "1.168.192.in-addr.arpa."
+            "3.168.192.in-addr.arpa."
           ];
           recursion = false;
           publicFallback = false;
         };
         relation = {
-          id = "allow-vlan3-dns-to-vlan2-dns";
+          id = "allow-vlan2-dns-to-vlan3-dns";
           from = {
             kind = "service";
-            name = "vlan3-dns";
+            name = "vlan2-dns";
           };
           to = {
             kind = "service";
-            name = "vlan2-dns";
+            name = "vlan3-dns";
           };
           trafficType = "dns";
           returnBehavior = "symmetric";
         };
         providerPolicy = {
-          source = "vlan3-dns";
+          source = "vlan2-dns";
           action = "refuse_non_local";
         };
         lateralPolicy = {
-          source = "vlan2";
-          target = "vlan3-dns";
+          source = "vlan3";
+          target = "vlan2-dns";
           localData = true;
           recursion = false;
           transitiveEgress = false;
