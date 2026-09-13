@@ -2,8 +2,16 @@
 , lib
 , pkgs
 , profiles
+, relativeRepo
 , ...
 }:
+let
+  # Public keys of the dedicated remote-builder identities for the hosts allowed
+  # to offload builds to this builder. Each client generates this once with
+  # `sudo ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_remote-builder` and
+  # commits the resulting .pub here (see profiles.nixos.nix.remote-builder-client).
+  remoteBuilderKeyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/remote-builder/${host}.pub");
+in
 {
   imports = [
     profiles.nixos.laptop.intel-workstation
@@ -16,6 +24,7 @@
     profiles.nixos.ssh.password-login
     profiles.nixos.users.sudo-nopasswd
     profiles.nixos.nix.remote-builder-client
+    profiles.nixos.nix.remote-builder-server
 
     inputs.disko.nixosModules.disko
     inputs.nixos-hardware.nixosModules.common-cpu-intel
@@ -38,6 +47,32 @@
     ./lxc/bind-to-lxc.nix
     ./nixos-shell-servers
   ];
+
+  local.nix.remoteBuilderServer = {
+    enable = true;
+    # l-envil is an x86_64 laptop and intentionally does not emulate aarch64
+    # here; aarch64 offloads stay on the dedicated s-sigma/s-tau builders.
+    clients = {
+      l-portal.key = remoteBuilderKeyFor "l-portal";
+      s-gamma.key = remoteBuilderKeyFor "s-gamma";
+      s-sigma.key = remoteBuilderKeyFor "s-sigma";
+      s-tau.key = remoteBuilderKeyFor "s-tau";
+      # TODO: commit l-esp's id_remote-builder.pub when it is back online.
+      # l-esp.key = remoteBuilderKeyFor "l-esp";
+    };
+  };
+
+  local.nix.remoteBuilderClient.excludeBuilders = [ "l-envil-builder" ];
+
+  # The i9-13900H only has 14 cores (20 threads) and is also used interactively.
+  # The stock `max-jobs = auto` (20 here) and `cores = 0` (all cores per build)
+  # fully throttle the box during `nixos-rebuild switch`, so cap both. This is
+  # daemon-wide: it applies to local builds as well as builds offloaded here by
+  # the other hosts' remote-builder clients.
+  nix.settings = {
+    max-jobs = 4;
+    cores = 4;
+  };
 
   local.network.private.enable = false;
 

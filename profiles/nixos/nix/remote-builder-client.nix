@@ -5,6 +5,13 @@
 let
   cfg = config.local.nix.remoteBuilderClient;
 
+  # Builders that are not explicitly excluded for this host. A host that is
+  # itself part of the shared fleet must exclude its own builder alias so it
+  # does not try to offload builds to itself over SSH.
+  enabledBuilders = lib.filterAttrs
+    (name: _: !(lib.elem name cfg.excludeBuilders))
+    cfg.builders;
+
   # Aliases so the Nix builder hostnames resolve deterministically and pin the
   # SSH identity, independent of DNS and the calling user's agent.
   sshConfigText = ''
@@ -18,7 +25,7 @@ let
           IdentityFile /root/.ssh/id_remote-builder
           StrictHostKeyChecking accept-new
     '')
-    (builtins.attrNames cfg.builders);
+    (builtins.attrNames enabledBuilders);
 
   buildMachines = lib.mapAttrsToList
     (name: m: {
@@ -33,7 +40,7 @@ let
       mandatoryFeatures = m.mandatoryFeatures;
       publicHostKey = m.publicHostKey;
     })
-    cfg.builders;
+    enabledBuilders;
 in
 {
   options.local.nix.remoteBuilderClient = {
@@ -41,6 +48,12 @@ in
       type = lib.types.bool;
       default = true;
       description = "Offload builds to remote ssh-ng builders. Set false to import the profile without enabling offloading.";
+    };
+
+    excludeBuilders = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Builder aliases to omit from this host's build machines (e.g. a host's own alias when it is also part of the fleet).";
     };
 
     builders = lib.mkOption {
@@ -80,8 +93,10 @@ in
         }
       );
       default = {
-        # The shared remote-builder fleet. Both hosts are x86_64 and emulate
-        # aarch64 via binfmt, so they serve every client system in the herd.
+        # The shared remote-builder fleet. s-sigma and s-tau are x86_64 and
+        # emulate aarch64 via binfmt, so they serve every client system in the
+        # herd. l-envil only serves x86_64: it is a laptop with fewer cores and
+        # keeps its aarch64 emulation off.
         s-sigma-builder = {
           address = "100.64.0.16";
           systems = [ "x86_64-linux" "aarch64-linux" ];
@@ -91,6 +106,14 @@ in
           address = "100.64.0.17";
           systems = [ "x86_64-linux" "aarch64-linux" ];
           supportedFeatures = [ "nixos-test" "benchmark" "big-parallel" "kvm" ];
+        };
+        l-envil-builder = {
+          address = "100.64.0.13";
+          systems = [ "x86_64-linux" ];
+          # i9-13900H: 14 cores / 20 threads, also used interactively and for
+          # local LLM workloads. Cap concurrent jobs well below the server
+          # builders' 8 so offloads do not saturate the laptop.
+          maxJobs = 4;
         };
       };
       description = "Remote builders to offload to, keyed by an SSH alias.";
