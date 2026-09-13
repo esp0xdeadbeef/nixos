@@ -1657,46 +1657,40 @@ in
       {
         namespace = "lan.";
         authority = {
-          service = "vlan2-dns";
+          service = "vlan3-dns";
           records = [
-            "vlan2-kea-local-data"
             "vlan3-static-local-data"
           ];
         };
         requester = {
-          service = "vlan3-dns";
+          service = "vlan2-dns";
           allowedNamespaces = [
             "lan."
-            "1.168.192.in-addr.arpa."
+            "3.168.192.in-addr.arpa."
           ];
           recursion = false;
           publicFallback = false;
         };
         relation = {
-          id = "allow-vlan3-dns-to-vlan2-dns";
+          id = "allow-vlan2-dns-to-vlan3-dns";
           from = {
-            kind = "service";
-            name = "vlan3-dns";
-          };
-          to = {
             kind = "service";
             name = "vlan2-dns";
           };
+          to = {
+            kind = "service";
+            name = "vlan3-dns";
+          };
           trafficType = "dns";
           returnBehavior = "symmetric";
-          resolverPath = [
-            "access-vlan3"
-            "downstream-selector"
-            "access-vlan2"
-          ];
         };
         providerPolicy = {
-          source = "vlan3-dns";
+          source = "vlan2-dns";
           action = "refuse_non_local";
         };
         lateralPolicy = {
-          source = "vlan2";
-          target = "vlan3-dns";
+          source = "vlan3";
+          target = "vlan2-dns";
           localData = true;
           recursion = false;
           transitiveEgress = false;
