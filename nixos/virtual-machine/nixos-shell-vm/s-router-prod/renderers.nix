@@ -1,5 +1,6 @@
 { inputs
 , lib
+, relativeRepo
 , modelSource
 , selectorFile
 , system
@@ -21,48 +22,28 @@ let
   intentPath = "${modelSource}/${intentFileName}";
   inventoryPath = "${modelSource}/${inventoryFileName}";
 
-  # The inventory model is a function of the deployment host so the model does
-  # not hardcode which router renders it. Apply this router's hostName and
-  # hand the CPM the resolved attrset via a store file (its path loader would
-  # otherwise call the function with an empty argument set).
-  inventory = import inventoryPath { inherit hostName; };
-  inventoryExport = builtins.toFile "inventory.json" (builtins.toJSON inventory);
-
-  cpmLib = controlPlaneModelInput.libBySystem.${system};
-
-  cpmBuilt = cpmLib.compileAndBuildFromPaths {
-    inputPath = intentPath;
-    inventoryPath = inventoryExport;
+  # FS-982: the host profile imports renderer output; bundle production lives
+  # behind the producer boundary, not in the host profile. The inventory path
+  # is passed as source selection; the producer resolves it (it may be a
+  # { hostName }-arg function) and owns intent+inventory -> bundle.
+  producer = import (relativeRepo.module "library/10-vms/nixos-shell-vm/renderer-pipeline-producer.nix") {
+    inherit lib;
   };
-  cpmForRenderer = controlPlaneTransform cpmBuilt;
 
-  controlPlaneArtifact =
-    let
-      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmForRenderer);
-    in
-    {
-      kind = "network-control-plane-artifact";
-      artifactIdentity = artifactDigest;
-      inherit artifactDigest;
-      control_plane_model = cpmForRenderer;
-      authorityConflicts = [ ];
-      provenance = {
-        producer = "nixos/${hostName}";
-        source = "network-control-plane-model";
-      };
-    };
+  inventoryInput = import inventoryPath;
+  inventory = producer.realizeInventory { inventoryInput = inventoryInput; inherit hostName; };
 
-  canonicalBundle = networkRealizationModelInput.lib.realize {
-    input = controlPlaneArtifact;
-    requestScope = {
-      kind = "complete-artifact";
-      identity = hostName;
-    };
+  canonicalBundle = producer.realizeBundle {
+    inherit
+      system
+      intentPath
+      hostName
+      controlPlaneTransform
+      ;
+    inventory = inventoryInput;
+    controlPlaneModelInput = controlPlaneModelInput;
+    networkRealizationModelInput = networkRealizationModelInput;
     rootLockIdentity = builtins.hashString "sha256" (builtins.readFile ../../../../flake.lock);
-    producerRevision =
-      networkRealizationModelInput.rev
-        or networkRealizationModelInput.dirtyRev
-        or "uncommitted";
   };
 
   rendererInput = {
@@ -70,63 +51,12 @@ let
     bundle = canonicalBundle;
   };
 
-  # FS-982: host-facing VM NICs are platform-binding material, not host-profile
-  # network realization. The binding is produced here (validated against the
-  # canonical bundle and pinned schema contract) so the renderer owns the QEMU
-  # NIC output instead of the host profile. When a host passes no vmNics (for
-  # example s-router-prod's pinned render path), platformBinding stays null and
-  # the renderer contract is byte-for-byte unchanged.
-  vmNicForBinding =
-    nic:
-    {
-      inherit (nic) nicId;
-      attachment = {
-        kind = "bridge";
-        name = nic.bridge;
-      };
-      model = nic.model or "virtio-net-pci";
-    }
-    // lib.optionalAttrs (nic.mac or null != null) {
-      mac = {
-        sourceClass = "public";
-        address = nic.mac;
-      };
-      stableMacRequired = true;
-    };
-
-  platformBinding =
-    if vmNics == [ ] then
-      null
-    else
-      let
-        nics = builtins.map vmNicForBinding vmNics;
-        bindingBase = {
-          kind = "network-platform-binding-bundle";
-          schemaRevision = "network-platform-binding/v1";
-          bundleIdentity = canonicalBundle.bundleIdentity;
-          target = "nixos";
-          requestScope = canonicalBundle.requestScope;
-          categories.deployment.vmTargets.${hostName} = {
-            explicitNicSet = true;
-            expectedNicCount = builtins.length nics;
-            inherit nics;
-          };
-          provenance = {
-            producer = "nixos/${hostName}";
-            producerRevision = "local-working-tree";
-          };
-        };
-        bindingIdentity = builtins.hashString "sha256" (builtins.toJSON bindingBase);
-      in
-      bindingBase
-      // {
-        inherit bindingIdentity;
-        validation = {
-          valid = true;
-          artifactIdentity = bindingIdentity;
-          schemaSetIdentity = canonicalBundle.validation.schemaSetIdentity;
-        };
-      };
+  # FS-982-SMS-130: the VM NIC platform binding is produced by the same
+  # boundary, not assembled inline in the host profile.
+  platformBinding = producer.vmNicsPlatformBinding {
+    inherit hostName vmNics;
+    bundle = canonicalBundle;
+  };
 
   render-nixos =
     nixosRendererInput.libBySystem.${system}.renderer.canonical.hostModule (
@@ -196,11 +126,9 @@ let
     builtins.listToAttrs entries;
 
   renderer-contract = {
-    inherit canonicalBundle controlPlaneArtifact render-nixos;
-    cpm = cpmForRenderer;
+    inherit canonicalBundle render-nixos;
     inherit inventory intentPath inventoryPath;
-  };
-in
+  };in
 {
   imports = [
     render-nixos

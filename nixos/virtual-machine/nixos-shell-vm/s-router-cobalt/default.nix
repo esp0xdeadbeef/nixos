@@ -71,6 +71,7 @@ in
     (import ../s-router-prod/renderers.nix {
       inherit
         inputs
+        relativeRepo
         lib
         modelSource
         ;
