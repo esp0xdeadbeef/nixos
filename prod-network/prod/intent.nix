@@ -1397,13 +1397,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-vlan2"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1430,13 +1423,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-vlan7"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1463,13 +1449,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-vlan8"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1496,13 +1475,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-clients"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1529,13 +1501,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-svc"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1562,13 +1527,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-iot"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1595,13 +1553,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-iot-srv"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1628,13 +1579,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-mgmt"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -1684,11 +1628,6 @@ in
           };
           trafficType = "dns";
           returnBehavior = "symmetric";
-          resolverPath = [
-            "access-vlan3"
-            "downstream-selector"
-            "access-vlan2"
-          ];
         };
         providerPolicy = {
           source = "vlan3-dns";
@@ -1733,11 +1672,6 @@ in
           };
           trafficType = "dns";
           returnBehavior = "symmetric";
-          resolverPath = [
-            "access-dmz"
-            "downstream-selector"
-            "access-clients"
-          ];
         };
         providerPolicy = {
           source = "dmz-dns";
@@ -1781,11 +1715,6 @@ in
           };
           trafficType = "dns";
           returnBehavior = "symmetric";
-          resolverPath = [
-            "access-clients"
-            "downstream-selector"
-            "access-unlock"
-          ];
         };
         providerPolicy = {
           source = "clients-dns";
@@ -3216,13 +3145,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-clients"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -3249,13 +3171,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-svc"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -3282,13 +3197,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-iot"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -3315,13 +3223,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-iot-srv"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -3348,13 +3249,6 @@ in
             name = "core-dns";
             node = "core";
           };
-          resolverPath = [
-            "access-mgmt"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "wan" ];
@@ -3381,13 +3275,6 @@ in
             name = "onyx-dns";
             node = "core-vpn-onyx";
           };
-          resolverPath = [
-            "access-clients-vpn"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core-vpn-onyx"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "onyx" ];
@@ -3414,13 +3301,6 @@ in
             name = "opal-dns";
             node = "core-vpn-opal";
           };
-          resolverPath = [
-            "access-clients-vpn"
-            "downstream-selector"
-            "policy"
-            "upstream-selector"
-            "core-vpn-opal"
-          ];
           egressSurface = {
             kind = "external";
             uplinks = [ "opal" ];
@@ -3466,11 +3346,6 @@ in
           };
           trafficType = "dns";
           returnBehavior = "symmetric";
-          resolverPath = [
-            "access-dmz"
-            "downstream-selector"
-            "access-clients"
-          ];
         };
         providerPolicy = {
           source = "dmz-dns";
@@ -3514,11 +3389,6 @@ in
           };
           trafficType = "dns";
           returnBehavior = "symmetric";
-          resolverPath = [
-            "access-clients"
-            "downstream-selector"
-            "access-unlock"
-          ];
         };
         providerPolicy = {
           source = "clients-dns";
