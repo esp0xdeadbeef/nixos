@@ -10,7 +10,7 @@
       "vmbr1"
       "vmbr4"
     ];
-    instances = [ "s-router-prod" ];
+    instances = [ "s-router-neon" ];
     description = "Start or stop router nixos-shell VMs from eno1 carrier";
   };
 }
