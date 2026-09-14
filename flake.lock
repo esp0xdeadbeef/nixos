@@ -1457,11 +1457,11 @@
         "nixpkgs-network": "nixpkgs-network_41"
       },
       "locked": {
-        "lastModified": 1789327504,
-        "narHash": "sha256-bCkhstB6/vJw3V8/wa8jPS6pX8MJfCQfnxAYS0tREPQ=",
+        "lastModified": 1789335877,
+        "narHash": "sha256-dtyvMtiUf/V6dHUqGBWtcmPYvdALSFgletHThOZkGus=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "5495c9feba1eb91beb4dfa7c4f31a2e85ef915c6",
+        "rev": "14cbb8d4a381e18a4cb2de4c0c321655657ff960",
         "type": "github"
       },
       "original": {
@@ -1792,11 +1792,11 @@
         "nixpkgs-network": "nixpkgs-network_27"
       },
       "locked": {
-        "lastModified": 1789311802,
-        "narHash": "sha256-oAmpK7Qqu+5DchfeOVWZi1IKty4Qr52PcHMOIOoDE2A=",
+        "lastModified": 1789346455,
+        "narHash": "sha256-dMivg6kiIlS84YFNnynk8CpnYrcbOPnFl+jB2Vwk/fU=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "0098ae2998d2263163b396bf7048e1f2e75e5ba8",
+        "rev": "127e83d422b123dfa66cbf27b20b4fc60c375f09",
         "type": "github"
       },
       "original": {
@@ -1885,11 +1885,11 @@
         "nixpkgs-network": "nixpkgs-network_42"
       },
       "locked": {
-        "lastModified": 1789311802,
-        "narHash": "sha256-oAmpK7Qqu+5DchfeOVWZi1IKty4Qr52PcHMOIOoDE2A=",
+        "lastModified": 1789346455,
+        "narHash": "sha256-dMivg6kiIlS84YFNnynk8CpnYrcbOPnFl+jB2Vwk/fU=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "0098ae2998d2263163b396bf7048e1f2e75e5ba8",
+        "rev": "127e83d422b123dfa66cbf27b20b4fc60c375f09",
         "type": "github"
       },
       "original": {
@@ -2189,11 +2189,11 @@
         "nixpkgs": "nixpkgs_16"
       },
       "locked": {
-        "lastModified": 1789329265,
-        "narHash": "sha256-TAZsICcH20xr9P9IO1EcpThi+Hg2RCIJVICc3RW+etc=",
+        "lastModified": 1789346478,
+        "narHash": "sha256-xu1id9xR8vJunFy409SaOiyaNB4qI0Pp+r3JSFmPrcQ=",
         "owner": "esp0xdeadbeef",
         "repo": "network-labs",
-        "rev": "4856eb5c1fa3adb997b6fd8d1fcb14f880c9846e",
+        "rev": "ddbcbdae61ad6fb54e7d1221e197fa08a73e552b",
         "type": "github"
       },
       "original": {
