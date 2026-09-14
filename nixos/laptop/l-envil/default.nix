@@ -69,8 +69,8 @@ in
   # and builds offloaded here by the other hosts' remote-builder clients. Raise
   # back to max-jobs = 4 / cores = 4 once the power supply is fixed.
   nix.settings = {
-    max-jobs = 4;
-    cores = 1;
+    max-jobs = 2;
+    cores = 2;
   };
 
   local.network.private.enable = false;
