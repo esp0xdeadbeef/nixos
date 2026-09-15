@@ -5,12 +5,21 @@
 let
   cfg = config.local.nix.remoteBuilderClient;
 
-  # Builders that are not explicitly excluded for this host. A host that is
-  # itself part of the shared fleet must exclude its own builder alias so it
-  # does not try to offload builds to itself over SSH.
-  enabledBuilders = lib.filterAttrs
-    (name: _: !(lib.elem name cfg.excludeBuilders))
-    cfg.builders;
+  # A laptop client must never offload to another laptop builder: the laptops
+  # are interactive, tightly job-capped hosts, and two of them listing each
+  # other as builders makes each wait for the other on the same derivation
+  # (l-envil <-> l-esp deadlocked on the shared home-configuration manpage
+  # path). Only the dedicated servers are safe offload targets for a laptop.
+  #
+  # Servers are built to peer with each other and with the laptops, so the
+  # same-class exclusion applies only when this host is a laptop. Every client
+  # also drops its own alias to prevent self-offload.
+  isExcluded = name: m:
+    name == cfg.self
+    || (cfg.class == "laptop" && m.class == "laptop")
+    || (lib.elem name cfg.excludeBuilders);
+
+  enabledBuilders = lib.filterAttrs (name: m: !(isExcluded name m)) cfg.builders;
 
   # Aliases so the Nix builder hostnames resolve deterministically and pin the
   # SSH identity, independent of DNS and the calling user's agent.
@@ -50,10 +59,29 @@ in
       description = "Offload builds to remote ssh-ng builders. Set false to import the profile without enabling offloading.";
     };
 
+    self = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        This host's own builder alias in `builders`, or null when the host is
+        not itself part of the fleet. Used to drop self-offload.
+      '';
+    };
+
+    class = lib.mkOption {
+      type = lib.types.enum [ "server" "laptop" ];
+      default = "server";
+      description = ''
+        This host's own class. A `laptop` client never offloads to a builder
+        of class `laptop`, so two interactive laptops cannot deadlock by
+        waiting on each other; a `server` client keeps the full fleet.
+      '';
+    };
+
     excludeBuilders = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
-      description = "Builder aliases to omit from this host's build machines (e.g. a host's own alias when it is also part of the fleet).";
+      description = "Extra builder aliases to omit from this host's build machines, beyond the same-class and self exclusions applied automatically.";
     };
 
     builders = lib.mkOption {
@@ -63,6 +91,16 @@ in
             address = lib.mkOption {
               type = lib.types.str;
               description = "Builder address as reachable from this host (e.g. a nebula overlay IP).";
+            };
+            class = lib.mkOption {
+              type = lib.types.enum [ "server" "laptop" ];
+              default = "server";
+              description = ''
+                Builder class. A laptop client never offloads to a builder
+                of class `laptop`, which keeps interactive laptops from using
+                each other as builders and deadlocking. Server clients use
+                every non-self builder, including peers and laptops.
+              '';
             };
             systems = lib.mkOption {
               type = lib.types.listOf lib.types.str;
@@ -99,16 +137,19 @@ in
         # keeps its aarch64 emulation off.
         s-sigma-builder = {
           address = "100.64.0.16";
+          class = "server";
           systems = [ "x86_64-linux" "aarch64-linux" ];
           supportedFeatures = [ "nixos-test" "benchmark" "big-parallel" "kvm" ];
         };
         s-tau-builder = {
           address = "100.64.0.17";
+          class = "server";
           systems = [ "x86_64-linux" "aarch64-linux" ];
           supportedFeatures = [ "nixos-test" "benchmark" "big-parallel" "kvm" ];
         };
         l-envil-builder = {
           address = "100.64.0.13";
+          class = "laptop";
           systems = [ "x86_64-linux" ];
           # i9-13900H: 14 cores / 20 threads, also used interactively and for
           # local LLM workloads. Temporarily capped to a single job: the SFP+
@@ -119,6 +160,7 @@ in
         };
         l-esp-builder = {
           address = "100.64.0.10";
+          class = "laptop";
           systems = [ "x86_64-linux" ];
           # i7-12850HX: 16 cores / 24 threads, interactive laptop. Same cap as
           # l-envil.
@@ -126,6 +168,7 @@ in
         };
         l-portal-builder = {
           address = "100.64.0.14";
+          class = "laptop";
           # The only native aarch64 builder (ThinkPad X13s). It does not emulate,
           # so it serves aarch64 only. Weakest host: 8 cores / 14 GiB, capped to
           # 2 jobs; speedFactor 1 so clients prefer the emulating servers.
