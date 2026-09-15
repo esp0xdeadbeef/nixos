@@ -377,11 +377,11 @@
         "nixpkgs-network": "nixpkgs-network"
       },
       "locked": {
-        "lastModified": 1789496283,
-        "narHash": "sha256-JfUHjf2kO8Ni64JG59VYKiNPzoOb4x0u/veHaVsWfoQ=",
+        "lastModified": 1789501939,
+        "narHash": "sha256-lKp292XOmD9xO9bNaafVdXhPMnCFd/vIwxmTmI5YZiE=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "61d90e11665721a606ffd3e3c5dd7d17011d8e45",
+        "rev": "2b1e066c09b60106ca0ef2084a8be774e987d9b3",
         "type": "github"
       },
       "original": {
