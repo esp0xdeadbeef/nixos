@@ -129,7 +129,7 @@ Verified port map (via `netgear-admin` disable probe):
 |---|---|---|
 | 1 | l-envil USB (`enp0s13f0u4u4u3`) | WAN (VLAN 300) |
 | 2 | l-portal USB (`enu1u1`) | portal (VLAN 8) |
-| 3 | l-envil dock (`enp170s0`) | LAN trunk (2/3/7/8) |
+| 3 | l-envil dock (pinned `cobalt-lan0`) | LAN trunk (2/3/7/8) |
 | 4 | ISP router | WAN (VLAN 300 untagged) |
 | 5–8 | — | empty |
 
@@ -178,8 +178,8 @@ it, so reach it out-of-band by putting a transient `/24` helper address on
 switch):
 
 ```sh
-# l-envil host. The dock NIC that carries the switch (the LAN dock NIC, at the
-# time of writing `enp0s13f0u3u2`) is already enslaved into br-cobalt-lan;
+# l-envil host. The dock NIC that carries the switch (the LAN dock NIC, pinned
+# by permanent MAC to `cobalt-lan0`) is already enslaved into br-cobalt-lan;
 # add only the transient mgmt helper IP on the bridge, then ping the factory
 # mgmt IP. The /24 is dedicated to switch management and is not persisted.
 sudo ip addr add 192.168.0.2/24 dev br-cobalt-lan
