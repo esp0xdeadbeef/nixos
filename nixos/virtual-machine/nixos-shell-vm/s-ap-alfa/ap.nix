@@ -5,17 +5,18 @@
 # LAN trunk (see ../wifi-ssids.nix) exactly like the 5GHz Nighthawk AP, so a
 # client sees the same SSID set on both bands.
 #
-# Rates: 802.11n HT20 + short GI on the 2.4GHz band (the RT3070 supports
-# HT20/HT40). Client isolation is on so intra-BSS frames go through the policy
-# point instead of bridging client-to-client at L2.
+# Channel 11 is a determined value (the 2.4GHz band is scanned by hand to pick
+# it, not by the AP at boot), so every reboot uses the same channel and clients
+# never see the BSS move. Rates: 802.11n HT20 + short GI (RT3070 HT20/HT40).
+# Client isolation is on so intra-BSS frames go through the policy point.
 let
   spec = import ../wifi-ssids.nix;
 in
 (import ../wifi-ap.nix { inherit lib pkgs inputs relativeRepo; }) {
   radio = {
     iface = "wlan0";
-    scanIf = "wlan0-scan";
     band = "2g";
+    channel = 11;
     country = "NL";
   };
   inherit (spec) planes deriveOrder;

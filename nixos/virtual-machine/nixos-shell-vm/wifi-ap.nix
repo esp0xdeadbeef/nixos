@@ -5,9 +5,16 @@
 # so a radio only declares its band settings and the plane set it carries. The
 # plane set itself lives in ./wifi-ssids.nix.
 #
+# Each BSS runs its own hostapd process on its own VAP interface. This radio
+# family cannot use a single hostapd with `bss=` sections: hostapd then derives
+# the extra BSSIDs from the base MAC via bssid_mask, and the rt2800usb base
+# (00:c0:ca:98:32:ff) is not aligned to the required mask, so hostapd refuses
+# to start ("Start address must be the first address in the block"). Driving one
+# process per VAP avoids BSSID derivation entirely.
+#
 # Usage:
 #   (import ../wifi-ap.nix { inherit lib pkgs inputs relativeRepo; }) {
-#     radio = { iface = "wlan0"; scanIf = "wlan0-scan"; band = "2g"; ... };
+#     radio = { iface = "wlan0"; band = "2g"; channel = 11; country = "NL"; };
 #     planes = spec.planes;       # from ../wifi-ssids.nix
 #     deriveOrder = spec.deriveOrder;
 #   }
@@ -19,9 +26,9 @@
 , relativeRepo
 }:
 {
-  # Radio / band description. `band` selects the hostapd rate configuration:
-  #   "2g" -> hw_mode=g, optional auto channel (1/6/11 scan), 11n HT20 + short GI
-  #   "5g" -> hw_mode=a, fixed channel, 11n + 11ac + 11ax, 80MHz
+  # Radio / band description. The channel is a determined value, not scanned:
+  #   "2g" -> hw_mode=g, 11n HT20 + short GI
+  #   "5g" -> hw_mode=a, 11n + 11ac + 11ax, 80MHz
   radio
 , # Planes to advertise on this radio (list from ./wifi-ssids.nix).
   planes
@@ -49,16 +56,19 @@ let
   # "iface:plane:bridge:keyMgmt" specs consumed by the conf loop.
   confSpecs = lib.concatMapStringsSep " " (v: "\"${v.iface}:${v.plane}:${v.bridge}:${v.keyMgmt}\"") vaps;
 
-  # The 802.11 PHY lines differ per band but are constant across a radio's BSSes.
+  # Shared 802.11 PHY settings (constant across the radio's BSSes). The channel
+  # is a determined value; ap_isolate=1 keeps intra-BSS frames going through the
+  # policy point instead of being bridged client-to-client at L2.
   phyLines =
     if radio.band == "2g" then
       ''
         hw_mode=g
-        channel=$ch
+        channel=${toString radio.channel}
         wmm_enabled=1
         country_code=${radio.country}
         ieee80211n=1
         ht_capab=[SHORT-GI-20]
+        ap_isolate=1
       ''
     else
       ''
@@ -75,34 +85,8 @@ let
         ieee80211ax=1
         he_oper_chwidth=1
         he_oper_centr_freq_seg0_idx=${toString radio.vhtCenterIdx}
+        ap_isolate=1
       '';
-
-  channelScan =
-    if radio.band == "2g" && radio ? scanIf then
-      ''
-        # Pick the least-congested 2.4GHz channel (1/6/11) from a one-shot scan.
-        ${pkgs.iproute2}/bin/ip link set ${radio.scanIf} up 2>/dev/null || true
-        sleep 2
-        ${pkgs.iw}/bin/iw dev ${radio.scanIf} scan > /run/ap/scan.txt 2>/dev/null || true
-        ${pkgs.iproute2}/bin/ip link set ${radio.scanIf} down 2>/dev/null || true
-
-        c1=$(${pkgs.gnugrep}/bin/grep -c "freq: 2412" /run/ap/scan.txt || true)
-        c6=$(${pkgs.gnugrep}/bin/grep -c "freq: 2437" /run/ap/scan.txt || true)
-        c11=$(${pkgs.gnugrep}/bin/grep -c "freq: 2462" /run/ap/scan.txt || true)
-
-        bestfreq=2412
-        bestn=$c1
-        if [ "$c6" -lt "$bestn" ]; then bestfreq=2437; bestn=$c6; fi
-        if [ "$c11" -lt "$bestn" ]; then bestfreq=2462; bestn=$c11; fi
-        case "$bestfreq" in
-          2412) ch=1 ;;
-          2437) ch=6 ;;
-          2462) ch=11 ;;
-          *) ch=6 ;;
-        esac
-      ''
-    else
-      "ch=${toString (radio.channel or 0)}";
 
   servedPlanes = map (p: p.plane) planes;
 
@@ -110,8 +94,8 @@ let
   # order, otherwise the radio would guess an SSID. Fail closed instead.
   missingDerive = lib.filter (p: lib.hasPrefix "derive:" p.ssid && !(lib.elem p.plane deriveOrder)) planes;
 
-  # Derive the served planes' SSIDs once, in the shared cross-radio order, so a
-  # radio only derives what it actually carries and every radio still agrees.
+  # Derive the served planes' SSIDs in the shared cross-radio order, so a radio
+  # only derives what it carries and every radio still agrees on shared planes.
   deriveLines = lib.concatMapStrings
     (plane: ''
       ssid_${varName plane}=$(${deriveSsid} "$seed" ${plane} ${ssidList} "$used")
@@ -139,8 +123,6 @@ let
 
   hostapdConf = pkgs.writeShellScript "make-ap-hostapd-conf" ''
     set -euo pipefail
-    ${channelScan}
-
     YQ=${pkgs.yq-go}/bin/yq
     SEC=/run/secrets/cobalt-wifi
     seed=$("$YQ" -r '.seed' "$SEC")
@@ -154,6 +136,7 @@ let
     # Passphrases.
     ${pskLines}
 
+    # One config per VAP, one hostapd process per config.
     for spec in ${confSpecs}; do
       iface="''${spec%%:*}"
       rest="''${spec#*:}"
@@ -172,7 +155,6 @@ let
     driver=nl80211
     ssid=$ssid
     ${phyLines}
-    ap_isolate=1
     wpa=2
     wpa_key_mgmt=$keyMgmt
     wpa_pairwise=CCMP
@@ -198,13 +180,6 @@ let
       done
     '')
     vapCreateIndexes;
-  scanCreate = lib.optionalString (radio ? scanIf) ''
-    for _ in $(seq 1 30); do
-      if [ -d /sys/class/net/${radio.scanIf} ]; then break; fi
-      ${pkgs.iw}/bin/iw phy "$phy" interface add ${radio.scanIf} type station 2>/dev/null || true
-      sleep 1
-    done
-  '';
 
   mkApUnit =
     v: {
@@ -220,7 +195,7 @@ let
           pkgs.iproute2
         ];
         serviceConfig = {
-          ExecStart = "${pkgs.hostapd}/bin/hostapd -i ${v.iface} ${ctrl}/${v.iface}.conf";
+          ExecStart = "${pkgs.hostapd}/bin/hostapd /run/ap/${v.iface}.conf";
           Restart = "always";
           RestartSec = 3;
         };
@@ -260,7 +235,7 @@ assert lib.assertMsg (missingDerive == [ ])
     };
 
     ap-vap = {
-      description = "Create the AP and scan VAPs";
+      description = "Create the AP VAPs";
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
         Type = "oneshot";
@@ -269,7 +244,6 @@ assert lib.assertMsg (missingDerive == [ ])
       script = ''
         phy=$(cat /sys/class/net/${radio.iface}/phy80211/name 2>/dev/null || echo phy0)
         ${vapCreate}
-        ${scanCreate}
       '';
     };
   } // lib.listToAttrs (map mkApUnit vaps);
