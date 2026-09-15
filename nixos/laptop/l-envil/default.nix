@@ -61,7 +61,10 @@ in
     };
   };
 
-  local.nix.remoteBuilderClient.excludeBuilders = [ "l-envil-builder" ];
+  local.nix.remoteBuilderClient = {
+    self = "l-envil-builder";
+    class = "laptop";
+  };
 
   # Temporarily capped to a single build core: the FRITZ!SFP XGS-PON adapter in
   # the Thunderbolt SFP+ cage draws enough current that saturating the i9-13900H

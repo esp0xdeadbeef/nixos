@@ -45,7 +45,10 @@ in
     };
   };
 
-  local.nix.remoteBuilderClient.excludeBuilders = [ "l-esp-builder" ];
+  local.nix.remoteBuilderClient = {
+    self = "l-esp-builder";
+    class = "laptop";
+  };
 
   # i7-12850HX: 16 cores / 24 threads, also used interactively. Cap the daemon
   # so local and offloaded builds cannot fully throttle the laptop.

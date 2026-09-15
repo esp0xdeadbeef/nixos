@@ -14,6 +14,11 @@ in
 {
   networking.hostName = lib.mkForce hostName;
 
+  # s-gamma offloads to the whole builder fleet (it is a server, not an
+  # interactive laptop), so it keeps the default `server` class and does not
+  # drop the laptop builders.
+  local.nix.remoteBuilderClient.class = "server";
+
   imports = [
     inputs.disko.nixosModules.disko
     profiles.nixos.mail.mailbox-sets

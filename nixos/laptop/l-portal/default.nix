@@ -86,7 +86,10 @@ in
     };
   };
 
-  local.nix.remoteBuilderClient.excludeBuilders = [ "l-portal-builder" ];
+  local.nix.remoteBuilderClient = {
+    self = "l-portal-builder";
+    class = "laptop";
+  };
 
   # Limit the daemon to ~2 build cores: at most 2 concurrent single-core jobs
   # for local and offloaded builds alike, leaving the rest of the SoC free for
