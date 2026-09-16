@@ -155,7 +155,6 @@ let
     };
     to = {
       kind = "external";
-      uplinks = [ "wan" ];
     };
     action = "allow";
     returnBehavior = "symmetric";
@@ -597,7 +596,7 @@ in
           priority = 95;
           from = {
             kind = "external";
-            uplinks = [ "wan" ];
+            scope = "core";
           };
           to = {
             kind = "service";
@@ -633,7 +632,7 @@ in
           priority = 95;
           from = {
             kind = "external";
-            uplinks = [ "wan" ];
+            scope = "core";
           };
           to = {
             kind = "service";
@@ -1149,10 +1148,7 @@ in
             kind = "service";
             name = "core-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -1213,10 +1209,7 @@ in
             kind = "service";
             name = "vlan2-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "deny";
         }
@@ -1227,10 +1220,7 @@ in
             kind = "service";
             name = "vlan7-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "deny";
         }
@@ -1331,10 +1321,7 @@ in
             kind = "service";
             name = "clients-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "deny";
         }
@@ -1345,10 +1332,7 @@ in
             kind = "service";
             name = "svc-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "deny";
         }
@@ -1878,6 +1862,9 @@ in
               name = "vlan2";
             }
           ];
+          selects = [
+            "wan"
+          ];
         };
 
         access-vlan3 = {
@@ -1898,6 +1885,9 @@ in
               name = "vlan7";
             }
           ];
+          selects = [
+            "wan"
+          ];
         };
 
         access-vlan8 = {
@@ -1908,6 +1898,9 @@ in
               name = "vlan8";
             }
           ];
+          selects = [
+            "wan"
+          ];
         };
         access-mgmt = {
           role = "access";
@@ -1916,6 +1909,9 @@ in
               kind = "tenant";
               name = "neon-mgmt";
             }
+          ];
+          selects = [
+            "wan"
           ];
         };
         access-svc = {
@@ -1926,6 +1922,9 @@ in
               name = "neon-svc";
             }
           ];
+          selects = [
+            "wan"
+          ];
         };
         access-clients = {
           role = "access";
@@ -1934,6 +1933,9 @@ in
               kind = "tenant";
               name = "neon-clients";
             }
+          ];
+          selects = [
+            "wan"
           ];
         };
         access-iot = {
@@ -1944,6 +1946,9 @@ in
               name = "neon-iot";
             }
           ];
+          selects = [
+            "wan"
+          ];
         };
         access-iot-srv = {
           role = "access";
@@ -1952,6 +1957,9 @@ in
               kind = "tenant";
               name = "neon-iot-srv";
             }
+          ];
+          selects = [
+            "wan"
           ];
         };
         access-dmz = {
@@ -2768,11 +2776,7 @@ in
             kind = "service";
             name = "clients-dns";
           };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -2784,11 +2788,7 @@ in
             kind = "service";
             name = "svc-dns";
           };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -2798,7 +2798,7 @@ in
           priority = 95;
           from = {
             kind = "external";
-            uplinks = [ "wan" ];
+            scope = "core";
           };
           to = {
             kind = "service";
@@ -2836,11 +2836,7 @@ in
             kind = "service";
             name = "iot-dns";
           };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -2852,11 +2848,7 @@ in
             kind = "service";
             name = "iot-srv-dns";
           };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -2868,11 +2860,7 @@ in
             kind = "service";
             name = "mgmt-dns";
           };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -2889,13 +2877,7 @@ in
             kind = "tenant";
             name = "cobalt-clients-vpn";
           };
-          to = {
-            kind = "external";
-            uplinks = [
-              "onyx"
-              "opal"
-            ];
-          };
+          to = { kind = "external"; };
           action = "allow";
           returnBehavior = "symmetric";
         }
@@ -2906,11 +2888,7 @@ in
             kind = "external";
             name = "onyx";
           };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "wireguard-1637";
           action = "allow";
           returnBehavior = "symmetric";
@@ -2922,11 +2900,7 @@ in
             kind = "external";
             name = "opal";
           };
-          to = {
-            kind = "external";
-            name = "wan";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "wireguard-1637";
           action = "allow";
           returnBehavior = "symmetric";
@@ -2979,10 +2953,7 @@ in
             kind = "service";
             name = "onyx-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "onyx" ];
-          };
+          to = { kind = "external"; scope = "core-vpn-onyx"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -3009,10 +2980,7 @@ in
             kind = "service";
             name = "opal-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "opal" ];
-          };
+          to = { kind = "external"; scope = "core-vpn-opal"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -3099,10 +3067,7 @@ in
             kind = "service";
             name = "core-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "allow";
           returnBehavior = "symmetric";
@@ -3114,10 +3079,7 @@ in
             kind = "service";
             name = "clients-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "deny";
         }
@@ -3128,10 +3090,7 @@ in
             kind = "service";
             name = "svc-dns";
           };
-          to = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
+          to = { kind = "external"; scope = "core"; };
           trafficType = "dns";
           action = "deny";
         }
@@ -3612,6 +3571,9 @@ in
               name = "cobalt-svc";
             }
           ];
+          selects = [
+            "wan"
+          ];
         };
 
         access-clients = {
@@ -3621,6 +3583,9 @@ in
               kind = "tenant";
               name = "cobalt-clients";
             }
+          ];
+          selects = [
+            "wan"
           ];
         };
 
@@ -3632,6 +3597,9 @@ in
               name = "cobalt-iot";
             }
           ];
+          selects = [
+            "wan"
+          ];
         };
 
         access-iot-srv = {
@@ -3641,6 +3609,9 @@ in
               kind = "tenant";
               name = "cobalt-iot-srv";
             }
+          ];
+          selects = [
+            "wan"
           ];
         };
 
@@ -3655,6 +3626,15 @@ in
         };
 
         access-clients-vpn = {
+
+          selects = [
+
+            "onyx"
+
+            "opal"
+
+          ];
+
           role = "access";
           attachments = [
             {
@@ -3681,6 +3661,9 @@ in
               kind = "tenant";
               name = "cobalt-mgmt";
             }
+          ];
+          selects = [
+            "wan"
           ];
         };
       };
