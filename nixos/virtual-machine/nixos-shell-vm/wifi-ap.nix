@@ -147,6 +147,11 @@ let
       case "$plane" in
         ${caseArms}
       esac
+      # disable_pmksa_caching: a stale AP-side PMKSA for a client's (often
+      # randomised) MAC makes hostapd offer a cached PMKID that the client can
+      # no longer use; the association then succeeds but the key handshake
+      # never completes, which Android reports as "authorization problems".
+      # Forcing a full SAE/4-way every time removes that failure mode.
       cat > /run/ap/$iface.conf <<EOF
     ctrl_interface=${ctrl}
     logger_stdout_level=0
@@ -160,6 +165,7 @@ let
     wpa_pairwise=CCMP
     wpa_passphrase=$pass
     bridge=$bridge
+    disable_pmksa_caching=1
     EOF
       # WPA3/SAE requires protected management frames.
       if [ "$keyMgmt" = "SAE" ]; then
