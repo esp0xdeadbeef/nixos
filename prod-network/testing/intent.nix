@@ -3506,6 +3506,18 @@ in
 
         access-clients-vpn = {
 
+          # FS-481: the two VPN providers are equal-cost members of one
+          # selection; the selection requires explicit per-member liveness and
+          # concurrent equal-cost use. The behaviors are intent; the renderer
+          # must not infer them from the member count.
+          behaviors = [
+
+            "liveness"
+
+            "equal-cost-multipath"
+
+          ];
+
           selects = [
 
             "onyx"
