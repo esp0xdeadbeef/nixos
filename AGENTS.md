@@ -43,6 +43,27 @@ you placed a behavior in the right layer.
 - Do not parse intent shapes (nodes/uplinks/egress) in downstream layers;
   consume the upstream layer's normalized output.
 
+## Protected paths: prod and legacy-prod (absolute rule)
+
+The production and legacy production network surfaces are protected. This
+covers, at minimum, `prod-network/prod/`, `prod-network/current/`, any
+`*-prod` / `*-legacy-prod` flake inputs and pins, and the
+`s-router-prod` / `s-router-legacy-prod` / `s-router-prod-*` /
+`s-router-legacy-prod-*` host configs and their secrets.
+
+- Do not read, edit, delete, move, `git checkout`, `git restore`, `git stash`,
+  or otherwise mutate these paths without **explicit, current, per-session
+  permission** from the user that names the exact files. A general task, an
+  earlier approval, or another file's approval is not permission for these.
+- There are two separate permissions, and both are required:
+  1. permission to **edit** the protected files, and
+  2. permission to **push** the resulting commits.
+- Without the edit permission, treat these paths as read-only-untouchable and
+  leave them exactly as found. Do not "restore", "fix", or "clean up" them
+  as a side effect of another task.
+- When in doubt, stop and ask. An unauthorized touch of these paths is never
+  a lesser error than an incomplete task.
+
 ## Git safety (applies to every repo, not just network-*)
 
 Never discard work to "get back to a baseline". The working tree is the
