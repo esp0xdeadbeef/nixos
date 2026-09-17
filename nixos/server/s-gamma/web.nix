@@ -1,9 +1,13 @@
-{ config, profiles, relativeRepo, ... }:
+{ config, lib, profiles, relativeRepo, ... }:
 
 {
   imports = [
     profiles.nixos.web.server
   ];
+
+  # Temporarily force nginx (and therefore the public website) off on s-gamma.
+  # Set back to `lib.mkForce true` to restore the site.
+  services.nginx.enable = lib.mkForce false;
 
   profiles.web.server = {
     enable = true;
