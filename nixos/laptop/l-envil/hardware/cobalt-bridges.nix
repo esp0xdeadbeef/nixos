@@ -43,7 +43,7 @@
     "cobalt-wan0"
     "br-cobalt-lan"
     "br-cobalt-wan"
-    "br-cobalt-lan.30"
+    "cobalt-lan.30"
     "vlan30"
   ];
 
@@ -69,6 +69,13 @@
   # resulting untagged segment to the host through the `vlan30` bridge (same
   # shape as `mkBridge <parent> 30 { bridge = "vlan30"; }`). The host takes a
   # DHCP lease on that bridge.
+  #
+  # The VLAN child is named `cobalt-lan.30`, NOT `br-cobalt-lan.30`: Linux
+  # caps interface names at 15 bytes (IFNAMSIZ), and `br-cobalt-lan.30` is 16.
+  # networkd rejects an over-long name outright (both the netdev Name= and the
+  # parent's VLAN= reference), which silently leaves `vlan30` with no port and
+  # NO-CARRIER. This is a host-side realization name, not network meaning, so a
+  # short deterministic name is correct (FS-176, FS-187).
   systemd.network.netdevs = {
     "10-br-cobalt-lan" = {
       netdevConfig = {
@@ -84,9 +91,9 @@
       };
     };
 
-    "20-br-cobalt-lan.30" = {
+    "20-cobalt-lan.30" = {
       netdevConfig = {
-        Name = "br-cobalt-lan.30";
+        Name = "cobalt-lan.30";
         Kind = "vlan";
       };
       vlanConfig.Id = 30;
@@ -118,7 +125,7 @@
       linkConfig.RequiredForOnline = "no";
       # Terminate VLAN 30 off the dock trunk; the VLAN child is bridged to the
       # untagged `vlan30` bridge below.
-      networkConfig.VLAN = [ "br-cobalt-lan.30" ];
+      networkConfig.VLAN = [ "cobalt-lan.30" ];
     };
 
     "10-br-cobalt-wan" = {
@@ -128,8 +135,8 @@
     };
 
     # VLAN 30 child of the LAN trunk -> untagged clients bridge.
-    "20-br-cobalt-lan.30" = {
-      matchConfig.Name = "br-cobalt-lan.30";
+    "20-cobalt-lan.30" = {
+      matchConfig.Name = "cobalt-lan.30";
       linkConfig.RequiredForOnline = "no";
       networkConfig.Bridge = "vlan30";
     };
