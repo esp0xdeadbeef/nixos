@@ -823,11 +823,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1789701153,
-        "narHash": "sha256-uzNm6xd/G4C8ydVutSLx+v7GKZ1WOUJt5VGnwnLLjvo=",
+        "lastModified": 1789739325,
+        "narHash": "sha256-dqWu+MkWBBTgFMkMbuoPH4WImWr/CPN+a/1owpkCCA4=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "119410d2c19ab51d846f2c1ce8e6f741af1f4b32",
+        "rev": "6808497895d9dae8b6426f978d7418c810b8faa2",
         "type": "github"
       },
       "original": {
@@ -2706,11 +2706,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789680722,
-        "narHash": "sha256-/37Ltw1TgFfTLmc0RHLaiTrUIovWo+dbn7N3g4V9Zas=",
+        "lastModified": 1789739327,
+        "narHash": "sha256-8UDjX3e4AW9k3pEMQ/KgHCwIYrgm4UJB8FiQqdbo3d8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "5d4dc7a7653ee2fa2420817360341c941b3522b0",
+        "rev": "e5aa2a4cf727869e865a57bae2878836f48b954b",
         "type": "github"
       },
       "original": {
@@ -2821,11 +2821,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789680722,
-        "narHash": "sha256-/37Ltw1TgFfTLmc0RHLaiTrUIovWo+dbn7N3g4V9Zas=",
+        "lastModified": 1789739327,
+        "narHash": "sha256-8UDjX3e4AW9k3pEMQ/KgHCwIYrgm4UJB8FiQqdbo3d8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "5d4dc7a7653ee2fa2420817360341c941b3522b0",
+        "rev": "e5aa2a4cf727869e865a57bae2878836f48b954b",
         "type": "github"
       },
       "original": {
@@ -2862,11 +2862,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789680722,
-        "narHash": "sha256-/37Ltw1TgFfTLmc0RHLaiTrUIovWo+dbn7N3g4V9Zas=",
+        "lastModified": 1789739327,
+        "narHash": "sha256-8UDjX3e4AW9k3pEMQ/KgHCwIYrgm4UJB8FiQqdbo3d8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "5d4dc7a7653ee2fa2420817360341c941b3522b0",
+        "rev": "e5aa2a4cf727869e865a57bae2878836f48b954b",
         "type": "github"
       },
       "original": {
@@ -2903,11 +2903,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789680722,
-        "narHash": "sha256-/37Ltw1TgFfTLmc0RHLaiTrUIovWo+dbn7N3g4V9Zas=",
+        "lastModified": 1789739327,
+        "narHash": "sha256-8UDjX3e4AW9k3pEMQ/KgHCwIYrgm4UJB8FiQqdbo3d8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "5d4dc7a7653ee2fa2420817360341c941b3522b0",
+        "rev": "e5aa2a4cf727869e865a57bae2878836f48b954b",
         "type": "github"
       },
       "original": {
@@ -2939,11 +2939,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789680722,
-        "narHash": "sha256-/37Ltw1TgFfTLmc0RHLaiTrUIovWo+dbn7N3g4V9Zas=",
+        "lastModified": 1789739327,
+        "narHash": "sha256-8UDjX3e4AW9k3pEMQ/KgHCwIYrgm4UJB8FiQqdbo3d8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "5d4dc7a7653ee2fa2420817360341c941b3522b0",
+        "rev": "e5aa2a4cf727869e865a57bae2878836f48b954b",
         "type": "github"
       },
       "original": {
@@ -2986,11 +2986,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789680722,
-        "narHash": "sha256-/37Ltw1TgFfTLmc0RHLaiTrUIovWo+dbn7N3g4V9Zas=",
+        "lastModified": 1789739327,
+        "narHash": "sha256-8UDjX3e4AW9k3pEMQ/KgHCwIYrgm4UJB8FiQqdbo3d8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "5d4dc7a7653ee2fa2420817360341c941b3522b0",
+        "rev": "e5aa2a4cf727869e865a57bae2878836f48b954b",
         "type": "github"
       },
       "original": {
@@ -3033,11 +3033,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789680722,
-        "narHash": "sha256-/37Ltw1TgFfTLmc0RHLaiTrUIovWo+dbn7N3g4V9Zas=",
+        "lastModified": 1789739327,
+        "narHash": "sha256-8UDjX3e4AW9k3pEMQ/KgHCwIYrgm4UJB8FiQqdbo3d8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "5d4dc7a7653ee2fa2420817360341c941b3522b0",
+        "rev": "e5aa2a4cf727869e865a57bae2878836f48b954b",
         "type": "github"
       },
       "original": {
