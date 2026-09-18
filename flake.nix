@@ -113,21 +113,39 @@
 
     # Pinned production stack (frozen: never advanced by `nix flake update`).
     # s-router-prod consumes these; s-router-neon tracks the same model on main.
+    #
+    # The prod compilers and models declare their own `network-labs` input; pin
+    # it explicitly so a non-prod `network-labs` bump can never be dragged into
+    # the frozen stack through the mutable root. The revs are the ones the
+    # frozen stack resolved to when it was pinned (see flake.lock at the
+    # commit that froze the -prod inputs).
+    network-labs-prod = {
+      url = "github:esp0xdeadbeef/network-labs/11ac8629278d255dcc0c353858a75bf59e918bd3";
+    };
+
+    # The prod renderer resolved to a distinct labs rev when it was pinned.
+    network-labs-prod-renderer = {
+      url = "github:esp0xdeadbeef/network-labs/f354a51f7713871194c6a1ccedeb81735d3f71f6";
+    };
+
     network-compiler-prod = {
       url = "github:esp0xdeadbeef/network-compiler/f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-labs.follows = "network-labs-prod";
     };
 
     network-forwarding-model-prod = {
       url = "github:esp0xdeadbeef/network-forwarding-model/5f6a6cd12a68650fc9fb920981ecf0d2f5dd8f73";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-prod";
+      inputs.network-labs.follows = "network-labs-prod";
     };
 
     network-control-plane-model-prod = {
       url = "github:esp0xdeadbeef/network-control-plane-model/5f32cfe04b25e1619a12cd24365ac9165a648c8c";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
+      inputs.network-labs.follows = "network-labs-prod";
     };
 
     network-realization-schema-prod = {
@@ -153,25 +171,33 @@
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
       inputs.network-realization-model.follows = "network-realization-model-prod";
       inputs.nixos-network-compiler.follows = "nixos-network-compiler-prod";
+      inputs.network-labs.follows = "network-labs-prod-renderer";
     };
 
     # Frozen legacy production stack: the previous s-router-prod render
     # (prod-network/current), retained as s-router-legacy-prod.
+    network-labs-legacy-prod = {
+      url = "github:esp0xdeadbeef/network-labs/11ac8629278d255dcc0c353858a75bf59e918bd3";
+    };
+
     network-compiler-legacy-prod = {
       url = "github:esp0xdeadbeef/network-compiler/f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-labs.follows = "network-labs-legacy-prod";
     };
 
     network-forwarding-model-legacy-prod = {
       url = "github:esp0xdeadbeef/network-forwarding-model/5f6a6cd12a68650fc9fb920981ecf0d2f5dd8f73";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-legacy-prod";
+      inputs.network-labs.follows = "network-labs-legacy-prod";
     };
 
     network-control-plane-model-legacy-prod = {
       url = "github:esp0xdeadbeef/network-control-plane-model/5f32cfe04b25e1619a12cd24365ac9165a648c8c";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-legacy-prod";
+      inputs.network-labs.follows = "network-labs-legacy-prod";
     };
 
     network-realization-schema-legacy-prod = {
@@ -197,6 +223,7 @@
       inputs.network-forwarding-model.follows = "network-forwarding-model-legacy-prod";
       inputs.network-realization-model.follows = "network-realization-model-legacy-prod";
       inputs.nixos-network-compiler.follows = "nixos-network-compiler-legacy-prod";
+      inputs.network-labs.follows = "network-labs-legacy-prod";
     };
 
     network-renderer-containerlab-linux-backend = {
