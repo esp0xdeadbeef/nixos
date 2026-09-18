@@ -823,10 +823,12 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1789754896,
-        "narHash": "sha256-IvAo1r8j2kGNDezmgu6oira3OXjWbtGZEScfZm/FNrU=",
-        "path": "/home/deadbeef/github/network-control-plane-model",
-        "type": "path"
+        "lastModified": 1789754926,
+        "narHash": "sha256-AxL3H0EUKiooYbTQV4a6GeQ4SHn5eosJZ2w1Q+P3xxM=",
+        "owner": "esp0xdeadbeef",
+        "repo": "network-control-plane-model",
+        "rev": "c3783ccfa624e812d00235dec1d434eec1121b58",
+        "type": "github"
       },
       "original": {
         "owner": "esp0xdeadbeef",
