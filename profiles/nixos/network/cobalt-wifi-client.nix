@@ -9,7 +9,7 @@
 let
   cfg = config.local.network.cobalt-wifi-client;
 
-  ssidList = inputs.wifi-ssids.outPath + "/ssids.txt";
+  ssidList = relativeRepo.sourcePath "library/01-general/network/ssids.txt";
   deriveSsid = pkgs.writeShellScript "derive-ssid" (
     builtins.readFile (relativeRepo.sourcePath "library/01-general/network/wifi-ssid-derive.sh")
   );
