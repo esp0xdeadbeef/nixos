@@ -120,29 +120,29 @@
     # frozen stack resolved to when it was pinned (see flake.lock at the
     # commit that froze the -prod inputs).
     network-labs-prod = {
-      url = "github:esp0xdeadbeef/network-labs/11ac8629278d255dcc0c353858a75bf59e918bd3";
+      url = "github:esp0xdeadbeef/network-labs/8ee6e2fea34fbddea24e9918e96d30c72132adb6";
     };
 
     # The prod renderer resolved to a distinct labs rev when it was pinned.
     network-labs-prod-renderer = {
-      url = "github:esp0xdeadbeef/network-labs/f354a51f7713871194c6a1ccedeb81735d3f71f6";
+      url = "github:esp0xdeadbeef/network-labs/8ee6e2fea34fbddea24e9918e96d30c72132adb6";
     };
 
     network-compiler-prod = {
-      url = "github:esp0xdeadbeef/network-compiler/f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5";
+      url = "github:esp0xdeadbeef/network-compiler/12f79fc3dbc465a420ce92f13d3a6fb1dabeb5c9";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-labs.follows = "network-labs-prod";
     };
 
     network-forwarding-model-prod = {
-      url = "github:esp0xdeadbeef/network-forwarding-model/5f6a6cd12a68650fc9fb920981ecf0d2f5dd8f73";
+      url = "github:esp0xdeadbeef/network-forwarding-model/9e3a4e9b4997eece570520b618af97769f78c5b6";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-compiler.follows = "network-compiler-prod";
       inputs.network-labs.follows = "network-labs-prod";
     };
 
     network-control-plane-model-prod = {
-      url = "github:esp0xdeadbeef/network-control-plane-model/5f32cfe04b25e1619a12cd24365ac9165a648c8c";
+      url = "github:esp0xdeadbeef/network-control-plane-model/d2b12fdbc6b3f405bb1af90e37b2ece47de12a3c";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
       inputs.network-labs.follows = "network-labs-prod";
@@ -160,12 +160,12 @@
     };
 
     nixos-network-compiler-prod = {
-      url = "github:esp0xdeadbeef/nixos-network-compiler/f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5";
+      url = "github:esp0xdeadbeef/nixos-network-compiler/12f79fc3dbc465a420ce92f13d3a6fb1dabeb5c9";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     network-renderer-nixos-prod = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos/f7d8a020961f755207a52226372b46b45e274c68";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/be1696bcdafd00fded9884ea92dea25b60a4f71b";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-prod";
