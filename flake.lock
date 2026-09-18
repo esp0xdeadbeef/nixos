@@ -2706,7 +2706,6 @@
         ]
       },
       "locked": {
-        "__final": true,
         "lastModified": 1789743361,
         "narHash": "sha256-ROosMy+SFWP9pjWeRelDSBDEcKwmZlKU0qbVgWuMb60=",
         "owner": "esp0xdeadbeef",
@@ -2822,7 +2821,6 @@
         ]
       },
       "locked": {
-        "__final": true,
         "lastModified": 1789743361,
         "narHash": "sha256-ROosMy+SFWP9pjWeRelDSBDEcKwmZlKU0qbVgWuMb60=",
         "owner": "esp0xdeadbeef",
@@ -2864,7 +2862,6 @@
         ]
       },
       "locked": {
-        "__final": true,
         "lastModified": 1789743361,
         "narHash": "sha256-ROosMy+SFWP9pjWeRelDSBDEcKwmZlKU0qbVgWuMb60=",
         "owner": "esp0xdeadbeef",
@@ -2906,7 +2903,6 @@
         ]
       },
       "locked": {
-        "__final": true,
         "lastModified": 1789743361,
         "narHash": "sha256-ROosMy+SFWP9pjWeRelDSBDEcKwmZlKU0qbVgWuMb60=",
         "owner": "esp0xdeadbeef",
@@ -2990,7 +2986,6 @@
         ]
       },
       "locked": {
-        "__final": true,
         "lastModified": 1789743361,
         "narHash": "sha256-ROosMy+SFWP9pjWeRelDSBDEcKwmZlKU0qbVgWuMb60=",
         "owner": "esp0xdeadbeef",
@@ -3038,7 +3033,6 @@
         ]
       },
       "locked": {
-        "__final": true,
         "lastModified": 1789743361,
         "narHash": "sha256-ROosMy+SFWP9pjWeRelDSBDEcKwmZlKU0qbVgWuMb60=",
         "owner": "esp0xdeadbeef",
