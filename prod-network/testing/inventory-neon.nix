@@ -230,6 +230,11 @@ let
 
   coreUpstreamLink = "p2p-core-upstream-selector";
   upstreamPolicyVlan2Link = "p2p-policy-upstream-selector--access-access-vlan2--uplink-wan";
+  # FS-210/FS-230: vlan3 hosts the DMZ service (the Nebula lighthouse). Its
+  # public-ingress replies need the ingress/return transport lane; this is a
+  # transport binding, not WAN egress for vlan3 (access-vlan3 declares no
+  # selects).
+  upstreamPolicyVlan3Link = "p2p-policy-upstream-selector--access-access-vlan3--uplink-wan";
   upstreamPolicyVlan7Link = "p2p-policy-upstream-selector--access-access-vlan7--uplink-wan";
   policyDownstreamVlan2Link = "p2p-downstream-selector-policy--access-access-vlan2";
   policyDownstreamVlan3Link = "p2p-downstream-selector-policy--access-access-vlan3";
@@ -369,6 +374,13 @@ let
       interfaceName = "policy-vlan2";
     };
 
+    policy-vlan3 = p2pPort {
+      link = upstreamPolicyVlan3Link;
+      adapterName = "prod-5b8cc11484ec";
+      bridge = "rt-upstream-policy-vlan3";
+      interfaceName = "policy-vlan3";
+    };
+
     policy-vlan7 = p2pPort {
       link = upstreamPolicyVlan7Link;
       adapterName = "prod-f3bcb2fb5b11";
@@ -424,6 +436,13 @@ let
       adapterName = "prod-d9b6a07da75d";
       bridge = "rt-upstream-policy-vlan2";
       interfaceName = "upstream-vlan2";
+    };
+
+    upstream-vlan3 = p2pPort {
+      link = upstreamPolicyVlan3Link;
+      adapterName = "prod-782910d2984a";
+      bridge = "rt-upstream-policy-vlan3";
+      interfaceName = "upstream-vlan3";
     };
 
     upstream-vlan7 = p2pPort {
@@ -1456,6 +1475,7 @@ in
           rt-policy-downstream-vlan3 = { };
           rt-policy-downstream-vlan7 = { };
           rt-upstream-policy-vlan2 = { };
+          rt-upstream-policy-vlan3 = { };
           rt-upstream-policy-vlan7 = { };
           rt-downstream-access-vlan8 = { };
           rt-policy-downstream-vlan8 = { };
