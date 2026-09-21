@@ -291,8 +291,17 @@
 
     # integrated:
     # nix run github:Mic92/nixos-shell -- --flake .#vm
+    #
+    # Pinned to the latest stable release tag. Upstream `main` migrated to
+    # virtiofs (59c2a95) and requires `virtualisation.sharedDirectories.*.writable`,
+    # which only exists in nixos-unstable. The primary `nixpkgs` input tracks
+    # the stable nixos-26.05 branch, whose qemu-vm still shares via 9p, so the
+    # newer module cannot evaluate here. Move back to `main` once the primary
+    # nixpkgs reaches 26.11; the guard in
+    # library/10-vms/nixos-shell-vm/1-helpers/vm-storage-persist.nix fails on
+    # 26.11, so the migration cannot be forgotten.
     nixos-shell = {
-      url = "github:Mic92/nixos-shell";
+      url = "github:Mic92/nixos-shell/2.2.0";
     };
 
     nixos-shell-vm-manager = {
