@@ -33,6 +33,14 @@ let
           IdentitiesOnly yes
           IdentityFile /root/.ssh/id_remote-builder
           StrictHostKeyChecking accept-new
+          # Bound the connect phase. Nix's `connect-timeout` is the
+          # substituter (curl) timeout only, so it does not apply to the
+          # ssh-ng builder: a blackholed (offline) builder otherwise stalls
+          # on the OS TCP SYN timeout (~2 min) for every derivation scheduled
+          # to it, and only then does `fallback` retry locally. Failing the
+          # ssh connect fast lets the local build start promptly.
+          ConnectTimeout 5
+          ConnectionAttempts 1
     '')
     (builtins.attrNames enabledBuilders);
 
@@ -190,6 +198,9 @@ in
       settings = {
         builders-use-substitutes = true;
         fallback = true;
+        # Substituter (curl) connect timeout only; it does NOT bound ssh-ng
+        # builder connections. That is `ConnectTimeout` in the generated
+        # /root/.ssh/config, see sshConfigText above.
         connect-timeout = 5;
       };
     };
