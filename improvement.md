@@ -3,28 +3,20 @@
 This is a planning note only. Do not implement these changes while the current
 repository changes are still being validated.
 
+Everything here is **open work**. Completed migrations (the `relativeRepo`
+helper, the `cudaCache` module, the nixos-shell VM host profile, the LLM
+profiles, removal of `outPath`) have been dropped from this document — do not
+re-add them as proposals. If a step below is finished, delete it rather than
+leaving it as history.
+
 ## Current Structure
 
-The root README says this repository was originally private, was published later
-because someone asked for it, and is based on Misterio77's
-`nix-starter-configs`. That matters: the current structure should be treated as
-an evolved personal workstation/server config, not as a deliberately designed
-public framework. The cleanup should preserve working host behavior and reduce
-surprise gradually.
+The repo originated from Misterio77's `nix-starter-configs` and evolved into an
+active personal + production config. That history is useful context, but the
+structure should now be treated as a deliberate design, not a starter template.
 
-The README also explicitly calls out the old ugly importer pattern:
-
-```sh
-(echo '{ pkgs, ... }: { imports = ['; find . -name 'build_*' -prune -o -name '*.nix' ! -name 'default.nix' -print; echo ']; }') | nixfmt | tee ./default.nix
-```
-
-That explains why several directories look like generated import surfaces and
-why `build_*` files are scattered around. The improvement plan should replace
-that importer workflow with explicit, named profile imports, not just rearrange
-files.
-
-The repository is flake-based. `flake.nix` owns host discovery and creates every
-`nixosConfigurations` entry automatically from direct subdirectories under:
+The flake owns host discovery. `flake.nix` scans these roots and creates every
+`nixosConfigurations` entry automatically:
 
 - `nixos/laptop`
 - `nixos/server`
@@ -32,81 +24,96 @@ The repository is flake-based. `flake.nix` owns host discovery and creates every
 - `nixos/virtual-machine/dedicated-vm`
 - `nixos/virtual-machine/nixos-anywhere`
 
-Each discovered host gets only its host directory imported as the root NixOS
-module. Shared context is passed through `specialArgs`, including `inputs`,
-`outputs`, `self`, `name`, and `outPath`.
+There is one arch override (`hostSystems`), for the non-x86 laptop. Do not
+replace discovery with a hand-maintained host list.
 
-The repo currently has these broad areas:
+The broad areas:
 
-- `nixos/`: concrete host definitions, hardware, service stacks, VM definitions,
-  install notes, and host-local experiments.
-- `home-manager/`: per-user Home Manager configs plus some shared Home Manager
-  snippets under `home-manager/01-general` and `home-manager/02-window-manager-i3`.
-- `library/`: legacy shared NixOS configuration bundles and helper modules.
-- `profiles/`: named NixOS and Home Manager profiles. This is now the main
-  reusable profile layer.
-- `modules/nixos` and `modules/home-manager`: exported module surfaces, still
-  underused compared with `profiles/`.
-- `overlays/`: overlay exports, currently `additions`, `modifications`, and
-  `unstable-packages`.
-- `pkgs/`: flake package export point, including reusable tools such as
-  `pentest-workspace`.
-- `secrets/`: SOPS data and key-management notes.
+- `nixos/`: concrete hosts, hardware, service stacks, VM definitions.
+- `home-manager/`: per-user Home Manager configs plus shared snippets.
+- `library/`: shared bundles and helpers. `library/01-general` is still the
+  broad legacy bundle and is the main outstanding split target.
+- `profiles/`: named NixOS and Home Manager profiles; the main reusable layer.
+- `modules/nixos` and `modules/home-manager`: exported module surfaces.
+- `overlays/`, `pkgs/`, `secrets/`: overlays, local packages, SOPS data.
 
-## Main Problems
+## Open Problems
 
-The repo works, but boundaries are blurry:
+These are the things still worth changing. Each maps to a cleanup step below.
 
-- Some structure came from a starter template, while later host-specific work was
-  added pragmatically. The result is understandable historically, but there is
-  no longer one obvious convention for where a reusable thing should live.
-- `library/01-general/default.nix` imports a very large set of NixOS modules.
-  It mixes desktop, network, package lists, secrets, system defaults,
-  virtualization, terminal config, time, and service assumptions.
-- Host files import both true host hardware and higher-level profiles directly.
-  This makes it harder to see what is host-specific versus reusable.
-- Some reusable modules live in `library/`, some in `home-manager/01-general`,
-  while exported module directories under `modules/` are still not the clear
-  reusable API.
-- `nixos/laptop/l-envil/1-custom-packages/burp-fix.nix` is still host-local.
-  That is fine if it is only `/etc` glue for one laptop, but it should move if
-  it becomes a package or reusable wrapper.
-- Overlays are used both for actual overlays and for injecting `pkgs.unstable`.
-  That pattern works, but makes package provenance less explicit.
-- There are old, backup, and experimental files mixed into active trees:
-  `z_old`, `*.bak`, `not-workingyet`, `build_*`, and TODO-named directories.
-- `library/default.nix` currently duplicates the legacy edge assertion module
-  content instead of acting as the root library index. That is surprising and
-  should be fixed in a cleanup branch.
-- The generated-importer mindset makes it easy to add files and hard to know
-  whether a file is intentionally imported, accidentally imported, or dead.
+### Imports
+
+- `library/01-general` is still too broad. Every host that imports it inherits
+  desktop, virtualization, and other assumptions whether it needs them or not.
+- Two import philosophies coexist and the live code contradicts the stated
+  rule. The README and AGENTS.md say to import by explicit intent, yet
+  `library/imports.nix` still provides `enabledImports` /
+  `enabledImportsRecursive` directory-scanning discovery, and it is still called
+  from `home-manager/l-esp/projects/default.nix` and
+  `nixos/laptop/l-esp/optional/default.nix`. Either migrate those two call sites
+  to explicit imports and retire the helper, or document the exception. Do not
+  leave both conventions undocumented.
+
+### Conventions
+
+- AGENTS.md prescribes top-level modules as `{ pkgs, lib, config, inputs, ... }`
+  and feature flags via an `enable` boolean, but only a minority of `.nix` files
+  use `mkOption` / `mkEnableOption`, and many `library/*/default.nix` files are
+  bare `imports` aggregators with no option. Decide whether the option
+  convention applies to new modules only or retroactively, and write that down.
+
+### Tooling
+
+- The formatter gate does not gate. The `formatter` in `flake.nix` exits 0 with
+  `No .nix files supplied; skipping formatter.` when called with no arguments,
+  which is how `nix fmt` and CI invoke it. Nothing enforces the AGENTS.md
+  formatting rule, and the tree has drifted. Fix the wrapper, then clear the
+  drift.
+- The AGENTS.md checking gate, `nix flake check --all-systems`, has no PR-time
+  workflow. The scheduled flake-lock workflow covers derivation evaluation; a
+  push/PR check would close the loop for ordinary changes.
+
+### Repo hygiene
+
+- Stale local refs: six local branches and one live `stash@{0}` (a WIP intent
+  revert captured before a restore). The stash sits on top of protected
+  `prod-network` intent and must be resolved explicitly before further network
+  work, not left dangling. There are no tags, so these branches hold the only
+  refs to that history; delete them only after confirming nothing unique is
+  lost.
+- `overlays/not-workingyet/` is tracked and overlaps the stale-file cleanup.
+- `library/02-window-manager-i3` and `library/03-window-manager-sway` overlap
+  with `profiles/nixos/desktop/*`; fold them in or delete them.
+
+### Protected paths
+
+- `prod-network/{prod,testing,current}/` are near-duplicate large trees
+  (`intent.nix` alone is ~3.6k lines each, with matching inventory and per-device
+  SOPS secrets). These paths are protected: do not read, edit, or move them
+  without explicit, per-session permission naming the exact files. The
+  duplication is recorded only so a single-source-of-truth design can be
+  proposed deliberately later; do not act on it as a side effect of unrelated
+  work.
 
 ## Proposed Target Layout
 
-The goal is not to make every host list every tiny file. That becomes noisy and
-defeats the point of having reusable config. The goal is also not to import one
-huge `default.nix` everywhere, because then hosts silently receive capabilities
-they do not need.
-
-Use the host root as a readable menu, and make the menu items small named
+The goal is not to make every host list every tiny file, and not to import one
+huge bundle everywhere. Use the host root as a readable menu of small named
 bundles:
 
 ```nix
 {
   imports = [
-    # External modules
     inputs.lanzaboote.nixosModules.lanzaboote
     inputs.impermanence.nixosModules.impermanence
     inputs.home-manager.nixosModules.home-manager
     inputs.sops-nix.nixosModules.sops
 
-    # Shared profiles
     profiles.base
     profiles.desktop.i3
     profiles.virtualization.libvirt-host
     profiles.virtualization.podman
 
-    # Host-local modules
     ./hardware
     ./connect-nas
     ./nixos-shell-servers
@@ -114,51 +121,21 @@ bundles:
 }
 ```
 
-That is the balance to aim for:
+Boundaries:
 
-- the host config is explicit about intent;
-- the host config does not contain a long list of implementation files;
-- shared bundles are narrow enough that their names mean something;
-- broad convenience bundles are allowed, but only when the name truly matches
-  the host.
-
-Aim for a structure where a host says:
-
-```nix
-{
-  imports = [
-    profiles.base
-    profiles.desktop.i3
-    profiles.virtualization.host
-    roles.laptop
-    ./hardware
-    ./services
-    ./home.nix
-  ];
-}
-```
-
-The exact names can change, but the important boundary is:
-
-- `hosts/` or current `nixos/`: only concrete machines and their local hardware.
-- `profiles/nixos/`: reusable system profiles, such as desktop, server,
-  virtualization host, impermanence, pentesting workstation, router VM host.
-- `profiles/home-manager/`: reusable user profiles, such as editors, i3, git,
-  PDF tools, virt-manager settings.
-- `modules/nixos/`: real option-bearing reusable NixOS modules.
-- `modules/home-manager/`: real option-bearing reusable Home Manager modules.
+- `nixos/`: only concrete machines and their local hardware.
+- `profiles/nixos/`: reusable system profiles (desktop, server, virtualization
+  host, impermanence, pentest, router VM host).
+- `profiles/home-manager/`: reusable user profiles.
+- `modules/nixos` / `modules/home-manager`: real option-bearing reusable modules.
 - `pkgs/`: all local package derivations.
-- `overlays/`: only package-set modifications that cannot be represented as
-  packages.
-- `lib/` or `nix/lib/`: helper functions for host discovery, import generation,
-  package helpers, and option helpers.
+- `overlays/`: only package-set modifications that cannot be a package.
+- `library/`: helpers only, once `library/01-general` is fully split.
 
 ### Convenience Bundles
 
-Convenience bundles are still useful. The mistake is having only one huge bundle
-such as `library/01-general/default.nix`.
-
-Better:
+Convenience bundles are still useful; the mistake is having one catch-all such
+as `library/01-general/default.nix`. Prefer role-named bundles:
 
 ```nix
 profiles.workstation.default = [
@@ -170,215 +147,42 @@ profiles.workstation.default = [
 ];
 ```
 
-Then a real workstation can import `profiles.workstation.default`, while
-`s-sigma` can import only the subset it needs. If a host imports a convenience
-bundle, the bundle name should describe a real role, not just "general".
-
-For `s-sigma`, a good first target would be something like:
-
-```nix
-imports = [
-  profiles.base
-  profiles.desktop.i3
-  profiles.virtualization.libvirt-host
-
-  ./hardware
-  ./connect-nas
-  ./nixos-shell-servers
-];
-```
-
-This keeps `s-sigma/default.nix` compact, but it no longer has to inherit every
-desktop/workstation/pentest package from a generic catch-all import.
-
-## Imports
-
-### Current Import Style
-
-Current host configs import many paths directly. Example patterns:
-
-- `${outPath}/library/01-general`
-- `${outPath}/library/02-window-manager-i3`
-- local `./hardware`, `./connect-nas`, `./llms`, etc.
-- direct Home Manager module imports inside each user config.
-
-This is simple, but it scales poorly because `library/01-general` is too broad.
-Every host that imports it gets desktop packages, virtualization packages, and
-other assumptions whether it needs them or not.
-
-It also makes cache behavior worse than necessary. `outPath` is currently based
-on `self.outPath`, so values like `"${outPath}/some/file.nix"` carry a reference
-to the whole flake source. That means unrelated repository changes can affect
-derivations or generated config that only need one module, patch, secret file, or
-model input.
-
-The README's generated importer command also hints at a previous approach where
-directory content determined imports automatically. That is fine during early
-personal config growth, but long term it makes review and rollback harder.
-Imports should become intentional API boundaries.
-
-### Add A Relative Repo Helper
-
-Do not try to make `outPath` itself relative. A value such as `"../../.."` is a
-string, not a Nix path literal, and Nix will not resolve it relative to the file
-that happens to use it. Replacing `outPath` with a function would also break
-existing `"${outPath}/..."` and `outPath + "/..."` call sites.
-
-Instead, add a new helper to `specialArgs`, tentatively named `relativeRepo`, and
-keep `outPath = self.outPath` as a legacy compatibility value until the migration
-is complete.
-
-The helper should be evaluated at the call site by passing `__curPos`. It can
-find the repository root by walking upward from `builtins.dirOf __curPos.file`
-until it finds `flake.nix`.
-
-Expose two separate operations:
-
-```nix
-relativeRepo.import __curPos "library/10-vms/nixos-shell-vm/host-config"
-relativeRepo.path __curPos "secrets/${config.networking.hostName}.yaml"
-```
-
-- `relativeRepo.import` is only for module imports and eval-only imports. It may
-  return an absolute string into the flake source.
-- `relativeRepo.path` is for real file dependencies such as `sopsFile`,
-  `lib.fileContents`, patches, renderer model inputs, and any value that can
-  enter a derivation or runtime config. It should wrap the target with
-  `builtins.path` so the store context is attached to the specific file or
-  directory rather than to the whole flake source.
-
-Sketch:
-
-```nix
-relativeRepo =
-  let
-    findRoot = dir:
-      if builtins.pathExists (dir + "/flake.nix") then
-        dir
-      else
-        let
-          parent = builtins.dirOf dir;
-        in
-        if parent == dir then
-          throw "relativeRepo: could not find flake.nix above ${dir}"
-        else
-          findRoot parent;
-
-    rootOf = pos: findRoot (builtins.dirOf pos.file);
-    clean = rel: lib.removePrefix "/" rel;
-  in
-  {
-    import = pos: rel: rootOf pos + "/${clean rel}";
-
-    path = pos: rel:
-      builtins.path {
-        path = rootOf pos + "/${clean rel}";
-        name = builtins.baseNameOf rel;
-      };
-  };
-```
-
-Migration examples:
-
-```nix
-imports = [
-  (relativeRepo.import __curPos "library/01-general/desktop/shell-env.nix")
-];
-
-sops.defaultSopsFile =
-  relativeRepo.path __curPos "secrets/${config.networking.hostName}.yaml";
-```
-
-This should be introduced before removing old `outPath` usage. Migrate call
-sites by category:
-
-1. Module imports and simple `import` expressions can move to
-   `relativeRepo.import`.
-2. Secrets, SSH public keys, patches, renderer inputs, and source directories
-   should move to `relativeRepo.path`.
-3. Broad source roots such as `vmSourceForHost` should be reviewed separately;
-   they may need purpose-built filtered sources rather than a generic repo path.
-
-Validate the helper with targeted evals before broad migration. In particular,
-check that `builtins.getContext` for `relativeRepo.path` points at the specific
-target store path, while imports still evaluate successfully.
-
-### Improve Import Boundaries
-
-Split broad bundles into focused profiles:
-
-- `profiles/nixos/base`: locale, nix settings, gc, common CLI tools, SSH defaults.
-- `profiles/nixos/desktop`: fonts, XDG portal, screen recording, desktop packages.
-- `profiles/nixos/i3`: i3/Xorg-specific system dependencies.
-- `profiles/nixos/virtualization-host`: libvirt, docker/podman/lxc, virt packages.
-- `profiles/nixos/pentest`: pentest package set and wordlists.
-- `profiles/nixos/impermanence-workstation`: shared impermanence patterns, with
-  host-specific file lists kept per host.
-- `profiles/nixos/server`: server defaults, no desktop assumptions.
-- `profiles/home/editors`: shared VS Code/VSCodium policy.
-- `profiles/home/i3`: shared i3 Home Manager config.
-
-Then make hosts import profiles by intent rather than importing the whole
-`library/01-general` bundle.
-
-This does not require abandoning the Misterio77-style flake structure. Keep the
-good parts from the starter pattern: flake outputs, `nixosConfigurations`,
-overlays, packages, and module exports. The improvement is to make the imports
-semantic rather than generated from directory contents.
+A host can then import `profiles.workstation.default`, while `s-sigma` imports
+only the subset it needs. If a host imports a bundle, the bundle name should
+describe a real role, not just "general".
 
 ### Practical Rule Of Thumb
 
 If a host file imports more than roughly 15 tiny shared files, introduce a named
 profile. If a profile configures unrelated domains, split it.
 
-Good profile names describe why a host wants them:
+Good names describe why a host wants them (`profiles.base`,
+`profiles.desktop.i3`, `profiles.virtualization.libvirt-host`,
+`profiles.packages.pentest`). Weak names hide intent (`general`, `common`,
+`default`, `everything`).
 
-- `profiles.base`
-- `profiles.desktop.i3`
-- `profiles.virtualization.libvirt-host`
-- `profiles.packages.pentest`
-- `profiles.server.vm-host`
-
-Weak profile names hide intent:
-
-- `general`
-- `common`
-- `default`
-- `everything`
-
-Some `default.nix` files are still fine, but they should mean "default for this
-specific role or directory", not "all shared config in the repo".
+`default.nix` is fine when it means "default for this specific role or
+directory", not "all shared config in the repo".
 
 ### Use Module Export Sets
 
 Populate `modules/nixos/default.nix` and `modules/home-manager/default.nix` with
-named modules. This gives stable names:
+stable named modules:
 
 ```nix
 outputs.nixosModules.virtualization-host
 outputs.homeManagerModules.editors-vscode
 ```
 
-Host configs can still use relative paths, but exported names make it easier to
-reuse modules in tests, VMs, or external flakes.
+Hosts can still use relative paths, but exported names make reuse in tests, VMs,
+and external flakes easier. Add names only after the profile names settle.
 
 ## Overlays
-
-### Current Overlay State
-
-`overlays/default.nix` exposes:
-
-- `additions`: imports packages from `pkgs/`.
-- `modifications`: currently empty.
-- `unstable-packages`: adds `pkgs.unstable`.
-
-The removed `certipy-ad` overlay is a good example of an overlay that was useful
-temporarily but should not live forever once upstream is fixed.
 
 ### Overlay Policy
 
 Use overlays only for package-set changes that must affect dependency resolution
-inside nixpkgs. Examples:
+inside nixpkgs:
 
 - replacing a dependency inside another package;
 - carrying a temporary upstream patch;
@@ -386,311 +190,35 @@ inside nixpkgs. Examples:
 
 Do not use overlays for normal local packages. Put those in `pkgs/`.
 
-Add comments for every non-empty overlay:
-
-- what it changes;
-- why it exists;
-- upstream issue or PR if available;
-- removal condition.
-
-Example:
-
-```nix
-modifications = final: prev: {
-  # TODO(remove after nixpkgs#123456 reaches nixos-26.05):
-  # Fix foo runtime dependency mismatch.
-  foo = prev.foo.overrideAttrs (...);
-};
-```
+Add a comment to every non-empty overlay stating what it changes, why it exists,
+the upstream issue/PR if any, and the removal condition.
 
 ### Unstable Package Set
 
-The `pkgs.unstable` overlay is convenient, but it hides provenance. Keep it if it
-is useful, but standardize access:
+`pkgs.unstable` is convenient but hides provenance. Standardize access:
 
-- Use `pkgs.unstable.<package>` for intentionally unstable packages.
-- Avoid ad hoc `import inputs.nixpkgs-unstable` in individual modules.
-- If a module must choose stable versus unstable, make that explicit in the
-profile or module option.
+- use `pkgs.unstable.<package>` for intentionally unstable packages;
+- avoid ad hoc `import inputs.nixpkgs-unstable` in individual modules;
+- if a module must choose stable versus unstable, make that explicit in the
+  profile or module option.
 
 ## Packages
 
-### Package-Backed Modules
-
 For host features that install a local package and configure system integration,
-split package and module:
+split package from module:
 
-- package derivation in `pkgs/<name>/default.nix`;
-- NixOS module in `profiles/nixos/<feature>.nix` or
-  `modules/nixos/<feature>.nix`.
+- derivation in `pkgs/<name>/default.nix`;
+- NixOS module in `profiles/nixos/<feature>.nix` or `modules/nixos/<feature>.nix`.
 
-This prevents package build logic from being hidden inside host config.
-
-Keep `burp-fix` host-local only while it is just `l-envil`-specific `/etc` glue.
-If it becomes a reusable wrapper or package, move the derivation into `pkgs/`
-and keep the system integration in a profile or module.
-
-## NixOS-Shell VM Host Profile
-
-The VM host interface is now `profiles.nixos.vm-host.nixos-shell`. This profile
-is intentionally a thin adapter for the external `nixos-shell-vm-manager`
-module; it does not contain lifecycle scripts or a second option schema.
-
-Host inventories configure `services.nixosShellVmManager` directly. The paired
-`s-sigma` and `s-tau` hosts share their common inventory and health policy in
-`nixos/server/nixos-shell-vm-inventory.nix`, while each host keeps its
-own carrier and start-on-boot authority in its local
-`nixos-shell-servers` directory. `l-esp` keeps its independent test inventory.
-
-The host generation contains every assigned immutable VM image. Activation can
-therefore register a candidate without building or downloading anything, and a
-VM can start after a cold offline boot. Only instances with the explicit
-`activation.refreshPins = true` policy may attempt a network-dependent lock
-refresh before an eligible start; failure falls back to the host-pinned image.
-
-Generic rollout, rollback, QGA health, persistent-disk, tmux-console, carrier,
-and stop-authority behavior belongs in `nixos-shell-vm-manager`. Consumer host
-files should only assign images and host-specific policy. Guest configuration
-remains under `nixos/virtual-machine/nixos-shell-vm`.
-
-The former in-repository lifecycle implementation has been retired. Do not add
-host-local image services, update timers, QMP scripts, or another versioned VM
-host profile. Changes to lifecycle behavior require manager construction and
-integration evidence before a consumer pin is advanced.
-
-## LLM Workstation Profiles
-
-The LLM-related modules are another obvious place where the repo should become
-easier. The current setup works, but the intent is split across host-local files:
-
-- `nixos/laptop/l-esp/llms/default.nix`
-- `nixos/laptop/l-esp/llms/ollama.nix`
-- `nixos/laptop/l-esp/llms/lmstudio.nix`
-- `nixos/laptop/l-envil/llms/ollama.nix`
-- `nixos/laptop/l-envil/llms/lmstudio.nix`
-- `nixos/laptop/l-envil/llms/web-ui-ollama.nix`
-
-The repeated concepts are:
-
-- install LM Studio;
-- enable Ollama;
-- choose CPU versus CUDA Ollama package;
-- preload a model list;
-- optionally expose Ollama on `0.0.0.0`;
-- optionally allow port `11434` on selected firewall interfaces;
-- optionally run Open WebUI backed by Ollama;
-- persist Ollama and LM Studio state on impermanent hosts.
-
-That is exactly the kind of config that should become a profile with a few host
-choices, not a pair of copied host-local modules.
-
-### Desired Shape
-
-Use one shared LLM profile with options, or a small set of named profiles:
-
-```nix
-profiles.nixos.llm.ollama
-profiles.nixos.llm.lmstudio
-profiles.nixos.llm.open-webui
-```
-
-For the host, the import should remain readable:
-
-```nix
-imports = [
-  profiles.llm.ollama
-  profiles.llm.lmstudio
-  profiles.llm.open-webui
-];
-```
-
-If options are worth it, a local module could look like:
-
-```nix
-services.local.llm = {
-  ollama = {
-    enable = true;
-    package = "cuda"; # or "default"
-    host = "0.0.0.0";
-    models = [
-      "llama3.1:8b"
-      "qwen2.5-coder:1.5b-base"
-      "nomic-embed-text"
-    ];
-    firewallInterfaces = [ "podman0" ];
-  };
-
-  lmstudio.enable = true;
-
-  openWebui = {
-    enable = true;
-    bind = "127.0.0.1:3000";
-    dataDir = "/persist/var/lib/open-webui";
-  };
-};
-```
-
-This keeps the host decision explicit without making every host copy the same
-Ollama service definition.
-
-### Split Defaults From Host Choices
-
-The model list is a host choice. Do not hide it inside a generic default unless
-it is truly universal.
-
-Better:
-
-- shared profile defines how Ollama is configured;
-- host defines which models it wants;
-- a convenience model set can exist for common cases.
-
-Example:
-
-```nix
-llmModelSets.default = [
-  "llama3.1:8b"
-  "qwen2.5-coder:1.5b-base"
-  "nomic-embed-text"
-];
-
-llmModelSets.heavy = llmModelSets.default ++ [
-  "deepseek-coder:33b"
-  "nous-hermes2:34b"
-];
-```
-
-Then `l-esp` can use a lighter set and `l-envil` can use a CUDA/heavy set.
-
-### Package Selection
-
-Avoid ad hoc imports of `inputs.nixpkgs-unstable` inside LLM modules. Prefer the
-repo convention:
-
-```nix
-pkgs.unstable.ollama-cuda
-pkgs.unstable.ollama
-```
-
-The module can select between them based on a simple host option:
-
-```nix
-package = if cfg.cuda then pkgs.unstable.ollama-cuda else pkgs.unstable.ollama;
-```
-
-This keeps unstable usage visible and consistent with the rest of the repo.
-
-### Binary Caches For CUDA Packages
-
-CUDA-backed LLM packages are not normal workstation packages operationally. If
-`ollama-cuda`, CUDA-enabled Python packages, Hashcat, or similar packages miss
-the binary cache, the laptop may try to build a large CUDA closure locally. That
-is slow at best and can make validation risky while other repo changes are being
-tested.
-
-Binary cache configuration now lives in a small reusable NixOS module:
-
-```nix
-outputs.nixosModules.cudaCache
-local.nix.cudaCache
-```
-
-It is also imported through `library/01-general` so hosts that already use the
-shared library get the option definitions. The module auto-enables only when the
-evaluated NixOS config declares the Nvidia driver or Nvidia kernel modules. This
-means `l-esp` and `l-envil` get the CUDA cache automatically, while `s-sigma`
-does not as long as Nvidia remains disabled there.
-
-The current public CUDA cache configured by the module is:
-
-```nix
-nix.settings = {
-  extra-substituters = [
-    "https://cache.nixos-cuda.org"
-  ];
-  extra-trusted-public-keys = [
-    "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
-  ];
-};
-```
-
-Use `extra-substituters`, not a replacement `substituters` list, so the normal
-NixOS cache remains active. The old `cuda-maintainers.cachix.org` cache should
-not be reintroduced without checking whether it is still current.
-
-Private/local cache support is intentionally not part of this implementation.
-There is no local cache running right now, so adding options for one would only
-increase surface area without solving the current problem. If a private cache or
-remote builder becomes useful later, design it as a separate Nix profile.
-
-Do not hide this inside the Ollama service module itself. Package selection and
-cache selection are related, but they are different decisions. A host should be
-able to say "use CUDA Ollama" and separately say "trust the public CUDA cache".
-
-Practical first step:
-
-1. Keep the public CUDA cache module auto-enabled from declared Nvidia driver
-   usage.
-2. Test with `nix build --dry-run` for `l-esp` and `l-envil` to see whether
-   `ollama-cuda` downloads or builds.
-3. If cache misses still happen often, decide separately whether a remote builder
-   or private cache is worth adding later.
-
-### Persistence
-
-Ollama persistence is currently entangled with impermanence comments and
-host-specific file lists. Make the LLM profile declare the generic persistence
-needs, but let hosts decide whether impermanence is active.
-
-Useful defaults:
-
-- persist `/var/lib/private/ollama` or the chosen Ollama home;
-- persist `~/.lmstudio` for users that install LM Studio;
-- persist `/var/lib/open-webui` when Open WebUI is enabled.
-
-Be careful with DynamicUser and `/var/lib/private/ollama`: this is exactly the
-kind of thing that should be tested on one host before generalizing.
-
-### Open WebUI
-
-Open WebUI should be a separate opt-in profile. It depends on the host wanting a
-local web interface, and it introduces container state, ports, and persistence.
-
-Good boundary:
-
-- `profiles.llm.ollama`: the model server;
-- `profiles.llm.open-webui`: UI container for hosts that want it.
-
-Do not make Open WebUI part of the base Ollama profile.
-
-### Practical First Step
-
-Do not create a full option module first. Start by extracting the duplication:
-
-1. Create `profiles/nixos/llm/lmstudio.nix` with only `environment.systemPackages
-   = [ pkgs.lmstudio ];`.
-2. Create `profiles/nixos/llm/ollama-base.nix` that enables Ollama but leaves
-   package, host binding, and model list overridable by the host.
-3. Keep `l-esp` and `l-envil` model lists in host-local files initially.
-4. Move `l-envil`'s Open WebUI module to `profiles/nixos/llm/open-webui.nix`, but
-   keep it opt-in.
-5. After both laptops evaluate, consider a real `services.local.llm` option
-   module.
-
-This is low-risk because the first useful extraction is LM Studio: it is only a
-package install and has no service or network behavior.
+Keep `burp-fix` host-local while it is only `l-envil`-specific `/etc` glue. If
+it becomes a reusable wrapper or package, move the derivation into `pkgs/` and
+keep the system integration in a profile or module.
 
 ## Home Manager
 
-The new shared VS Code/VSCodium module is the right direction:
-
-```text
-home-manager/01-general/editors/vscode.nix
-```
-
-Long term, either keep shared Home Manager profiles under
-`home-manager/01-general`, or move reusable ones into
-`modules/home-manager`/`profiles/home-manager`. Avoid splitting shared Home
-Manager logic between multiple conventions unless the boundary is explicit.
+Shared Home Manager logic should live in one place. Either keep recognizable
+profiles under `profiles/home-manager`, or under `home-manager/01-general`, but
+do not split the shared surface across both without an explicit boundary.
 
 Recommended grouping:
 
@@ -704,7 +232,7 @@ Host-specific user config should become mostly identity, secrets, and imports.
 
 ## Host Layout
 
-Keep hardware and machine identity local to each host:
+Keep hardware and machine identity local:
 
 ```text
 nixos/laptop/l-esp/
@@ -714,10 +242,7 @@ nixos/laptop/l-esp/
   home.nix
 ```
 
-Keep reusable service stacks outside host directories unless they are truly
-single-host. For example, `llms`, `android`, and `unmount-pentest-directory` may
-be reusable workstation profiles if both `l-envil` and `l-esp` can use them.
-
+Keep reusable service stacks outside host directories unless truly single-host.
 For servers, keep role modules explicit:
 
 ```text
@@ -732,53 +257,105 @@ nixos/server/s-sigma/
 
 ## Secrets
 
-SOPS wiring is spread per host and Home Manager user. That is acceptable, but can
-be clearer:
-
-- Keep host SOPS file selection in host root.
-- Keep user SOPS file selection in Home Manager root.
-- Move repeated age key path conventions into small helper modules if they are
-  identical across hosts.
+- Keep host SOPS file selection in the host root.
+- Keep user SOPS file selection in the Home Manager root.
+- Move repeated age key path conventions into small helper modules if identical
+  across hosts.
 
 Do not centralize secret names too early; centralize only repeated mechanics.
 
+## Profile Boundary Notes From 2026-06-29 Audit
+
+These were noticed while moving GUI applications out of NixOS package sets and
+into Home Manager. The unresolved ones remain open work.
+
+- Secure Boot tooling belongs in a boot profile, not core. `sbctl` should follow
+  `boot.lanzaboote.enable`; key enrollment stays an explicit per-machine action.
+- Rich Neovim/LSP setup stays an editor profile, not a core dependency. `core`
+  is imported by nixos-shell VM host configs, so editor-heavy profiles must
+  attach only to interactive hosts that want them. Keep plain `vim` in core
+  because nano is disabled and every machine needs a fallback editor.
+- Xorg and i3 helper packages stay in desktop/i3 profiles, not core.
+- Wireshark stays system-side (capture permissions/groups are NixOS concerns)
+  but should sit behind a small workstation or pentest-capture profile.
+- KDE Connect stays system-side where it enables `programs.kdeconnect`, but
+  host-local duplicates should collapse into the Android workstation profile or
+  an explicit KDE Connect profile.
+- Desktop session plumbing stays NixOS-side (display manager, X11/i3, PAM/i3lock,
+  dconf, keyring); browsers, chat clients, PDF readers, RDP clients, LLM GUIs,
+  and torrent clients belong in Home Manager.
+- NAS/CIFS client glue is a repeated host-local `connect-nas` module. Consider a
+  storage/NAS client profile owning `cifs-utils`, mount defaults, and shared
+  mechanics while secrets and endpoints stay host-local.
+- Repeated `security.pam.services.login.enableGnomeKeyring = true` should become
+  part of a desktop keyring profile.
+- Host-local VM/nixos-shell support should keep moving toward clearly-named
+  profiles; do not mix VM host plumbing, debug packages, network management, and
+  persistence disks into a broad host root.
+- Legacy `library/01-general/desktop/packages.nix` still mixes virtualization,
+  desktop tools, CLI utilities, and privilege-bearing packages. Split or retire
+  it before reusing it on new hosts.
+
 ## Staged Cleanup Plan
 
-1. Inventory active imports.
-   Use a script or `nix eval` to list every host and its imported top-level
-   profiles. Compare this with the README's generated-importer TODO.
+Do these in order. Steps 0 and 1 are prerequisites: later steps assume a
+trustworthy `nix fmt` and a clean ref state. None of these touch protected paths.
 
-2. Split remaining broad legacy imports.
-   Keep moving `library/01-general` behavior into focused profiles such as
-   `base`, `desktop`, `virtualization-host`, `packages`, and `pentesting`.
-   Update one non-critical host first.
+0. Make the formatter check enforceable, then clear the drift.
+   Change the no-argument path in `flake.nix`'s `formatter` to run
+   `nixpkgs-fmt --check .` (or `--fail-on-change`) so `nix fmt` and CI actually
+   fail on unformatted files. Then format the whole-tree drift as a single
+   isolated commit containing nothing else.
 
-3. Normalize unstable usage.
+1. Resolve stale refs.
+   Resolve the live `stash@{0}` (WIP intent revert on top of protected
+   `prod-network` intent), then prune the stale local branches once it is
+   confirmed nothing unique is lost. Keep `main` tracking `origin/main`.
+
+2. Inventory active imports.
+   List every host and its imported top-level profiles, and compare against the
+   current tree. Use `nix eval` or a script.
+
+3. Decide the dynamic-import question.
+   `library/imports.nix` still provides directory-scanning discovery, which
+   contradicts the explicit-intent convention. Migrate its two call sites to
+   explicit imports and retire the helper, or document the exception.
+
+4. Split remaining broad legacy imports.
+   Keep moving `library/01-general` behavior into focused profiles
+   (`base`, `desktop`, `virtualization-host`, `packages`, `pentesting`). Update
+   one non-critical host first, and fold in the i3/sway `library/` overlap while
+   doing so.
+
+5. Normalize unstable usage.
    Replace ad hoc `import inputs.nixpkgs-unstable` with `pkgs.unstable` or a
    single helper pattern.
 
-4. Tighten exported module sets.
+6. Tighten exported module sets.
    Add stable names in `modules/nixos/default.nix` and
-   `modules/home-manager/default.nix` after the profile names settle.
+   `modules/home-manager/default.nix` after profile names settle.
 
-5. Remove stale files.
-   Move `z_old`, `*.bak`, and experiments either to an archive directory or out
-   of the flake source if they are not used.
+7. Remove stale files.
+   Move `overlays/not-workingyet` and any remaining experiments to an archive
+   directory or out of the flake source.
 
-6. Fix root `library/default.nix`.
-   Make it a real index or delete it if unused. The current duplicate content is
-   misleading.
+8. Decide the option convention.
+   Write down whether the AGENTS.md `mkOption` / `enable` rule applies to new
+   modules only or retroactively, and align the docs.
 
-7. Update the README.
-   Replace the old importer TODO with the chosen import convention once the
-   cleanup is real. Keep the note that the repo originated from
-   Misterio77's starter configs, because that is useful context.
+9. Update the README.
+   Document the chosen import convention and point readers at this plan and
+   AGENTS.md. Keep the note about the Misterio77 origin as context.
+
+10. Add a PR-time `nix flake check` workflow.
+    The scheduled flake-lock workflow already evaluates derivations; a push/PR
+    check closes the loop for ordinary changes.
 
 ## Validation Strategy
 
 For every cleanup step:
 
-- Run `nix flake check` only when the build cost is acceptable.
+- Run `nix flake check --all-systems` when the build cost is acceptable.
 - At minimum, run targeted evals:
 
 ```sh
@@ -788,22 +365,25 @@ nix eval .#nixosConfigurations.s-sigma.config.system.build.toplevel.drvPath
 ```
 
 - For package changes, build the affected package directly.
-
 - For Home Manager-only moves, eval the affected user config before rebuilding
   the host.
 
+Concurrent `nix eval` runs contend on one eval cache and may emit an occasional
+SQLite "database is busy" warning; that is benign.
+
 ## What Not To Do Yet
 
-- Do not rename host directories while active host discovery depends on direct
+- Do not rename host directories while host discovery depends on direct
   subdirectories.
-- Do not remove `outPath`/`self.outPath` usage until all imports are migrated.
 - Do not convert everything into option-bearing modules at once.
 - Do not move secrets during the import cleanup.
 - Do not combine unrelated cleanup with package updates.
+- Do not touch `prod-network/{prod,testing,current}/` without explicit,
+  per-session permission naming the exact files.
 
 ## Desired End State
 
-The desired repo should make these questions easy to answer:
+The repo should make these questions easy to answer:
 
 - Which machines exist?
 - Which profiles does each machine use?
@@ -812,48 +392,6 @@ The desired repo should make these questions easy to answer:
 - Which modules are reusable outside this repo?
 - Which files are host-specific hardware or secrets glue?
 
-The next concrete cleanup should be reducing direct dependency on
-`library/01-general` by moving one remaining broad import path into focused
-profiles and validating one host at a time.
-
-## Profile Boundary Notes From 2026-06-29 Audit
-
-These are things noticed while moving GUI applications out of NixOS package
-sets and into Home Manager.
-
-- Secure Boot tooling should be a boot profile, not a core package. `sbctl`
-  should follow `boot.lanzaboote.enable`, while key enrollment remains an
-  explicit per-machine firmware action.
-- Rich Neovim/LSP setup should stay an editor profile, not a core dependency.
-  `core` is imported by nixos-shell VM host configs, so editor-heavy profiles
-  must be attached only to interactive workstation/server hosts that want them.
-  Keep plain `vim` in core because nano is disabled and every machine still
-  needs a fallback editor.
-  VM debug helpers should also avoid installing Neovim directly.
-- Xorg and i3 helper packages should stay in desktop/i3 profiles, not in core.
-  nixos-shell VM hosts import core and should not receive GUI session tools
-  unless they explicitly opt into a desktop profile.
-- Wireshark should stay system-side because capture permissions and groups are
-  NixOS concerns, but it should be isolated behind a small workstation or
-  pentest capture profile instead of being scattered through broad package
-  lists.
-- KDE Connect should stay system-side when it enables `programs.kdeconnect`,
-  but host-local duplicates should collapse into the Android workstation profile
-  or an explicit KDE Connect profile.
-- Desktop session plumbing should be separated from user apps: display manager,
-  X11/i3 enablement, PAM/i3lock, dconf, keyring, and related session packages
-  belong in NixOS desktop profiles; browsers, chat clients, PDF readers, RDP
-  clients, LLM GUIs, and torrent clients belong in Home Manager.
-- NAS/CIFS client glue appears as repeated host-local `connect-nas` modules.
-  Consider a storage/NAS client profile that owns `cifs-utils`, mount defaults,
-  and the shared mechanics while keeping secrets and endpoints host-local.
-- Repeated `security.pam.services.login.enableGnomeKeyring = true` should become
-  part of a desktop keyring profile instead of being set individually on
-  desktop-capable hosts.
-- Host-local VM/nixos-shell support should keep moving toward profiles with
-  clear intent: VM host plumbing, VM debug packages, VM network management, and
-  persistence disks should not be mixed into broad host roots unless the profile
-  name says exactly what capability is being enabled.
-- Legacy `library/01-general/desktop/packages.nix` still mixes virtualization,
-  desktop tools, CLI utilities, and privilege-bearing packages. Split or retire
-  it before reusing it on new hosts.
+The next concrete action is step 0 above: make `nix fmt` enforce something, then
+clear the formatter drift and stale refs before resuming the `library/01-general`
+split one host at a time.
