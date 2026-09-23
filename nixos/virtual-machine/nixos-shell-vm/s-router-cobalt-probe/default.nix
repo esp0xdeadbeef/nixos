@@ -9,7 +9,7 @@
 let
   hostName = "s-router-cobalt";
   system = "x86_64-linux";
-  modelSource = /tmp/model-probe;
+  modelSource = relativeRepo.sourcePath "prod-network/testing";
   deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
   deviceIds =
     map
