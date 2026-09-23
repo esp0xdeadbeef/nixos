@@ -1086,11 +1086,11 @@
         "nixpkgs-network": "nixpkgs-network_7"
       },
       "locked": {
-        "lastModified": 1790205667,
-        "narHash": "sha256-6x/74vg12JMA/EcIZXcLbQLzJ9PXuW4PJhlETAZeVJ0=",
+        "lastModified": 1790205803,
+        "narHash": "sha256-sdpb2FoYA5RnFROU7vszglwcRcjiIoVcwspUKQOgHoc=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "0865cd5cf2466f9f4aafff16da7be14dcd66e383",
+        "rev": "a318dec8f30efbc448f790a5a6debecda87f283a",
         "type": "github"
       },
       "original": {
