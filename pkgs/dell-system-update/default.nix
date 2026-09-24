@@ -61,11 +61,11 @@ let
 
   payload = stdenv.mkDerivation rec {
     pname = "dell-system-update-payload";
-    version = "2.3.0.0";
+    version = "2.3.0.1";
 
     src = fetchurl {
-      url = "https://linux.dell.com/repo/hardware/dsu/os_independent/x86_64/dell-system-update-2.3.0.0-26.07.00.x86_64.rpm";
-      hash = "sha256-8+YZmmBM346/K5RIHljdTAuQ87N/r4oTBJS74eF7FN4=";
+      url = "https://linux.dell.com/repo/hardware/dsu/os_independent/x86_64/dell-system-update-2.3.0.1-26.08.00.x86_64.rpm";
+      hash = "sha256-iX+Rzd/+1C1dq3L7NakDuCPNCfV5BMaZia4eyJujTM8=";
     };
 
     nativeBuildInputs = [
