@@ -207,6 +207,7 @@ let
   coreUpstreamLink = "p2p-core-upstream-selector";
   coreVpnOnyxUpstreamLink = "p2p-core-vpn-onyx-upstream-selector";
   coreVpnOpalUpstreamLink = "p2p-core-vpn-opal-upstream-selector";
+  coreGarnetUpstreamLink = "p2p-core-vpn-garnet-upstream-selector";
   upstreamPolicyClientsLink = "p2p-policy-upstream-selector--access-access-clients--uplink-wan";
   upstreamPolicyIotSrvLink = "p2p-policy-upstream-selector--access-access-iot-srv--uplink-wan";
   policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
@@ -229,6 +230,9 @@ let
   policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
   downstreamAccessUnlockLink = "p2p-access-unlock-downstream-selector";
   upstreamPolicyMgmtLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-wan";
+  upstreamPolicyMgmtGarnetLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-garnet";
+  upstreamPolicySvcGarnetLink = "p2p-policy-upstream-selector--access-access-svc--uplink-garnet";
+  upstreamPolicyDmzGarnetLink = "p2p-policy-upstream-selector--access-access-dmz--uplink-garnet";
   policyDownstreamMgmtLink = "p2p-downstream-selector-policy--access-access-mgmt";
   downstreamAccessMgmtLink = "p2p-access-mgmt-downstream-selector";
 
@@ -288,6 +292,13 @@ let
       interfaceName = "core-vpn-opal";
     };
 
+    core-vpn-garnet = p2pPort {
+      link = coreGarnetUpstreamLink;
+      adapterName = "cb-us-cne";
+      bridge = "rt-core-vpn-garnet-upstream-selector";
+      interfaceName = "core-vpn-garnet";
+    };
+
     policy-clients = p2pPort {
       link = upstreamPolicyClientsLink;
       adapterName = "cb-us-p2";
@@ -335,6 +346,27 @@ let
       adapterName = "cb-us-p10";
       bridge = "rt-upstream-policy-mgmt";
       interfaceName = "policy-mgmt";
+    };
+
+    policy-mgmt-garnet = p2pPort {
+      link = upstreamPolicyMgmtGarnetLink;
+      adapterName = "cb-us-mgmt-xs";
+      bridge = "rt-upstream-policy-mgmt-garnet";
+      interfaceName = "policy-mgmt-garnet";
+    };
+
+    policy-svc-garnet = p2pPort {
+      link = upstreamPolicySvcGarnetLink;
+      adapterName = "cb-us-svc-xs";
+      bridge = "rt-upstream-policy-svc-garnet";
+      interfaceName = "policy-svc-garnet";
+    };
+
+    policy-dmz-garnet = p2pPort {
+      link = upstreamPolicyDmzGarnetLink;
+      adapterName = "cb-us-dmz-xs";
+      bridge = "rt-upstream-policy-dmz-garnet";
+      interfaceName = "policy-dmz-garnet";
     };
   };
 
@@ -386,6 +418,27 @@ let
       adapterName = "cb-p-us10";
       bridge = "rt-upstream-policy-mgmt";
       interfaceName = "upstream-mgmt";
+    };
+
+    upstream-mgmt-garnet = p2pPort {
+      link = upstreamPolicyMgmtGarnetLink;
+      adapterName = "cb-p-mgmt-xs";
+      bridge = "rt-upstream-policy-mgmt-garnet";
+      interfaceName = "upstream-mgmt-garnet";
+    };
+
+    upstream-svc-garnet = p2pPort {
+      link = upstreamPolicySvcGarnetLink;
+      adapterName = "cb-p-svc-xs";
+      bridge = "rt-upstream-policy-svc-garnet";
+      interfaceName = "upstream-svc-garnet";
+    };
+
+    upstream-dmz-garnet = p2pPort {
+      link = upstreamPolicyDmzGarnetLink;
+      adapterName = "cb-p-dmz-xs";
+      bridge = "rt-upstream-policy-dmz-garnet";
+      interfaceName = "upstream-dmz-garnet";
     };
 
     downstream-svc = p2pPort {
@@ -988,6 +1041,15 @@ let
       interfaceName = "iot-srv";
     };
   };
+
+  coreGarnet = mkNode "core-vpn-garnet" {
+    upstream-selector = p2pPort {
+      link = coreGarnetUpstreamLink;
+      adapterName = "cb-cne-us";
+      bridge = "rt-core-vpn-garnet-upstream-selector";
+      interfaceName = "upstream-selector";
+    };
+  };
 in
 {
   schemaVersion = 1;
@@ -1171,6 +1233,7 @@ in
           rt-core-upstream-selector = { };
           rt-core-vpn-onyx-upstream-selector = { };
           rt-core-vpn-opal-upstream-selector = { };
+          rt-core-vpn-garnet-upstream-selector = { };
           rt-downstream-access-svc = { };
           rt-downstream-access-clients = { };
           rt-downstream-access-dmz = { };
@@ -1193,6 +1256,9 @@ in
           rt-downstream-access-mgmt = { };
           rt-policy-downstream-mgmt = { };
           rt-upstream-policy-mgmt = { };
+          rt-upstream-policy-mgmt-garnet = { };
+          rt-upstream-policy-svc-garnet = { };
+          rt-upstream-policy-dmz-garnet = { };
         };
       };
     };
@@ -1236,6 +1302,7 @@ in
       ${nodeName "access-mgmt"} = accessMgmt;
       ${nodeName "core-vpn-onyx"} = vpnOnyx;
       ${nodeName "core-vpn-opal"} = vpnOpal;
+      ${nodeName "core-vpn-garnet"} = coreGarnet;
     };
   };
 
@@ -1406,6 +1473,27 @@ in
                 };
               };
               runtimeNodes = { };
+            };
+
+            garnet = {
+              provider = "nebula";
+              nebula = {
+                role = "core-client";
+                lighthouse = {
+                  node = "core-vpn-garnet";
+                  endpoint = "198.51.100.102";
+                  endpoint6 = "2001:db8:80::102";
+                  endpointSourceFile = "/run/secrets/garnet-lighthouse-endpoint4";
+                  endpoint6SourceFile = "/run/secrets/garnet-lighthouse-endpoint6";
+                  port = 4243;
+                };
+              };
+              nodes = {
+                core-vpn-garnet = {
+                  addr4 = "10.80.0.2/32";
+                  addr6 = "fd42:dead:beef:80::2/128";
+                };
+              };
             };
           };
         };

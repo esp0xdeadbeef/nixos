@@ -234,6 +234,61 @@ When verifying config output before deploying:
 - `nix build <path>.source --no-link --print-out-paths` to get the built file
 - `nix eval <path> --json` to inspect raw attribute values
 
+## Debugging the network-* layers
+
+When a rendered/canonical output is wrong, do NOT edit a downstream layer and
+re-check the final NixOS output. Evaluate one layer at a time and confirm which
+layer first produces the wrong value (first-wrong-layer). The intent is the same
+input at every layer; each layer adds its own contract.
+
+**The lock shadows `--override-input`.** `nix eval` on this flake resolves
+`network-*` inputs through `flake.lock` (and any `follows`), so a dirty
+`--override-input path:...` may be ignored and you will silently test the pinned
+rev. To evaluate a *local* change to a `network-*` repo, copy it to a fresh
+dirty-free path and point the override there (or `nix flake lock --update-input`):
+
+```bash
+rm -rf /tmp/cpm-verify && cp -r ~/github/network-control-plane-model /tmp/cpm-verify
+rm -rf /tmp/cpm-verify/.git   # drop the lock so path: uses the working tree
+```
+
+A quick way to prove a file is on the live path at all: delete it and re-eval —
+if nothing breaks, the layer you are editing is not the evaluated one.
+
+### Example 1 — compiler output only (no inventory)
+
+Check what the compiler emits for the intent before NFM/CPM touch it:
+
+```bash
+cd ~/github/network-compiler
+nix eval --impure --json --expr '
+  let f = builtins.getFlake (toString ./.);
+      out = f.lib.compile "x86_64-linux"
+        (import ~/github/nixos/prod-network/testing/intent-neon.nix);
+      rels = out.sites.esp0xdeadbeef.neon.relations;
+  in builtins.map (r: r.source.id) (builtins.filter (r: r ? publicIngressTupleAuthority) rels)'
+```
+
+### Example 2 — direct CPM output (intent + inventory)
+
+Bypass the flake/lock entirely and call the CPM on a local copy, so you see the
+canonical output for the exact intent+inventory pair:
+
+```bash
+nix eval --refresh --impure --json --expr '
+  let cpm = (builtins.getFlake "/tmp/cpm-verify").libBySystem.x86_64-linux;
+      b = cpm.compileAndBuild {
+        input = import ~/github/nixos/prod-network/testing/intent-neon.nix;
+        inventory = import ~/github/nixos/prod-network/testing/inventory-neon.nix { };
+      };
+      core = b.control_plane_model.data.esp0xdeadbeef.neon.runtimeTargets."esp0xdeadbeef-neon-core";
+  in builtins.map (r: r.sourceTranslation.address or "none") (core.natIntent.publicIngress or [ ])'
+```
+
+The same shape works per layer: compiler (`f.lib.compile`), forwarding model,
+control-plane model (above), realization model, then the renderer. Fix the
+highest layer that first deviates, not the renderer that finally reports it.
+
 ## Updating fetchurl packages
 
 When a fetchurl-based derivation fails because the upstream URL 404s (Dell, etc.):

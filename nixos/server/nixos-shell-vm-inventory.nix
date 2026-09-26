@@ -198,6 +198,12 @@ let
       description = "Nebula VM (nixos-shell)";
     }
     {
+      name = "s-nebula-garnet";
+      description = "garnet overlay Nebula lighthouse (nixos-shell)";
+      storageSize = "4G";
+      stopGraceSeconds = 30;
+    }
+    {
       name = "s-agents";
       description = "Agent workbench VM (nixos-shell)";
     }
