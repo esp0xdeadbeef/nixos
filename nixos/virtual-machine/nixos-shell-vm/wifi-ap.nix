@@ -59,6 +59,15 @@ let
   # Shared 802.11 PHY settings (constant across the radio's BSSes). The channel
   # is a determined value; ap_isolate=1 keeps intra-BSS frames going through the
   # policy point instead of being bridged client-to-client at L2.
+  #
+  # noscan=1 on the 5GHz/80MHz radio: each plane runs its own hostapd process on
+  # its own VAP on the same single-radio phy, and the pre-start HT scan picks a
+  # primary channel per process. In an 80MHz block that choice is not unique
+  # (36/40/44/48), so the first VAP can latch onto one primary (e.g. 40) while a
+  # later one keeps the configured one (36). The two then disagree on the same
+  # wiphy and the stray VAP silently stops beaconing its SSID. Skipping the scan
+  # pins every VAP to radio.channel so they agree. The 2.4GHz single-channel case
+  # has no such ambiguity and keeps the scan.
   phyLines =
     if radio.band == "2g" then
       ''
@@ -74,6 +83,7 @@ let
       ''
         hw_mode=a
         channel=${toString radio.channel}
+        noscan=1
         wmm_enabled=1
         country_code=${radio.country}
         ieee80211n=1
