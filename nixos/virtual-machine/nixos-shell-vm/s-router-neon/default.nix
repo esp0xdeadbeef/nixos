@@ -51,7 +51,7 @@ in
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     "${modelSource}/runtime-secrets.nix"
 
-    (import ../s-router-prod/renderers.nix {
+    (import ./renderers.nix {
       inherit
         inputs
         relativeRepo
@@ -63,6 +63,7 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model;
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;
+      nebulaRendererInput = inputs.network-renderer-nebula;
       intentFileName = "intent-neon.nix";
       inventoryFileName = "inventory-neon.nix";
       inherit vmNics;

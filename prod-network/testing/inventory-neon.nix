@@ -229,6 +229,7 @@ let
   };
 
   coreUpstreamLink = "p2p-core-upstream-selector";
+  coreGarnetUpstreamLink = "p2p-core-vpn-garnet-upstream-selector";
   upstreamPolicyVlan2Link = "p2p-policy-upstream-selector--access-access-vlan2--uplink-wan";
   # FS-210/FS-230: vlan3 hosts the DMZ service (the Nebula lighthouse). Its
   # public-ingress replies need the ingress/return transport lane; this is a
@@ -250,6 +251,9 @@ let
   upstreamPolicyIotSrvLink = "p2p-policy-upstream-selector--access-access-iot-srv--uplink-wan";
   upstreamPolicyIotLink = "p2p-policy-upstream-selector--access-access-iot--uplink-wan";
   upstreamPolicyMgmtLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-wan";
+  upstreamPolicyMgmtGarnetLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-garnet";
+  upstreamPolicySvcGarnetLink = "p2p-policy-upstream-selector--access-access-svc--uplink-garnet";
+  upstreamPolicyDmzGarnetLink = "p2p-policy-upstream-selector--access-access-dmz--uplink-garnet";
   policyDownstreamSvcLink = "p2p-downstream-selector-policy--access-access-svc";
   policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
   policyDownstreamDmzLink = "p2p-downstream-selector-policy--access-access-dmz";
@@ -266,6 +270,10 @@ let
   downstreamAccessMgmtLink = "p2p-access-mgmt-downstream-selector";
   sNebulaContainerAddress = "192.168.3.10";
   sNebulaContainerAddress6 = "fd42:dead:beef:3::1337:dead:beef";
+  sNebulaGarnetAddress = "192.168.3.12";
+  # IID = ::1337 + the container MAC's last 4 bytes (s-nebula-garnet-container-mac),
+  # matching the RA token scheme used by s-nebula-container.
+  sNebulaGarnetAddress6 = "fd42:dead:beef:3::1337:e1ee:fbeb";
   sLlmInferenceContainerAddress = "192.168.3.11";
 
   core =
@@ -328,6 +336,15 @@ let
       };
     };
 
+  coreGarnet = mkNode "core-vpn-garnet" {
+    upstream-selector = p2pPort {
+      link = coreGarnetUpstreamLink;
+      adapterName = "prod-core-vpn-garnet-us";
+      bridge = "rt-core-vpn-garnet-upstream-selector";
+      interfaceName = "upstream-selector";
+    };
+  };
+
   ispPppoePeer = {
     host = externalIspHost;
     platform = "linux";
@@ -365,6 +382,13 @@ let
       adapterName = "prod-381287f8b9a7";
       bridge = "rt-core-upstream-selector";
       interfaceName = "core";
+    };
+
+    core-vpn-garnet = p2pPort {
+      link = coreGarnetUpstreamLink;
+      adapterName = "prod-us-core-vpn-garnet";
+      bridge = "rt-core-vpn-garnet-upstream-selector";
+      interfaceName = "core-vpn-garnet";
     };
 
     policy-vlan2 = p2pPort {
@@ -427,6 +451,27 @@ let
       adapterName = "prod-us-mgmt";
       bridge = "rt-upstream-policy-mgmt";
       interfaceName = "policy-mgmt";
+    };
+
+    policy-mgmt-garnet = p2pPort {
+      link = upstreamPolicyMgmtGarnetLink;
+      adapterName = "prod-us-mgmt-xs";
+      bridge = "rt-upstream-policy-mgmt-garnet";
+      interfaceName = "policy-mgmt-garnet";
+    };
+
+    policy-svc-garnet = p2pPort {
+      link = upstreamPolicySvcGarnetLink;
+      adapterName = "prod-us-svc-xs";
+      bridge = "rt-upstream-policy-svc-garnet";
+      interfaceName = "policy-svc-garnet";
+    };
+
+    policy-dmz-garnet = p2pPort {
+      link = upstreamPolicyDmzGarnetLink;
+      adapterName = "prod-us-dmz-xs";
+      bridge = "rt-upstream-policy-dmz-garnet";
+      interfaceName = "policy-dmz-garnet";
     };
   };
 
@@ -519,6 +564,27 @@ let
       adapterName = "prod-p-us-mgmt";
       bridge = "rt-upstream-policy-mgmt";
       interfaceName = "upstream-mgmt";
+    };
+
+    upstream-mgmt-garnet = p2pPort {
+      link = upstreamPolicyMgmtGarnetLink;
+      adapterName = "prod-p-us-mgmt-xs";
+      bridge = "rt-upstream-policy-mgmt-garnet";
+      interfaceName = "upstream-mgmt-garnet";
+    };
+
+    upstream-svc-garnet = p2pPort {
+      link = upstreamPolicySvcGarnetLink;
+      adapterName = "prod-p-us-svc-xs";
+      bridge = "rt-upstream-policy-svc-garnet";
+      interfaceName = "upstream-svc-garnet";
+    };
+
+    upstream-dmz-garnet = p2pPort {
+      link = upstreamPolicyDmzGarnetLink;
+      adapterName = "prod-p-us-dmz-xs";
+      bridge = "rt-upstream-policy-dmz-garnet";
+      interfaceName = "upstream-dmz-garnet";
     };
 
     downstream-svc = p2pPort {
@@ -815,6 +881,11 @@ let
                 name = "s-nebula-container.lan.";
                 a = [ sNebulaContainerAddress ];
                 aaaa = [ sNebulaContainerAddress6 ];
+              }
+              {
+                name = "s-nebula-garnet.lan.";
+                a = [ sNebulaGarnetAddress ];
+                aaaa = [ sNebulaGarnetAddress6 ];
               }
               {
                 name = "s-llm-inference-container.lan.";
@@ -1296,6 +1367,11 @@ in
       ipv6 = [ sNebulaContainerAddress6 ];
     };
 
+    s-nebula-garnet = {
+      ipv4 = [ sNebulaGarnetAddress ];
+      ipv6 = [ sNebulaGarnetAddress6 ];
+    };
+
     s-llm-inference-container = {
       ipv4 = [ sLlmInferenceContainerAddress ];
     };
@@ -1468,6 +1544,7 @@ in
 
         bridgeNetworks = {
           rt-core-upstream-selector = { };
+          rt-core-vpn-garnet-upstream-selector = { };
           rt-downstream-access-vlan2 = { };
           rt-downstream-access-vlan3 = { };
           rt-downstream-access-vlan7 = { };
@@ -1499,6 +1576,9 @@ in
           rt-upstream-policy-iot-srv = { };
           rt-upstream-policy-iot = { };
           rt-upstream-policy-mgmt = { };
+          rt-upstream-policy-mgmt-garnet = { };
+          rt-upstream-policy-svc-garnet = { };
+          rt-upstream-policy-dmz-garnet = { };
         };
       };
     };
@@ -1527,6 +1607,7 @@ in
 
     nodes = {
       ${nodeName "core"} = core;
+      ${nodeName "core-vpn-garnet"} = coreGarnet;
       ${nodeName "isp-pppoe-peer"} = ispPppoePeer;
       ${nodeName "upstream-selector"} = upstreamSelector // { ports = { }; };
       ${nodeName "policy"} = policy;
@@ -1545,6 +1626,37 @@ in
     };
   };
 
+  controlPlane = {
+    sites = {
+      esp0xdeadbeef = {
+        neon = {
+          overlays = {
+            garnet = {
+              provider = "nebula";
+              nebula = {
+                role = "lighthouse";
+                lighthouse = {
+                  node = "core-vpn-garnet";
+                  endpoint = "198.51.100.102";
+                  endpoint6 = "2001:db8:80::102";
+                  endpointSourceFile = "/run/secrets/garnet-lighthouse-endpoint4";
+                  endpoint6SourceFile = "/run/secrets/garnet-lighthouse-endpoint6";
+                  port = 4243;
+                };
+              };
+              nodes = {
+                core-vpn-garnet = {
+                  addr4 = "10.80.0.1/32";
+                  addr6 = "fd42:dead:beef:80::1/128";
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+
   render = {
     hosts = {
       core = {
@@ -1552,6 +1664,11 @@ in
         deploymentHost = prodHost;
         runtimeRole = "core";
         wanUplink = "upstream-core";
+      };
+
+      core-vpn-garnet = {
+        deploymentHost = prodHost;
+        runtimeRole = "core";
       };
 
       upstream-selector = {

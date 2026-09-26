@@ -20,6 +20,7 @@ keys:
   - &s-router-legacy-edge age10n4xywtw8n3xjf6u5zp67hcc5s7htvpetkq0ndvvtyju88uued3s4r686d
   - &s-infra age1866sg8w2ex2ylc2aec5r7xc9uhvgny6v0x8rcmcm6s06jv2gc3jsdjzfmq
   - &s-nebula age1seqn6c56kxch7epv6dr3k43tx5eecj4aktlcg0njqg8ef3ewrvpq9vwsmw
+  - &s-nebula-garnet age1g6faf3ewz6eknzgnpxke0jfu5dfsl73ea837qc5g3pqqsgqfdfmst8uy73
   - &s-test age1n49y8n965sjwt6l8tk2nss5wcsww3qtg0rvqt974sz5npsvmpezs8pllr6
   - &s-router-core age16lrtp9fnvamca3g78pzr4jxcq0nzlj5vs4p5n5jerkxylnwh294syst0yh
   - &s-router-upstream-selector age1xnwyn6yl7mdtnk6jkg5k22pk33x3zfql9r8suqcamfu5w3x2rqmsste7qv
@@ -430,6 +431,13 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-infra
+  - path_regex: '^(secrets/)*s-nebula-garnet\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-nebula-garnet
   - path_regex: '^(secrets/)*s-nebula.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
@@ -437,6 +445,20 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-nebula
+  - path_regex: '^(secrets/)*s-router-neon-nebula-garnet\.ya?ml$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-neon
+  - path_regex: '^(secrets/)*s-router-cobalt-nebula-garnet\.ya?ml$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-cobalt
   - path_regex: '^(secrets/)*s-test.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:

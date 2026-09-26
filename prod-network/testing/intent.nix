@@ -124,6 +124,22 @@ let
     }
 
     {
+      name = "nebula-garnet";
+      match = [
+        {
+          proto = "udp";
+          dports = [ 4243 ];
+          family = "any";
+        }
+        {
+          proto = "tcp";
+          dports = [ 4243 ];
+          family = "any";
+        }
+      ];
+    }
+
+    {
       name = "tang";
       match = [
         {
@@ -181,6 +197,19 @@ in
       loopback = {
         ipv4 = "10.19.0.0/24";
         ipv6 = "fd42:dead:beef:1900::/118";
+      };
+
+      overlay = {
+        ipv4 = {
+          prefix = "10.80.0.0/24";
+          offsetStart = 10;
+          perNodePrefixLength = 32;
+        };
+        ipv6 = {
+          prefix = "fd42:dead:beef:80::/64";
+          offsetStart = 10;
+          perNodePrefixLength = 128;
+        };
       };
     };
 
@@ -301,6 +330,13 @@ in
         }
         {
           kind = "host";
+          name = "s-nebula-garnet";
+          tenant = "vlan3";
+          ipv4 = [ "192.168.3.12" ];
+          ipv6 = [ "fd42:dead:beef:3::1337:e1ee:fbeb" ];
+        }
+        {
+          kind = "host";
           name = "vlan7-dns";
           tenant = "vlan7";
           ipv4 = [ "192.168.2.1" ];
@@ -402,6 +438,11 @@ in
           name = "s-nebula-container-icmp";
           providers = [ "s-nebula-container" ];
           trafficType = "icmp";
+        }
+        {
+          name = "s-nebula-garnet";
+          providers = [ "s-nebula-garnet" ];
+          trafficType = "nebula-garnet";
         }
         {
           name = "vlan2-gateway-icmp";
@@ -658,6 +699,77 @@ in
               {
                 protocol = "tcp";
                 publicPort = 4242;
+              }
+            ];
+          };
+        }
+        {
+          id = "allow-wan-to-s-nebula-garnet";
+          priority = 96;
+          from = {
+            kind = "external";
+            scope = "core";
+          };
+          to = {
+            kind = "service";
+            name = "s-nebula-garnet";
+          };
+          trafficType = "nebula-garnet";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-nebula-garnet";
+            targetEndpoint = "s-nebula-garnet";
+            targetPort = 4243;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 4243;
+              }
+              {
+                protocol = "tcp";
+                publicPort = 4243;
+              }
+            ];
+          };
+        }
+        {
+          id = "allow-wan-to-s-nebula-garnet-ipv6";
+          priority = 96;
+          from = {
+            kind = "external";
+            scope = "core";
+          };
+          to = {
+            kind = "service";
+            name = "s-nebula-garnet";
+          };
+          trafficType = "nebula-garnet";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-nebula-garnet";
+            targetEndpoint = "s-nebula-garnet";
+            targetPort = 4243;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "preserve-source";
+            translationMode = "none";
+            family = "ipv6";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 4243;
+              }
+              {
+                protocol = "tcp";
+                publicPort = 4243;
               }
             ];
           };
@@ -1119,6 +1231,80 @@ in
         (allowTenantToWan "neon-iot" 120)
         (allowTenantToWan "neon-iot-srv" 130)
         (allowTenantToWan "neon-mgmt" 140)
+        {
+          id = "allow-mgmt-to-garnet";
+          priority = 150;
+          from = {
+            kind = "tenant";
+            name = "neon-mgmt";
+          };
+          to = {
+            kind = "external";
+            name = "garnet";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-svc-to-garnet";
+          priority = 151;
+          from = {
+            kind = "tenant";
+            name = "neon-svc";
+          };
+          to = {
+            kind = "external";
+            name = "garnet";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-dmz-to-garnet";
+          priority = 152;
+          from = {
+            kind = "tenant";
+            name = "neon-dmz";
+          };
+          to = {
+            kind = "external";
+            name = "garnet";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-iot-srv-nebula-garnet-underlay-to-isp";
+          priority = 153;
+          from = {
+            kind = "tenant";
+            name = "neon-iot-srv";
+          };
+          to = {
+            kind = "external";
+          };
+          trafficType = "nebula-garnet";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-garnet-underlay-to-core";
+          priority = 154;
+          from = {
+            kind = "external";
+            name = "garnet";
+          };
+          to = {
+            kind = "external";
+            scope = "core";
+          };
+          trafficType = "nebula-garnet";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
       ];
     };
 
@@ -1780,6 +1966,19 @@ in
           };
         };
 
+        # Service-only peer overlay (NAS, printer, future vlan10+ services).
+        # It selects the peer site's service scopes, which own their prefixes
+        # (FS-322), and offers no default: an egress (default offers 0.0.0.0/0
+        # and ::/0) is not modeled here.
+        core-vpn-garnet = {
+          role = "core";
+
+          selects = [
+            "access-svc"
+            "access-dmz"
+          ];
+        };
+
         upstream-selector = {
           role = "upstream-selector";
         };
@@ -1926,6 +2125,10 @@ in
           "upstream-selector"
         ]
         [
+          "core-vpn-garnet"
+          "upstream-selector"
+        ]
+        [
           "upstream-selector"
           "policy"
         ]
@@ -1979,6 +2182,21 @@ in
         ]
       ];
     };
+
+    transport = {
+      overlays = [
+        {
+          name = "garnet";
+          terminateOn = "core-vpn-garnet";
+          peerSite = "esp0xdeadbeef.cobalt";
+          mustTraverse = [ "policy" ];
+          underlayAccess = {
+            kind = "tenant";
+            name = "neon-iot-srv";
+          };
+        }
+      ];
+    };
   };
 
   esp0xdeadbeef.cobalt = {
@@ -1991,6 +2209,19 @@ in
       loopback = {
         ipv4 = "10.1.1.0/24";
         ipv6 = "fd42:dead:beef:2900::/118";
+      };
+
+      overlay = {
+        ipv4 = {
+          prefix = "10.80.0.0/24";
+          offsetStart = 10;
+          perNodePrefixLength = 32;
+        };
+        ipv6 = {
+          prefix = "fd42:dead:beef:80::/64";
+          offsetStart = 10;
+          perNodePrefixLength = 128;
+        };
       };
     };
 
@@ -2809,6 +3040,80 @@ in
         (allowTenantToWan "cobalt-iot-srv" 130)
         (allowTenantToWan "cobalt-mgmt" 140)
         {
+          id = "allow-mgmt-to-garnet";
+          priority = 150;
+          from = {
+            kind = "tenant";
+            name = "cobalt-mgmt";
+          };
+          to = {
+            kind = "external";
+            name = "garnet";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-svc-to-garnet";
+          priority = 151;
+          from = {
+            kind = "tenant";
+            name = "cobalt-svc";
+          };
+          to = {
+            kind = "external";
+            name = "garnet";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-dmz-to-garnet";
+          priority = 152;
+          from = {
+            kind = "tenant";
+            name = "cobalt-dmz";
+          };
+          to = {
+            kind = "external";
+            name = "garnet";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-iot-srv-nebula-garnet-underlay-to-isp";
+          priority = 153;
+          from = {
+            kind = "tenant";
+            name = "cobalt-iot-srv";
+          };
+          to = {
+            kind = "external";
+          };
+          trafficType = "nebula-garnet";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
+          id = "allow-garnet-underlay-to-core";
+          priority = 154;
+          from = {
+            kind = "external";
+            name = "garnet";
+          };
+          to = {
+            kind = "external";
+            scope = "core";
+          };
+          trafficType = "nebula-garnet";
+          action = "allow";
+          returnBehavior = "one-way";
+        }
+        {
           id = "allow-clients-vpn-to-vpn-uplinks";
           priority = 85;
           from = {
@@ -3430,6 +3735,19 @@ in
           ];
         };
 
+        # Service-only peer overlay (NAS, printer, future vlan10+ services).
+        # It selects the peer site's service scopes, which own their prefixes
+        # (FS-322), and offers no default: an egress (default offers 0.0.0.0/0
+        # and ::/0) is not modeled here.
+        core-vpn-garnet = {
+          role = "core";
+
+          selects = [
+            "access-svc"
+            "access-dmz"
+          ];
+        };
+
         upstream-selector = {
           role = "upstream-selector";
         };
@@ -3573,6 +3891,10 @@ in
           "upstream-selector"
         ]
         [
+          "core-vpn-garnet"
+          "upstream-selector"
+        ]
+        [
           "upstream-selector"
           "policy"
         ]
@@ -3628,6 +3950,16 @@ in
         {
           name = "opal";
           terminateOn = [ "core-vpn-opal" ];
+          underlayAccess = {
+            kind = "tenant";
+            name = "cobalt-iot-srv";
+          };
+        }
+        {
+          name = "garnet";
+          terminateOn = "core-vpn-garnet";
+          peerSite = "esp0xdeadbeef.neon";
+          mustTraverse = [ "policy" ];
           underlayAccess = {
             kind = "tenant";
             name = "cobalt-iot-srv";
