@@ -95,6 +95,84 @@ These are the things still worth changing. Each maps to a cleanup step below.
   proposed deliberately later; do not act on it as a side effect of unrelated
   work.
 
+### Build distribution and shared binary cache
+
+The fleet rebuilds work that another host has already done. Builds are already
+centralized onto the remote builders (s-sigma / s-tau, ssh-ng + binfmt), but the
+resulting store paths never flow back to the other hosts as substitutable
+artifacts, so each host rebuilds the same flake outputs locally.
+
+The fix is a fleet-wide binary cache, not new builders:
+
+- **Cache = the builders' own stores, served over HTTP.** `services.nix-serve`
+  already runs on s-sigma/s-tau but is scoped to VMs/LXC via a loopback socket.
+  Rebind it to the nebula overlay IP so every physical host can read it. No
+  separate cache directory is needed.
+- **Warm it ahead of demand.** A systemd timer on each builder prebuilds every
+  `nixosConfigurations.<host>.config.system.build.toplevel` and flake package,
+  so the cache is populated before a laptop asks. (Hydra is the heavyweight
+  version of this: jobset -> builds -> cache; adopt it only if we want
+  per-commit status, logs, and a UI.)
+- **Subscribe every host.** Add `extra-substituters` (the two builder URLs) and
+  `extra-trusted-public-keys` (the two cache public keys, committed to the repo)
+  in a shared profile imported by all hosts. This is the same mechanism already
+  used for cache.nixos.org, numtide, and the CUDA cache.
+- **Signing trust model.** One signing keypair per builder; only the public keys
+  are shared. A host downloads only from caches whose key it lists.
+- **Keep GC from evicting the cache.** Pin the fleet closure (or protect cached
+  paths) on the builders, or a `nix-collect-garbage` wipes the prebuilt
+  artifacts.
+- **Builders must also consume the cache.** With the cache in the substituter
+  list and `builders-use-substitutes = true` (already set), s-sigma and s-tau
+  download each other's results instead of rebuilding.
+
+Optional variant: a real shared cache directory on the NAS
+(`nix copy --to file:///mnt/nas/nix-cache`, nix-serve pointed at that dir).
+Reach for it only if the cache should live off the servers' disks; SMB is a more
+fragile live-cache backing store than serving the local store.
+
+### Multi-site build coordination
+
+Two sites each run an R730 (s-sigma, s-tau) as a builder. Independent prebuild
+timers on both would race: each enumerates the same fleet closure and starts the
+same derivations concurrently, and nix-serve offers no claim/lock protocol, so
+duplicate work is the default. The rule is: **one build authority, the rest are
+mirrors and fallbacks.**
+
+- **Single prebuild authority.** Only one server runs the prebuild timer and
+  owns "build the fleet". The other site runs no timer; it is a cache consumer
+  and a fallback builder for when the authority is unreachable.
+- **Cache replication, not independent building.** The mirror site warms by
+  pulling, never by building: either lazy (its hosts list the authority as a
+  substituter and the mirror keeps what it fetches) or eager (a timer on either
+  side runs `nix store copy` of the fleet closure to the mirror's store over
+  ssh-ng).
+- **Local-first substituter ordering.** Each site's hosts list their own local
+  mirror before the remote one, and both before cache.nixos.org (which already
+  has priority 40). The LAN mirror serves the common case; the nebula link to
+  the other site only serves cache misses.
+- **Fallback builds still dedupe.** Keep `builders-use-substitutes = true`:
+  when the authority's cache is reachable the fallback builder downloads the
+  result instead of rebuilding; it only builds when the authority has nothing
+  to offer.
+- **True race elimination needs a coordinator.** If per-commit status and a
+  single dispatch queue become necessary, Hydra is the tool: one queue runner
+  dedupes jobs and hands them to machines, so two builders can never start the
+  same job. The timer approach above is a cheap approximation, not a
+  distributed scheduler.
+
+**Failure behaviour.** The single authority only owns *proactive warming*, not
+build capability. If it is down, nothing stops: hosts keep building locally or
+offload to the fallback server (`fallback = true`), and both sites' nix-serve
+mirrors keep serving whatever is already in their stores. What is lost is warm-
+cache progress, plus a small window for duplicate work: the fallback may build
+paths on demand while the authority is away, and when the authority returns it
+must not rebuild those same paths. Symmetric substituters close that gap — each
+server lists the other, so whoever builds a path first, the other downloads it.
+Promoting the fallback to authority is a manual decision (or a healthcheck-gated
+timer); only a coordinator (Hydra) makes failover automatic without
+reintroducing a race window.
+
 ## Proposed Target Layout
 
 The goal is not to make every host list every tiny file, and not to import one
@@ -350,6 +428,17 @@ trustworthy `nix fmt` and a clean ref state. None of these touch protected paths
 10. Add a PR-time `nix flake check` workflow.
     The scheduled flake-lock workflow already evaluates derivations; a push/PR
     check closes the loop for ordinary changes.
+
+11. Fleet binary cache.
+    Rebind `services.nix-serve` on s-sigma/s-tau to the nebula overlay IP, add
+    a prebuild timer, and add a shared `profiles.nixos.nix.binary-cache` profile
+    with the builder URLs and public keys for every host. See "Build
+    distribution and shared binary cache" above.
+
+12. Single build authority across sites.
+    Run the prebuild timer on exactly one R730; make the other site a pull
+    mirror (`nix store copy`) plus fallback builder, and order substituters
+    local-first on every host. See "Multi-site build coordination" above.
 
 ## Validation Strategy
 
