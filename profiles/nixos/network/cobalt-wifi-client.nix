@@ -24,21 +24,31 @@ let
     '')
     cfg.networks;
 
+  # NetworkManager has no per-profile "prefer this band" knob, so 5GHz
+  # preference is expressed as two profiles per network: a higher-priority one
+  # pinned to band "a" (5GHz) and a lower-priority band "bg" (2.4GHz) fallback.
+  # When a 5GHz BSS is in range the higher priority wins; when it is not, the
+  # 5GHz profile matches no AP and NM autoconnects the fallback instead.
   mkProfile =
+    { suffix, band, priority }:
     net:
+    let
+      id = net.name + suffix;
+    in
     {
-      name = net.name;
+      name = id;
       value = {
         connection = {
-          id = net.name;
+          inherit id;
           type = "wifi";
           autoconnect = true;
-          autoconnect-priority = net.priority;
+          autoconnect-priority = priority;
           permissions = "";
         };
         wifi = {
           mode = "infrastructure";
           ssid = "$" + envVar net.name "SSID";
+          inherit band;
         };
         wifi-security = {
           key-mgmt = net.keyMgmt;
@@ -48,6 +58,12 @@ let
         ipv6.method = "auto";
       };
     };
+
+  mkProfiles =
+    net: [
+      (mkProfile { suffix = ""; band = "a"; priority = net.priority; } net)
+      (mkProfile { suffix = "-2g4"; band = "bg"; priority = net.priority - 1; } net)
+    ];
 in
 {
   options.local.network.cobalt-wifi-client = {
@@ -111,7 +127,7 @@ in
 
     networking.networkmanager.ensureProfiles = {
       environmentFiles = [ "/run/cobalt-wifi.env" ];
-      profiles = builtins.listToAttrs (map mkProfile cfg.networks);
+      profiles = builtins.listToAttrs (lib.concatMap mkProfiles cfg.networks);
     };
   };
 }
