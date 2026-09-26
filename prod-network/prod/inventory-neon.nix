@@ -230,6 +230,10 @@ let
 
   coreUpstreamLink = "p2p-core-upstream-selector";
   upstreamPolicyVlan2Link = "p2p-policy-upstream-selector--access-access-vlan2--uplink-wan";
+  # FS-210/FS-230: vlan3 hosts the DMZ service (the Nebula lighthouse). Its
+  # public-ingress replies need the ingress/return transport lane; this is a
+  # transport binding, not WAN egress for vlan3 (access-vlan3 declares no
+  # selects).
   upstreamPolicyVlan3Link = "p2p-policy-upstream-selector--access-access-vlan3--uplink-wan";
   upstreamPolicyVlan7Link = "p2p-policy-upstream-selector--access-access-vlan7--uplink-wan";
   policyDownstreamVlan2Link = "p2p-downstream-selector-policy--access-access-vlan2";
