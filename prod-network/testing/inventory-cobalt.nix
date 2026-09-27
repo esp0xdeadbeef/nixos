@@ -1487,9 +1487,7 @@ in
                   addr4 = "10.80.0.1/32";
                   addr6 = "fd42:dead:beef:80::1/128";
                   endpoint = "198.51.100.102";
-                  endpoint6 = "2001:db8:80::102";
                   endpointSourceFile = "/run/secrets/garnet-lighthouse-endpoint4";
-                  endpoint6SourceFile = "/run/secrets/garnet-lighthouse-endpoint6";
                   port = 4243;
                 };
               };
