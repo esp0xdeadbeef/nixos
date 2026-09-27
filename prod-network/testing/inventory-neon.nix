@@ -229,7 +229,7 @@ let
   };
 
   coreUpstreamLink = "p2p-core-upstream-selector";
-  coreGarnetUpstreamLink = "p2p-core-vpn-garnet-upstream-selector";
+  coreGarnetUpstreamLink = "p2p-core-vpn-garnet-neon-upstream-selector";
   upstreamPolicyVlan2Link = "p2p-policy-upstream-selector--access-access-vlan2--uplink-wan";
   # FS-210/FS-230: vlan3 hosts the DMZ service (the Nebula lighthouse). Its
   # public-ingress replies need the ingress/return transport lane; this is a
@@ -336,11 +336,11 @@ let
       };
     };
 
-  coreGarnet = mkNode "core-vpn-garnet" {
+  coreGarnet = mkNode "core-vpn-garnet-neon" {
     upstream-selector = p2pPort {
       link = coreGarnetUpstreamLink;
-      adapterName = "prod-core-vpn-garnet-us";
-      bridge = "rt-core-vpn-garnet-upstream-selector";
+      adapterName = "prod-core-vpn-garnet-neon-us";
+      bridge = "rt-core-vpn-garnet-neon-upstream-selector";
       interfaceName = "upstream-selector";
     };
   };
@@ -384,11 +384,11 @@ let
       interfaceName = "core";
     };
 
-    core-vpn-garnet = p2pPort {
+    core-vpn-garnet-neon = p2pPort {
       link = coreGarnetUpstreamLink;
-      adapterName = "prod-us-core-vpn-garnet";
-      bridge = "rt-core-vpn-garnet-upstream-selector";
-      interfaceName = "core-vpn-garnet";
+      adapterName = "prod-us-core-vpn-garnet-neon";
+      bridge = "rt-core-vpn-garnet-neon-upstream-selector";
+      interfaceName = "core-vpn-garnet-neon";
     };
 
     policy-vlan2 = p2pPort {
@@ -1544,7 +1544,7 @@ in
 
         bridgeNetworks = {
           rt-core-upstream-selector = { };
-          rt-core-vpn-garnet-upstream-selector = { };
+          rt-core-vpn-garnet-neon-upstream-selector = { };
           rt-downstream-access-vlan2 = { };
           rt-downstream-access-vlan3 = { };
           rt-downstream-access-vlan7 = { };
@@ -1607,7 +1607,7 @@ in
 
     nodes = {
       ${nodeName "core"} = core;
-      ${nodeName "core-vpn-garnet"} = coreGarnet;
+      ${nodeName "core-vpn-garnet-neon"} = coreGarnet;
       ${nodeName "isp-pppoe-peer"} = ispPppoePeer;
       ${nodeName "upstream-selector"} = upstreamSelector // { ports = { }; };
       ${nodeName "policy"} = policy;
@@ -1636,7 +1636,12 @@ in
               nebula = {
                 role = "lighthouse";
                 lighthouse = {
-                  node = "core-vpn-garnet";
+                  node = "core-vpn-garnet-neon";
+                  # The lighthouse's own overlay (mesh) address, so a peer/client
+                  # site can build its static-host-map without having the
+                  # lighthouse node locally (FS-460-HDS-010-SDS-010-SMS-010).
+                  addr4 = "10.80.0.1/32";
+                  addr6 = "fd42:dead:beef:80::1/128";
                   endpoint = "198.51.100.102";
                   endpoint6 = "2001:db8:80::102";
                   endpointSourceFile = "/run/secrets/garnet-lighthouse-endpoint4";
@@ -1645,14 +1650,14 @@ in
                 };
               };
               nodes = {
-                core-vpn-garnet = {
+                core-vpn-garnet-neon = {
                   addr4 = "10.80.0.1/32";
                   addr6 = "fd42:dead:beef:80::1/128";
                   # Target-only facts (FS-460-HDS-010-SDS-010-SMS-010): the
                   # container/interface this overlay node runs in, and its
                   # nebula group membership.
                   service = {
-                    name = "core-vpn-garnet";
+                    name = "core-vpn-garnet-neon";
                     interface = "nebula-garnet";
                     # Underlay is the WAN (pppoe, 1492); a conservative
                     # nebula tun MTU that survives the tunnel (SMS-041: explicit).
@@ -1680,7 +1685,7 @@ in
         wanUplink = "upstream-core";
       };
 
-      core-vpn-garnet = {
+      core-vpn-garnet-neon = {
         deploymentHost = prodHost;
         runtimeRole = "core";
       };

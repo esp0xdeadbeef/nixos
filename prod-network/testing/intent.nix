@@ -1970,7 +1970,7 @@ in
         # It selects the peer site's service scopes, which own their prefixes
         # (FS-322), and offers no default: an egress (default offers 0.0.0.0/0
         # and ::/0) is not modeled here.
-        core-vpn-garnet = {
+        core-vpn-garnet-neon = {
           role = "core";
 
           selects = [
@@ -2125,7 +2125,7 @@ in
           "upstream-selector"
         ]
         [
-          "core-vpn-garnet"
+          "core-vpn-garnet-neon"
           "upstream-selector"
         ]
         [
@@ -2187,7 +2187,7 @@ in
       overlays = [
         {
           name = "garnet";
-          terminateOn = "core-vpn-garnet";
+          terminateOn = "core-vpn-garnet-neon";
           peerSite = "esp0xdeadbeef.cobalt";
           mustTraverse = [ "policy" ];
           underlayAccess = {
@@ -3739,7 +3739,7 @@ in
         # It selects the peer site's service scopes, which own their prefixes
         # (FS-322), and offers no default: an egress (default offers 0.0.0.0/0
         # and ::/0) is not modeled here.
-        core-vpn-garnet = {
+        core-vpn-garnet-cobalt = {
           role = "core";
 
           selects = [
@@ -3891,7 +3891,7 @@ in
           "upstream-selector"
         ]
         [
-          "core-vpn-garnet"
+          "core-vpn-garnet-cobalt"
           "upstream-selector"
         ]
         [
@@ -3957,7 +3957,7 @@ in
         }
         {
           name = "garnet";
-          terminateOn = "core-vpn-garnet";
+          terminateOn = "core-vpn-garnet-cobalt";
           peerSite = "esp0xdeadbeef.neon";
           mustTraverse = [ "policy" ];
           underlayAccess = {
