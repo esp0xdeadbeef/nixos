@@ -106,7 +106,22 @@ in
         format = "yaml";
         path = "/run/secrets/neon-wan-mac";
       };
-    };
+    }
+    # garnet overlay PKI + lighthouse endpoint for the neon core node
+    # (FS-460-HDS-010-SDS-010-SMS-010). The Nebula renderer bind-mounts these
+    # exact names into the core-vpn-garnet-neon container.
+    // (lib.genAttrs
+      [
+        "nebula-profile-core-vpn-garnet-neon-ca-crt"
+        "nebula-profile-core-vpn-garnet-neon-crt"
+        "nebula-profile-core-vpn-garnet-neon-key"
+        "garnet-lighthouse-endpoint4"
+      ]
+      (name: {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-neon-garnet.yaml";
+        format = "yaml";
+      })
+    );
 
   containers.access-vlan2.bindMounts = lib.listToAttrs (
     map
