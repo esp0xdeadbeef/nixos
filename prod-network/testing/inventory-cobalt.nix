@@ -1492,6 +1492,20 @@ in
                 core-vpn-garnet = {
                   addr4 = "10.80.0.2/32";
                   addr6 = "fd42:dead:beef:80::2/128";
+                  # Target-only facts (FS-460-HDS-010-SDS-010-SMS-010): the
+                  # container/interface this overlay node runs in, and its
+                  # nebula group membership.
+                  service = {
+                    name = "core-vpn-garnet";
+                    interface = "nebula-garnet";
+                    # Underlay is the WAN (pppoe, 1492); a conservative
+                    # nebula tun MTU that survives the tunnel (SMS-041: explicit).
+                    mtu = 1280;
+                    # Bare IPv4 the daemon listens on (target/underlay fact,
+                    # SMS-110: explicit; here the WAN-facing core interface).
+                    listenHost = "0.0.0.0";
+                  };
+                  groups = [ "garnet" ];
                 };
               };
             };
