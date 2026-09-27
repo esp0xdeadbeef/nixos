@@ -124,7 +124,22 @@ in
         format = "yaml";
         path = "/run/secrets/cobalt-wan-mac";
       };
-    };
+    }
+    # garnet overlay PKI + lighthouse endpoint for the cobalt core node
+    # (FS-460-HDS-010-SDS-010-SMS-010). The Nebula renderer bind-mounts these
+    # exact names into the core-vpn-garnet-cobalt container.
+    // (lib.genAttrs
+      [
+        "nebula-profile-core-vpn-garnet-cobalt-ca-crt"
+        "nebula-profile-core-vpn-garnet-cobalt-crt"
+        "nebula-profile-core-vpn-garnet-cobalt-key"
+        "garnet-lighthouse-endpoint4"
+      ]
+      (name: {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-garnet.yaml";
+        format = "yaml";
+      })
+    );
 
   # The DHCP servers in the access containers read the per-device MAC
   # reservations from the host's SOPS materialization.

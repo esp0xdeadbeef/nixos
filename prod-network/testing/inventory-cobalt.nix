@@ -207,7 +207,7 @@ let
   coreUpstreamLink = "p2p-core-upstream-selector";
   coreVpnOnyxUpstreamLink = "p2p-core-vpn-onyx-upstream-selector";
   coreVpnOpalUpstreamLink = "p2p-core-vpn-opal-upstream-selector";
-  coreGarnetUpstreamLink = "p2p-core-vpn-garnet-upstream-selector";
+  coreGarnetUpstreamLink = "p2p-core-vpn-garnet-cobalt-upstream-selector";
   upstreamPolicyClientsLink = "p2p-policy-upstream-selector--access-access-clients--uplink-wan";
   upstreamPolicyIotSrvLink = "p2p-policy-upstream-selector--access-access-iot-srv--uplink-wan";
   policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
@@ -292,11 +292,11 @@ let
       interfaceName = "core-vpn-opal";
     };
 
-    core-vpn-garnet = p2pPort {
+    core-vpn-garnet-cobalt = p2pPort {
       link = coreGarnetUpstreamLink;
       adapterName = "cb-us-cne";
-      bridge = "rt-core-vpn-garnet-upstream-selector";
-      interfaceName = "core-vpn-garnet";
+      bridge = "rt-core-vpn-garnet-cobalt-upstream-selector";
+      interfaceName = "core-vpn-garnet-cobalt";
     };
 
     policy-clients = p2pPort {
@@ -1042,11 +1042,11 @@ let
     };
   };
 
-  coreGarnet = mkNode "core-vpn-garnet" {
+  coreGarnet = mkNode "core-vpn-garnet-cobalt" {
     upstream-selector = p2pPort {
       link = coreGarnetUpstreamLink;
       adapterName = "cb-cne-us";
-      bridge = "rt-core-vpn-garnet-upstream-selector";
+      bridge = "rt-core-vpn-garnet-cobalt-upstream-selector";
       interfaceName = "upstream-selector";
     };
   };
@@ -1233,7 +1233,7 @@ in
           rt-core-upstream-selector = { };
           rt-core-vpn-onyx-upstream-selector = { };
           rt-core-vpn-opal-upstream-selector = { };
-          rt-core-vpn-garnet-upstream-selector = { };
+          rt-core-vpn-garnet-cobalt-upstream-selector = { };
           rt-downstream-access-svc = { };
           rt-downstream-access-clients = { };
           rt-downstream-access-dmz = { };
@@ -1302,7 +1302,7 @@ in
       ${nodeName "access-mgmt"} = accessMgmt;
       ${nodeName "core-vpn-onyx"} = vpnOnyx;
       ${nodeName "core-vpn-opal"} = vpnOpal;
-      ${nodeName "core-vpn-garnet"} = coreGarnet;
+      ${nodeName "core-vpn-garnet-cobalt"} = coreGarnet;
     };
   };
 
@@ -1480,7 +1480,12 @@ in
               nebula = {
                 role = "core-client";
                 lighthouse = {
-                  node = "core-vpn-garnet";
+                  node = "core-vpn-garnet-neon";
+                  # The lighthouse's own overlay (mesh) address, so this
+                  # client site builds its static-host-map without needing the
+                  # lighthouse node locally (FS-460-HDS-010-SDS-010-SMS-010).
+                  addr4 = "10.80.0.1/32";
+                  addr6 = "fd42:dead:beef:80::1/128";
                   endpoint = "198.51.100.102";
                   endpoint6 = "2001:db8:80::102";
                   endpointSourceFile = "/run/secrets/garnet-lighthouse-endpoint4";
@@ -1489,14 +1494,14 @@ in
                 };
               };
               nodes = {
-                core-vpn-garnet = {
+                core-vpn-garnet-cobalt = {
                   addr4 = "10.80.0.2/32";
                   addr6 = "fd42:dead:beef:80::2/128";
                   # Target-only facts (FS-460-HDS-010-SDS-010-SMS-010): the
                   # container/interface this overlay node runs in, and its
                   # nebula group membership.
                   service = {
-                    name = "core-vpn-garnet";
+                    name = "core-vpn-garnet-cobalt";
                     interface = "nebula-garnet";
                     # Underlay is the WAN (pppoe, 1492); a conservative
                     # nebula tun MTU that survives the tunnel (SMS-041: explicit).
