@@ -318,6 +318,17 @@
       url = "github:esp0xdeadbeef/nixos";
       flake = false;
     };
+
+    # Vendor firmware for the BPI-R4 Pro 4E (MT7988A): the signed BL2 + ARM-TF
+    # FIP blobs the MT7988 BootROM/BL2 need to boot at all.  They cannot be
+    # built from source.  Sliced from the vendor OpenWrt SD image by
+    # nixos/server/s-nodus/firmware.nix, which pins them by content hash.
+    #
+    # The image is large (~268 MiB) and is not redistributable, so it is NOT
+    # an input here: point the flash script at a local copy (see
+    # nixos/server/s-nodus/README.md).  The resulting blobs (~8 MiB) are small
+    # and pinned by hash in firmware.nix.
+
   };
 
   outputs =
@@ -352,6 +363,8 @@
       # it as x86_64-linux is wrong.
       hostSystems = {
         l-portal = "aarch64-linux";
+        # s-nodus: Banana Pi BPI-R4 Pro 4E (MediaTek MT7988A).
+        s-nodus = "aarch64-linux";
       };
 
       hostSystemFor = name: hostSystems.${name} or "x86_64-linux";
@@ -494,5 +507,16 @@
             }
         )
         hosts;
+
+      # Disko configurations evaluated on the BUILD host (x86_64), not the
+      # target. disko's own binaries must run on the machine doing the
+      # partitioning -- evaluating them for aarch64 would ship aarch64 binaries
+      # to an x86_64 host ("Exec format error").
+      #
+      # NOTE: disko alone does NOT produce a bootable s-nodus card (it cannot
+      # write the BL2/FIP firmware blobs nor the raw NixOS FIT). Use
+      # nixos/server/s-nodus/mk-sd-image.sh for the full image.
+      diskoConfigurations.s-nodus-disk =
+        (import ./nixos/server/s-nodus/disko.nix { });
     };
 }
