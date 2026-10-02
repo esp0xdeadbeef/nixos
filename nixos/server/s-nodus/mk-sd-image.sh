@@ -239,16 +239,16 @@ _populate_root_in_image() {
 # i.e. two 0x40000 images filling the 0x80000 (512 KiB) partition.
 _write_uboot_env_in_image() {
   local IMG="$1"
-  local env="$WORK/uboot.env" tmp top
-  tmp="$(mktemp)"
-  top=$(nix build --builders '' --print-out-paths --no-link \
-    "$REPO#nixosConfigurations.s-nodus.config.system.build.toplevel")
-  sed "s|@@TOPLEVEL@@|$top|" "$HERE/uboot-env.txt" > "$tmp"
+  local env="$WORK/uboot.env"
 
+  # uboot-env.txt is used verbatim: its init= points at the stable
+  # /nix/var/nix/profiles/system symlink, so it does not need to track the
+  # current toplevel (and a rebuild that moves the profile is picked up on
+  # the next boot without rewriting this env).
+  #
   # mkenvimage writes ONE copy of the given size; write it twice ourselves.
   nix shell nixpkgs#ubootTools -c \
-    mkenvimage -s 0x40000 -r -o "$env" "$tmp"
-  rm -f "$tmp"
+    mkenvimage -s 0x40000 -r -o "$env" "$HERE/uboot-env.txt"
 
   [ "$(stat -c%s "$env")" -eq 262144 ] || { echo "!! unexpected env size"; exit 1; }
 
