@@ -4,6 +4,7 @@
 , name
 , pkgs
 , profiles
+, relativeRepo
 , ...
 }:
 
@@ -36,13 +37,32 @@
 
     profiles.nixos.impermanence.minimal
     profiles.nixos.ssh.password-login
+    # Shared key set (same as l-envil/s-gamma): l-portal, l-esp, s-sigma,
+    # s-sigma-root.  Keeps s-nodus reachable by key over the clients VLAN
+    # without the serial dev port.
+    profiles.nixos.ssh.deadbeef-authorized-keys
     profiles.nixos.users.deadbeef-ssh
     profiles.nixos.users.sudo-nopasswd
+
+    # Join the nebula overlay (100.64.0.18) so s-nodus can reach -- and
+    # offload builds to -- the fleet's remote builders, and read secrets via
+    # sops (identity = the persistent ssh host key below).
+    inputs.sops-nix.nixosModules.sops
+    profiles.nixos.network.nebula-mesh
+    profiles.nixos.sops.persist-root-ssh
+    profiles.nixos.nix.remote-builder-client
 
     ./boot.nix
     ./dtb.nix
     ./network.nix
     ./fit.nix
+
+    # Optional machine-local overrides.  The board keeps its own copy at
+    # /etc/nixos.local.nix (mirrored by the rsync deploy) so an on-board
+    # rebuild can set nixpkgs.buildPlatform = aarch64-linux and build
+    # natively; the checked-in default cross-builds from x86_64 for the
+    # card image.  Kept out of this dir so the repo rsync cannot clobber it.
+    ./local-overrides.nix
 
     # microSD layout.  Replicates the vendor GPT geometry (bl2/ubootenv/
     # factory/fip + production FIT + btrfs root) because the MT7988 BootROM,
@@ -54,13 +74,54 @@
   networking.hostName = lib.mkForce name;
   time.timeZone = "Europe/Amsterdam";
 
+  # Nebula mesh secrets (same five keys as s-gamma; see secrets/s-nodus.yaml).
+  # The host cert is s-nodus's own (100.64.0.18), the CA + lighthouse IPs are
+  # the shared mesh values.
+  sops.secrets = lib.genAttrs [
+    "nebula-ca-crt"
+    "nebula-host-crt"
+    "nebula-host-key"
+    "nebula-lighthouse-public-ip"
+    "nebula-cobalt-lighthouse-public-ip"
+  ]
+    (_: {
+      sopsFile = relativeRepo.sourcePath "secrets/s-nodus.yaml";
+    });
+
+  # s-nodus is a server-class client: it may offload to the whole builder
+  # fleet (s-sigma/s-tau, both serving aarch64-linux), unlike a laptop, which
+  # never uses another laptop as a builder.
+  local.nix.remoteBuilderClient.class = "server";
+
+  # Persistent SSH host identity, shared with sops (`persist-root-ssh` uses
+  # this key as the age identity) -- same arrangement as s-gamma.
+  services.openssh.hostKeys = [
+    {
+      type = "ed25519";
+      path = "/persist/etc/ssh/ssh_host_ed25519_key";
+    }
+  ];
+
   # Board support (kernel/bootloader/DHCP-everything).
   local.bpiR4Pro.enable = true;
 
-  # Serial console + SSH (password-login profile already enables sshd
-  # with PermitRootLogin = "no"; we keep key/console access only).
+  # Enable the impermanence defaults.  Importing the profile is not enough:
+  # it is gated on this option, and without it /persist and /nix never get
+  # `neededForBoot` (+ the x-initrd.mount that follows), so they are mounted
+  # only in stage 2.  sops-nix runs in the INITRD and reads its age identity
+  # from /persist/root/.ssh/id_ed25519, so without this the secrets cannot be
+  # decrypted and nebula-mesh has no config to start with.
+  profiles.impermanence.minimal.enable = true;
+
+  # Serial console + SSH (password-login profile enables sshd with
+  # PermitRootLogin = "no"; the deadbeef-authorized-keys profile supplies the
+  # keys).  sshd/gssapi/key-auth all off, so this is key-only for deadbeef.
   services.getty.autologinUser = "root";
   users.users.root.initialPassword = "changeme"; # change on first login
+
+  # deadbeef in wheel so the sudo-nopasswd profile (NOPASSWD for group wheel)
+  # grants passwordless sudo -- same arrangement as l-envil.
+  users.users.deadbeef.extraGroups = [ "wheel" ];
 
   # aarch64 board.  buildPlatform is set so the rootfs/kernel can also be
   # cross-built on the x86_64 host (mk-sd-image.sh runs there); without it the
