@@ -63,8 +63,16 @@ let
   # /persist are separate subvolumes mounted from /etc/fstab.
   # clk/pd_ignore_unused are required (see boot.nix): without them the MTK net
   # driver's late probe hangs the CPU.
-  toplevel = config.system.build.toplevel;
-  bootargs = "console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=PARTLABEL=nixos-root rootflags=subvol=/root rootwait rw init=${toplevel}/init";
+  # NOTE: this /chosen/bootargs is effectively advisory.  U-Boot's
+  # image_setup_libfdt() always overwrites it with env_get("bootargs"), so the
+  # real cmdline lives in the U-Boot env written by mk-sd-image.sh (from
+  # uboot-env.txt).  We keep it here so the FIT is self-describing and so a
+  # FIT booted from a stock/vendor env still has a sane cmdline.
+  #
+  # It must NOT pin init= to a specific toplevel: after an on-board rebuild the
+  # env would still be correct (it uses the stable profile symlink) while this
+  # would silently go stale.  Use the stable profile path for the same reason.
+  bootargs = "console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=PARTLABEL=nixos-root rootflags=subvol=/root rootwait rw init=/nix/var/nix/profiles/system/init";
 
   itsFile = pkgs.writeText "bpi-r4-pro-4e.its" ''
     /dts-v1/;
