@@ -15,15 +15,15 @@
 #   VLAN 90   = unlock   (Tang-only unlock plane, no WAN/DNS)
 #
 # Physical port map (current wiring):
-#   1 -> l-envil dock (cobalt-lan0)      LAN trunk (20/30/31/50/51/60/90)
-#   2-3, 5-8 -> unwired / inert
-#   4 -> s-nodus lan5                     untagged clients (VLAN 30)
+#   1-2 -> LAN trunk (cobalt-lan0)        tagged planes (20/30/31/50/51/60/90)
+#   4-5 -> untagged clients               access on VLAN 30
+#   3, 6-8 -> unwired / inert
 #
 # History: this map used to describe the original il NAT-phase topology
-# (1=l-envil WAN, 3=LAN trunk, 4=ISP router, 5=l-portal clients-vpn). Only
-# ports 1 and 4 are wired now; the rest of the entries were stale and have
-# been reset to a bare default VLAN so an accidental patch cannot land a
-# device on the wrong plane.
+# (1=l-envil WAN, 3=LAN trunk, 4=ISP router, 5=l-portal clients-vpn). Ports
+# 1-2 are the tagged LAN trunk and 4-5 are untagged clients; the remaining
+# defaults are bare so an accidental patch cannot land a device on the wrong
+# plane.
 # Caveats:
 # - prosafe-vlan currently ships drivers for gs108ev3/gs116ev2; GS108PEv3 may
 #   need a driver alias/port added upstream.
@@ -46,16 +46,15 @@ address = "192.168.0.239"
 model = "gs108ev3"     # TODO: GS108PEv3 driver
 
 [switches.cobalt-switch.ports]
-# Port 1 carries every plane as tagged frames; l-envil tags/untags per bridge.
+# Ports 1-2 carry every plane as tagged frames; l-envil tags/untags per bridge.
 1 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T", "90T"] }
-# Port 4 is s-nodus's lan5: untagged access on the clients plane, so the board
-# gets a 10.2.30.0/24 DHCP lease from the clients router and is reachable by
-# SSH without the dev/serial port.
+2 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T", "90T"] }
+# Ports 4-5 are untagged access on the clients plane, so those devices get a
+# 10.2.30.0/24 DHCP lease from the clients router.
 4 = { pvid = 30, vlans = ["30U"] }
+5 = { pvid = 30, vlans = ["30U"] }
 # Unwired: bare default VLAN only.
-2 = { pvid = 1, vlans = ["1U"] }
 3 = { pvid = 1, vlans = ["1U"] }
-5 = { pvid = 1, vlans = ["1U"] }
 6 = { pvid = 1, vlans = ["1U"] }
 7 = { pvid = 1, vlans = ["1U"] }
 8 = { pvid = 1, vlans = ["1U"] }
