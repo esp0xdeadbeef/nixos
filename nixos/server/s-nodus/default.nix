@@ -172,27 +172,56 @@
   # memory than the board's 4 GiB: it peaks around 3.3 GiB and an on-board
   # `nixos-rebuild` was OOM-killed at 92% CPU / 84% RSS.
   #
-  # Two layers of swap:
+  # Swap is a FILE on the btrfs root, not a partition:
   #
-  #   * swapDevices: the dedicated partition on the Samsung NVMe created by
-  #     disko.nix.  This is what actually provides headroom -- NVMe behind
-  #     PCIe 3.0 x1, far faster than the microSD whose writeback path throttled
-  #     builds into `wbt_wait` stalls.
-  #   * zramSwap: in-memory compressed swap.  Cheap and very fast, and given a
-  #     higher priority so the common case never touches the SSD.
+  #   * It costs no partitioning.  The same rootfs serves both stages, so the
+  #     swap size can change without re-laying-out any disk -- and the card
+  #     keeps its space unallocated, available to grow the root instead.
+  #   * btrfs is not a problem: NixOS's swapfile handling detects a btrfs
+  #     filesystem and creates the file with `btrfs filesystem mkswapfile`,
+  #     which sets the nocow attribute itself.  The old "btrfs refuses a
+  #     swapfile" caveat no longer applies.
+  #   * Compared with a partition it cannot be forgotten when re-running disko,
+  #     and there is one fewer device to keep uniquely labelled.
   #
-  # Builds themselves go to the remote builders (nix.settings.max-jobs = 0
-  # above); this only has to absorb evaluation.
+  # Sized well above RAM: evaluation alone is ~3.3 GiB, and a rebuild adds more
+  # on top.  The failure this prevents is a board that OOMs while rebuilding the
+  # very system needed to fix it.
   #
-  # `discard` is left off deliberately: the root filesystem uses async discard,
-  # and issuing discards on a swap partition adds latency for no benefit on an
-  # SSD this size.
+  # It lives under /persist, not /var/lib: impermanence wipes the root subvolume
+  # on every boot, so a swapfile on / would be recreated each time (and a
+  # half-written one would not survive a crash).  /persist is a separate,
+  # non-rolled-back subvolume -- the same place the SSH host keys and the VM
+  # state live.
+  #
+  # /persist/swap is its own btrfs subvolume, and services.btrfs.autoScrub
+  # below scrubs only the data subvolumes -- never this one.  btrfs checksums
+  # every data block, and a live swapfile is rewritten continuously, so
+  # scrubbing it reports a constant stream of checksum mismatches that look
+  # exactly like corruption.  Keeping it in a separate subvolume is the only
+  # supported way to exclude it: `btrfs scrub` has no per-file skip.
+  #
+  # zramSwap adds fast in-memory compressed swap beneath this at a higher
+  # priority, so the common case never touches the disk at all.
   swapDevices = [
     {
-      device = "/dev/disk/by-partlabel/swap";
-      # A dedicated partition, so no `size` -- that option is for swapfiles.
+      device = "/persist/swap/swapfile";
+      size = 8192; # MiB
     }
   ];
+
+  # Scrub the real data, never the swap subvolume.  Listing the mount points
+  # explicitly (rather than relying on the "all btrfs mount points" default)
+  # keeps /persist/swap out of the set now and if it is ever mounted.
+  services.btrfs.autoScrub = {
+    enable = true;
+    fileSystems = [
+      "/"
+      "/nix"
+      "/persist"
+    ];
+    interval = "monthly";
+  };
 
   zramSwap = {
     enable = true;

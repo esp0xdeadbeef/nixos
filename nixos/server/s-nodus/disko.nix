@@ -143,13 +143,11 @@
               # 2048-aligned like any normal disk (nothing here is located by
               # raw offset, unlike the firmware partitions on the card).
               start = "2048";
-              # Ends `swapSizeGiB` before the end of the disk, leaving exactly
-              # that much for the swap partition below.  Negative `end` is
-              # disko's relative-to-disk form (see its example/swap.nix); a
-              # computed expression like "100% - 64G" is rejected because
-              # `size` only accepts the literal "100%" or an absolute size.
-              end = "-${toString swapSizeGiB}G";
-              # Before swap.
+              # Fills the disk.  There is no separate swap partition: swap is
+              # a swapfile on /persist/swap (see the swapDevices comment in
+              # default.nix), which costs no partitioning and can be resized
+              # without re-laying-out the disk.
+              size = "100%";
               priority = 1;
               content = {
                 type = "btrfs";
@@ -167,33 +165,21 @@
                     mountpoint = "/persist";
                     mountOptions = [ "compress=zstd" "noatime" ];
                   };
+                  # Dedicated subvolume for the swapfile, deliberately excluded
+                  # from services.btrfs.autoScrub: btrfs checksums every data
+                  # block and a live swapfile is rewritten continuously, so
+                  # scrubbing it reports a constant stream of checksum
+                  # mismatches that look exactly like corruption.  `btrfs scrub`
+                  # has no per-file skip, so a separate subvolume is the only
+                  # supported way to leave it out.
+                  "/swap" = {
+                    mountpoint = "/persist/swap";
+                    mountOptions = [ "compress=no" "noatime" ];
+                  };
                 };
               };
             };
 
-            # --- swap -------------------------------------------------------
-            #
-            # A dedicated partition, not a swapfile: btrfs refuses a swapfile
-            # unless it is created nocow via `btrfs filesystem mkswapfile`, and
-            # a partition carries none of those constraints.
-            #
-            # This is what lets the GAMP pipeline be evaluated on the board at
-            # all -- evaluation peaks near 3.3 GiB against only 4 GiB of RAM.
-            swap = {
-              name = "swap";
-              label = "swap";
-              # After root.
-              priority = 2;
-              # Starts `swapSizeGiB` before the end of the disk -- the mirror of
-              # root's `end` -- and runs to the end.  Must NOT be a bare
-              # "100%": disko would then place it first, whole-disk, and
-              # overlap root.
-              start = "-${toString swapSizeGiB}G";
-              size = "100%";
-              content = {
-                type = "swap";
-              };
-            };
           };
         };
       };
@@ -271,9 +257,9 @@
             # --- nixos-root: the STAGE-1 root filesystem, on the card ----------
             #
             # Deliberately on the microSD, not the NVMe.  The card holds a
-            # complete NixOS (store closure, /etc, the system profile), so the
-            # board boots a self-consistent system with no dependency on the SSD
-            # at all.  That is what makes the SSD installable and, just as
+            # complete NixOS (store closure, the system profile), so the board
+            # boots a self-consistent system with no dependency on the SSD at
+            # all.  That is what makes the SSD installable and, just as
             # importantly, recoverable: this root stays as the fallback if a
             # later move of the root to the NVMe goes wrong.
             #
@@ -281,14 +267,19 @@
             # which stage 1 resolves INSIDE THIS filesystem -- so the store and
             # the profile here can never disagree the way they did when the root
             # was written to the NVMe separately from the FIT.
+            #
+            # Sized to the disk rather than to the rootfs image: the extra space
+            # is what holds the stage-1 swapfile and gives an on-board rebuild
+            # somewhere to work.  Taking "100%" here is how the board previously
+            # ended up with no usable swap.
             nixos-root = {
               name = "nixos-root";
               label = "nixos-root";
               start = "1245184";
-              size = "100%";
+              # 8 GiB, leaving the rest of the 29.7 GB card unallocated so the
+              # root can be grown later without reflashing.
+              end = "17727487";
               type = "8300";
-              # 100%-sized partitions otherwise default to priority 9001 (last);
-              # keep it after production so the index stays 6.
               priority = 6;
               content = {
                 type = "btrfs";
@@ -305,6 +296,17 @@
                   "/persist" = {
                     mountpoint = "/persist";
                     mountOptions = [ "compress=zstd" "noatime" ];
+                  };
+                  # Dedicated subvolume for the swapfile, deliberately excluded
+                  # from services.btrfs.autoScrub: btrfs checksums every data
+                  # block and a live swapfile is rewritten continuously, so
+                  # scrubbing it reports a constant stream of checksum
+                  # mismatches that look exactly like corruption.  `btrfs scrub`
+                  # has no per-file skip, so a separate subvolume is the only
+                  # supported way to leave it out.
+                  "/swap" = {
+                    mountpoint = "/persist/swap";
+                    mountOptions = [ "compress=no" "noatime" ];
                   };
                 };
               };
