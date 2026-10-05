@@ -250,11 +250,20 @@
   hardware.enableAllHardware = lib.mkForce false;
   # Module names must match what this kernel actually ships: `nvme` IS the PCI
   # driver here (there is no separate nvme-pci.ko), and it depends on
-  # nvme-core.  `ahci` is deliberately absent -- the board has no SATA.
+  # nvme-core.  No `ahci` -- the board has no SATA.
+  #
+  # The PCIe *host controller* and *PHY* modules are equally load-bearing and
+  # were the actual reason the NVMe never appeared: `nvme.ko` alone cannot see
+  # a device that no PCIe bus has enumerated.  Without them stage-1 logs only
+  #     mtk-pcie-gen3 11290000.pcie: PCIe link down ... failed with error -110
+  # (or nothing at all for 11280000, the controller the Samsung sits on) and
+  # `by-partlabel/nixos-root` is never created.
   boot.initrd.availableKernelModules = [
     "btrfs"
     "nvme"
     "nvme-core"
+    "pcie-mediatek-gen3"
+    "phy-mtk-pcie"
   ];
 
   # Expose the rootfs image under a stable attribute for mk-sd-image.sh.

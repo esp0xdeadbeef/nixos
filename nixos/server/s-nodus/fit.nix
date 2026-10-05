@@ -72,7 +72,15 @@ let
   # It must NOT pin init= to a specific toplevel: after an on-board rebuild the
   # env would still be correct (it uses the stable profile symlink) while this
   # would silently go stale.  Use the stable profile path for the same reason.
-  bootargs = "console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=fstab rootwait rw init=/nix/var/nix/profiles/system/init";
+  # `pci=pcie_bus_perf` is REQUIRED for the NVMe to enumerate on this board.
+  # Without it mtk-pcie-gen3 fails link training:
+  #     mtk-pcie-gen3 11290000.pcie: PCIe link down, current LTSSM state:
+  #     detect.quiet (0x1)
+  #     probe with driver mtk-pcie-gen3 failed with error -110
+  # and /dev/nvme0n1 never appears, so stage-1 cannot find the root.  The
+  # vendor OpenWrt cmdline carries this parameter, which is why the stock
+  # firmware sees the same SSD that our FIT could not.
+  bootargs = "console=ttyS0,115200n1 pci=pcie_bus_perf clk_ignore_unused pd_ignore_unused root=fstab rootwait rw init=/nix/var/nix/profiles/system/init";
 
   itsFile = pkgs.writeText "bpi-r4-pro-4e.its" ''
     /dts-v1/;
