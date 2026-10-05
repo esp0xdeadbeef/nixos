@@ -308,6 +308,12 @@ _populate_btrfs_root() {
   sudo btrfs subvolume create "$m/root"    >/dev/null
   sudo btrfs subvolume create "$m/nix"     >/dev/null
   sudo btrfs subvolume create "$m/persist" >/dev/null
+  # Dedicated subvolume for the swapfile.  It must exist so /persist/swap
+  # mounts and swapon finds the file; it is also what keeps the swapfile out of
+  # services.btrfs.autoScrub, which lists only /, /nix and /persist.  btrfs
+  # checksums every data block and a live swapfile is rewritten continuously,
+  # so scrubbing it would report permanent false corruption.
+  sudo btrfs subvolume create "$m/swap"    >/dev/null
   sudo umount "$m"
 
   # /nix subvolume: the store closure (chown -R 0:0 -- the flat rootfs image is
