@@ -240,9 +240,22 @@
 
   # sd-image force-enables enableAllHardware (a generic initrd module list for
   # portable images), which pulls modules this board disables and breaks initrd
-  # assembly.  Use the board's actual modules (MMC is built-in; btrfs for root).
+  # assembly.  Use the board's actual modules instead.
+  #
+  # The NVMe modules are load-bearing: the root filesystem lives on the Samsung
+  # (see ./disko.nix).  Without nvme/nvme-core the block device never appears in
+  # stage 1, `by-partlabel/nixos-root` is never created, and the boot dies in
+  # emergency mode with "Timed out waiting for device".  mmc_block is built into
+  # the kernel, so the boot chain needs nothing extra.
   hardware.enableAllHardware = lib.mkForce false;
-  boot.initrd.availableKernelModules = [ "btrfs" ];
+  # Module names must match what this kernel actually ships: `nvme` IS the PCI
+  # driver here (there is no separate nvme-pci.ko), and it depends on
+  # nvme-core.  `ahci` is deliberately absent -- the board has no SATA.
+  boot.initrd.availableKernelModules = [
+    "btrfs"
+    "nvme"
+    "nvme-core"
+  ];
 
   # Expose the rootfs image under a stable attribute for mk-sd-image.sh.
   system.build.rootfsImage = config.sdImage.rootFilesystemImage;
