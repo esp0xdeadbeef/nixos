@@ -280,6 +280,33 @@ _populate_btrfs_root() {
       *) sudo cp -a "$f" "$m/" ;;
     esac
   done
+
+  # Point /nix/var/nix/profiles/system at the toplevel the boot chain expects.
+  #
+  # This is MANDATORY and was previously missing: the kernel cmdline is
+  # `init=/nix/var/nix/profiles/system/init`, and stage 1 resolves that symlink
+  # *inside the new root*.  Without it (or pointing at a toplevel the store does
+  # not contain) the boot fails at "Find NixOS closure" even though the root is
+  # mounted correctly.
+  #
+  # The toplevel is taken from the image's own store rather than passed in, so
+  # the link can only ever name a path that is actually present -- a manually
+  # written link to a stale toplevel is exactly how this broke before.
+  local toplevel
+  toplevel=$(find "$src/nix/store" -maxdepth 1 -name '*-nixos-system-*' -printf '%f\n' 2>/dev/null | sort | tail -1)
+  [ -n "$toplevel" ] || { echo "!! no nixos-system toplevel in the rootfs image"; exit 1; }
+  echo ">> system profile -> /nix/store/$toplevel"
+  sudo mkdir -p "$m/nix/var/nix/profiles"
+  sudo ln -sfn "/nix/store/$toplevel" "$m/nix/var/nix/profiles/system"
+
+  # Verify it resolves *within the store we are about to write*, not merely
+  # that the link exists -- the target is what stage 1 execs.
+  [ -x "$src/nix/store/$toplevel/init" ] \
+    || { echo "!! $toplevel has no /init; image is incomplete"; exit 1; }
+  [ -e "$src/nix/store/$toplevel/etc/fstab" ] \
+    || { echo "!! $toplevel has no /etc/fstab"; exit 1; }
+  echo "   verified: system -> $toplevel (init + etc/fstab present)"
+
   sudo chown -R 0:0 "$m"
   sudo umount "$m"
   sudo umount "$src"
