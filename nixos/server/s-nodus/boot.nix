@@ -56,47 +56,19 @@ in
     ];
 
     # --- bootloader -----------------------------------------------------
-    # systemd-boot, chainloaded by the board's own U-Boot via `bootefi`.
+    # NixOS does not own the bootloader: the board's vendor U-Boot loads the
+    # raw FIT from the `production` partition (see ./fit.nix and
+    # mk-sd-image.sh).  Disable every NixOS bootloader so nothing writes an ESP
+    # we do not use.
     #
-    # U-Boot's `boot_efi` loads a FAT EFI application from a fixed partition
-    # and hands it a DTB:
-    #
-    #   boot_efi = load mmc 0:5 ... board.dtb && \
-    #              load mmc 0:5 ... EFI/BOOT/BOOTAA64.EFI && \
-    #              bootefi 0x46000000 0x47000000
-    #
-    # The ESP must therefore be GPT partition 5 of the disk U-Boot calls
-    # `mmc 0` -- see ./disko.nix, which puts it first on the NVMe for exactly
-    # this reason.  On this board the SD is mmc 0, so the ESP has to live on
-    # the microSD, not the NVMe, for the stock env to find it.
-    #
-    # This replaces the old raw-FIT boot (`production` + a fixed `init=`).
-    # With generations there is no store path pinned into the boot chain, so a
-    # rebuild cannot leave the boot pointing at a toplevel absent from the
-    # root -- which is the failure the FIT layout was prone to.
+    # A raw-FIT boot is fine here BECAUSE the root now lives on the same medium
+    # as the boot chain: the cmdline's `init=/nix/var/nix/profiles/system/init`
+    # resolves inside the card's own btrfs root, so the store and the profile
+    # are written together and cannot disagree.  The failure this layout used to
+    # have was putting the root on the NVMe while the FIT stayed on the card.
     boot.loader.grub.enable = lib.mkForce false;
     boot.loader.generic-extlinux-compatible.enable = lib.mkForce false;
-    boot.loader.systemd-boot.enable = lib.mkForce true;
-    boot.loader.efi.efiSysMountPoint = "/boot";
-    # U-Boot has no persistent EFI variables, so bootctl must install to the
-    # removable-media fallback path \EFI\BOOT\BOOTAA64.EFI, which U-Boot loads
-    # directly.  Without this bootctl would create an EFI entry that nothing
-    # can read.
-    boot.loader.efi.canTouchEfiVariables = false;
-
-    # U-Boot `bootefi` needs a DTB passed on its command line (fdtcontroladdr
-    # is unset on this build), but systemd-boot stores each generation's dtb at
-    # a hashed /EFI/nixos/ path that changes on every rebuild -- useless for a
-    # stable U-Boot env.  Keep a stable copy at the ESP root for U-Boot, and
-    # let systemd-boot override it per generation with the real one (its
-    # `devicetree` loader-entry line).
-    #
-    # Absolute coreutils path: an on-board `nixos-rebuild` runs the bootloader
-    # installer under systemd-run with a minimal PATH where bare `cp` is absent.
-    boot.loader.systemd-boot.extraInstallCommands = ''
-      ${pkgs.coreutils}/bin/cp -f \
-        ${config.hardware.deviceTree.package}/${config.hardware.deviceTree.name} \
-        /boot/board.dtb
-    '';
+    boot.loader.systemd-boot.enable = lib.mkForce false;
+    boot.loader.efi.canTouchEfiVariables = false; # no EFI vars on this board
   };
 }

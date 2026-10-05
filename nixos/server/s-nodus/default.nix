@@ -222,7 +222,23 @@
   # No FAT firmware partition: the FIT (fit.nix) is the boot artifact, and the
   # ESP/FAT path does not exist on this board's vendor U-Boot.
   sdImage.populateFirmwareCommands = "";
-  sdImage.populateRootCommands = "";
+
+  # Create the system profile symlink inside the root image, at build time.
+  #
+  # The cmdline is `init=/nix/var/nix/profiles/system/init`, and stage 1
+  # resolves that link *inside the root it just mounted*.  Without it -- or with
+  # it pointing at a toplevel the store does not contain -- the boot dies at
+  # "Find NixOS closure" while the root looks perfectly healthy, which is the
+  # failure mode this layout kept hitting.
+  #
+  # Doing it here rather than by hand after the fact means the link and the
+  # store are produced by the same build and therefore cannot disagree: the
+  # target is ${config.system.build.toplevel}, which is exactly what
+  # make-btrfs-fs puts in the store (it comes from sdImage.storePaths).
+  sdImage.populateRootCommands = ''
+    mkdir -p ./files/nix/var/nix/profiles
+    ln -sfn ${config.system.build.toplevel} ./files/nix/var/nix/profiles/system
+  '';
   sdImage.expandOnBoot = false; # the module's auto-grow is ext4-only
 
   # Root is btrfs (override the module's ext4 default).
