@@ -121,7 +121,10 @@ build() {
   local P6_N=$rootBlocks
   local p6End=$(( P6_S + P6_N - 1 ))
 
-  # The image only needs to reach the end of the root partition.
+  # The image needs to reach the end of the root partition so the GPT covers
+  # it; the filesystem itself is written afterwards by `populate` (see below),
+  # because a meaningful NixOS root needs btrfs SUBVOLUMES (/root, /nix,
+  # /persist) and `make-btrfs-fs` only produces a flat image.
   local total=$(( p6End + 34 ))
   echo ">> assembling $IMG (total=$total sec = $(( total/2/1024 )) MiB)"
   rm -f "$IMG"
@@ -145,12 +148,11 @@ build() {
   dd if="$FW/fip.bin"  of="$IMG" bs=512 seek=$P4_S conv=notrunc status=none
   dd if="$FIT"         of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
 
-  # The root partition holds a flat btrfs filesystem, written straight in.  Its
-  # subvolumes (/root, /nix, /persist) are already inside the image, so the
-  # kernel's rootflags=subvol=/root finds them without any post-processing.
-  echo ">> writing root filesystem to partition 6"
-  dd if="$ROOTFS" of="$IMG" bs=512 seek=$P6_S conv=notrunc status=none
-
+  # Partition 6 is left EMPTY here on purpose.  It is created now only so the
+  # GPT geometry is final; its btrfs filesystem (with the /root, /nix and
+  # /persist subvolumes the config's fileSystems declare) is written by the
+  # `populate` command against the flashed device.
+  echo ">> partition 6 left for 'populate' (btrfs with subvolumes)"
   # U-Boot environment: MANDATORY.  U-Boot's image_setup_libfdt() always
   # overwrites /chosen/bootargs with env_get("bootargs"), so the FIT's bootargs
   # are ignored and the vendor default (root=/dev/fit0) cannot boot NixOS.
@@ -165,8 +167,9 @@ build() {
   echo "   verified: fip header + production FIT magic"
 
   echo ">> built $IMG ($(du -h "$IMG" | cut -f1))"
-  echo "   flash with: $0 flash <sd-device>"
-  echo "   the card is now self-contained: it boots NixOS with no NVMe present."
+  echo "   flash with:  $0 flash <sd-device>"
+  echo "   then:        $0 populate <sd-device>   (writes the root filesystem)"
+  echo "   the card then boots NixOS with no NVMe present."
   echo "   stage 2 (move the root to the NVMe) is run FROM the booted system."
 }
 
@@ -376,10 +379,47 @@ scratch_swap() {
   echo ">> NOTE: not persisted.  This disk is not in disko.nix by design."
 }
 
+# ------------------------------------------------------------- populate ----
+# Write the stage-1 root filesystem into partition 6 of a flashed SD card.
+#
+# Separate from `build` because the two media disagree on what a root is:
+# `make-btrfs-fs` produces a FLAT image (store + files, no subvolumes), while
+# this system's fileSystems declare `subvol=/root`, `/nix` and `/persist`.  dd'ing
+# the flat image in leaves a root that cannot satisfy them -- the kernel asks for
+# subvol=/root and finds nothing.
+#
+# So the partition is formatted here and populated by _populate_btrfs_root, the
+# same helper `root` uses for the NVMe.
+populate() {
+  local DEV="${1:?usage: $0 populate <sd-device> [rootfs-image]}"
+  local ROOT_IMAGE="${2:-}"
+  [ -b "$DEV" ] || { echo "!! $DEV is not a block device"; exit 1; }
+  case "$DEV" in
+    /dev/mmcblk*|/dev/mtd*) : ;;
+  esac
+
+  if [ -z "$ROOT_IMAGE" ]; then
+    echo ">> building the root filesystem image"
+    ROOT_IMAGE=$(nix build --print-out-paths --no-link \
+      "$REPO#nixosConfigurations.s-nodus.config.system.build.rootfsImage")
+  fi
+  echo "   rootfs = $ROOT_IMAGE"
+
+  local PART; PART=$(partition_of "$DEV" 6)
+  echo ">> formatting $PART (btrfs, label nixos-root)"
+  sudo umount "$PART" 2>/dev/null || true
+  sudo wipefs -a "$PART" >/dev/null 2>&1 || true
+
+  echo ">> subvolumes + populate on $PART"
+  _populate_btrfs_root "$PART" "$ROOT_IMAGE"
+  echo ">> done.  partition 6 is ready."
+}
+
 cmd="${1:-}"; shift || true
 case "$cmd" in
   build) build "$@" ;;
   flash) flash "$@" ;;
+  populate) populate "$@" ;;
   root)  root "$@" ;;
   swap)  scratch_swap "$@" ;;
   *) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
