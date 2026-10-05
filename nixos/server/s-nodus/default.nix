@@ -254,16 +254,26 @@
   #
   # The PCIe *host controller* and *PHY* modules are equally load-bearing and
   # were the actual reason the NVMe never appeared: `nvme.ko` alone cannot see
-  # a device that no PCIe bus has enumerated.  Without them stage-1 logs only
-  #     mtk-pcie-gen3 11290000.pcie: PCIe link down ... failed with error -110
-  # (or nothing at all for 11280000, the controller the Samsung sits on) and
-  # `by-partlabel/nixos-root` is never created.
+  # a device that no PCIe bus has enumerated.
+  #
+  # `phy-mtk-xsphy` specifically drives xs-phy@11e10000, whose port 3 IS the
+  # PCIe PHY for pcie@11280000 -- the controller the SSD sits on
+  # (`phys = <&xphyu3port0 PHY_TYPE_PCIE>` in mt7988a.dtsi).  Without it that
+  # controller never probes and logs NOTHING AT ALL -- unlike its siblings it
+  # does not even report "link down", because the driver is still waiting on an
+  # unsatisfied PHY dependency.  The vendor firmware shows the difference:
+  #
+  #   mtk-xsphy soc:xphy@11e10000: failed to get ref_clk(id-1)   <- defers
+  #   phy phy-soc:xphy@11e10000.3: type_sw - reg 0x218, index 0   <- comes up
+  #
+  # and then 11280000 probes a second time and links.  Ours had neither line.
   boot.initrd.availableKernelModules = [
     "btrfs"
     "nvme"
     "nvme-core"
     "pcie-mediatek-gen3"
     "phy-mtk-pcie"
+    "phy-mtk-xsphy"
   ];
 
   # Expose the rootfs image under a stable attribute for mk-sd-image.sh.

@@ -140,8 +140,8 @@
             root = {
               name = "nixos-root";
               label = "nixos-root";
-              # 2048-sector aligned like any normal disk (unlike the firmware
-              # partitions on the SD, nothing here is located by raw offset).
+              # 2048-aligned like any normal disk (nothing here is located by
+              # raw offset, unlike the firmware partitions on the card).
               start = "2048";
               # Ends `swapSizeGiB` before the end of the disk, leaving exactly
               # that much for the swap partition below.  Negative `end` is
@@ -149,8 +149,7 @@
               # computed expression like "100% - 64G" is rejected because
               # `size` only accepts the literal "100%" or an absolute size.
               end = "-${toString swapSizeGiB}G";
-              # Lower priority than swap, so root is created first and becomes
-              # partition 1.
+              # Before swap.
               priority = 1;
               content = {
                 type = "btrfs";
@@ -183,9 +182,7 @@
             swap = {
               name = "swap";
               label = "swap";
-              # Raised so swap becomes partition 2, after root (100%-sized
-              # partitions would otherwise default to priority 9001, i.e.
-              # last).
+              # After root.
               priority = 2;
               # Starts `swapSizeGiB` before the end of the disk -- the mirror of
               # root's `end` -- and runs to the end.  Must NOT be a bare
@@ -251,21 +248,44 @@
               priority = 4;
             };
 
-            # --- production: raw FIT the stock U-Boot boots -------------------
-            # Content is null (not formatted); mk-sd-image.sh writes the FIT
-            # raw at offset 0.  Kept at the vendor's 448M so a kernel+initrd+
-            # dtb FIT fits comfortably under U-Boot's `imszb`/part_size check.
+            # --- esp: systemd-boot + kernels + board dtb --------------------
             #
-            # The btrfs root does NOT live here -- it is on the NVMe (`root`
-            # above).  The card carries the boot chain only, which the MT7988
-            # BootROM/BL2 can only find on mmc 0.
-            production = {
-              name = "production";
-              label = "production";
-              start = "327680";
-              end = "1245183";
-              type = "8300";
+            # The board's OpenWrt U-Boot chainloads an EFI application with
+            # `bootefi`:
+            #
+            #   boot_efi = load mmc 0:5 ... board.dtb && \
+            #              load mmc 0:5 ... EFI/BOOT/BOOTAA64.EFI && \
+            #              bootefi 0x46000000 0x47000000
+            #
+            # `mmc 0` is the microSD, and the vendor env addresses the ESP by
+            # PARTITION NUMBER (5), so the ESP has to live *here*, not on the
+            # NVMe -- U-Boot on this board has no `nvme` command to read a disk
+            # by device (only PCI, which the Shell cannot easily use).
+            #
+            # U-Boot `bootefi`s the removable-media path \EFI\BOOT\BOOTAA64.EFI,
+            # which `boot.loader.efi.canTouchEfiVariables = false` makes
+            # systemd-boot install -- no EFI variables needed.
+            #
+            # Replaces the old raw-FIT `production` partition.  With boot
+            # generations there is no store path pinned anywhere in the boot
+            # chain, so a rebuild cannot leave the boot pointing at a toplevel
+            # that is missing from the root -- which is how the FIT layout
+            # broke.  Fixed geometry keeps the index at exactly 5; mk-sd-image.sh
+            # writes bl2/ubootenv/factory/fip into partitions 1-4 and this ESP
+            # is populated by `bootctl install` from the running system.
+            esp = {
+              name = "esp";
+              label = "ESP";
+              start = "1048576";
+              end = "3145727"; # 1 GiB
+              type = "EF00";
               priority = 5;
+              content = {
+                type = "filesystem";
+                format = "vfat";
+                mountpoint = "/boot";
+                mountOptions = [ "umask=0077" ];
+              };
             };
           };
         };
