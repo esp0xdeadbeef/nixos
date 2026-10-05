@@ -276,6 +276,21 @@
     "phy-mtk-xsphy"
   ];
 
+  # Allow an unauthenticated shell in the stage-1 emergency mode.
+  #
+  # Without this, `emergencyAccess` defaults to false and systemd's sulogin
+  # refuses with "Cannot open access to console, the root account is locked" --
+  # which makes a failed boot undebuggable from the serial console even though
+  # the box is physically in front of you.  With it, a failure at
+  # initrd-find-nixos-closure (or anything else in stage 1) drops to a root
+  # shell where /sysroot is already mounted, so the cause can be inspected and
+  # fixed in place instead of pulling the storage out.
+  #
+  # Stage 2 is unaffected: `systemd.enableEmergencyMode` is a separate option
+  # and stays at its default.  Physical console access is already required to
+  # reach this shell, so this does not widen the threat model.
+  boot.initrd.systemd.emergencyAccess = true;
+
   # Expose the rootfs image under a stable attribute for mk-sd-image.sh.
   system.build.rootfsImage = config.sdImage.rootFilesystemImage;
 
