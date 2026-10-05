@@ -28,7 +28,21 @@
 # stale after any on-board `nixos-rebuild` (the FIT's /chosen/bootargs is
 # ignored -- U-Boot always uses this env -- so the env is the only lever).
 # resolve-in-root resolves the symlink inside the mounted root.
-bootargs=console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=PARTLABEL=nixos-root rootflags=subvol=/root rootwait rw init=/nix/var/nix/profiles/system/init
+# `root=fstab` (NOT root=PARTLABEL=nixos-root): with the systemd initrd,
+# fileSystems."/" already carries `x-initrd.mount` (filesystems.nix adds it for
+# anything fsNeededForBoot, and "/" always is), so systemd-fstab-generator
+# creates sysroot.mount from that entry.  Passing a root= *device* as well
+# makes it try to create sysroot.mount a second time:
+#
+#   systemd-fstab-generator: Failed to create unit file
+#     '/run/systemd/generator/sysroot.mount', as it already exists.
+#
+# It then bails out of generating the rest, so /persist never mounts -- and
+# sops-nix runs in the initrd and reads its age key from
+# /persist/root/.ssh/id_ed25519, which is why secrets failed to decrypt.
+# `root=fstab` resolves the root from the fstab entry instead of the cmdline
+# and leaves a single sysroot.mount.  (This is what the working s-gamma does.)
+bootargs=console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=fstab rootwait rw init=/nix/var/nix/profiles/system/init
 bootdelay=2
 
 # --- SD boot path (verbatim from the vendor env) -----------------------------

@@ -74,10 +74,28 @@ the BootROM/BL2/U-Boot locate payloads by fixed sector + GPT name:
 | 3 | `factory` | 9216 | 2 MiB | — | (zeros) |
 | 4 | `fip` | 13312 | 4 MiB | — | ARM-TF FIP (BL31 + BL33/U-Boot) |
 | 5 | `production` | 327680 | 448 MiB | — | raw NixOS FIT |
-| 6 | `nixos-root` | 1245184 | 100% | btrfs (`/root`,`/nix`,`/persist`) | `/` |
+
+The card carries **only the boot chain**. It deliberately has no root
+filesystem: that lives on the first NVMe (below), whose layout is
+
+| # | PARTLABEL | Size | FS | Role |
+|---|---|---|---|---|
+| 1 | `nixos-root` | disk − swap | btrfs (`/root`,`/nix`,`/persist`) | `/` |
+| 2 | `swap` | `swapSizeGiB` (64 GiB) | swap | paging |
 
 `bl2`/`fip` are signed vendor blobs; `production` holds the FIT. The `nixos-root`
 btrfs label/PARTLABEL is what the FIT's bootargs resolve.
+
+`nixos-root` must be **unique across all attached disks**. The card used to
+carry a `nixos-root` partition of its own, and while both existed
+`/dev/disk/by-partlabel/nixos-root` resolved to whichever udev happened to
+settle last -- which mounted the wrong root and dropped the board into an
+emergency shell. The card's copy is now named `sd-old-root` (and holds no
+root); leave it that way.
+
+Swap is sized by the `swapSizeGiB` argument (default 64 GiB). The board has
+only 4 GiB of RAM, and evaluating the network pipeline peaks near 3.3 GiB, so
+swap is what keeps a heavy build from being OOM-killed.
 
 ### Safety — write ONLY the microSD
 
