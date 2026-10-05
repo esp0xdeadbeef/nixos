@@ -42,7 +42,7 @@
 # /persist/root/.ssh/id_ed25519, which is why secrets failed to decrypt.
 # `root=fstab` resolves the root from the fstab entry instead of the cmdline
 # and leaves a single sysroot.mount.  (This is what the working s-gamma does.)
-bootargs=console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=fstab rootwait rw init=/nix/var/nix/profiles/system/init
+bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf clk_ignore_unused pd_ignore_unused root=fstab rootwait rw init=/nix/var/nix/profiles/system/init
 bootdelay=2
 
 # --- SD boot path (verbatim from the vendor env) -----------------------------
