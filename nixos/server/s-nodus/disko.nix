@@ -1,6 +1,44 @@
-{ disk ? "/dev/sda", ... }:
+{
+  # The microSD, named explicitly -- there is deliberately no usable default.
+  # It is /dev/sda when preparing a card on a laptop but /dev/mmcblk0 on the
+  # board, so any default would be wrong on one of the two and could point at
+  # an unrelated disk.  Pass `--argstr disk <device>` (or `{ disk = ...; }`).
+  #
+  # null is allowed and only referenced when `withSdcard` is true, so the
+  # NVMe-only configuration need not name a card at all.
+  disk ? null
+, rootDisk ? "/dev/nvme0n1"
+  # Swap size in whole GiB, carved off the end of the root disk.
+  #
+  # The board has only 4 GiB of RAM, while evaluating the network pipeline peaks
+  # around 3.3 GiB and heavier work (several concurrent evaluator/build
+  # processes, VM images) spikes well past that.  64 GiB is 16x RAM, which keeps
+  # even a large overshoot from turning into an OOM kill.  The cost is ~32 GiB
+  # more reserved out of a ~954 GiB disk (root keeps ~889 GiB), so the headroom
+  # is far more valuable than the space.
+, swapSizeGiB ? 64
+, withSdcard ? disk != null
+  # Passed explicitly by callers; there is deliberately no `<nixpkgs>` fallback
+  # because that is impure and breaks `nix flake check` / nixos-anywhere's pure
+  # evaluation ("cannot look up '<nixpkgs/lib>' in pure evaluation mode").
+, lib
+, ...
+}:
 
-# s-nodus storage layout -- microSD only. NEVER SPI-NAND or eMMC.
+# s-nodus storage layout -- boot chain on microSD, root on NVMe.
+#
+# TWO devices, deliberately:
+#
+#   1. The microSD carries the *boot chain only* (bl2 / ubootenv / factory /
+#      fip / production).  This is forced by the hardware: the MT7988 BootROM
+#      loads BL2 from raw sector 34 of mmc 0, and BL2 then looks up the GPT
+#      partition named `fip` on the same device.  Neither can move to NVMe
+#      without reflashing the board's SPI-NAND firmware, which is never done.
+#
+#   2. The root filesystem lives on an NVMe SSD, because that is the part that
+#      needs throughput and space.  A 30 GB SD card cannot hold the closure
+#      once a QEMU VM is involved (~7.3 GiB), and its writeback path throttles
+#      builds into `wbt_wait` stalls.
 #
 # The layout is NOT a free choice.  Two separate pieces of the MediaTek boot
 # chain look up GPT partitions *by name*, at *fixed* places:
@@ -33,20 +71,24 @@
 # Layout (identical geometry to the vendor GPT; those offsets are what BL2's
 # own GPT scan and the BootROM expect):
 #
-#   #  name        start(sec)  size         type
-#   1  bl2               34    8158  (~4M)  Linux
-#   2  ubootenv        8192    1024  (512K) Linux
-#   3  factory         9216    4096  (2M)   Linux
-#   4  fip            13312    8192  (4M)   EFI    <- BL2 looks for this name
-#   5  production    327680  917504 (448M)  Linux  <- U-Boot boots the FIT here
-#   6  nixos-root   1245184   <fills>        Linux  btrfs root
+#   #  name        start(sec)  size         type        device
+#   1  bl2               34    8158  (~4M)  Linux       SD
+#   2  ubootenv        8192    1024  (512K) Linux       SD
+#   3  factory         9216    4096  (2M)   Linux       SD
+#   4  fip            13312    8192  (4M)   EFI         SD   <- BL2 looks for this name
+#   5  production    327680  917504 (448M)  Linux       SD   <- U-Boot boots the FIT here
+#   1  nixos-root      2048   <fills>        Linux       NVMe  btrfs root
 #
-# `start`/`end` are sectors with alignment 1: sgdisk's default 2048-sector
-# alignment would round the firmware offsets and point BL2 at empty space.
+# The SECOND NVMe is deliberately NOT described here: it is used only as
+# throwaway swap while installing (the board needs more memory than its 4 GiB
+# to evaluate this config), and holds nothing the machine depends on.
 #
-# SAFETY: disko writes only the block device passed as `disk`; the board's
-# SPI-NAND bootloader is never a target.  SD and eMMC share one mmc controller
-# on MT7988, so pass a stable /dev/disk/by-id path from the live environment.
+# `start`/`end` are sectors with alignment 1 on the SD: sgdisk's default
+# 2048-sector alignment would round the firmware offsets and point BL2 at
+# empty space.  The NVMe partition is normally aligned.
+#
+# SAFETY: disko writes only the block devices passed as `disk`/`rootDisk`; the
+# board's SPI-NAND bootloader is never a target.
 {
   assertions = [
     {
@@ -67,96 +109,166 @@
     }
   ];
 
-  disko.devices.disk.sdcard = {
-    type = "disk";
-    device = disk;
-    content = {
-      type = "gpt";
-      partitions = {
-        # --- firmware partitions (raw blobs, written by mk-sd-image.sh) ------
-        # No filesystem: their content is the BL2/FIP payload the BootROM and
-        # BL2 load.  They exist here so the GPT has the entries the firmware
-        # looks up by name.
-        bl2 = {
-          name = "bl2";
-          label = "bl2";
-          start = "34";
-          end = "8191";
-          type = "8300";
-          # `priority` controls disko's partition NUMBER (index).  Pin these to
-          # the vendor GPT indices so a disko-created GPT is byte-for-byte
-          # equivalent to mk-sd-image.sh's.  (The boot chain looks partitions up
-          # by NAME, so this is not strictly required to boot -- but matching
-          # the vendor layout means the two paths cannot drift.)
-          priority = 1;
-        };
-        ubootenv = {
-          name = "ubootenv";
-          label = "ubootenv";
-          start = "8192";
-          end = "9215";
-          type = "8300";
-          priority = 2;
-        };
-        factory = {
-          name = "factory";
-          label = "factory";
-          start = "9216";
-          end = "13311";
-          type = "8300";
-          priority = 3;
-        };
-        fip = {
-          name = "fip";
-          label = "fip";
-          start = "13312";
-          end = "21503";
-          type = "EF00";
-          priority = 4;
-        };
-
-        # --- production: raw FIT the stock U-Boot boots ---------------------
-        # Content is null (not formatted); mk-sd-image.sh writes the FIT raw at
-        # offset 0.  Kept at the vendor's 448M so a kernel+initrd+dtb FIT fits
-        # comfortably under U-Boot's `imszb`/part_size check.
-        production = {
-          name = "production";
-          label = "production";
-          start = "327680";
-          end = "1245183";
-          type = "8300";
-          priority = 5;
-        };
-
-        # --- btrfs root ----------------------------------------------------
-        root = {
-          name = "nixos-root";
-          label = "nixos-root";
-          start = "1245184";
-          size = "100%";
-          # 100%-size partitions default to priority 9001 (created last); keep
-          # that so nixos-root is partition 6 as in the vendor layout.
-          priority = 6;
-          content = {
-            type = "btrfs";
-            extraArgs = [ "-f" "-L" "nixos-root" ];
-            subvolumes = {
-              "/root" = {
-                mountpoint = "/";
-                mountOptions = [ "compress=zstd" "noatime" ];
+  # `root` is always present.  `sdcard` only when withSdcard is set: it is
+  # /dev/sda when preparing a card on a laptop, but the board enumerates the
+  # same card as /dev/mmcblk0, and installing the NVMe root must not touch it
+  # at all (the boot chain lives there).
+  #
+  # Optional attributes rather than lib.mkIf: this file is evaluated both as a
+  # disko configuration (a raw attrset, where mkIf has no meaning and silently
+  # yields a `condition` key instead of the disk) and through the NixOS module
+  # system.
+  disko.devices.disk =
+    {
+      # --- root filesystem: Samsung SSD 960 PRO (NVMe) ---------------------
+      #
+      # The boot chain MUST stay on the microSD: the MT7988 BootROM loads BL2
+      # from raw sector 34 of mmc 0, and BL2 then looks up the GPT partition
+      # named `fip` on the same device.  Neither can be relocated to NVMe
+      # without touching the board's SPI-NAND firmware, which is deliberately
+      # never done.  Only the root moves, because that is the part that needs
+      # speed and space.
+      #
+      # `root=fstab` is on the kernel cmdline, so stage-1 reads /etc/fstab to
+      # find this; the PARTLABEL `nixos-root` below is what that entry resolves.
+      root = {
+        type = "disk";
+        device = rootDisk;
+        content = {
+          type = "gpt";
+          partitions = {
+            root = {
+              name = "nixos-root";
+              label = "nixos-root";
+              # 2048-sector aligned like any normal disk (unlike the firmware
+              # partitions on the SD, nothing here is located by raw offset).
+              start = "2048";
+              # Ends `swapSizeGiB` before the end of the disk, leaving exactly
+              # that much for the swap partition below.  Negative `end` is
+              # disko's relative-to-disk form (see its example/swap.nix); a
+              # computed expression like "100% - 64G" is rejected because
+              # `size` only accepts the literal "100%" or an absolute size.
+              end = "-${toString swapSizeGiB}G";
+              # Lower priority than swap, so root is created first and becomes
+              # partition 1.
+              priority = 1;
+              content = {
+                type = "btrfs";
+                extraArgs = [ "-f" "-L" "nixos-root" ];
+                subvolumes = {
+                  "/root" = {
+                    mountpoint = "/";
+                    mountOptions = [ "compress=zstd" "noatime" ];
+                  };
+                  "/nix" = {
+                    mountpoint = "/nix";
+                    mountOptions = [ "compress=zstd" "noatime" ];
+                  };
+                  "/persist" = {
+                    mountpoint = "/persist";
+                    mountOptions = [ "compress=zstd" "noatime" ];
+                  };
+                };
               };
-              "/nix" = {
-                mountpoint = "/nix";
-                mountOptions = [ "compress=zstd" "noatime" ];
-              };
-              "/persist" = {
-                mountpoint = "/persist";
-                mountOptions = [ "compress=zstd" "noatime" ];
+            };
+
+            # --- swap -------------------------------------------------------
+            #
+            # A dedicated partition, not a swapfile: btrfs refuses a swapfile
+            # unless it is created nocow via `btrfs filesystem mkswapfile`, and
+            # a partition carries none of those constraints.
+            #
+            # This is what lets the GAMP pipeline be evaluated on the board at
+            # all -- evaluation peaks near 3.3 GiB against only 4 GiB of RAM.
+            swap = {
+              name = "swap";
+              label = "swap";
+              # Raised so swap becomes partition 2, after root (100%-sized
+              # partitions would otherwise default to priority 9001, i.e.
+              # last).
+              priority = 2;
+              # Starts `swapSizeGiB` before the end of the disk -- the mirror of
+              # root's `end` -- and runs to the end.  Must NOT be a bare
+              # "100%": disko would then place it first, whole-disk, and
+              # overlap root.
+              start = "-${toString swapSizeGiB}G";
+              size = "100%";
+              content = {
+                type = "swap";
               };
             };
           };
         };
       };
+    }
+    // lib.optionalAttrs withSdcard {
+      # --- boot chain on the microSD ---------------------------------------
+      #
+      # Firmware partitions carry raw blobs and have no filesystem: their
+      # content is the BL2/FIP payload the BootROM and BL2 load.  They exist
+      # here so the GPT has the entries the firmware looks up by name.
+      sdcard = {
+        type = "disk";
+        device = disk;
+        content = {
+          type = "gpt";
+          partitions = {
+            bl2 = {
+              name = "bl2";
+              label = "bl2";
+              start = "34";
+              end = "8191";
+              type = "8300";
+              # `priority` controls disko's partition NUMBER (index).  Pin these
+              # to the vendor GPT indices so a disko-created GPT matches
+              # mk-sd-image.sh's.  (The boot chain looks partitions up by NAME,
+              # so this is not strictly required to boot -- but matching the
+              # vendor layout means the two paths cannot drift.)
+              priority = 1;
+            };
+            ubootenv = {
+              name = "ubootenv";
+              label = "ubootenv";
+              start = "8192";
+              end = "9215";
+              type = "8300";
+              priority = 2;
+            };
+            factory = {
+              name = "factory";
+              label = "factory";
+              start = "9216";
+              end = "13311";
+              type = "8300";
+              priority = 3;
+            };
+            fip = {
+              name = "fip";
+              label = "fip";
+              start = "13312";
+              end = "21503";
+              type = "EF00";
+              priority = 4;
+            };
+
+            # --- production: raw FIT the stock U-Boot boots -------------------
+            # Content is null (not formatted); mk-sd-image.sh writes the FIT
+            # raw at offset 0.  Kept at the vendor's 448M so a kernel+initrd+
+            # dtb FIT fits comfortably under U-Boot's `imszb`/part_size check.
+            #
+            # The btrfs root does NOT live here -- it is on the NVMe (`root`
+            # above).  The card carries the boot chain only, which the MT7988
+            # BootROM/BL2 can only find on mmc 0.
+            production = {
+              name = "production";
+              label = "production";
+              start = "327680";
+              end = "1245183";
+              type = "8300";
+              priority = 5;
+            };
+          };
+        };
+      };
     };
-  };
 }

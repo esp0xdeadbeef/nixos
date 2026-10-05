@@ -64,15 +64,38 @@
     # card image.  Kept out of this dir so the repo rsync cannot clobber it.
     ./local-overrides.nix
 
+    # Run the aarch64 cobalt router VM here (see ./vm-host.nix for why this is
+    # a single-instance config rather than the shared fleet inventory).
+    inputs.nixos-shell-vm-manager.nixosModules.default
+    # ./vm-host.nix  # TEMP: disabled to get a clean rebuild (s-router-cobalt-new VM cycle)
+
     # microSD layout.  Replicates the vendor GPT geometry (bl2/ubootenv/
     # factory/fip + production FIT + btrfs root) because the MT7988 BootROM,
     # BL2 and the stock U-Boot locate their payloads by fixed sector + GPT
     # name.  Applied with disko --mode disko; also drives fileSystems here.
-    (import ./disko.nix { })
+    (import ./disko.nix { inherit lib; })
   ];
 
   networking.hostName = lib.mkForce name;
   time.timeZone = "Europe/Amsterdam";
+
+  # Run sops as a systemd unit rather than an activation script.
+  #
+  # Why: the sops age key lives at /persist/root/.ssh/id_ed25519, and /persist
+  # is mounted by systemd from the real fstab.  As an activation script sops
+  # runs from initrd-nixos-activation (before switch-root), at which point
+  # systemd-sysroot-fstab-check has only brought up / and /nix -- /persist is
+  # NOT mounted yet, so the key is unreadable and every secret fails with
+  # "0 successful groups required, got 0".  That is not specific to this
+  # board: any host whose sops identity lives under /persist and whose sops
+  # runs from the activation script has the same ordering problem.
+  #
+  # With useSystemdActivation the generated unit declares
+  # `RequiresMountsFor = cfg.age.sshKeyPaths` and `after = [ "local-fs.target" ]`,
+  # so systemd itself waits for /persist before installing secrets.  This is
+  # the documented use of the option (sops-nix: "useful to specify additional
+  # dependencies ... such as required mountpoints for SOPS key files").
+  sops.useSystemdActivation = true;
 
   # Nebula mesh secrets (same five keys as s-gamma; see secrets/s-nodus.yaml).
   # The host cert is s-nodus's own (100.64.0.18), the CA + lighthouse IPs are
@@ -134,6 +157,49 @@
   # unless the flakes experimental feature is enabled.
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # 100% remote builds.  The board has 4 Cortex-A73 cores and 4 GiB of RAM,
+  # and the QEMU-inclusive closures it needs (nixos-shell-vm-manager pulls in
+  # qemu -> spice/gtk) are far beyond what it can build or even evaluate
+  # locally -- a local build attempt gets SIGKILLed by the OOM killer.
+  # max-jobs = 0 disables local build jobs entirely, so every derivation goes
+  # to the ssh-ng builders from profiles.nixos.nix.remote-builder-client
+  # (s-sigma/s-tau, which serve aarch64-linux).  Substitution still happens
+  # locally.  If no builder is reachable, builds fail loudly rather than
+  # wedging the board.
+  nix.settings.max-jobs = 0;
+
+  # Evaluation of the network-* pipeline happens on this host and needs more
+  # memory than the board's 4 GiB: it peaks around 3.3 GiB and an on-board
+  # `nixos-rebuild` was OOM-killed at 92% CPU / 84% RSS.
+  #
+  # Two layers of swap:
+  #
+  #   * swapDevices: the dedicated partition on the Samsung NVMe created by
+  #     disko.nix.  This is what actually provides headroom -- NVMe behind
+  #     PCIe 3.0 x1, far faster than the microSD whose writeback path throttled
+  #     builds into `wbt_wait` stalls.
+  #   * zramSwap: in-memory compressed swap.  Cheap and very fast, and given a
+  #     higher priority so the common case never touches the SSD.
+  #
+  # Builds themselves go to the remote builders (nix.settings.max-jobs = 0
+  # above); this only has to absorb evaluation.
+  #
+  # `discard` is left off deliberately: the root filesystem uses async discard,
+  # and issuing discards on a swap partition adds latency for no benefit on an
+  # SSD this size.
+  swapDevices = [
+    {
+      device = "/dev/disk/by-partlabel/swap";
+      # A dedicated partition, so no `size` -- that option is for swapfiles.
+    }
+  ];
+
+  zramSwap = {
+    enable = true;
+    memoryPercent = 100;
+    priority = 5;
+  };
+
   # Bring-up tooling.
   environment.systemPackages = with pkgs; [
     iproute2
@@ -166,6 +232,11 @@
   fileSystems."/".fsType = lib.mkForce "btrfs";
   fileSystems."/".device = lib.mkForce "/dev/disk/by-partlabel/nixos-root";
   boot.initrd.supportedFilesystems = [ "btrfs" ];
+
+  # sd-image.nix always declares a FAT /boot/firmware partition; this board has
+  # none (the FIT is the boot artifact, there is no ESP).  The entry cannot be
+  # removed, so mark it nofail+noauto -- it is then never touched at boot.
+  fileSystems."/boot/firmware".options = lib.mkForce [ "nofail" "noauto" ];
 
   # sd-image force-enables enableAllHardware (a generic initrd module list for
   # portable images), which pulls modules this board disables and breaks initrd
