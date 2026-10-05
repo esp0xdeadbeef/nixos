@@ -39,12 +39,18 @@ REPO="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || echo "$HERE/../.
 WORK=/tmp/bpi-r4/sdimg
 IMG="$WORK/s-nodus-boot.img"
 
-# SD boot-chain geometry (512-byte sectors); must match disko.nix.
+# SD geometry (512-byte sectors); must match disko.nix.
+#
+# The card carries BOTH the boot chain and a complete root filesystem.  That is
+# deliberate: it makes the board boot a self-consistent system with no
+# dependency on the NVMe, which is what allows the SSD to be installed and a
+# failed NVMe install to be recovered from.
 P1_S=34;       P1_N=8158               # bl2
 P2_S=8192;     P2_N=1024               # ubootenv
 P3_S=9216;     P3_N=4096               # factory
 P4_S=13312;    P4_N=8192               # fip
 P5_S=327680;   P5_N=917504             # production (raw FIT)
+P6_S=1245184;                          # nixos-root (btrfs, fills the card)
 
 # NVMe root geometry.
 R_S=2048                               # 2048-aligned, 1 MiB in
@@ -55,6 +61,7 @@ U2="5452574F-2211-4433-5566-778899AABB02"
 U3="5452574F-2211-4433-5566-778899AABB03"
 U4="5452574F-2211-4433-5566-778899AABB04"
 U5="5452574F-2211-4433-5566-778899AABB05"
+U6="5452574F-2211-4433-5566-778899AABB06"
 
 resolve_sgdisk() {
   if command -v sgdisk >/dev/null 2>&1; then
@@ -98,8 +105,24 @@ build() {
     echo "!! FIT ($fsz B) exceeds production partition ($(( P5_N * 512 )) B)"; exit 1
   fi
 
-  # The image only needs to reach the end of `production`; no root partition.
-  local total=$(( P5_S + P5_N + 34 ))
+  echo ">> building the SD root filesystem (btrfs image with the store closure)"
+  local ROOTFS
+  ROOTFS=$(nix build --print-out-paths --no-link \
+    "$REPO#nixosConfigurations.s-nodus.config.system.build.rootfsImage")
+  echo "   rootfs = $ROOTFS ($(du -h --apparent-size "$ROOTFS" | cut -f1) apparent)"
+
+  # Size the root partition to the rootfs image, then add slack so the first
+  # boot has room to write.  The image is sparse/compact: it is exactly as large
+  # as its contents, so `du --apparent-size` (not st_size of the sparse file) is
+  # what must fit.  Grow-to-fill happens on the running system.
+  local rootBytes rootBlocks
+  rootBytes=$(du -B 512 --apparent-size "$ROOTFS" | awk '{ print $1 }')
+  rootBlocks=$(( rootBytes + 65536 ))     # +32 MiB of slack
+  local P6_N=$rootBlocks
+  local p6End=$(( P6_S + P6_N - 1 ))
+
+  # The image only needs to reach the end of the root partition.
+  local total=$(( p6End + 34 ))
   echo ">> assembling $IMG (total=$total sec = $(( total/2/1024 )) MiB)"
   rm -f "$IMG"
   truncate -s $(( total * 512 )) "$IMG"
@@ -113,6 +136,7 @@ build() {
   "$SGDISK" -a 1 -n 3:$P3_S:$(( P3_S+P3_N-1 )) -t 3:8300 -c 3:factory    -u 3:$U3 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 4:$P4_S:$(( P4_S+P4_N-1 )) -t 4:ef00 -c 4:fip        -u 4:$U4 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 5:$P5_S:$(( P5_S+P5_N-1 )) -t 5:8300 -c 5:production -u 5:$U5 "$IMG" >/dev/null
+  "$SGDISK" -a 1 -n 6:$P6_S:$p6End           -t 6:8300 -c 6:nixos-root -u 6:$U6 "$IMG" >/dev/null
   # Vendor GPT attribute flags (RequiredPartition / LegacyBIOSBootable).
   "$SGDISK" -A 1:set:0 -A 1:set:2 -A 2:set:0 -A 3:set:0 -A 4:set:0 "$IMG" >/dev/null
 
@@ -120,6 +144,12 @@ build() {
   dd if="$FW/bl2.bin"  of="$IMG" bs=512 seek=$P1_S conv=notrunc status=none
   dd if="$FW/fip.bin"  of="$IMG" bs=512 seek=$P4_S conv=notrunc status=none
   dd if="$FIT"         of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
+
+  # The root partition holds a flat btrfs filesystem, written straight in.  Its
+  # subvolumes (/root, /nix, /persist) are already inside the image, so the
+  # kernel's rootflags=subvol=/root finds them without any post-processing.
+  echo ">> writing root filesystem to partition 6"
+  dd if="$ROOTFS" of="$IMG" bs=512 seek=$P6_S conv=notrunc status=none
 
   # U-Boot environment: MANDATORY.  U-Boot's image_setup_libfdt() always
   # overwrites /chosen/bootargs with env_get("bootargs"), so the FIT's bootargs
@@ -136,7 +166,8 @@ build() {
 
   echo ">> built $IMG ($(du -h "$IMG" | cut -f1))"
   echo "   flash with: $0 flash <sd-device>"
-  echo "   then:       $0 root <nvme-device>"
+  echo "   the card is now self-contained: it boots NixOS with no NVMe present."
+  echo "   stage 2 (move the root to the NVMe) is run FROM the booted system."
 }
 
 # Write the U-Boot environment into the ubootenv partition (p2) of an image.
