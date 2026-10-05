@@ -51,15 +51,15 @@ P3_S=9216;     P3_N=4096               # factory
 P4_S=13312;    P4_N=8192               # fip
 P5_S=327680;   P5_N=917504             # production (raw FIT)
 P6_S=1245184;  P6_GIB=8                # nixos-root (btrfs): rootfs + headroom
-P7_N=33554432;                         # swap: 16 GiB (65536 sectors/GiB x 512)
-# 
-# The card deliberately does NOT hand 100% of its space to the root.  That is
-# how the previous layout failed: root filled the disk, swap was a token
-# partition, and the first on-board rebuild hit the OOM killer with nowhere to
-# page -- leaving a board that could not build its own fix.  A few GB of
-# headroom plus a swap larger than RAM keeps stage 1 usable, which matters
-# because stage 1 is the recovery medium.
-P7_GIB=16
+#
+# The card does NOT hand 100% of its space to the root: the remainder stays
+# unallocated so it can be grown later without reflashing.  Space is not the
+# constraint it once was -- swap is a swapfile on the btrfs root (see the
+# swapDevices comment in default.nix), not a partition, so there is no token
+# swap partition to allocate and nothing that can crowd it out.
+#
+# The P6_GIB slack above the rootfs image exists for exactly that swapfile
+# plus the working room an on-board rebuild needs.
 
 # NVMe root geometry.
 R_S=2048                               # 2048-aligned, 1 MiB in
@@ -71,7 +71,6 @@ U3="5452574F-2211-4433-5566-778899AABB03"
 U4="5452574F-2211-4433-5566-778899AABB04"
 U5="5452574F-2211-4433-5566-778899AABB05"
 U6="5452574F-2211-4433-5566-778899AABB06"
-U7="5452574F-2211-4433-5566-778899AABB07"
 
 resolve_sgdisk() {
   if command -v sgdisk >/dev/null 2>&1; then
@@ -125,16 +124,10 @@ build() {
   # boot has room to write.  The image is sparse/compact: it is exactly as large
   # as its contents, so `du --apparent-size` (not st_size of the sparse file) is
   # what must fit.  Grow-to-fill happens on the running system.
-  local rootBytes rootBlocks
-  rootBytes=$(du -B 512 --apparent-size "$ROOTFS" | awk '{ print $1 }')
-  rootBlocks=$(( rootBytes + 65536 ))     # +32 MiB of slack
-  local P6_N=$rootBlocks
-  local p6End=$(( P6_S + P6_N - 1 ))
-
-  # Root gets the rootfs image plus headroom, then swap takes a fixed slice, and
-  # whatever is left stays unallocated.  Nothing grabs "100%" -- see the P6/P7
-  # comment at the top: a full-disk root with a token swap is what made the
-  # board unable to rebuild itself.
+  # Root is a FIXED size (P6_GIB), not sized to the rootfs image: the slack
+  # holds the swapfile and gives an on-board rebuild somewhere to work.  The
+  # image itself is compact, so `du --apparent-size` (not the sparse file's
+  # st_size) is what has to fit.
   local rootBytes rootBlocks
   rootBytes=$(du -B 512 --apparent-size "$ROOTFS" | awk '{ print $1 }')
   local P6_N=$(( P6_GIB * 2097152 ))
@@ -144,14 +137,11 @@ build() {
     exit 1
   fi
   local p6End=$(( P6_S + P6_N - 1 ))
-  local P7_S=$(( p6End + 1 ))
-  local p7End=$(( P7_S + P7_N - 1 ))
-
-  # The image covers root + swap; the rest of the card is left alone so the
-  # running system can grow the root into it if the slack proves too small.
-  local total=$(( p7End + 34 ))
+  # The image covers the boot chain and the root; the rest of the card is left
+  # unallocated so the running system can grow the root into it if needed.
+  local total=$(( p6End + 34 ))
   echo ">> assembling $IMG (total=$total sec = $(( total/2/1024 )) MiB)"
-  echo "   root ${P6_GIB} GiB | swap ${P7_GIB} GiB | rest left unallocated"
+  echo "   root ${P6_GIB} GiB | rest left unallocated"
   rm -f "$IMG"
   truncate -s $(( total * 512 )) "$IMG"
 
@@ -165,7 +155,6 @@ build() {
   "$SGDISK" -a 1 -n 4:$P4_S:$(( P4_S+P4_N-1 )) -t 4:ef00 -c 4:fip        -u 4:$U4 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 5:$P5_S:$(( P5_S+P5_N-1 )) -t 5:8300 -c 5:production -u 5:$U5 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 6:$P6_S:$p6End           -t 6:8300 -c 6:nixos-root -u 6:$U6 "$IMG" >/dev/null
-  "$SGDISK" -a 1 -n 7:$P7_S:$p7End           -t 7:8200 -c 7:swap       -u 7:$U7 "$IMG" >/dev/null
   # Vendor GPT attribute flags (RequiredPartition / LegacyBIOSBootable).
   "$SGDISK" -A 1:set:0 -A 1:set:2 -A 2:set:0 -A 3:set:0 -A 4:set:0 "$IMG" >/dev/null
 
@@ -179,17 +168,6 @@ build() {
   # /persist subvolumes the config's fileSystems declare) is written by the
   # `populate` command against the flashed device.
   echo ">> partition 6 left for 'populate' (btrfs with subvolumes)"
-
-  # Swap is a real partition, not a file: btrfs refuses a swapfile unless it is
-  # created nocow, and a partition carries none of that.  Formatted here because
-  # mkswap is trivial and needs no helper.
-  echo ">> creating ${P7_GIB} GiB swap on partition 7"
-  dd if=/dev/zero of="$IMG" bs=512 seek=$P7_S count=1024 conv=notrunc status=none
-  local sw=$WORK/swap.img
-  rm -f "$sw"; truncate -s $(( P7_N * 512 )) "$sw"
-  mkswap -L swap "$sw" >/dev/null
-  dd if="$sw" of="$IMG" bs=512 seek=$P7_S conv=notrunc status=none
-  rm -f "$sw"
   # U-Boot environment: MANDATORY.  U-Boot's image_setup_libfdt() always
   # overwrites /chosen/bootargs with env_get("bootargs"), so the FIT's bootargs
   # are ignored and the vendor default (root=/dev/fit0) cannot boot NixOS.
