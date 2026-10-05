@@ -72,7 +72,7 @@ let
   # It must NOT pin init= to a specific toplevel: after an on-board rebuild the
   # env would still be correct (it uses the stable profile symlink) while this
   # would silently go stale.  Use the stable profile path for the same reason.
-  bootargs = "console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=PARTLABEL=nixos-root rootflags=subvol=/root rootwait rw init=/nix/var/nix/profiles/system/init";
+  bootargs = "console=ttyS0,115200n1 clk_ignore_unused pd_ignore_unused root=fstab rootwait rw init=/nix/var/nix/profiles/system/init";
 
   itsFile = pkgs.writeText "bpi-r4-pro-4e.its" ''
     /dts-v1/;

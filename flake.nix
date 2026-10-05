@@ -498,6 +498,23 @@
                   self
                   name
                   ;
+
+                # VM images this host is meant to run, resolved HERE rather
+                # than via `self.nixosConfigurations.<vm>` inside the host's own
+                # module tree.  Referencing the attrset from within a member of
+                # it is a cycle: evaluating s-nodus forces the VM image, which
+                # forces nixosConfigurations, which forces s-nodus again -- and
+                # it surfaces as `attribute '<vm>' missing` while building the
+                # host's rootfsImage.  Computing the mapping at the flake level,
+                # where nixosConfigurations is complete, cannot cycle.
+                vmImages =
+                  if name == "s-nodus" then
+                    {
+                      s-router-cobalt-new =
+                        self.nixosConfigurations.s-router-cobalt-new.config.system.build.nixos-shell;
+                    }
+                  else
+                    { };
               };
 
               modules = [
@@ -516,7 +533,30 @@
       # NOTE: disko alone does NOT produce a bootable s-nodus card (it cannot
       # write the BL2/FIP firmware blobs nor the raw NixOS FIT). Use
       # nixos/server/s-nodus/mk-sd-image.sh for the full image.
+      # Card + NVMe, for building a complete card.  `disk` MUST be given: the
+      # card is /dev/sda on a laptop but /dev/mmcblk0 on the board, so there is
+      # no safe default.  e.g.
+      #   nix run github:nix-community/disko -- \
+      #     --mode destroy,format,mount --argstr disk /dev/sda \
+      #     --flake .#s-nodus-disk
+      #
+      # Left unset here on purpose: the value is supplied at disko invocation
+      # time, and the attribute is only forced when `sdcard` is actually
+      # described (see disko.nix).
       diskoConfigurations.s-nodus-disk =
-        (import ./nixos/server/s-nodus/disko.nix { });
+        (import ./nixos/server/s-nodus/disko.nix {
+          inherit lib;
+          disk = null;
+        });
+
+      # Root-only: describes just the NVMe.  Used to install the root filesystem
+      # without touching the microSD, whose boot chain is already in place and
+      # must stay intact.
+      diskoConfigurations.s-nodus-root =
+        (import ./nixos/server/s-nodus/disko.nix {
+          inherit lib;
+          disk = null;
+          withSdcard = false;
+        });
     };
 }
