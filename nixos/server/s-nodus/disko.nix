@@ -248,43 +248,65 @@
               priority = 4;
             };
 
-            # --- esp: systemd-boot + kernels + board dtb --------------------
+            # --- production: raw FIT the stock U-Boot boots -------------------
             #
-            # The board's OpenWrt U-Boot chainloads an EFI application with
-            # `bootefi`:
+            # U-Boot's env looks this partition up BY NAME and `bootm`s the FIT
+            # written at offset 0:
             #
-            #   boot_efi = load mmc 0:5 ... board.dtb && \
-            #              load mmc 0:5 ... EFI/BOOT/BOOTAA64.EFI && \
-            #              bootefi 0x46000000 0x47000000
+            #   boot_production       = run sdmmc_read_production && bootm $loadaddr#...
+            #   sdmmc_read_production = part start mmc 0 production part_addr && ...
             #
-            # `mmc 0` is the microSD, and the vendor env addresses the ESP by
-            # PARTITION NUMBER (5), so the ESP has to live *here*, not on the
-            # NVMe -- U-Boot on this board has no `nvme` command to read a disk
-            # by device (only PCI, which the Shell cannot easily use).
-            #
-            # U-Boot `bootefi`s the removable-media path \EFI\BOOT\BOOTAA64.EFI,
-            # which `boot.loader.efi.canTouchEfiVariables = false` makes
-            # systemd-boot install -- no EFI variables needed.
-            #
-            # Replaces the old raw-FIT `production` partition.  With boot
-            # generations there is no store path pinned anywhere in the boot
-            # chain, so a rebuild cannot leave the boot pointing at a toplevel
-            # that is missing from the root -- which is how the FIT layout
-            # broke.  Fixed geometry keeps the index at exactly 5; mk-sd-image.sh
-            # writes bl2/ubootenv/factory/fip into partitions 1-4 and this ESP
-            # is populated by `bootctl install` from the running system.
-            esp = {
-              name = "esp";
-              label = "ESP";
-              start = "1048576";
-              end = "3145727"; # 1 GiB
-              type = "EF00";
+            # Content is null (not formatted): the payload is a raw FIT, written
+            # by mk-sd-image.sh.  Kept at the vendor's 448M so a kernel+initrd+
+            # dtb FIT fits comfortably under U-Boot's imszb/part_size check.
+            production = {
+              name = "production";
+              label = "production";
+              start = "327680";
+              end = "1245183";
+              type = "8300";
               priority = 5;
+            };
+
+            # --- nixos-root: the STAGE-1 root filesystem, on the card ----------
+            #
+            # Deliberately on the microSD, not the NVMe.  The card holds a
+            # complete NixOS (store closure, /etc, the system profile), so the
+            # board boots a self-consistent system with no dependency on the SSD
+            # at all.  That is what makes the SSD installable and, just as
+            # importantly, recoverable: this root stays as the fallback if a
+            # later move of the root to the NVMe goes wrong.
+            #
+            # A raw-FIT boot pins `init=` to /nix/var/nix/profiles/system/init,
+            # which stage 1 resolves INSIDE THIS filesystem -- so the store and
+            # the profile here can never disagree the way they did when the root
+            # was written to the NVMe separately from the FIT.
+            nixos-root = {
+              name = "nixos-root";
+              label = "nixos-root";
+              start = "1245184";
+              size = "100%";
+              type = "8300";
+              # 100%-sized partitions otherwise default to priority 9001 (last);
+              # keep it after production so the index stays 6.
+              priority = 6;
               content = {
-                type = "filesystem";
-                format = "vfat";
-                mountpoint = "/boot";
-                mountOptions = [ "umask=0077" ];
+                type = "btrfs";
+                extraArgs = [ "-f" "-L" "nixos-root" ];
+                subvolumes = {
+                  "/root" = {
+                    mountpoint = "/";
+                    mountOptions = [ "compress=zstd" "noatime" ];
+                  };
+                  "/nix" = {
+                    mountpoint = "/nix";
+                    mountOptions = [ "compress=zstd" "noatime" ];
+                  };
+                  "/persist" = {
+                    mountpoint = "/persist";
+                    mountOptions = [ "compress=zstd" "noatime" ];
+                  };
+                };
               };
             };
           };
