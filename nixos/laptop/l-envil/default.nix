@@ -57,6 +57,13 @@ in
       l-portal.key = remoteBuilderKeyFor "l-portal";
       s-gamma.key = remoteBuilderKeyFor "s-gamma";
       s-sigma.key = remoteBuilderKeyFor "s-sigma";
+      # s-nodus (BPI-R4 Pro 4E): 4-core aarch64 board with 4 GiB of RAM.  Its
+      # large closures -- the QEMU-inclusive one especially -- cannot be built
+      # on the board, so it offloads here.  Small config derivations still
+      # build locally (nix.settings.max-jobs = 2) so the board can bootstrap
+      # when no builder is reachable: the builders are reached over nebula,
+      # which needs the secrets, which come from a rebuild.
+      s-nodus.key = remoteBuilderKeyFor "s-nodus";
       s-tau.key = remoteBuilderKeyFor "s-tau";
     };
   };
