@@ -186,7 +186,7 @@
   # A small allowance lets those tiny derivations build locally while the large
   # ones still go remote on their own merits (they are far slower to build than
   # to send), and a local rebuild now works before nebula is up.  Swap is sized
-  # for it: an 8 GiB file plus zram, see swapDevices below.
+  # for it: a 64 GiB file on the NVMe root plus zram, see swapDevices below.
   nix.settings.max-jobs = 2;
 
   # Evaluation of the network-* pipeline happens on this host and needs more
@@ -227,7 +227,11 @@
   swapDevices = [
     {
       device = "/persist/swap/swapfile";
-      size = 8192; # MiB
+      # 64 GiB, matching the SSD-backed (not microSD) swap the board is meant
+      # to run on.  The larger size removes any OOM risk from evaluating the
+      # network pipeline and building the QEMU-inclusive VM closure on the
+      # 4 GiB board.  NixOS recreates the existing btrfs swapfile in place.
+      size = 65536; # MiB
     }
   ];
 
