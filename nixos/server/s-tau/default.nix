@@ -35,6 +35,9 @@ in
       l-esp.key = remoteBuilderKeyFor "l-esp";
       l-portal.key = remoteBuilderKeyFor "l-portal";
       s-gamma.key = remoteBuilderKeyFor "s-gamma";
+      # s-nodus (BPI-R4 Pro 4E) is a 4-core aarch64 board that cannot build its
+      # own QEMU-inclusive closure within its 4 GiB of RAM.
+      s-nodus.key = remoteBuilderKeyFor "s-nodus";
       # Peer servers rebuild each other, so each trusts the other's remote-builder identity.
       s-sigma.key = remoteBuilderKeyFor "s-sigma";
     };
