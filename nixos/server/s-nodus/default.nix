@@ -169,16 +169,25 @@
   # unless the flakes experimental feature is enabled.
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  # 100% remote builds.  The board has 4 Cortex-A73 cores and 4 GiB of RAM,
-  # and the QEMU-inclusive closures it needs (nixos-shell-vm-manager pulls in
-  # qemu -> spice/gtk) are far beyond what it can build or even evaluate
-  # locally -- a local build attempt gets SIGKILLed by the OOM killer.
-  # max-jobs = 0 disables local build jobs entirely, so every derivation goes
-  # to the ssh-ng builders from profiles.nixos.nix.remote-builder-client
-  # (s-sigma/s-tau, which serve aarch64-linux).  Substitution still happens
-  # locally.  If no builder is reachable, builds fail loudly rather than
-  # wedging the board.
-  nix.settings.max-jobs = 0;
+  # Mostly-remote builds, with a small local allowance.
+  #
+  # The board has 4 Cortex-A73 cores and 4 GiB of RAM, and the QEMU-inclusive
+  # closures it needs (nixos-shell-vm-manager pulls in qemu -> spice/gtk) are
+  # far beyond what it can build locally -- an attempt gets SIGKILLed by the OOM
+  # killer.  Those must go to the ssh-ng builders from
+  # profiles.nixos.nix.remote-builder-client.
+  #
+  # max-jobs was 0, which sends EVERY derivation to the builders.  That is
+  # wrong during bootstrap: the builders are reached over nebula, nebula needs
+  # the secrets, and the secrets need a rebuild -- so with no builder reachable
+  # the board cannot rebuild itself at all, not even the trivial config
+  # derivations (users-groups.json, vconsole.conf).
+  #
+  # A small allowance lets those tiny derivations build locally while the large
+  # ones still go remote on their own merits (they are far slower to build than
+  # to send), and a local rebuild now works before nebula is up.  Swap is sized
+  # for it: an 8 GiB file plus zram, see swapDevices below.
+  nix.settings.max-jobs = 2;
 
   # Evaluation of the network-* pipeline happens on this host and needs more
   # memory than the board's 4 GiB: it peaks around 3.3 GiB and an on-board
