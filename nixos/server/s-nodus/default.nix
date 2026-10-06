@@ -252,22 +252,20 @@
   # ESP/FAT path does not exist on this board's vendor U-Boot.
   sdImage.populateFirmwareCommands = "";
 
-  # Create the system profile symlink inside the root image, at build time.
+  # No populateRootCommands: the system profile link is written by
+  # mk-sd-image.sh's `populate`, onto the /nix subvolume.
   #
-  # The cmdline is `init=/nix/var/nix/profiles/system/init`, and stage 1
-  # resolves that link *inside the root it just mounted*.  Without it -- or with
-  # it pointing at a toplevel the store does not contain -- the boot dies at
-  # "Find NixOS closure" while the root looks perfectly healthy, which is the
-  # failure mode this layout kept hitting.
+  # It cannot be done here.  This hook writes into the rootfs image's root
+  # directory, which `populate` copies into the /root subvolume -- but at runtime
+  # /nix is mounted from a SEPARATE (/nix) subvolume that covers /root's nix/
+  # directory.  A link written here is therefore shadowed and stage 1 cannot see
+  # it: the boot dies at "Find NixOS closure" with the root mounted and looking
+  # healthy, which is precisely how this failed.
   #
-  # Doing it here rather than by hand after the fact means the link and the
-  # store are produced by the same build and therefore cannot disagree: the
-  # target is ${config.system.build.toplevel}, which is exactly what
-  # make-btrfs-fs puts in the store (it comes from sdImage.storePaths).
-  sdImage.populateRootCommands = ''
-    mkdir -p ./files/nix/var/nix/profiles
-    ln -sfn ${config.system.build.toplevel} ./files/nix/var/nix/profiles/system
-  '';
+  # `populate` writes the link onto the subvolume that is actually mounted at
+  # /nix, and reads the toplevel out of the image's own store so the target is
+  # always present.
+  sdImage.populateRootCommands = "";
   sdImage.expandOnBoot = false; # the module's auto-grow is ext4-only
 
   # Root is btrfs (override the module's ext4 default).

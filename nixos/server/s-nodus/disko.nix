@@ -276,9 +276,12 @@
               name = "nixos-root";
               label = "nixos-root";
               start = "1245184";
-              # 8 GiB, leaving the rest of the 29.7 GB card unallocated so the
-              # root can be grown later without reflashing.
-              end = "17727487";
+              # 24 GiB of the card's 29.7 GB, leaving ~5 GiB unallocated.
+              # The root holds the store, the swapfile and the working space an
+              # on-board rebuild needs, so it is sized generously rather than to
+              # the rootfs image; a full-disk root with a token swap is what
+              # previously left the board unable to rebuild itself.
+              end = "51576831";
               type = "8300";
               priority = 6;
               content = {
