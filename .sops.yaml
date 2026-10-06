@@ -11,7 +11,7 @@ keys:
   - &s-sigma age1lkqlezc852g3svecanwg7ctl2y9ur0qs9pquwjas5dhkhcl9yq5qvr33q2
   - &s-tau age1wkzp7dzxr0fk92zrm2c8eqyhu8hvqzxqlmepsm72yxnhw5x9wseqfn26cp
   - &s-gamma age13v5pme6vzmlclc25zqrmv3gx6qg4lcp5378tp7xrf0vecnlvdcns8semur
-  - &s-nodus age1tenhmxzt2kk5u7yrak0sk30cz70fl5aln6rf9896x2nf2kg00ajqhtgkv3
+  - &s-nodus age1t4rx3z68ax4lqqeeqannm3rfxdza8p7fsvjrjgra6df98ddna37quf028k
   - &s-test-vm-impermanence-root age1zwgk9rqgwgpnzqz0fu5sdkc57sk9gkzk0kx7qw7l3zgacrnvh54srdp94w
   - &s-router-vpn-impermanence-root age1yjk7dkn7swdansateksk0extzns5q02xg8h9w4w97vx9mwnphgxsqywsej
   - &s-router-impermanence-root age1agw6jxjk5r0ttfyevk2m0fa73u73yjjl8nyrq880hslku4mtspxqevpysj
