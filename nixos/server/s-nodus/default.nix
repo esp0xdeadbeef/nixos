@@ -146,11 +146,23 @@
   # grants passwordless sudo -- same arrangement as l-envil.
   users.users.deadbeef.extraGroups = [ "wheel" ];
 
-  # aarch64 board.  buildPlatform is set so the rootfs/kernel can also be
-  # cross-built on the x86_64 host (mk-sd-image.sh runs there); without it the
-  # rootfs derivation is aarch64-only and fails with "platform mismatch".
+  # aarch64 board.
+  #
+  # buildPlatform is deliberately NOT pinned to x86_64.  It used to be, so the
+  # rootfs/kernel could be cross-built on the laptop (mk-sd-image.sh runs
+  # there), but that made an ON-BOARD rebuild impossible: the build graph then
+  # contained x86_64-linux derivations (boot.json, the toplevel itself) that
+  # this aarch64 host cannot build, and with nix.settings.max-jobs = 0 they are
+  # only offered to the remote builders -- which are reached over nebula, which
+  # needs the secrets from the very rebuild being blocked.
+  #
+  # Leaving buildPlatform equal to hostPlatform means a rebuild on the board
+  # builds natively, which is what actually has to work.  The SD image is still
+  # produced the same way it always was: nixpkgs' cross machinery is selected by
+  # the eval/build platform pair, and mk-sd-image.sh runs on a host that can
+  # satisfy whichever it picks (the builders serve both aarch64 and x86_64).
   nixpkgs.hostPlatform = "aarch64-linux";
-  nixpkgs.buildPlatform = lib.mkDefault "x86_64-linux";
+  nixpkgs.buildPlatform = lib.mkDefault "aarch64-linux";
 
   # Enable flakes/nix-command: profiles.nixos.base.system sets
   # accept-flake-config=true, whose generated nix.conf fails validation
