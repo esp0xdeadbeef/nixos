@@ -67,7 +67,7 @@
     # Run the aarch64 cobalt router VM here (see ./vm-host.nix for why this is
     # a single-instance config rather than the shared fleet inventory).
     inputs.nixos-shell-vm-manager.nixosModules.default
-    # ./vm-host.nix  # TEMP: disabled to get a clean rebuild (s-router-cobalt-new VM cycle)
+    ./vm-host.nix
 
     # microSD layout.  Replicates the vendor GPT geometry (bl2/ubootenv/
     # factory/fip + production FIT + btrfs root) because the MT7988 BootROM,
