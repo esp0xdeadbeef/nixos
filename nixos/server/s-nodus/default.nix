@@ -55,6 +55,7 @@
     ./boot.nix
     ./dtb.nix
     ./network.nix
+    ./cobalt-bridges.nix
     ./fit.nix
 
     # Optional machine-local overrides.  The board keeps its own copy at

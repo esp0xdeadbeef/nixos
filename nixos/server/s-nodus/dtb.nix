@@ -49,12 +49,21 @@ let
     includePaths = dtIncludePaths;
   };
 
-  # 3. apply the overlay to the base DTB -> one resolved board DTB
+  # 2b. our local overlay: re-enable switch ports 1/2/3 as lan1/lan2/lan3
+  # (the board dtsi disables them; this site router needs them).  See the
+  # file header for the role mapping.
+  lanOverlay = pkgs.deviceTree.compileDTS {
+    name = "bpi-r4-pro-lan-ports-overlay";
+    dtsFile = ./lan-ports.dtso;
+    includePaths = dtIncludePaths;
+  };
+
+  # 3. apply the overlays to the base DTB -> one resolved board DTB
   resolvedDtb = pkgs.runCommand "mt7988a-bananapi-bpi-r4-pro-4e-sd.dtb"
     {
       nativeBuildInputs = [ pkgs.dtc ];
     } ''
-    fdtoverlay -i ${baseDtb} -o "$out" ${sdOverlay}
+    fdtoverlay -i ${baseDtb} -o "$out" ${sdOverlay} ${lanOverlay}
   '';
 in
 {
