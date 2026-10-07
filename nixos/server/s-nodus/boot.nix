@@ -38,6 +38,45 @@ in
     # dark -- intentionally out of scope.
     boot.kernelPackages = lib.mkForce pkgs.linuxPackages_latest;
 
+    # The ethernet driver and the DSA switch driver MUST be present in the
+    # kernel.  Without them the board boots with no netdev at all: no `end0`,
+    # no `lan*` switch port, no DHCP uplink, and the only way back in is the
+    # serial console.
+    #
+    # The headline cause of an unreachable board was actually kernel/modules
+    # DRIFT (the boot FIT carrying a different kernel than the generation's
+    # `kernel-modules`; see ./fit.nix, which now keeps them in sync).  This
+    # guard is the complementary check: it fails the build if the kernel's
+    # modules tree does not carry the MT7988 ethernet + MT7530 DSA drivers at
+    # all, so a nixpkgs/kernel bump cannot silently drop them.
+    #
+    # It runs on the modules output (a normal derivation), so it is a real
+    # build check, not an eval-time guess about the merged kernel config.
+    system.extraDependencies = [
+      (pkgs.runCommand "s-nodus-kernel-mt7988-net-check"
+        {
+          nativeBuildInputs = [ pkgs.xz ];
+          modules = config.boot.kernelPackages.kernel.modules;
+        }
+        ''
+          found_eth=0
+          found_dsa=0
+          while IFS= read -r f; do
+            case "$f" in
+              */drivers/net/ethernet/mediatek/mtk_eth.ko*) found_eth=1 ;;
+              */drivers/net/dsa/mt7530.ko*) found_dsa=1 ;;
+            esac
+          done < <(find "$modules" -type f -o -type l)
+          if [ "$found_eth" != 1 ] || [ "$found_dsa" != 1 ]; then
+            echo "ERROR: kernel modules tree lacks MT7988 ethernet/DSA drivers" >&2
+            echo "  mtk_eth found: $found_eth  mt7530 found: $found_dsa" >&2
+            echo "  modules: $modules" >&2
+            exit 1
+          fi
+          touch "$out"
+        '')
+    ];
+
     # --- console / bootargs ---------------------------------------------
     # ttyS0 @ 115200 8N1 (confirmed on a live boot).
     #
