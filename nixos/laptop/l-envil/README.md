@@ -181,9 +181,11 @@ nix shell nixpkgs#sbsigntool -c sbverify --list /mnt/boot/EFI/Linux/*.efi
 
 ## CUDA
 
-l-envil has an NVIDIA RTX A1000 Laptop GPU. Keep
-`nixpkgs.config.cudaCapabilities = [ "8.6" ];` so CUDA packages such as
-Ollama and Hashcat target this GPU instead of compiling every architecture.
+l-envil has an NVIDIA RTX 4070 Laptop GPU (Ada Lovelace, compute capability
+8.9). Keep `nixpkgs.config.cudaCapabilities = [ "8.9" ];` so CUDA packages
+such as Ollama and Hashcat target this GPU instead of compiling every
+architecture. The previous `[ "8.6" ]` targeted an RTX A1000 that this host
+does not have; its sm_86-only build made Ollama silently fall back to CPU.
 The public NixOS CUDA cache is auto-enabled by the shared CUDA cache module
 when NVIDIA support is configured.
 

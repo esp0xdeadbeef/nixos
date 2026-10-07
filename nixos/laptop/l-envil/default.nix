@@ -120,9 +120,13 @@ in
     internalScale = "0.75x0.75";
   };
 
+  # l-envil's dGPU is an Ada Lovelace RTX 4070 Laptop GPU (compute
+  # capability 8.9). The old [ "8.6" ] (sm_86-only) build silently fell back
+  # to CPU. Target 8.9 exactly. cudaForwardCompat adds compute_89 PTX for
+  # consumers that honour gencode (hashcat); ollama only uses realArches.
   nixpkgs.config = {
-    cudaCapabilities = [ "8.6" ];
-    cudaForwardCompat = false;
+    cudaCapabilities = [ "8.9" ];
+    cudaForwardCompat = true;
   };
 
   users.users.deadbeef.extraGroups = [ "wheel" ];
