@@ -2,8 +2,10 @@
 {
   imports = [
     (import ../../../server/nixos-shell-vm-inventory.nix {
+      # s-router-cobalt is deliberately NOT here: it is started/stopped by the
+      # carrierControls rule on cobalt-wan0 in ./default.nix, so it comes up
+      # only when the WAN adapter is connected.
       startOnBootInstances = [
-        "s-router-cobalt"
         "s-nebula-cobalt"
         "s-tang"
         "s-ap-nighthawk"
