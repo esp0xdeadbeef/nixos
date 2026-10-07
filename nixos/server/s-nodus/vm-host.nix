@@ -47,10 +47,9 @@ let
       set -euo pipefail
 
       dummy=wan-carrier
-      # mod-def0 lines are named "mod-def0"; there is one per SFP cage.
-      # sfp2 is the WAN cage.  gpiofind returns the chip:line for a named
-      # line; the sfp driver keeps the line claimed, so read its value from
-      # debugfs instead of requesting it.
+      # mod-def0 lines are named "mod-def0"; there is one per SFP cage.  The
+      # sfp driver keeps those lines claimed, so their value is read from
+      # debugfs instead of being requested with gpiod.
       poll=2
 
       mk_iface() {
@@ -61,12 +60,18 @@ let
 
       # mod-def0 ACTIVE LOW: present => value 0 in /sys/kernel/debug/gpio.
       # Lines look like:
+      #   gpio-1   (                    |mod-def0            ) in  hi IRQ ACTIVE LOW
       #   gpio-69  (                    |mod-def0            ) in  hi IRQ ACTIVE LOW
-      # Two lines share the "mod-def0" name (sfp1, sfp2).  The higher-numbered
-      # line is sfp2 on this board (observed: gpio-1=sfp1, gpio-69=sfp2).
+      # Two lines share the "mod-def0" name.  The DT says which is which:
+      #   /sys/firmware/devicetree/base/sfp2/mod-def0-gpios -> pinctrl line 1
+      #   /sys/firmware/devicetree/base/sfp1/mod-def0-gpios -> pinctrl line 69
+      # and gpiochip0 (pinctrl_moore) is that controller, so on this board
+      #   sfp2 (WAN)  = gpio-1
+      #   sfp1        = gpio-69
+      # i.e. the WAN cage is the LOWEST-numbered mod-def0 line.
       presence() {
         line=$(grep -E '\|mod-def0' /sys/kernel/debug/gpio 2>/dev/null \
-          | sort -t- -k2 -n | tail -1 || true)
+          | sort -t- -k2 -n | head -1 || true)
         [ -n "$line" ] || { echo absent; return; }
         # state column reads "hi"/"lo"; mod-def0 is ACTIVE LOW, so a seated
         # module pulls the line low => present.
