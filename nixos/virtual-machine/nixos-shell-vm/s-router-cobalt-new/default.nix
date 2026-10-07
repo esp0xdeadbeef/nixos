@@ -118,15 +118,16 @@ in
 
   # vm-settings.nix sizes every router VM for the Dell servers (42 cores,
   # 40 GiB RAM, 20 GiB disk) and attaches it to the x86-only `vmbr4` bridge.
-  # The board is a 4-core/4 GiB MT7988A whose only usable interface is the
-  # DSA switch port, so override both to something that fits.
+  # The board is a 4-core/4 GiB MT7988A, so override both to fit.
+  #
+  # NOTE: the QEMU NIC list is NOT set here.  The NixOS renderer owns
+  # virtualisation.qemu.networkingOptions (FS-982-SMS-130) and emits it from
+  # the `vmNics` platform binding above (lan-trunk -> br-cobalt-lan,
+  # wan -> br-cobalt-wan).  Setting it here as well would duplicate the NICs.
   virtualisation = {
     cores = lib.mkForce 4;
-    memorySize = lib.mkForce 1024;
+    memorySize = lib.mkForce (1024 * 2);
     diskSize = lib.mkForce (8 * 1024);
-    # Drop the vmbr4 NICs; nixos-shell adds the user-mode NAT NIC by default,
-    # which is enough to reach the guest and for it to DHCP/build.
-    qemu.networkingOptions = lib.mkForce [ "-nic none" ];
   };
 
   system.stateVersion = lib.mkForce "26.05";
