@@ -365,6 +365,10 @@
         l-portal = "aarch64-linux";
         # s-nodus: Banana Pi BPI-R4 Pro 4E (MediaTek MT7988A).
         s-nodus = "aarch64-linux";
+        # s-router-cobalt-new runs under KVM on s-nodus, so the guest must
+        # match the board.  This is the only place its architecture is set;
+        # every other VM defaults to x86_64-linux.
+        s-router-cobalt-new = "aarch64-linux";
       };
 
       hostSystemFor = name: hostSystems.${name} or "x86_64-linux";
@@ -498,6 +502,11 @@
                   self
                   name
                   ;
+
+                # Guest architecture for this configuration.  Defaults to
+                # x86_64-linux and is overridden per host/VM through
+                # `hostSystems` above, so VM modules never hardcode it.
+                vmSystem = hostSystemFor name;
 
                 # VM images this host is meant to run, resolved HERE rather
                 # than via `self.nixosConfigurations.<vm>` inside the host's own
