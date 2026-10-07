@@ -4,6 +4,7 @@
 , pkgs
 , relativeRepo
 , outputs
+, vmSystem ? "x86_64-linux"
 , ...
 }:
 let
@@ -13,8 +14,10 @@ let
   # (CPM, realization model, nixos/wireguard/nebula renderers) is arch-generic
   # -- `system` is threaded through as a parameter and every layer exposes
   # aarch64-linux in libBySystem -- so this is the only change required.
-  # The x86_64 build of an equivalent VM is `s-router-cobalt` on l-envil.
-  system = "aarch64-linux";
+  # The architecture is NOT hardcoded here: it defaults to x86_64-linux and is
+  # overridden to aarch64-linux via `hostSystems` in flake.nix.  The x86_64
+  # build of an equivalent VM is `s-router-cobalt` on l-envil.
+  system = vmSystem;
   modelSource = relativeRepo.sourcePath "prod-network/testing";
   deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
   deviceIds =
@@ -108,13 +111,14 @@ in
     })
   ];
 
-  # Build/run this VM as aarch64.  `system` above is only the value threaded
-  # into the GAMP renderers; host-config-routers-without-network/vm-settings.nix
-  # hardcodes nixpkgs.hostPlatform = "x86_64-linux" (these VMs were designed for
-  # the x86 Dell servers), so without mkForce the whole configuration is built
-  # for x86_64 and the run-*-vm runner embeds x86_64 coreutils -> "Exec format
+  # Build/run this VM for the architecture selected above (default x86_64).
+  # `system` above is only the value threaded into the GAMP renderers;
+  # host-config-routers-without-network/vm-settings.nix hardcodes
+  # nixpkgs.hostPlatform = "x86_64-linux" (these VMs were designed for the x86
+  # Dell servers), so without mkForce the whole configuration is built for
+  # x86_64 and the run-*-vm runner embeds x86_64 coreutils -> "Exec format
   # error" on the board.  l-portal sets hostPlatform the same way.
-  nixpkgs.hostPlatform = lib.mkForce "aarch64-linux";
+  nixpkgs.hostPlatform = lib.mkForce system;
 
   # vm-settings.nix sizes every router VM for the Dell servers (42 cores,
   # 40 GiB RAM, 20 GiB disk) and attaches it to the x86-only `vmbr4` bridge.
