@@ -44,6 +44,7 @@ keys:
   - &s-router-legacy-prod age1d53ydnf0dfzxpkt4lkea23yrhfl30hksqnj8wp2cn2up3as43sjsk4wsvv
   - &s-router-neon age1tyy7562g9jry5ppjmf05m5xw253mnpykcshv87c9ppns5sa5xfmqg5p2fr
   - &s-router-cobalt age1fqla0mcf7dp5hytm6mvukjhe8pas636rtn3ts38pj3fv4mxjzyesj9ewms
+  - &s-router-cobalt-new age1qgcwdynlj2jv3kh6j68n9lw5glr9un2s9aj8j9grdxqd37rq8epqcuc2nj
   - &s-ap-alfa age18lxdtlsj0xks66wmplzsttp2wy60yrh7hmt06a9z0r385xxfcqjsrhpyhm
   - &s-mail-classifier age1elpsqft4da686ftu0237uv0vsc5zqcjcd2xphust5cmu2yk99epskk5r6c
 
@@ -377,6 +378,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-cobalt-new
           - *s-ap-alfa
   - path_regex: '^(secrets/)*s-router-cobalt.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
@@ -387,6 +389,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-cobalt-new
   - path_regex: '^(secrets/)*s-router-cobalt-vpn-.*\.conf$'
     input_type: binary
     output_type: binary
@@ -397,6 +400,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-cobalt-new
   - path_regex: '^(secrets/)*s-router-cobalt-vpn-.*\.ya?ml$'
     encrypted_regex: ".*"
     key_groups:
@@ -406,6 +410,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-cobalt-new
   - path_regex: '^(secrets/)*s-router-legacy-core.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
@@ -468,6 +473,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-cobalt-new
   - path_regex: '^(secrets/)*s-test.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
@@ -614,6 +620,7 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-cobalt-new
           - *s-router-neon
   - path_regex: '^prod-network/testing/secrets/devices/[A-Za-z0-9_-]+\.sops\.ya?ml$'
     encrypted_regex: ".*"
@@ -622,4 +629,5 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-cobalt
+          - *s-router-cobalt-new
           - *s-router-neon
