@@ -191,4 +191,64 @@ in
     } ''
     mkimage -f ${itsFile} "$out"
   '';
+
+  # The board boots a STATIC FIT from the `production` partition: the vendor
+  # U-Boot `bootm`s the kernel+initrd baked into that image.  A NixOS
+  # generation change (nixos-rebuild switch/boot, or the auto-upgrade timer)
+  # does NOT rewrite it, so the running kernel keeps its old build while the
+  # generation's `kernel-modules` move on.  The modules then no longer match
+  # the kernel and drivers fail to load -- the board came up with no network
+  # interface at all after exactly that drift.
+  #
+  # Keep the FIT in the system closure and reflash `production` whenever it
+  # differs from the FIT the current generation would produce.  This makes the
+  # upgrade path safe: `boot` moves the profile, and this unit moves the FIT
+  # to match, on the very next boot (and on every boot, idempotently).
+  system.extraDependencies = [ config.system.build.bpiR4ProFit ];
+
+  systemd.services.s-nodus-fit-sync = {
+    description = "Reflash the BPI-R4 Pro production FIT to match the current generation";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" ];
+    # Do not block the boot on this; it only needs to have run before the next
+    # reboot.  It is ordered early enough to fix a mismatch well before then.
+    unitConfig.DefaultDependencies = true;
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = with pkgs; [
+      coreutils
+      util-linux
+    ];
+    script = ''
+      set -euo pipefail
+
+      fit=${config.system.build.bpiR4ProFit}
+      part=/dev/disk/by-partlabel/production
+
+      [ -b "$part" ] || { echo "no $part: skipping FIT sync"; exit 0; }
+      [ -r "$fit" ] || { echo "FIT $fit missing: skipping"; exit 0; }
+
+      fit_size=$(stat -c %s "$fit")
+      part_size=$(blockdev --getsize64 "$part")
+      if [ "$fit_size" -gt "$part_size" ]; then
+        echo "FIT ($fit_size B) larger than production ($part_size B)" >&2
+        exit 1
+      fi
+
+      want=$(sha256sum "$fit" | cut -d' ' -f1)
+      have=$(head -c "$fit_size" "$part" | sha256sum | cut -d' ' -f1)
+
+      if [ "$want" = "$have" ]; then
+        echo "production FIT already matches the current generation"
+        exit 0
+      fi
+
+      echo "reflashing production FIT (have $have -> want $want)"
+      dd if="$fit" of="$part" bs=1M conv=fsync status=none
+      sync
+      echo "production FIT updated"
+    '';
+  };
 }
