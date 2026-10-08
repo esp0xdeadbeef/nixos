@@ -15,6 +15,7 @@ in
 
   imports = [
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config")
+    ./network-planes.nix
     ./overwrites.nix
     ./container-settings.nix
   ];
