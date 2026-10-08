@@ -6,7 +6,7 @@
 }:
 let
   primaryUser = config.local.users.primary.resolvedName;
-  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
+  keyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/${host}.pub");
 in
 {
   local.users.primary.name = lib.mkDefault "deadbeef";

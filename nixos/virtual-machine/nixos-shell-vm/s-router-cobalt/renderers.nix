@@ -20,8 +20,12 @@
 { ... }:
 
 let
-  intentPath = "${modelSource}/${intentFileName}";
-  inventoryPath = "${modelSource}/${inventoryFileName}";
+  # Join with a PATH, not string interpolation: `"${modelSource}/..."` would
+  # stringify the path, which copies it into the store and drops the store
+  # context under pure evaluation (`nix flake check`).  `path + "/..."` keeps a
+  # real path, which survives `import`/`readFile`.
+  intentPath = modelSource + "/${intentFileName}";
+  inventoryPath = modelSource + "/${inventoryFileName}";
 
   # FS-982: the host profile imports renderer output; bundle production lives
   # behind the producer boundary, not in the host profile. The inventory path

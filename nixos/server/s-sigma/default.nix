@@ -8,7 +8,7 @@ let
   # to offload builds to this builder. Each client generates this once with
   # `sudo ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_remote-builder` and
   # commits the resulting .pub here (see profiles.nixos.nix.remote-builder-client).
-  remoteBuilderKeyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/remote-builder/${host}.pub");
+  remoteBuilderKeyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/remote-builder/${host}.pub");
 in
 {
   imports = [
