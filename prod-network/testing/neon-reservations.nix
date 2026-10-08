@@ -170,6 +170,14 @@
       vlan2 = 86;
     };
   };
+  # Publicly-exposed game servers live in the dmz plane, not the legacy vlan2
+  # holding pen.  Handle stays `s-gameserver`; only the scope moves.
+  s-gameserver = {
+    hostname = "s-gameserver";
+    scopes = {
+      neon-dmz = 10;
+    };
+  };
   s-nebula = {
     hostname = "s-nebula";
     scopes = {

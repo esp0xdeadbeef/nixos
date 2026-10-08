@@ -1147,6 +1147,8 @@ let
             poolEnd = "10.3.60.200";
             router = "10.3.60.1";
             leaseStatePath = "/var/lib/kea/dmz.leases";
+            reservations = reservationsFor "neon-dmz";
+            reservationSource = protectedReservationSource "/run/secrets/devices/";
           };
         };
 
@@ -1374,6 +1376,15 @@ in
 
     s-llm-inference-container = {
       ipv4 = [ sLlmInferenceContainerAddress ];
+    };
+
+    # Publicly-exposed game servers (neon dmz plane).  The IPv4 address is the
+    # dhcp/neon-dmz reservation offset 10 in 10.3.60.0/24 and the IPv6 is the
+    # same offset in the dmz ULA, so both are realization facts of the
+    # reservation above, not new allocations.
+    s-gameserver = {
+      ipv4 = [ "10.3.60.10" ];
+      ipv6 = [ "fd42:dead:beef:360::10" ];
     };
 
     vlan7-dns = {
