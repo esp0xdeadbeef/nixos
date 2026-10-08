@@ -184,9 +184,24 @@ let
 
     ${mxlStanza}
 
-    /* gmac2 is the MxL CPU port; gmac1 is the 2.5G/10G WAN. */
-    &gmac1 { status = "okay"; };
-    &gmac2 { status = "okay"; };
+    /* gmac2 is the MxL86252 CPU conduit: mainline's mtk_soc_eth requires a
+       phy-mode on every enabled MAC, and the vendor board DTS gives gmac2
+       `phy-mode = "10gbase-r"` + a 10G fixed-link.  Without this the whole
+       mtk_soc_eth probe fails with -EINVAL ("incorrect phy-mode") and the
+       board boots with NO ethernet at all. */
+    &gmac2 {
+      phy-mode = "10gbase-r";
+      phy-connection-type = "10gbase-r";
+      status = "okay";
+      fixed-link {
+        speed = <10000>;
+        full-duplex;
+      };
+    };
+
+    /* gmac1 is the 2.5G RJ45/10G SFP+ WAN combo.  The host does not need it
+       (the cobalt VM owns WAN), and mainline cannot enable it without a
+       phy-mode/PHY the way the vendor kernel can -- so leave it disabled. */
   '';
 in
 {
