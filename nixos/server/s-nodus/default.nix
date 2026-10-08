@@ -43,6 +43,12 @@
     profiles.nixos.ssh.deadbeef-authorized-keys
     profiles.nixos.users.deadbeef-ssh
     profiles.nixos.users.sudo-nopasswd
+    profiles.nixos.shell.zsh-prompt
+
+    # Declares local.users.primary (the zsh-prompt profile resolves the
+    # interactive user through it; s-nodus does not import
+    # profiles.nixos.base.default, which would normally pull this in).
+    (relativeRepo.module "modules/nixos/local-users.nix")
 
     # Join the nebula overlay (100.64.0.18) so s-nodus can reach -- and
     # offload builds to -- the fleet's remote builders, and read secrets via
@@ -128,6 +134,10 @@
 
   # Board support (kernel/bootloader/DHCP-everything).
   local.bpiR4Pro.enable = true;
+
+  # zsh as the interactive shell (same profile as s-gamma and the laptops).
+  # The board is a headless serial/SSH host, so the prompt reads "server".
+  local.shell.zshPrompt.enable = true;
 
   # Enable the impermanence defaults.  Importing the profile is not enough:
   # it is gated on this option, and without it /persist and /nix never get
