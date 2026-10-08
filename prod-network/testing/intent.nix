@@ -163,6 +163,39 @@ let
       ];
     }
 
+    # Game servers exposed to the internet from the dmz plane (FS-180: the
+    # ports belong to the service, not the relation).  Minecraft prod/test and
+    # the Valheim connect port (2456; 2457/2458 are the query/steam ports the
+    # server also binds).
+    #
+    # IPv4 only: the neon-dmz tenant declares no `routedPrefixes` runtime IPv6
+    # allocation, so the dmz has no public IPv6 surface to ingress on.  Saying
+    # `ipv4` here is the honest model; an `any` family would claim an IPv6
+    # public ingress authority the dmz does not have (FS-310
+    # PUBLIC_INGRESS_IPV6_AUTHORITY_MISSING).
+    {
+      name = "game-server";
+      match = [
+        {
+          proto = "tcp";
+          dports = [
+            25565
+            25566
+          ];
+          family = "ipv4";
+        }
+        {
+          proto = "udp";
+          dports = [
+            2456
+            2457
+            2458
+          ];
+          family = "ipv4";
+        }
+      ];
+    }
+
     {
       name = "traceroute";
       match = [
@@ -410,6 +443,12 @@ in
         }
         {
           kind = "host";
+          name = "s-gameserver";
+          tenant = "neon-dmz";
+          ipv4 = [ "10.3.60.10" ];
+        }
+        {
+          kind = "host";
           name = "neon-unlock-dns";
           tenant = "neon-unlock";
           ipv4 = [ "10.3.90.1" ];
@@ -556,6 +595,57 @@ in
           name = "tang";
           providers = [ "neon-tang" ];
           trafficType = "tang";
+        }
+        # FS-190/FS-200: publicly-exposed game servers in the dmz access space.
+        # The service carries its own ports via the `game-server` traffic type;
+        # the public-ingress relations below bind who may reach it.  The
+        # exposure class is public-ingress and the authentication boundary is
+        # the game protocol itself.
+        {
+          name = "s-gameserver";
+          providers = [ "s-gameserver" ];
+          trafficType = "game-server";
+          servicePolicy = {
+            requesterScopes = [{ kind = "external"; scope = "core"; }];
+            responderScope = { kind = "host"; name = "s-gameserver"; tenant = "neon-dmz"; };
+            serviceClass = "game-server";
+            discovery = {
+              protocol = "none";
+              direction = "none";
+              advertisedServices = [ ];
+            };
+            payload = {
+              protocol = "game-server";
+              ports = [
+                2456
+                2457
+                2458
+                25565
+                25566
+              ];
+              direction = "requester-to-responder";
+              returnBehavior = "established-only";
+            };
+            management = {
+              allowed = false;
+              boundary = "gameserver-host-local-only";
+            };
+            reverseInitiation = {
+              allowed = false;
+              boundary = "no-gameserver-initiated-client-paths";
+            };
+            deniedPaths = [
+              {
+                from = { kind = "tenant"; name = "neon-clients"; };
+                to = { kind = "service"; name = "s-gameserver"; };
+                reason = "clients-reach-games-only-through-the-lan-path";
+                negativeProbe = "neon-clients-to-s-gameserver-public-tuples";
+              }
+            ];
+            exposureClass = "public-ingress";
+            authenticationBoundary = "game-protocol-native";
+            cloudDependency = "none";
+          };
         }
       ];
       relations = [
@@ -767,6 +857,191 @@ in
               {
                 protocol = "tcp";
                 publicPort = 4242;
+              }
+            ];
+          };
+        }
+        # FS-210/FS-230: public ingress for the neon dmz game servers.  The
+        # IPv4 path is NAPT (the site has one public IPv4 surface).  FS-220
+        # uniqueness holds because no other binding claims these ports on the
+        # wan surface.
+        #
+        # One relation per public port: the CPM derives a single
+        # `targetPort` from the relation and applies it to every tuple
+        # (`tupleRecords` in cpm/firewall-intent/public-ingress.nix `inherit
+        # targetPort`), so a multi-tuple relation would DNAT every public port
+        # to the same target port.  The game server's public and target ports
+        # are identical, which only a per-port relation can express today.
+        #
+        # IPv6 is intentionally not modeled: public IPv6 ingress needs a
+        # `routedPrefixes` runtime allocation on the tenant and neon-dmz has
+        # none (only vlan2/3/7/8 do), so the traffic type is declared ipv4 and
+        # no IPv6 ingress authority is claimed (FS-310
+        # PUBLIC_INGRESS_IPV6_AUTHORITY_MISSING).
+        {
+          id = "allow-wan-to-s-gameserver-mc-prod";
+          priority = 90;
+          from = {
+            kind = "external";
+            scope = "core";
+          };
+          to = {
+            kind = "service";
+            name = "s-gameserver";
+          };
+          trafficType = "game-server";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-gameserver";
+            targetEndpoint = "s-gameserver";
+            targetPort = 25565;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "tcp";
+                publicPort = 25565;
+                targetPort = 25565;
+              }
+            ];
+          };
+        }
+        {
+          id = "allow-wan-to-s-gameserver-mc-test";
+          priority = 91;
+          from = {
+            kind = "external";
+            scope = "core";
+          };
+          to = {
+            kind = "service";
+            name = "s-gameserver";
+          };
+          trafficType = "game-server";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-gameserver";
+            targetEndpoint = "s-gameserver";
+            targetPort = 25566;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "tcp";
+                publicPort = 25566;
+                targetPort = 25566;
+              }
+            ];
+          };
+        }
+        # Valheim: 2456 is the connect port; 2457/2458 are the query/steam
+        # ports the server also binds.  Each needs its own relation for the
+        # same single-targetPort reason as above.
+        {
+          id = "allow-wan-to-s-gameserver-valheim";
+          priority = 92;
+          from = {
+            kind = "external";
+            scope = "core";
+          };
+          to = {
+            kind = "service";
+            name = "s-gameserver";
+          };
+          trafficType = "game-server";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-gameserver";
+            targetEndpoint = "s-gameserver";
+            targetPort = 2456;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 2456;
+                targetPort = 2456;
+              }
+            ];
+          };
+        }
+        {
+          id = "allow-wan-to-s-gameserver-valheim-query";
+          priority = 93;
+          from = {
+            kind = "external";
+            scope = "core";
+          };
+          to = {
+            kind = "service";
+            name = "s-gameserver";
+          };
+          trafficType = "game-server";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-gameserver";
+            targetEndpoint = "s-gameserver";
+            targetPort = 2457;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 2457;
+                targetPort = 2457;
+              }
+            ];
+          };
+        }
+        {
+          id = "allow-wan-to-s-gameserver-valheim-steam";
+          priority = 94;
+          from = {
+            kind = "external";
+            scope = "core";
+          };
+          to = {
+            kind = "service";
+            name = "s-gameserver";
+          };
+          trafficType = "game-server";
+          action = "allow";
+          publicIngressTupleAuthority = {
+            sourceScope = "internet";
+            publicSurface = "wan";
+            targetService = "s-gameserver";
+            targetEndpoint = "s-gameserver";
+            targetPort = 2458;
+            returnBehavior = "stateful-return";
+            sourcePreservation = "rewritten";
+            translationMode = "napt";
+            hairpin = "not-modeled";
+            asymmetricRouting = "not-allowed";
+            tuples = [
+              {
+                protocol = "udp";
+                publicPort = 2458;
+                targetPort = 2458;
               }
             ];
           };
