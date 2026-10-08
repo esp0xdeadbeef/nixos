@@ -18,8 +18,12 @@ let
   # overridden to aarch64-linux via `hostSystems` in flake.nix.  The x86_64
   # build of an equivalent VM is `s-router-cobalt` on l-envil.
   system = vmSystem;
-  modelSource = relativeRepo.sourcePath "prod-network/testing";
-  deviceDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
+  modelSource = relativeRepo.sourceModule "prod-network/testing";
+  # Eval-time directory listing (readDir): needs a real path (sourceModule).
+  deviceDir = relativeRepo.sourceModule "prod-network/testing/secrets/devices";
+  # Build-time sops inputs: keep the fileset snapshot (sourcePath) so the
+  # generated sops manifest records the same store paths as before.
+  deviceSopsDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
   deviceIds =
     map
       (name: lib.removeSuffix ".sops.yaml" name)
@@ -142,7 +146,7 @@ in
         (id: {
           name = "cobalt-device-${id}";
           value = {
-            sopsFile = "${deviceDir}/${id}.sops.yaml";
+            sopsFile = "${deviceSopsDir}/${id}.sops.yaml";
             key = "mac";
             format = "yaml";
             path = "/run/secrets/devices/${id}";

@@ -3,17 +3,22 @@
 # Device tree for the Banana Pi BPI-R4 Pro 4E (MT7988A).
 #
 # Why we build the DTB ourselves:
-#   * The board DTS (mt7988a-bananapi-bpi-r4-pro-4e.dts) only exists from
-#     Linux 6.19 onward -> the nixpkgs default kernel (6.18.x) does NOT have it.
-#   * Our kernel is linuxPackages_latest (7.2.x), which DOES have the source,
-#     but this nixpkgs does not build/install DTBs for it here, so we cannot
-#     rely on $kernel/dtbs.
+#   * Our kernel is linuxPackages_latest (7.2.x), which has the mainline board
+#     DTS source, but this nixpkgs does not build/install DTBs for it here, so
+#     we cannot rely on $kernel/dtbs.
 #
-# So we unpack the (official, mainline) kernel source and compile:
-#   base  : mt7988a-bananapi-bpi-r4-pro-4e.dts      (official mainline board DTS)
-#   overlay: mt7988a-bananapi-bpi-r4-pro-sd.dtso    (official mainline SD overlay)
-# into a single resolved DTB. Nothing is vendored or decompiled from a
-# downstream tree -- both files come straight from the kernel source we run.
+# We compile:
+#   base  : the official mainline board dtsi, plus a generated fragment that
+#           describes the jacks of BOTH switches on this board (see
+#           ./lan-port-map.nix for authority and provenance).
+#   overlay: mt7988a-bananapi-bpi-r4-pro-sd.dtso (official mainline SD overlay)
+# and apply the overlay with fdtoverlay to get one resolved board DTB.
+#
+# The board fragment is part of the BASE compilation unit (not an fdtoverlay)
+# on purpose: fdtoverlay cannot resolve a phandle introduced by the overlay
+# itself (`&gbeN_led0_pins`) nor /delete-node/, both of which the map needs.
+# The upstream node text is vendored from the vendor 4E board DTS
+# (BPI-SINOVOIP/BPI-R4PRO-4E-OPENWRT, GPL-2.0 OR MIT) and adapted to mainline.
 let
   kernel = config.boot.kernelPackages.kernel;
 
@@ -32,10 +37,28 @@ let
     "${kernelSource}/scripts/dtc/include-prefixes"
   ];
 
-  baseDts = "${dtsDir}/mt7988a-bananapi-bpi-r4-pro-4e.dts";
-  sdDts = "${dtsDir}/mt7988a-bananapi-bpi-r4-pro-sd.dtso";
+  # The single source of truth for the physical port map (DT labels + roles).
+  lanPortMap = import ./lan-port-map.nix { inherit lib; };
 
-  # 1. compile the official base board DTB
+  # Our base DTS: the official mainline board dtsi plus the generated fragment.
+  # We include the board dtsi (not the -4e.dts, which carries its own /dts-v1/)
+  # and set the 4E model, exactly as the upstream -4e.dts does.
+  baseDts = pkgs.writeText "mt7988a-bananapi-bpi-r4-pro-4e-s-nodus.dts" ''
+    /dts-v1/;
+
+    #include "mt7988a-bananapi-bpi-r4-pro.dtsi"
+
+    / {
+      model = "Bananapi BPI-R4 Pro 4E";
+      compatible = "bananapi,bpi-r4-pro-4e",
+                   "bananapi,bpi-r4-pro",
+                   "mediatek,mt7988a";
+    };
+
+    ${lanPortMap.baseFragment}
+  '';
+
+  # 1. compile our base board DTB
   baseDtb = pkgs.deviceTree.compileDTS {
     name = "bpi-r4-pro-4e-base";
     dtsFile = baseDts;
@@ -43,27 +66,19 @@ let
   };
 
   # 2. compile the official SD overlay
+  sdDts = "${dtsDir}/mt7988a-bananapi-bpi-r4-pro-sd.dtso";
   sdOverlay = pkgs.deviceTree.compileDTS {
     name = "bpi-r4-pro-sd-overlay";
     dtsFile = sdDts;
     includePaths = dtIncludePaths;
   };
 
-  # 2b. our local overlay: re-enable switch ports 1/2/3 as lan1/lan2/lan3
-  # (the board dtsi disables them; this site router needs them).  See the
-  # file header for the role mapping.
-  lanOverlay = pkgs.deviceTree.compileDTS {
-    name = "bpi-r4-pro-lan-ports-overlay";
-    dtsFile = ./lan-ports.dtso;
-    includePaths = dtIncludePaths;
-  };
-
-  # 3. apply the overlays to the base DTB -> one resolved board DTB
+  # 3. apply the SD overlay to the base DTB -> one resolved board DTB
   resolvedDtb = pkgs.runCommand "mt7988a-bananapi-bpi-r4-pro-4e-sd.dtb"
     {
       nativeBuildInputs = [ pkgs.dtc ];
     } ''
-    fdtoverlay -i ${baseDtb} -o "$out" ${sdOverlay} ${lanOverlay}
+    fdtoverlay -i ${baseDtb} -o "$out" ${sdOverlay}
   '';
 in
 {

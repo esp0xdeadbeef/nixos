@@ -181,6 +181,71 @@ subvolumes, the closure into `/nix`, and `chown -R 0:0` (a store that is not
 root-owned breaks logrotate's owner check and systemd-tmpfiles' "unsafe path
 transition" guard).
 
+## LAN ports and the cobalt trunk
+
+s-nodus feeds the `s-router-cobalt-new` VM through host-private L2 bridges
+(`./cobalt-bridges.nix`). The host itself has no address on them; the VM owns
+all routing/NAT (`./network.nix`).
+
+### Port map
+
+The MT7988 internal switch exposes exactly **four** PHY ports. Port 0 is the
+board's `lan5` management port (DHCP, host uplink/nebula); ports 1-3 are
+disabled by the mainline board dtsi and re-enabled here as `lan1`/`lan2`/`lan3`.
+There is **no `lan4`** -- the switch has no fifth port.
+
+Both the device-tree overlay and the networkd rules are generated from the
+single map in `./lan-port-map.nix`, so a port's DT label and its role cannot
+drift apart:
+
+| netdev | role | bridge |
+|---|---|---|
+| `lan1` | 802.1Q trunk (tagged) | `br-cobalt-lan` |
+| `lan2` | untagged clients access | `vlan30` |
+| `lan3` | untagged clients access | `vlan30` |
+| `lan5` | management (DHCP) | not bridged |
+
+`br-cobalt-lan` terminates VLAN 30 off the trunk (`cobalt-lan.30`) into the
+untagged `vlan30` bridge that `lan2`/`lan3` join. The cobalt VM attaches its
+LAN NIC to `br-cobalt-lan` and its WAN NIC to `br-cobalt-wan`; it starts only
+while the WAN SFP is present (`./vm-host.nix`), but `lan1` stays wired
+regardless.
+
+### Verifying the trunk
+
+`lan1` is a **bridge member**. `tcpdump -i lan1` can miss frames the bridge
+forwards straight through to another port, so a blank capture there is not
+proof that nothing arrives. Capture on the bridge or the VLAN child instead,
+and confirm the link state first:
+
+```sh
+ip -br link show lan1                 # must not be NO-CARRIER
+bridge link show                      # lan1 should be a member of br-cobalt-lan
+ip -br link show master br-cobalt-lan # members (plus the VM tap when it runs)
+tcpdump -i br-cobalt-lan -n -e        # tagged VLAN 30 frames crossing the bridge
+tcpdump -i cobalt-lan.30 -n -e        # the same frames after tag termination
+```
+
+The cobalt clients plane is `10.2.30.0/24`, gateway `10.2.30.1` (the VM), DHCP
+pool `10.2.30.100-200`. To prove the switch trunk is configured correctly
+without the VM, put a transient VLAN-30 address on the trunk and ping a known
+VLAN-30 peer:
+
+```sh
+# transient; not persisted. The bridge stays unaddressed otherwise.
+ip link add link br-cobalt-lan name t30 type vlan id 30
+ip addr add 10.2.30.250/24 dev t30
+ip link set t30 up
+ping -c3 10.2.30.1                    # or any live VLAN-30 host
+ip link del t30
+```
+
+If `tcpdump -i br-cobalt-lan -e` shows tagged VLAN-30 frames but the ping does
+not answer, the L2 path is fine and the problem is L3 (no VLAN-30 peer up). If
+the bridge capture is empty too, nothing is arriving from the switch: check
+that the switch port is a matching 802.1Q trunk (ports 1-2 carry VLAN 30
+tagged; `prod-network/cobalt/switch-vlan.toml`) and that lan1 has carrier.
+
 ## TODOs / hardening
 
 - [ ] Replace `initialPassword` with a proper credential (sops/keys).

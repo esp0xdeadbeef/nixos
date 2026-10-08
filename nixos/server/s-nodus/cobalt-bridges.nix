@@ -1,10 +1,10 @@
 { lib, pkgs, ... }:
 
-# Cobalt host-side platform binding for the s-router-cobalt-new VM (BPI-R4 Pro 4E).
+# Cobalt host-side platform binding for the s-router-cobalt-new VM
+# (Banana Pi BPI-R4 Pro 4E).
 #
 # Role (mirrors nixos/laptop/l-envil/hardware/cobalt-bridges.nix):
-#   lan1  -> 802.1Q trunk into br-cobalt-lan   (carries the cobalt LAN trunk)
-#   lan2  -> access port, untagged (VLAN 30)    (clients)
+#   lan2  -> 802.1Q trunk into br-cobalt-lan   (carries the cobalt LAN trunk)
 #   lan3  -> access port, untagged (VLAN 30)    (clients)
 #   lan5  -> management (DHCP, host uplink/nebula) -- NOT part of the bridges
 #   sfp1/sfp2 -> SFP+ cages; sfp2 is the WAN source for VM activation
@@ -14,11 +14,53 @@
 # trunk/VLAN/service semantics live in the canonical realization bundle the VM
 # consumes (FS-176, FS-187; URS "platform binding").
 #
-# The board's dtsi disables switch ports 1/2/3; ./lan-ports.dtso re-enables
-# them, so lan1/2/3 exist as netdevs for these rules to match.
+# The board has TWO switch chips; ./lan-port-map.nix is the single source of
+# truth for every real jack (MT7988 internal ports 0/2/3 and the MxL86252
+# 2.5G ports), and the DT overlay and these networkd rules are generated from
+# the SAME map.  Notably there is NO `lan1`: on the 4E the MT7988 internal
+# switch port 1 has a PHY/LED but no jack, so it is deleted rather than
+# exposed as a fake interface.
 let
+  # Single source of truth for the Ethernet port map (DT label + role).
+  portMap = import ./lan-port-map.nix { inherit lib; };
+
   # VLAN used for the untagged access ports (matches the cobalt clients plane).
   clientVlan = 30;
+
+  # networkd `.network` stanza for one mapped port, keyed by its DT label.
+  #   trunk      -> 802.1Q trunk into br-cobalt-lan
+  #   access     -> untagged clients VLAN into the vlan30 access bridge
+  #   unused     -> realized netdev, no bridge (jack present, no cobalt role)
+  #   management -> handled separately below (DHCP on its own netdev)
+  mkPortNetwork = p:
+    if p.role == "management" then
+      lib.nameValuePair "10-${p.label}"
+        {
+          matchConfig.Name = p.label;
+          linkConfig.RequiredForOnline = "yes";
+          networkConfig = {
+            DHCP = "ipv4";
+            LinkLocalAddressing = "no";
+          };
+        }
+    else
+      lib.nameValuePair "10-${p.label}" {
+        matchConfig.Name = p.label;
+        linkConfig.RequiredForOnline = "no";
+        networkConfig = lib.mkIf (p.role == "trunk" || p.role == "access") {
+          Bridge =
+            if p.role == "trunk" then "br-cobalt-lan" else "vlan${toString clientVlan}";
+        };
+      };
+
+  # The internal switch map entries plus the management port (which is not in
+  # the generated overlay -- mainline already labels internal port 0 `lan5` --
+  # but must still get a networkd rule).
+  managedPorts =
+    portMap.internalPorts
+    ++ [{ label = portMap.mgmtLabel; role = "management"; }];
+
+  lanNetworks = lib.listToAttrs (map mkPortNetwork managedPorts);
 in
 {
   # networkd owns the cobalt ports and the bridges; the scripted/dhcpcd client
@@ -62,14 +104,7 @@ in
     };
   };
 
-  systemd.network.networks = {
-    # lan1: the 802.1Q trunk.  Pure L2 into br-cobalt-lan.
-    "10-lan1" = {
-      matchConfig.Name = "lan1";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig.Bridge = "br-cobalt-lan";
-    };
-
+  systemd.network.networks = lanNetworks // {
     # br-cobalt-lan terminates the client VLAN off the trunk into the
     # untagged access bridge.
     "10-br-cobalt-lan" = {
@@ -84,19 +119,6 @@ in
       networkConfig = { };
     };
 
-    # lan2/lan3: untagged access ports for the clients VLAN.
-    "10-lan2" = {
-      matchConfig.Name = "lan2";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig.Bridge = "vlan${toString clientVlan}";
-    };
-
-    "10-lan3" = {
-      matchConfig.Name = "lan3";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig.Bridge = "vlan${toString clientVlan}";
-    };
-
     # VLAN child off the trunk -> untagged access bridge.
     "20-cobalt-lan.${toString clientVlan}" = {
       matchConfig.Name = "cobalt-lan.${toString clientVlan}";
@@ -109,16 +131,6 @@ in
       matchConfig.Name = "vlan${toString clientVlan}";
       linkConfig.RequiredForOnline = "no";
       networkConfig = { };
-    };
-
-    # Management: lan5 takes DHCP (host uplink / nebula underlay).
-    "10-lan5" = {
-      matchConfig.Name = "lan5";
-      linkConfig.RequiredForOnline = "yes";
-      networkConfig = {
-        DHCP = "ipv4";
-        LinkLocalAddressing = "no";
-      };
     };
   };
 

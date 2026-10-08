@@ -72,10 +72,18 @@ let
     let
       resolvedInventory = realizeInventory { inventoryInput = inventory; inherit hostName; };
       cpmLib = controlPlaneModelInput.libBySystem.${system};
-      inventoryExport = builtins.toFile "inventory.json" (builtins.toJSON resolvedInventory);
+      # Pass the resolved inventory attrset straight to the CPM.  It used to be
+      # serialised with `builtins.toFile` and passed as a store-path STRING; in
+      # pure evaluation (nix flake check) that string crosses the flake boundary
+      # into the CPM's `libBySystem` with its store context stripped, so
+      # `readFile` resolved the bare `<hash>-inventory.json` relative to CWD and
+      # failed with "path ... is not valid".  The CPM's `readValue` accepts a
+      # plain attrset and returns it unchanged, so no serialisation is needed.
+      # (`compileAndBuildFromPaths` still takes the *intent* by path, which is a
+      # real Nix path and keeps its context.)
       cpmBuilt = cpmLib.compileAndBuildFromPaths {
         inputPath = intentPath;
-        inventoryPath = inventoryExport;
+        inventoryPath = resolvedInventory;
       };
       cpmForRenderer = controlPlaneTransform cpmBuilt;
       artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmForRenderer);

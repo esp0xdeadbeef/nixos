@@ -39,7 +39,7 @@
 let
   ssidList = relativeRepo.sourcePath "library/01-general/network/ssids.txt";
   deriveSsid = pkgs.writeShellScript "derive-ssid" (
-    builtins.readFile (relativeRepo.sourcePath "library/01-general/network/wifi-ssid-derive.sh")
+    builtins.readFile (relativeRepo.sourceModule "library/01-general/network/wifi-ssid-derive.sh")
   );
 
   ctrl = "/run/ap";

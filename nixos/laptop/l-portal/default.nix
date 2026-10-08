@@ -7,10 +7,10 @@
 }:
 let
   hostName = builtins.baseNameOf (builtins.dirOf __curPos.file);
-  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
+  keyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/${host}.pub");
   # Public keys of the dedicated remote-builder identities for the hosts allowed
   # to offload builds to this builder (see profiles.nixos.nix.remote-builder-client).
-  remoteBuilderKeyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/remote-builder/${host}.pub");
+  remoteBuilderKeyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/remote-builder/${host}.pub");
 in
 {
   imports = [

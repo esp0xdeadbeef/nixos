@@ -1,7 +1,7 @@
 { config, lib, profiles, relativeRepo, ... }:
 
 let
-  dnsRuntime = import (relativeRepo.sourcePath "prod-network/testing/dns-runtime-addresses-cobalt.nix");
+  dnsRuntime = import (relativeRepo.sourceModule "prod-network/testing/dns-runtime-addresses-cobalt.nix");
   requesterValues = builtins.attrValues dnsRuntime.requesters;
   tangAllowedSubnets = map (r: r.clientIpv4) requesterValues ++ map (r: r.clientIpv6) requesterValues;
 in
