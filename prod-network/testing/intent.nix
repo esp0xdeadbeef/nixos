@@ -150,6 +150,19 @@ let
       ];
     }
 
+    # Ollama inference API (FS-180: ports belong to the service, not the
+    # relation).  Exposed cross-site over the garnet overlay to cobalt-svc.
+    {
+      name = "ollama";
+      match = [
+        {
+          proto = "tcp";
+          dports = [ 11434 ];
+          family = "any";
+        }
+      ];
+    }
+
     {
       name = "traceroute";
       match = [
@@ -335,6 +348,16 @@ in
           ipv4 = [ "192.168.3.12" ];
           ipv6 = [ "fd42:dead:beef:3::1337:e1ee:fbeb" ];
         }
+        # Ollama inference endpoint.  Intent names the host in its tenant;
+        # the concrete 192.168.3.11 address is inventory (FS-181).  The
+        # name must match the inventory endpoint key
+        # (`s-llm-inference-container`) so the provider endpoint resolves.
+        {
+          kind = "host";
+          name = "s-llm-inference-container";
+          tenant = "vlan3";
+          ipv4 = [ "192.168.3.11" ];
+        }
         {
           kind = "host";
           name = "vlan7-dns";
@@ -443,6 +466,51 @@ in
           name = "s-nebula-garnet";
           providers = [ "s-nebula-garnet" ];
           trafficType = "nebula-garnet";
+        }
+        # FS-190/FS-200: Ollama is a cross-site shared service in the vlan3
+        # access space.  The service carries its own port via the `ollama`
+        # traffic type; the relation only states who may reach it.  It is
+        # served by the s-llm-inference endpoint and is reachable from
+        # cobalt-svc over the garnet overlay (FS-460).
+        {
+          name = "s-llm-inference";
+          providers = [ "s-llm-inference-container" ];
+          trafficType = "ollama";
+          servicePolicy = {
+            requesterScopes = [{ kind = "tenant"; name = "cobalt-svc"; }];
+            responderScope = { kind = "host"; name = "s-llm-inference-container"; tenant = "vlan3"; };
+            serviceClass = "inference-api";
+            discovery = {
+              protocol = "none";
+              direction = "none";
+              advertisedServices = [ ];
+            };
+            payload = {
+              protocol = "ollama";
+              ports = [ 11434 ];
+              direction = "requester-to-responder";
+              returnBehavior = "established-only";
+            };
+            management = {
+              allowed = false;
+              boundary = "inference-host-local-only";
+            };
+            reverseInitiation = {
+              allowed = false;
+              boundary = "no-inference-initiated-client-paths";
+            };
+            deniedPaths = [
+              {
+                from = { kind = "tenant"; name = "vlan2"; };
+                to = { kind = "service"; name = "s-llm-inference"; };
+                reason = "vlan2-has-no-modeled-inference-relation";
+                negativeProbe = "vlan2-to-llm-inference-tcp11434";
+              }
+            ];
+            exposureClass = "cross-site";
+            authenticationBoundary = "ollama-api-unauthenticated";
+            cloudDependency = "none";
+          };
         }
         {
           name = "vlan2-gateway-icmp";
@@ -1305,6 +1373,25 @@ in
           action = "allow";
           returnBehavior = "one-way";
         }
+        # FS-460: cobalt-svc reaches the vlan3 Ollama service over the garnet
+        # overlay.  The remote side of the path is the overlay ingress facing
+        # the s-llm-inference service; the payload port lives on the service
+        # (FS-180).
+        {
+          id = "allow-garnet-to-s-llm-inference";
+          priority = 155;
+          from = {
+            kind = "external";
+            name = "garnet";
+          };
+          to = {
+            kind = "service";
+            name = "s-llm-inference";
+          };
+          trafficType = "ollama";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
       ];
     };
 
@@ -1976,6 +2063,9 @@ in
           selects = [
             "access-svc"
             "access-dmz"
+            # FS-460: the garnet overlay also carries cobalt-svc -> ollama in
+            # the vlan3 access space, so the overlay core must select it.
+            "access-vlan3"
           ];
         };
 
@@ -2011,6 +2101,13 @@ in
               kind = "tenant";
               name = "vlan3";
             }
+          ];
+          # FS-322: vlan3 owns 192.168.3.0/24; it offers that prefix so the
+          # garnet overlay peer site can route toward it.  The offer is
+          # reachability only; payload still needs the s-llm-inference
+          # relation (FS-170/FS-180).
+          offers = [
+            "192.168.3.0/24"
           ];
         };
 
@@ -2193,6 +2290,22 @@ in
           underlayAccess = {
             kind = "tenant";
             name = "neon-iot-srv";
+          };
+          # URS (Reachability, Routing, and Overlays): overlay transport models
+          # imported and exported prefixes. Both address families are explicit.
+          # exported = prefixes this site offers on the overlay (the offering
+          # scopes own them, FS-322); imported = the peer's prefixes, which this
+          # site routes through the overlay so a single-site compile is not
+          # silently empty.
+          prefixes = {
+            exported = {
+              ipv4 = [ "192.168.3.0/24" ];
+              ipv6 = [ "fd42:dead:beef:3::/64" ];
+            };
+            imported = {
+              ipv4 = [ "10.2.20.0/24" ];
+              ipv6 = [ "fd42:dead:beef:220::/64" ];
+            };
           };
         }
       ];
@@ -3963,6 +4076,19 @@ in
           underlayAccess = {
             kind = "tenant";
             name = "cobalt-iot-srv";
+          };
+          # Mirror of the neon garnet overlay (URS: overlay transport models
+          # imported and exported prefixes). cobalt-svc's prefix is exported;
+          # neon's vlan3 prefix is imported so cobalt routes to the LLM server.
+          prefixes = {
+            exported = {
+              ipv4 = [ "10.2.20.0/24" ];
+              ipv6 = [ "fd42:dead:beef:220::/64" ];
+            };
+            imported = {
+              ipv4 = [ "192.168.3.0/24" ];
+              ipv6 = [ "fd42:dead:beef:3::/64" ];
+            };
           };
         }
       ];
