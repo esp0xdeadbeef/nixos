@@ -206,6 +206,23 @@ Conventional commits: `type(scope): description`
 - Format touched Nix files with `nix fmt` (runs nixpkgs-fmt on all .nix files, or on explicit file args).
 - Run `nix flake check --all-systems` after meaningful Nix changes.
 
+### Failing tests are never "pre-existing, not mine"
+
+When a test suite in any repo reports failures, they are yours to resolve. Do
+not triage them away as pre-existing, pinned, environmental, or out of scope.
+
+- Establish the delta anyway (stash your change, re-run, compare) so you know
+exactly which failures your change introduced — but that is for attribution,
+not for dismissal. The baseline failures still get fixed.
+- Fix each failure **from within the context of the specific SMS / design
+document it is testing**. The test encodes a contract; find the owning
+SMS/SDS/HDS/FS item and make the code satisfy it.
+- If the documentation the test asserts is stale, no longer relevant, or
+contradicts the current URS/FS, **update the documentation** (and the test)
+to the current contract — do not bend the code to an obsolete spec, and do not
+delete or weaken the test to make the suite green.
+- A test that passes only because it stopped asserting is not fixed.
+
 Do not run `nixos-rebuild switch` or other apply/deploy commands
 unless the user explicitly asks for that.
 
