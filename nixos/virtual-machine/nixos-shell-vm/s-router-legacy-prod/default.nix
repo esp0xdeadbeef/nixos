@@ -8,8 +8,12 @@
 }:
 let
   hostName = "s-router-legacy-prod";
-  modelSource = relativeRepo.sourcePath "prod-network/current";
-  deviceDir = relativeRepo.sourcePath "prod-network/current/secrets/devices";
+  modelSource = relativeRepo.sourceModule "prod-network/current";
+  # Eval-time directory listing (readDir): needs a real path (sourceModule).
+  deviceDir = relativeRepo.sourceModule "prod-network/current/secrets/devices";
+  # Build-time sops inputs: keep the fileset snapshot (sourcePath) so the
+  # generated sops manifest records the same store paths as before.
+  deviceSopsDir = relativeRepo.sourcePath "prod-network/current/secrets/devices";
   deviceIds =
     map
       (name: lib.removeSuffix ".sops.yaml" name)
@@ -44,7 +48,7 @@ in
     outputs.nixosModules.containerNetworkDefaults
 
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
-    "${modelSource}/runtime-secrets.nix"
+    (modelSource + "/runtime-secrets.nix")
 
     (import ./renderers.nix {
       inherit
@@ -78,7 +82,7 @@ in
       (id: {
         name = "legacy-device-${id}";
         value = {
-          sopsFile = "${deviceDir}/${id}.sops.yaml";
+          sopsFile = "${deviceSopsDir}/${id}.sops.yaml";
           key = "mac";
           format = "yaml";
           path = "/run/secrets/devices/${id}";

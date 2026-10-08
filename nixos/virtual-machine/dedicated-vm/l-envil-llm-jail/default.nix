@@ -13,7 +13,7 @@
 let
   hostName = builtins.baseNameOf (builtins.dirOf __curPos.file);
   codexUser = "deadbeef";
-  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
+  keyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/${host}.pub");
 in
 {
   imports = [

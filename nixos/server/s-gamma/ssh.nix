@@ -1,7 +1,7 @@
 { lib, relativeRepo, ... }:
 
 let
-  keyFor = host: lib.fileContents (relativeRepo.sourcePath "ssh-keys/deadbeef/${host}.pub");
+  keyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/${host}.pub");
 in
 {
   users.users.deadbeef.openssh.authorizedKeys.keys = [
