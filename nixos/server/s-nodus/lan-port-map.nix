@@ -71,13 +71,31 @@ let
   # it here.
   ledOnlyPhyPorts = [ 1 ];
 
-  # MxL86252 copper jacks (vendor: port@0..3).  No cobalt role yet -> `unused`.
+  # MxL86252 copper jacks.
+  #
+  # [mainline] mainline's mxl862xx DSA driver uses its OWN port numbering, which
+  # differs from the vendor/OpenWrt binding: port 0 is the *microcontroller*
+  # port (normally disabled), ports 1..8 are the PHYs, and the SerDes are
+  # ports 9..16 (MXL862XX_FIRST_SERDES_PORT = 9, 4 slots; port 9 = SerDes slot 0,
+  # port 13 = slot 1).  The vendor DTS numbers the copper jacks port@0..3 (so
+  # mainline treats the vendor's port@0 as the microcontroller port and its
+  # SPTAG setup fails with -E22 -> mxl_lan0 never appears), and puts the CPU on
+  # reg=8 / the SFP on reg=12 (mainline expects those at port 9 / port 13).
+  #
+  #   DSA port = mainline port index (node name + reg)
+  #   phyAddr  = MDIO address of the port's PHY (vendor: 0..3)
+  #   label    = netdev name
   mxlPorts = [
-    { dtsPort = 0; reg = 0; label = "mxl_lan0"; role = "unused"; }
-    { dtsPort = 1; reg = 1; label = "mxl_lan1"; role = "unused"; }
-    { dtsPort = 2; reg = 2; label = "mxl_lan2"; role = "unused"; }
-    { dtsPort = 3; reg = 3; label = "mxl_lan3"; role = "unused"; }
+    { port = 1; phyAddr = 0; label = "mxl_lan0"; role = "unused"; }
+    { port = 2; phyAddr = 1; label = "mxl_lan1"; role = "unused"; }
+    { port = 3; phyAddr = 2; label = "mxl_lan2"; role = "unused"; }
+    { port = 4; phyAddr = 3; label = "mxl_lan3"; role = "unused"; }
   ];
+
+  # MxL SerDes ports (mainline numbering): port 9 = CPU (USXGMII0 -> gmac2),
+  # port 13 = USXGMII1 -> the sfp1 cage.
+  mxlCpuPort = 9;
+  mxlSfpPort = 13;
 
   # SoC pinctrl group names for the switch-PHY LEDs (vendor mt7988a.dtsi).
   ledPinGroup = n: "gbe${toString n}_led0_pins";
@@ -99,16 +117,16 @@ let
           #size-cells = <0>;
 
     ${lib.concatMapStrings (p: ''
-          port@${toString p.dtsPort} {
-            reg = <${toString p.reg}>;
+          port@${toString p.port} {
+            reg = <${toString p.port}>;
             label = "${p.label}";
-            phy-handle = <&switchphy${toString p.dtsPort}>;
+            phy-handle = <&switchphy${toString p.phyAddr}>;
             phy-mode = "internal";
             status = "okay";
           };
     '') mxlPorts}
-          port@5 {
-            reg = <8>;
+          port@${toString mxlCpuPort} {
+            reg = <${toString mxlCpuPort}>;
             label = "cpu";
             phy-mode = "usxgmii";
             ethernet = <&gmac2>;
@@ -120,11 +138,19 @@ let
             };
           };
 
-          port@6 {
-            reg = <12>;
+          port@${toString mxlSfpPort} {
+            reg = <${toString mxlSfpPort}>;
             label = "mxl_lan5";
-            phy-mode = "10gbase-r";
-            phy-connection-type = "10gbase-r";
+            /* [mainline] the vendor DTS uses phy-mode = "10gbase-r" +
+               managed = "in-band-status", but mainline's mxl862xx PCS
+               reports LINK_INBAND_DISABLE for PHY_INTERFACE_MODE_10GBASER,
+               which makes DSA's in-band validation fail (-EINVAL).  USXGMII
+               reports LINK_INBAND_ENABLE, so use usxgmii for the SFP SerDes
+               (also what the CPU port side of the XPCS uses).  DSA requires
+               one of phy-handle / fixed-link / managed on a user port; the
+               SFP has no PHY, so managed = "in-band-status" is the
+               appropriate one. */
+            phy-mode = "usxgmii";
             managed = "in-band-status";
             sfp = <&sfp1>;
             status = "okay";
@@ -136,8 +162,8 @@ let
           #size-cells = <0>;
 
     ${lib.concatMapStrings (p: ''
-          switchphy${toString p.dtsPort}: switchphy@${toString p.dtsPort} {
-            reg = <${toString p.dtsPort}>;
+          switchphy${toString p.phyAddr}: switchphy@${toString p.phyAddr} {
+            reg = <${toString p.phyAddr}>;
           };
     '') mxlPorts}
         };
