@@ -53,11 +53,12 @@ let
         };
       };
 
-  # The internal switch map entries plus the management port (which is not in
-  # the generated overlay -- mainline already labels internal port 0 `lan5` --
-  # but must still get a networkd rule).
+  # Every cobalt-owned netdev gets a networkd rule: the management port
+  # (`lan5`, internal switch port 0 -- mainline already labels it, so it is not
+  # in the generated overlay) plus the MxL 2.5G jacks that carry the trunk and
+  # access roles.  `portMap.ports` is internalPorts ++ mxlPorts.
   managedPorts =
-    portMap.internalPorts
+    portMap.ports
     ++ [{ label = portMap.mgmtLabel; role = "management"; }];
 
   lanNetworks = lib.listToAttrs (map mkPortNetwork managedPorts);
