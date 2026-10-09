@@ -11,6 +11,13 @@
     profiles.nixos.llm-clients.agents
     profiles.nixos.llm-clients.claude-deepseek
     profiles.nixos.impermanence.default
+
+    # Join the nebula overlay (100.64.0.19). The mesh secrets -- the shared CA
+    # and lighthouse endpoints plus this host's own cert (signed by the
+    # mesh-ca on s-nebula) -- live in secrets/s-agents.yaml, which is already
+    # this host's sops.defaultSopsFile, so the profile's sops.secrets
+    # declarations pick it up without a per-key sopsFile override.
+    profiles.nixos.network.nebula-mesh
   ];
 
   sops.defaultSopsFile = relativeRepo.sourcePath "secrets/s-agents.yaml";
