@@ -52,23 +52,19 @@ let
   mgmtLabel = "lan5";
 
   # The 1G jacks/connectors driven by the MT7988 internal switch that carry a
-  # cobalt role.  Port 0 (lan5) is management and is not listed here.
-  #   switchPort = switch port index (port@N / ethernet-phy@N on &switch)
-  #   label      = the netdev name the kernel gives it (IFNAMSIZ <= 15)
-  #   role       = how cobalt-bridges.nix wires it
+  # Internal switch jacks on THIS board.
   #
-  # Port 2 is the second 1G RJ45 LAN jack; port 3 is the 1G FPC connector
-  # (ribbon header -- it needs an adapter board to become an RJ45).
-  internalPorts = [
-    { switchPort = 2; label = "lan2"; role = "trunk"; }
-    { switchPort = 3; label = "lan3"; role = "access"; }
-  ];
+  # The board's own ID EEPROM reads `R4PRO8X` and its jack population is the
+  # 8X one: ONE 1G RJ45 jack (internal switch port 0 -> `lan5`), four 2.5G RJ45
+  # jacks (MxL86252), two SFP+ cages and one combo.  Internal switch ports 1..3
+  # have NO connectors here, which is exactly what mainline's board dtsi means by
+  # "R4Pro has only port 0 connected".  We therefore enable NO extra internal
+  # ports: `lan5` (port 0) is management, and the cobalt trunk/access roles go
+  # on the real 2.5G jacks (see mxlPorts below).
+  internalPorts = [ ];
 
-  # Internal switch port 1 has NO connector on the 4E.  The vendor 4E DTS
-  # deletes port@1 and keeps only its PHY/LED, so the LED next to the empty
-  # footprint can blink while no bogus netdev appears.  The mainline board dtsi
-  # already leaves gsw_port1 `status = "disabled"`, so we simply never enable
-  # it here.
+  # Internal switch port 1 has a PHY/LED but no jack; keep the LED alive and
+  # leave the port disabled (mainline's board dtsi already does).
   ledOnlyPhyPorts = [ 1 ];
 
   # MxL86252 copper jacks.
@@ -85,9 +81,14 @@ let
   #   DSA port = mainline port index (node name + reg)
   #   phyAddr  = MDIO address of the port's PHY (vendor: 0..3)
   #   label    = netdev name
+  #   role     = how cobalt-bridges.nix wires it
+  #
+  # The four 2.5G jacks are the real cobalt-facing ports on this board: the
+  # trunk (tagged VLAN 30) on mxl_lan0 and the untagged access port on
+  # mxl_lan1; mxl_lan2/mxl_lan3 are spare.
   mxlPorts = [
-    { port = 1; phyAddr = 0; label = "mxl_lan0"; role = "unused"; }
-    { port = 2; phyAddr = 1; label = "mxl_lan1"; role = "unused"; }
+    { port = 1; phyAddr = 0; label = "mxl_lan0"; role = "trunk"; }
+    { port = 2; phyAddr = 1; label = "mxl_lan1"; role = "access"; }
     { port = 3; phyAddr = 2; label = "mxl_lan2"; role = "unused"; }
     { port = 4; phyAddr = 3; label = "mxl_lan3"; role = "unused"; }
   ];
