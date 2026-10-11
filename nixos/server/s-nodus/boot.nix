@@ -31,12 +31,10 @@ in
 
   config = lib.mkIf cfg.enable {
     # --- kernel ---------------------------------------------------------
-    # linuxPackages_latest on nixpkgs-unstable carries the official
-    # mt7988a-bananapi-bpi-r4-pro-4e DTS (landed in Linux 6.19).  Board core
-    # (MT7988A, mt7530 1G switch, 2.5G PHY, SD, I2C, RTC) is upstream; the
-    # MaxLinear 10G switch, AS21010 10G PHYs and SFP+ muxes are not and stay
-    # dark -- intentionally out of scope.
-    boot.kernelPackages = lib.mkForce pkgs.linuxPackages_latest;
+    # The board kernel (6.18 + the OpenWrt MT7988 net delta) is defined in
+    # ./kernel.nix, which owns boot.kernelPackages.  Mainline linuxPackages_latest
+    # has no USXGMII/SerDes support, so the 10G switch CPU conduit and the SFP+
+    # cages could never come up there.
 
     # The ethernet driver and the DSA switch driver MUST be present in the
     # kernel.  Without them the board boots with no netdev at all: no `end0`,
