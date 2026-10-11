@@ -409,6 +409,70 @@
 			phandle = <0x02>;
 		};
 
+		/*
+		 * SGMII / USXGMII SerDes PCS blocks.  The MACs bind these via
+		 * pcs-handle; without them mtk_eth_soc logs
+		 *   eth1: couldn't find a PCS for 10gbase-r
+		 * and no WAN / MxL-CPU link comes up.  Node text mirrors the
+		 * vendor / ly4096x board DTB.  The resets reference the
+		 * TOPRGU (watchdog) reset controller (our phandle 0x21), NOT
+		 * ethwarp: TOPRGU indices are SGMII0=1, SGMII1=2, XFI0=0x0c,
+		 * XFI1=0x0d (MT7988_TOPRGU_SW_RST_NUM=24).
+		 */
+		syscon@10060000 {
+			compatible = "mediatek,mt7988-sgmiisys", "mediatek,mt7988-sgmiisys0", "syscon", "simple-mfd";
+			reg = <0x00 0x10060000 0x00 0x1000>;
+			resets = <0x21 0x01>;
+			#clock-cells = <0x01>;
+			phandle = <0x80>;
+
+			pcs {
+				compatible = "mediatek,mt7988-sgmii";
+				clocks = <0x03 0x43 0x80 0x00 0x80 0x01>;
+				clock-names = "sgmii_sel", "sgmii_tx", "sgmii_rx";
+				phys = <0x5e>;
+				#pcs-cells = <0x00>;
+				phandle = <0x81>;
+			};
+		};
+
+		syscon@10070000 {
+			compatible = "mediatek,mt7988-sgmiisys", "mediatek,mt7988-sgmiisys1", "syscon", "simple-mfd";
+			reg = <0x00 0x10070000 0x00 0x1000>;
+			resets = <0x21 0x02>;
+			#clock-cells = <0x01>;
+			phandle = <0x82>;
+
+			pcs {
+				compatible = "mediatek,mt7988-sgmii";
+				clocks = <0x03 0x45 0x82 0x00 0x82 0x01>;
+				clock-names = "sgmii_sel", "sgmii_tx", "sgmii_rx";
+				phys = <0x5f>;
+				#pcs-cells = <0x00>;
+				phandle = <0x83>;
+			};
+		};
+
+		pcs@10080000 {
+			compatible = "mediatek,mt7988-usxgmiisys";
+			reg = <0x00 0x10080000 0x00 0x1000>;
+			resets = <0x21 0x0c>;
+			clocks = <0x03 0x41>;
+			phys = <0x5e>;
+			#pcs-cells = <0x00>;
+			phandle = <0x84>;
+		};
+
+		pcs@10081000 {
+			compatible = "mediatek,mt7988-usxgmiisys";
+			reg = <0x00 0x10081000 0x00 0x1000>;
+			resets = <0x21 0x0d>;
+			clocks = <0x03 0x42>;
+			phys = <0x5f>;
+			#pcs-cells = <0x00>;
+			phandle = <0x85>;
+		};
+
 		serial@11000000 {
 			compatible = "mediatek,mt7988-uart", "mediatek,mt6577-uart";
 			reg = <0x00 0x11000000 0x00 0x100>;
@@ -1198,7 +1262,16 @@
 			mac@1 {
 				compatible = "mediatek,eth-mac";
 				reg = <0x01>;
-				status = "disabled";
+				/* WAN = USXGMII1 -> the sfp2 cage (vendor "-sfp" board
+				   overlay).  Vendor-exact WAN binding: in-band status +
+				   10gbase-r + sfp2.  The vendor ships a "-iphy" overlay
+				   for the 2.5G RJ45 WAN instead. */
+				status = "okay";
+				managed = "in-band-status";
+				phy-mode = "10gbase-r";
+				phy-connection-type = "10gbase-r";
+				pcs-handle = <0x81 0x85>;
+				sfp = <0x78>;
 				phandle = <0x6e>;
 			};
 
@@ -1208,6 +1281,7 @@
 				status = "okay";
 				phy-mode = "10gbase-r";
 				phy-connection-type = "10gbase-r";
+				pcs-handle = <0x83 0x84>;
 				phandle = <0x35>;
 
 				fixed-link {
