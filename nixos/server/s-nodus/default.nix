@@ -59,6 +59,7 @@
     profiles.nixos.nix.remote-builder-client
 
     ./boot.nix
+    ./kernel.nix
     ./dtb.nix
     ./network.nix
     ./cobalt-bridges.nix
@@ -354,6 +355,18 @@
     "phy-mtk-pcie"
     "phy-mtk-xsphy"
   ];
+
+  # Wi-Fi: the on-board MT7996 (BE14, Wi-Fi 7) is a PCIe card in an M.2/miniPCIe
+  # slot (PCIe 0000:01:00.0 primary + 0001:01:00.0 secondary).  It needs the
+  # linux-firmware mediatek/mt7996/*.bin blobs; without them the driver loads but
+  # probe fails with:
+  #   mt7996e 0000:01:00.0: Direct firmware load for
+  #   mediatek/mt7996/mt7996_rom_patch_233.bin failed with error -2
+  # enableRedistributableFirmware pulls in pkgs.linux-firmware (which carries
+  # mediatek/mt7996/) and the regulatory database.  The slot POWER is a hardware
+  # dipswitch, not software (a board DIP in the wrong position left the slots at
+  # "detect.quiet" with no card enumerated).
+  hardware.enableRedistributableFirmware = true;
 
   # Allow an unauthenticated shell in the stage-1 emergency mode.
   #
