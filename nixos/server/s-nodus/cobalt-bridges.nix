@@ -120,6 +120,16 @@ in
       networkConfig = { };
     };
 
+    # The SFP+ WAN MAC (eth1) is the bridge member the cobalt VM's WAN NIC
+    # attaches to.  The VM terminates VLAN 300 on it itself (eth1.300), so the
+    # host only hands over the raw L2 port -- same shape as the vendor OpenWrt
+    # br-wan = eth1.  eth1 must not be addresed by the host.
+    "10-eth1" = {
+      matchConfig.Name = "eth1";
+      linkConfig.RequiredForOnline = "no";
+      networkConfig.Bridge = "br-cobalt-wan";
+    };
+
     # VLAN child off the trunk -> untagged access bridge.
     "20-cobalt-lan.${toString clientVlan}" = {
       matchConfig.Name = "cobalt-lan.${toString clientVlan}";
