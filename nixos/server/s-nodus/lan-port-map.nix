@@ -51,20 +51,21 @@ let
   # mainline board dtsi (the vendor/OpenWrt name for the same jack is `lan0`).
   mgmtLabel = "lan5";
 
-  # The 1G jacks/connectors driven by the MT7988 internal switch that carry a
-  # Internal switch jacks on THIS board.
+  # Internal switch jacks (1G).  Port 0 (`lan5`) is management; ports 2 and 3
+  # exist as real jacks too (verified: the vendor OpenWrt links internal `lan2`
+  # at 1G), but the cobalt trunk and access roles are carried on the 2.5G MxL
+  # jacks (see mxlPorts), so these are left as plain unbridged ports.
   #
-  # The board's own ID EEPROM reads `R4PRO8X` and its jack population is the
-  # 8X one: ONE 1G RJ45 jack (internal switch port 0 -> `lan5`), four 2.5G RJ45
-  # jacks (MxL86252), two SFP+ cages and one combo.  Internal switch ports 1..3
-  # have NO connectors here, which is exactly what mainline's board dtsi means by
-  # "R4Pro has only port 0 connected".  We therefore enable NO extra internal
-  # ports: `lan5` (port 0) is management, and the cobalt trunk/access roles go
-  # on the real 2.5G jacks (see mxlPorts below).
-  internalPorts = [ ];
+  #   switchPort = switch port index (port@N / ethernet-phy@N on &switch)
+  #   label      = the netdev name the kernel gives it (IFNAMSIZ <= 15)
+  #   role       = how cobalt-bridges.nix wires it
+  internalPorts = [
+    { switchPort = 2; label = "lan2"; role = "unused"; }
+    { switchPort = 3; label = "lan3"; role = "unused"; }
+  ];
 
-  # Internal switch port 1 has a PHY/LED but no jack; keep the LED alive and
-  # leave the port disabled (mainline's board dtsi already does).
+  # Internal switch port 1 has a PHY/LED but no connector; keep the LED alive
+  # and leave the port disabled (mainline's board dtsi already does).
   ledOnlyPhyPorts = [ 1 ];
 
   # MxL86252 copper jacks.
@@ -83,9 +84,9 @@ let
   #   label    = netdev name
   #   role     = how cobalt-bridges.nix wires it
   #
-  # The four 2.5G jacks are the real cobalt-facing ports on this board: the
-  # trunk (tagged VLAN 30) on mxl_lan0 and the untagged access port on
-  # mxl_lan1; mxl_lan2/mxl_lan3 are spare.
+  # The four 2.5G jacks are the real cobalt-facing ports: the trunk (tagged
+  # VLAN 30) is on mxl_lan0 (verified on the wire: it carries tagged VLANs
+  # 20/30/31/50/51/90) and the untagged access port on mxl_lan1.
   mxlPorts = [
     { port = 1; phyAddr = 0; label = "mxl_lan0"; role = "trunk"; }
     { port = 2; phyAddr = 1; label = "mxl_lan1"; role = "access"; }
