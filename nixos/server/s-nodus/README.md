@@ -246,6 +246,43 @@ the bridge capture is empty too, nothing is arriving from the switch: check
 that the switch port is a matching 802.1Q trunk (ports 1-2 carry VLAN 30
 tagged; `prod-network/cobalt/switch-vlan.toml`) and that lan1 has carrier.
 
+## Wi-Fi (`wifi-ap.nix`)
+
+The on-board MT7996 (Wi-Fi 7, tri-band) runs hostapd **on the host**, reusing
+the cobalt AP-VM implementation (`wifi-ap.nix` + `wifi-ssids.nix`) rather than
+passing the radio into a VM (an on-die PCIe device cannot be passed through the
+way the USB AP dongles are). It advertises every cobalt intent plane on every
+band that can carry it:
+
+| plane                | 2.4 GHz | 5 GHz | 6 GHz |
+|----------------------|:-------:|:-----:|:-----:|
+| `cobalt-clients`     |   yes   |  yes  |  yes  |
+| `cobalt-clients-vpn` |   yes   |  yes  |  yes  |
+| `cobalt-mgmt`        |   yes   |  yes  |   -   |
+| `cobalt-unlock`      |   yes   |  yes  |   -   |
+
+The two WPA-PSK planes are 2.4/5 GHz only: 6 GHz forbids pre-RSNA security, so
+only the SAE planes can be advertised there. Each plane's BSS bridges onto the
+same tenant the wired ports use (`vlan30` / VLAN 31 / 10 / 90 off the
+`br-cobalt-lan` trunk), so a Wi-Fi client lands on the same `10.2.30.0/24` as a
+wired one. SSIDs are the site-wide derived ones from `secrets/cobalt-wifi`.
+
+Debugging:
+
+```sh
+systemctl status 'ap-wlp*'                # one unit per BSS
+journalctl -u ap-wlp1s0.service -n50      # hostapd log for one BSS
+cat /run/ap/wlp1s0.conf                   # generated hostapd config
+cat /run/ap/ssids.env                     # derived SSIDs (shared across bands)
+```
+
+Gotchas baked into the builder: the MT7996 exposes a single netdev, so each
+band's base AP interface (`wlp1s-5`, `wlp1s-6`) is created on `phy0` first; all
+VAPs otherwise share the base MAC and the kernel refuses to bring up more than
+one (`Name not unique on network`), so each VAP gets a distinct
+locally-administered MAC. If `ap-conf-*` fails with an empty SSID, `/run/ap`
+was cleared — restart `ap-ssid-*` to regenerate `ssids.env`.
+
 ## TODOs / hardening
 
 - [ ] Replace `initialPassword` with a proper credential (sops/keys).
