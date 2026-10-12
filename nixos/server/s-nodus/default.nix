@@ -63,6 +63,8 @@
     ./dtb.nix
     ./network.nix
     ./cobalt-bridges.nix
+    # Host-level Wi-Fi AP (MT7996), reusing the cobalt AP-VM implementation.
+    ./wifi-ap.nix
     ./fit.nix
 
     # Optional machine-local overrides.  The board keeps its own copy at
