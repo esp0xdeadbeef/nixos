@@ -134,8 +134,18 @@ in
   # wan -> br-cobalt-wan).  Setting it here as well would duplicate the NICs.
   virtualisation = {
     cores = lib.mkForce 4;
+    # 2 GiB is the guest's *maximum*: virtio-balloon (below) lets the host
+    # reclaim the pages the guest is not using, so the guest can grow up to 2 GiB
+    # but only occupies what it needs.  Without ballooning a fixed 2 GiB left the
+    # 4 GiB host thrashing during forwarding.
     memorySize = lib.mkForce (1024 * 2);
     diskSize = lib.mkForce (8 * 1024);
+    # virtio-balloon with free-page-reporting: the guest reports freed pages and
+    # the host gets that RAM back automatically, so no fixed ballooning target
+    # has to be guessed -- the guest shrinks/grows with its real working set.
+    qemu.options = [
+      "-device virtio-balloon-pci,free-page-reporting=on"
+    ];
   };
 
   system.stateVersion = lib.mkForce "26.05";
