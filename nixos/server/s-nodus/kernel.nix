@@ -75,7 +75,6 @@ in
         DAMON_RECLAIM = lib.mkForce no;
         DAMON_LRU_SORT = lib.mkForce no;
         DAMON_STAT = lib.mkForce no;
-        DAMON_STAT_ENABLED_DEFAULT = lib.mkForce no;
       });
     })
   ));
