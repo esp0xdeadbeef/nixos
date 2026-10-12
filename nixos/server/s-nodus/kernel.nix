@@ -66,6 +66,17 @@ in
         MAXLINEAR_GPHY = module;
         # SFP cage support (sfp1 = LAN, sfp2 = WAN)
         SFP = module;
+        # DAMON reclaim/stat are enabled by default in nixpkgs' config and run
+        # kdamond continuously (~20-25% of a core here) scanning and reclaiming
+        # memory.  On this 4-core board that CPU is better spent forwarding, and
+        # DAMON-reclaim competes with kswapd under the VM's memory pressure.
+        DAMON = no;
+        DAMON_RECLAIM = no;
+        DAMON_STAT_ENABLED_DEFAULT = no;
+        DAMON_VADDR = no;
+        DAMON_PADDR = no;
+        DAMON_SYSFS = no;
+        DAMON_LRU_SORT = no;
       });
     })
   ));
