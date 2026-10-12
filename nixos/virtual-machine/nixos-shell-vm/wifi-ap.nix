@@ -125,11 +125,12 @@ let
   # order, otherwise the radio would guess an SSID. Fail closed instead.
   missingDerive = lib.filter (p: lib.hasPrefix "derive:" p.ssid && !(lib.elem p.plane deriveOrder)) planes;
 
-  # Derive the served planes' SSIDs in the shared cross-radio order, so a radio
-  # only derives what it carries and every radio still agrees on shared planes.
-  deriveLines = lib.concatMapStrings
+  # Derive each served plane's SSID purely from seed:plane: the derivation is a
+  # pure function of seed:plane, so every band computes the same SSID for a
+  # plane and no shared runtime state is needed.
+  deriveLinesPure = lib.concatMapStrings
     (plane: ''
-      ssid_${varName plane}=$(${deriveSsid} "$seed" ${plane} ${ssidList} "$used")
+      ssid_${varName plane}=$(${deriveSsid} "$seed" ${plane} ${ssidList} /dev/null)
     '')
     (lib.filter (p: lib.elem p servedPlanes) deriveOrder);
 
@@ -157,13 +158,16 @@ let
     mkdir -p /run/ap
     YQ=${pkgs.yq-go}/bin/yq
     SEC=/run/secrets/cobalt-wifi
+    seed=$("$YQ" -r '.seed' "$SEC")
 
-    # SSIDs are derived once by ap-ssid-*.service into a shared file so every
-    # radio agrees on the SSID for a given plane.  Deriving per radio would let
-    # concurrent ap-conf units race on the collision-avoidance list and end up
-    # with different SSIDs on different bands for the same plane.  The file is a
-    # hard requirement (ap-ssid-*.service is ordered and pulled in before us).
-    . /run/ap/ssids.env
+    # SSIDs are a pure function of seed:plane, so every radio derives the same
+    # SSID for a given plane without sharing any runtime state.  (The derivation
+    # is collision-free for the cobalt plane set; passing /dev/null as the
+    # used-list disables the cross-plane probing that would otherwise make the
+    # result depend on evaluation order and diverge between bands.)
+    ${deriveLinesPure}
+    # Fixed (non-derived) SSIDs.
+    ${secretSsidLines}
 
     # Passphrases.
     ${pskLines}
@@ -258,64 +262,11 @@ assert lib.assertMsg (missingDerive == [ ])
   "wifi-ap: planes missing from deriveOrder: ${toString (map (p: p.plane) missingDerive)}";
 {
   systemd.services = {
-    # Derive the plane SSIDs once, into /run/ap/ssids.env, so every radio's
-    # hostapd config uses the same SSID for a given plane.  The builder is
-    # instantiated once per radio, so this unit exists per radio; they all write
-    # the same file and the first to run wins (the rest no-op), which keeps the
-    # SSID<->plane mapping identical across bands.
-    "ap-ssid-${radio.iface}" = {
-      description = "Derive the shared AP SSIDs (${radio.iface})";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "sops-install-secrets.service" ];
-      requires = [ "sops-install-secrets.service" ];
-      path = [
-        pkgs.coreutils
-        pkgs.gawk
-        pkgs.gnugrep
-        pkgs.util-linux
-        pkgs.yq-go
-      ];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-      };
-      script = ''
-        set -euo pipefail
-        mkdir -p /run/ap
-        env=/run/ap/ssids.env
-        lock=/run/ap/ssids.lock
-        # One radio derives and the rest wait, so the SSID<->plane mapping is
-        # computed exactly once and every band reads the same values.
-        exec 9>"$lock"
-        flock 9
-        [ -s "$env" ] && exit 0
-        YQ=${pkgs.yq-go}/bin/yq
-        SEC=/run/secrets/cobalt-wifi
-        seed=$("$YQ" -r '.seed' "$SEC")
-        used=/run/ap/used-ssids
-        rm -f "$used"
-        tmp=$(mktemp /run/ap/ssids.XXXXXX)
-        ${lib.concatMapStrings
-          (plane: ''
-            printf 'ssid_${varName plane}=%q\n' "$(${deriveSsid} "$seed" ${plane} ${ssidList} "$used")" >> "$tmp"
-          '')
-          deriveOrder}
-        ${lib.concatMapStrings
-          (p:
-            lib.optionalString (lib.hasPrefix "secret:" p.ssid) ''
-              printf 'ssid_${varName p.plane}=%q\n' "$("$YQ" -r '.${lib.removePrefix "secret:" p.ssid}.ssid' "$SEC")" >> "$tmp"
-            '')
-          planes}
-        chmod 600 "$tmp"
-        mv "$tmp" "$env"
-      '';
-    };
-
     "ap-conf-${radio.iface}" = {
       description = "Generate hostapd AP configs for ${radio.iface}";
       wantedBy = [ "multi-user.target" ];
-      after = [ "ap-vap-${radio.iface}.service" "ap-ssid-${radio.iface}.service" "sops-install-secrets.service" ];
-      requires = [ "ap-vap-${radio.iface}.service" "ap-ssid-${radio.iface}.service" ];
+      after = [ "ap-vap-${radio.iface}.service" "sops-install-secrets.service" ];
+      requires = [ "ap-vap-${radio.iface}.service" ];
       path = [
         pkgs.coreutils
         pkgs.gawk

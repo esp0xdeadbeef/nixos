@@ -81,6 +81,8 @@ in
   systemd.services.ap-vap-extra = {
     description = "Create the MT7996 per-band AP base interfaces";
     wantedBy = [ "multi-user.target" ];
+    after = [ "ap-planes.service" ];
+    requires = [ "ap-planes.service" ];
     before = [ "ap-vap-wlp1s0.service" "ap-vap-wlp1s-5.service" "ap-vap-wlp1s-6.service" ];
     serviceConfig = {
       Type = "oneshot";
@@ -108,62 +110,48 @@ in
   };
 
   # Host-side trunk VLAN children + plane bridges the AP bridges into.
-  # VLAN 30 is already terminated as `vlan30` by cobalt-bridges.nix, so the
-  # ap-clients plane reuses it and we only create the other planes.
-  systemd.network.netdevs = {
-    "21-cobalt-lan.10" = {
-      netdevConfig = { Name = "cobalt-lan.10"; Kind = "vlan"; };
-      vlanConfig.Id = 10;
+  #
+  # These are created by a systemd oneshot running `ip`, NOT by
+  # systemd-networkd netdevs: networkd does not reliably create a bridge plus
+  # the VLAN children enslaved to it in a single pass, so on some boots
+  # cobalt-lan.{10,31,90} and the ap-* bridges never come up -- the bridges then
+  # stay NO-CARRIER and every BSS whose preStart waits for `bridge state UP`
+  # fails to start (the whole 2.4/5 GHz AP silently disappears).  Creating them
+  # explicitly is deterministic and orderable.
+  #
+  # VLAN 30 already exists as `vlan30` (cobalt-bridges.nix), so the clients
+  # plane reuses it; only the other three planes are built here.
+  systemd.services.ap-planes = {
+    description = "Create the cobalt AP VLAN children and plane bridges";
+    wantedBy = [ "multi-user.target" ];
+    before = [ "ap-vap-extra.service" ];
+    after = [ "sys-subsystem-net-devices-br\\x2dcobalt\\x2dlan.device" ];
+    requires = [ "sys-subsystem-net-devices-br\\x2dcobalt\\x2dlan.device" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
     };
-    "21-cobalt-lan.31" = {
-      netdevConfig = { Name = "cobalt-lan.31"; Kind = "vlan"; };
-      vlanConfig.Id = 31;
-    };
-    "21-cobalt-lan.90" = {
-      netdevConfig = { Name = "cobalt-lan.90"; Kind = "vlan"; };
-      vlanConfig.Id = 90;
-    };
-    "22-ap-mgmt" = {
-      netdevConfig = { Name = "ap-mgmt"; Kind = "bridge"; };
-    };
-    "22-ap-clients-vpn" = {
-      netdevConfig = { Name = "ap-clients-vpn"; Kind = "bridge"; };
-    };
-    "22-ap-unlock" = {
-      netdevConfig = { Name = "ap-unlock"; Kind = "bridge"; };
-    };
-  };
-
-  systemd.network.networks = {
-    "21-cobalt-lan.10" = {
-      matchConfig.Name = "cobalt-lan.10";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig.Bridge = "ap-mgmt";
-    };
-    "21-cobalt-lan.31" = {
-      matchConfig.Name = "cobalt-lan.31";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig.Bridge = "ap-clients-vpn";
-    };
-    "21-cobalt-lan.90" = {
-      matchConfig.Name = "cobalt-lan.90";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig.Bridge = "ap-unlock";
-    };
-    "22-ap-mgmt" = {
-      matchConfig.Name = "ap-mgmt";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig = { };
-    };
-    "22-ap-clients-vpn" = {
-      matchConfig.Name = "ap-clients-vpn";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig = { };
-    };
-    "22-ap-unlock" = {
-      matchConfig.Name = "ap-unlock";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig = { };
-    };
+    path = [ pkgs.iproute2 pkgs.gnugrep ];
+    script = ''
+      set -euo pipefail
+      trunk=br-cobalt-lan
+      # Locally-administered MACs so the bridges stay distinguishable.
+      # (vlan|bridge name, vlan id (0 = plain bridge), mac)
+      for spec in \
+        "cobalt-lan.10 10 ap-mgmt" \
+        "cobalt-lan.31 31 ap-clients-vpn" \
+        "cobalt-lan.90 90 ap-unlock"; do
+        set -- $spec
+        vlan_if=$1; vlan_id=$2; br=$3
+        ip link show "$br" >/dev/null 2>&1 || ip link add name "$br" type bridge
+        ip link set "$br" up
+        ip link show "$vlan_if" >/dev/null 2>&1 || ip link add link "$trunk" name "$vlan_if" type vlan id "$vlan_id"
+        ip link set "$vlan_if" up
+        ip link set "$vlan_if" master "$br"
+      done
+      for br in ap-mgmt ap-clients-vpn ap-unlock; do
+        ip link set "$br" up
+      done
+    '';
   };
 }

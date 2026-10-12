@@ -31,17 +31,17 @@ let
   #   trunk      -> 802.1Q trunk into br-cobalt-lan
   #   access     -> untagged clients VLAN into the vlan30 access bridge
   #   unused     -> realized netdev, no bridge (jack present, no cobalt role)
-  #   management -> handled separately below (DHCP on its own netdev)
+  #   management -> a plain, unaddressed jack.  The host's own management/
+  #                 underlay no longer rides a dedicated physical jack: it now
+  #                 comes off the trunk as tagged VLAN 30 (see the vlan30 DHCP
+  #                 rule below), so it survives losing/moving the mgmt cable.
   mkPortNetwork = p:
     if p.role == "management" then
       lib.nameValuePair "10-${p.label}"
         {
           matchConfig.Name = p.label;
-          linkConfig.RequiredForOnline = "yes";
-          networkConfig = {
-            DHCP = "ipv4";
-            LinkLocalAddressing = "no";
-          };
+          linkConfig.RequiredForOnline = "no";
+          networkConfig = { };
         }
     else
       lib.nameValuePair "10-${p.label}" {
@@ -65,8 +65,7 @@ let
 in
 {
   # networkd owns the cobalt ports and the bridges; the scripted/dhcpcd client
-  # would fight it for the same interfaces.  Management (lan5) moves to a
-  # networkd DHCP rule below.
+  # would fight it for the same interfaces.
   systemd.network.enable = true;
   networking.useNetworkd = true;
   networking.useDHCP = lib.mkForce false;
@@ -106,8 +105,6 @@ in
   };
 
   systemd.network.networks = lanNetworks // {
-    # br-cobalt-lan terminates the client VLAN off the trunk into the
-    # untagged access bridge.
     "10-br-cobalt-lan" = {
       matchConfig.Name = "br-cobalt-lan";
       linkConfig.RequiredForOnline = "no";
@@ -137,11 +134,17 @@ in
       networkConfig.Bridge = "vlan${toString clientVlan}";
     };
 
-    # The access bridge itself is pure L2 (the cobalt VM owns addressing).
+    # The access bridge carries the host's own DHCP management address (the
+    # host's management/underlay, used by nebula and for SSH, rides the trunk as
+    # tagged VLAN 30 rather than a dedicated mgmt jack, so it survives a
+    # missing/moved mgmt cable).  The cobalt VM still owns routing/NAT here.
     "20-vlan${toString clientVlan}" = {
       matchConfig.Name = "vlan${toString clientVlan}";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig = { };
+      linkConfig.RequiredForOnline = "yes";
+      networkConfig = {
+        DHCP = "ipv4";
+        LinkLocalAddressing = "no";
+      };
     };
   };
 
