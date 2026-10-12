@@ -380,6 +380,7 @@ creation_rules:
           - *s-router-cobalt
           - *s-router-cobalt-new
           - *s-ap-alfa
+          - *s-nodus
   - path_regex: '^(secrets/)*s-router-cobalt.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:

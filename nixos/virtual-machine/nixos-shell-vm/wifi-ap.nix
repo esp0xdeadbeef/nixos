@@ -79,6 +79,27 @@ let
         ht_capab=[SHORT-GI-20]
         ap_isolate=1
       ''
+    else if radio.band == "6g" then
+    # 6 GHz: no legacy 11b/g; HE mandatory, 80 MHz. The primary channel must
+    # be a 6 GHz PSC channel (e.g. 37) and op_class selects the 6 GHz band.
+      ''
+        hw_mode=a
+        op_class=131
+        channel=${toString radio.channel}
+        noscan=1
+        wmm_enabled=1
+        country_code=${radio.country}
+        ieee80211n=1
+        ht_capab=[SHORT-GI-20][SHORT-GI-40]
+        ieee80211ac=1
+        vht_oper_chwidth=1
+        vht_oper_centr_freq_seg0_idx=${toString radio.vhtCenterIdx}
+        vht_capab=[SHORT-GI-80][SHORT-GI-160][MAX-MPDU-11454]
+        ieee80211ax=1
+        he_oper_chwidth=1
+        he_oper_centr_freq_seg0_idx=${toString radio.vhtCenterIdx}
+        ap_isolate=1
+      ''
     else
       ''
         hw_mode=a
@@ -133,16 +154,17 @@ let
 
   hostapdConf = pkgs.writeShellScript "make-ap-hostapd-conf" ''
     set -euo pipefail
+    mkdir -p /run/ap
     YQ=${pkgs.yq-go}/bin/yq
     SEC=/run/secrets/cobalt-wifi
-    seed=$("$YQ" -r '.seed' "$SEC")
-    used=/run/ap/used-ssids
-    rm -f "$used"
 
-    # Derive shared planes first, in the order every radio must agree on.
-    ${deriveLines}
-    # Fixed (non-derived) SSIDs.
-    ${secretSsidLines}
+    # SSIDs are derived once by ap-ssid-*.service into a shared file so every
+    # radio agrees on the SSID for a given plane.  Deriving per radio would let
+    # concurrent ap-conf units race on the collision-avoidance list and end up
+    # with different SSIDs on different bands for the same plane.  The file is a
+    # hard requirement (ap-ssid-*.service is ordered and pulled in before us).
+    . /run/ap/ssids.env
+
     # Passphrases.
     ${pskLines}
 
@@ -187,6 +209,11 @@ let
   # Create every VAP that is not the radio's base interface.
   vapCreateIndexes = lib.range 1 (lib.length vaps - 1);
   ifaceOf = i: (lib.elemAt vaps i).iface;
+  # Give every VAP a deterministic, locally-administered MAC derived from the
+  # radio base MAC at runtime.  All VAPs on an mt7996 phy otherwise share the
+  # base MAC and the kernel refuses to bring more than one up ("Name not unique
+  # on network"), so hostapd can only start the first BSS.  Offset the last
+  # octet by the VAP index and set the local bit (0x02) of the first octet.
   vapCreate = lib.concatMapStrings
     (i: ''
       for _ in $(seq 1 30); do
@@ -194,6 +221,8 @@ let
         ${pkgs.iw}/bin/iw phy "$phy" interface add ${ifaceOf i} type __ap 2>/dev/null || true
         sleep 1
       done
+      ${pkgs.iproute2}/bin/ip link set ${ifaceOf i} down 2>/dev/null || true
+      ${pkgs.iproute2}/bin/ip link set ${ifaceOf i} address $(macAddr ${ifaceOf i}) 2>/dev/null || true
     '')
     vapCreateIndexes;
 
@@ -203,8 +232,8 @@ let
       value = {
         description = "WiFi AP ${v.iface} (${v.plane}) on bridge ${v.bridge}";
         wantedBy = [ "multi-user.target" ];
-        after = [ "ap-conf.service" "ap-vap.service" ];
-        requires = [ "ap-conf.service" "ap-vap.service" ];
+        after = [ "ap-conf-${radio.iface}.service" "ap-vap-${radio.iface}.service" ];
+        requires = [ "ap-conf-${radio.iface}.service" "ap-vap-${radio.iface}.service" ];
         path = [
           pkgs.coreutils
           pkgs.gnugrep
@@ -229,11 +258,64 @@ assert lib.assertMsg (missingDerive == [ ])
   "wifi-ap: planes missing from deriveOrder: ${toString (map (p: p.plane) missingDerive)}";
 {
   systemd.services = {
-    ap-conf = {
-      description = "Generate hostapd AP configs";
+    # Derive the plane SSIDs once, into /run/ap/ssids.env, so every radio's
+    # hostapd config uses the same SSID for a given plane.  The builder is
+    # instantiated once per radio, so this unit exists per radio; they all write
+    # the same file and the first to run wins (the rest no-op), which keeps the
+    # SSID<->plane mapping identical across bands.
+    "ap-ssid-${radio.iface}" = {
+      description = "Derive the shared AP SSIDs (${radio.iface})";
       wantedBy = [ "multi-user.target" ];
-      after = [ "ap-vap.service" "sops-install-secrets.service" ];
-      requires = [ "ap-vap.service" ];
+      after = [ "sops-install-secrets.service" ];
+      requires = [ "sops-install-secrets.service" ];
+      path = [
+        pkgs.coreutils
+        pkgs.gawk
+        pkgs.gnugrep
+        pkgs.util-linux
+        pkgs.yq-go
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        set -euo pipefail
+        mkdir -p /run/ap
+        env=/run/ap/ssids.env
+        lock=/run/ap/ssids.lock
+        # One radio derives and the rest wait, so the SSID<->plane mapping is
+        # computed exactly once and every band reads the same values.
+        exec 9>"$lock"
+        flock 9
+        [ -s "$env" ] && exit 0
+        YQ=${pkgs.yq-go}/bin/yq
+        SEC=/run/secrets/cobalt-wifi
+        seed=$("$YQ" -r '.seed' "$SEC")
+        used=/run/ap/used-ssids
+        rm -f "$used"
+        tmp=$(mktemp /run/ap/ssids.XXXXXX)
+        ${lib.concatMapStrings
+          (plane: ''
+            printf 'ssid_${varName plane}=%q\n' "$(${deriveSsid} "$seed" ${plane} ${ssidList} "$used")" >> "$tmp"
+          '')
+          deriveOrder}
+        ${lib.concatMapStrings
+          (p:
+            lib.optionalString (lib.hasPrefix "secret:" p.ssid) ''
+              printf 'ssid_${varName p.plane}=%q\n' "$("$YQ" -r '.${lib.removePrefix "secret:" p.ssid}.ssid' "$SEC")" >> "$tmp"
+            '')
+          planes}
+        chmod 600 "$tmp"
+        mv "$tmp" "$env"
+      '';
+    };
+
+    "ap-conf-${radio.iface}" = {
+      description = "Generate hostapd AP configs for ${radio.iface}";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "ap-vap-${radio.iface}.service" "ap-ssid-${radio.iface}.service" "sops-install-secrets.service" ];
+      requires = [ "ap-vap-${radio.iface}.service" "ap-ssid-${radio.iface}.service" ];
       path = [
         pkgs.coreutils
         pkgs.gawk
@@ -246,19 +328,32 @@ assert lib.assertMsg (missingDerive == [ ])
         Type = "oneshot";
         RemainAfterExit = true;
         ExecStart = hostapdConf;
-        RuntimeDirectory = "ap";
       };
     };
 
-    ap-vap = {
-      description = "Create the AP VAPs";
+    "ap-vap-${radio.iface}" = {
+      description = "Create the AP VAPs for ${radio.iface}";
       wantedBy = [ "multi-user.target" ];
+      path = [
+        pkgs.coreutils
+        pkgs.gawk
+      ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
       };
       script = ''
         phy=$(cat /sys/class/net/${radio.iface}/phy80211/name 2>/dev/null || echo phy0)
+        base=$(cat /sys/class/net/${radio.iface}/address 2>/dev/null)
+        # macAddr NAME: base MAC with the first octet's local bit set and the
+        # last two octets replaced by a hash of the interface name, so every BSS
+        # on the phy has a distinct, stable address regardless of band.
+        macAddr() {
+          local h=$(printf '%s' "$1" | cksum | ${pkgs.gawk}/bin/awk '{print $1}')
+          ${pkgs.gawk}/bin/awk -v h="$h" -F: '{
+            printf "%02x:%s:%s:%s:%02x:%02x\n", (strtonum("0x" $1) + 2), $2, $3, $4, (h % 256), (int(h / 256) % 256)
+          }' <<< "$base"
+        }
         ${vapCreate}
       '';
     };
