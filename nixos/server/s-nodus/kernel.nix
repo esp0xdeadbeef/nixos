@@ -66,11 +66,16 @@ in
         MAXLINEAR_GPHY = module;
         # SFP cage support (sfp1 = LAN, sfp2 = WAN)
         SFP = module;
-        # DAMON is enabled by default in nixpkgs' config and its kdamond burns
-        # ~22% of a core scanning/reclaiming memory, competing with kswapd.  The
-        # board does not use DAMON; build it out.  Disabling DAMON makes the
-        # DAMON_* sub-options unused, so they must not be set here.
-        DAMON = lib.mkForce no;
+        # nixpkgs' common-config enables DAMON + all its sub-options.  DAMON's
+        # reclaim/stat engines run kdamond continuously (~22% of a core here),
+        # scanning and reclaiming memory and competing with kswapd.  Keep DAMON
+        # itself on (its sub-options are only valid when it is, and disabling it
+        # makes them "unused" and fails the config check), but turn off the
+        # engines that actually burn CPU.
+        DAMON_RECLAIM = lib.mkForce no;
+        DAMON_LRU_SORT = lib.mkForce no;
+        DAMON_STAT = lib.mkForce no;
+        DAMON_STAT_ENABLED_DEFAULT = lib.mkForce no;
       });
     })
   ));
