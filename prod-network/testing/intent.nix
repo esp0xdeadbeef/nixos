@@ -2567,11 +2567,20 @@ in
             name = "neon-iot-srv";
           };
           # URS (Reachability, Routing, and Overlays): overlay transport models
-          # imported and exported prefixes. Both address families are explicit.
-          # exported = prefixes this site offers on the overlay (the offering
-          # scopes own them, FS-322); imported = the peer's prefixes, which this
-          # site routes through the overlay so a single-site compile is not
-          # silently empty.
+          # endpoint identity, permitted peers, and imported/exported prefixes.
+          # Both address families are explicit.  exported = prefixes this site
+          # offers on the overlay (the offering scopes own them, FS-322);
+          # imported = the peer's prefixes, which this site routes through the
+          # overlay so a single-site compile is not silently empty.  The peer's
+          # garnet participant address is the next hop for the imported prefixes
+          # (a peer site is not compiled in this site's pass, so it is modeled
+          # here as the overlay's endpoint identity).
+          peerNodes = {
+            "esp0xdeadbeef.cobalt" = {
+              addr4 = "10.80.0.2/24";
+              addr6 = "fd42:dead:beef:80::2/64";
+            };
+          };
           prefixes = {
             exported = {
               ipv4 = [ "192.168.3.0/24" ];
@@ -4353,8 +4362,19 @@ in
             name = "cobalt-iot-srv";
           };
           # Mirror of the neon garnet overlay (URS: overlay transport models
-          # imported and exported prefixes). cobalt-svc's prefix is exported;
-          # neon's vlan3 prefix is imported so cobalt routes to the LLM server.
+          # endpoint identity, permitted peers, and imported/exported prefixes).
+          # cobalt-svc's prefix is exported; neon's vlan3 prefix is imported so
+          # cobalt routes to the LLM server.  The peer's garnet participant
+          # address is the next hop for those imported prefixes; a peer site is
+          # not compiled in this site's pass, so it is modeled here (the peer
+          # node address is an inventory realization fact mirrored onto the
+          # overlay as its endpoint identity).
+          peerNodes = {
+            "esp0xdeadbeef.neon" = {
+              addr4 = "10.80.0.1/24";
+              addr6 = "fd42:dead:beef:80::1/64";
+            };
+          };
           prefixes = {
             exported = {
               ipv4 = [ "10.2.20.0/24" ];
