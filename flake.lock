@@ -377,11 +377,11 @@
         "nixpkgs-network": "nixpkgs-network"
       },
       "locked": {
-        "lastModified": 1791495802,
-        "narHash": "sha256-urPjpASifObNWJiLJryqVmUqPtCqPzIzyrzlmuoK6tA=",
+        "lastModified": 1791850156,
+        "narHash": "sha256-DJmuM2V1usaHZi/dxnaVm71D9/WekIs23UdkNlk9XA8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "2aff1974566625ddb048f24ebfcce4590f85e99b",
+        "rev": "05f7d4107ee32f41cbc766c3890628bd95b94bb1",
         "type": "github"
       },
       "original": {
@@ -823,11 +823,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1791513337,
-        "narHash": "sha256-sUVQGVYCrPb0xsqWcaxuUArTvyBMZfGo+v2T8axrZyE=",
+        "lastModified": 1791679081,
+        "narHash": "sha256-JBa6pKhMTK54UgsXqAKRK/mgTVdOQtbLww59X47nN34=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "eb337f128b13a4132c40a984fc98fb2149e6a2a6",
+        "rev": "b675a721378b2704f1ad48e4a6a87b8303c580a7",
         "type": "github"
       },
       "original": {
@@ -1086,11 +1086,11 @@
         "nixpkgs-network": "nixpkgs-network_7"
       },
       "locked": {
-        "lastModified": 1791500876,
-        "narHash": "sha256-SSLlylGiFucvG3fJb3FNJHS5Tsp6rfSndXKsORYevAw=",
+        "lastModified": 1791851108,
+        "narHash": "sha256-rbmfV6VZUgyxq3RslJQ6pTj3zE690ma+1EYqIFhQzPo=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "2760c16ad9cff9fb91887e9d579bd07cb9645b5f",
+        "rev": "e92991b50941c7f14a22253e625313bde46fa0dd",
         "type": "github"
       },
       "original": {
@@ -2593,11 +2593,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790474713,
-        "narHash": "sha256-IUclJ/jQDVaGY9yXw96G//N/JWsb1Wez/hoKpTS6VKA=",
+        "lastModified": 1791850399,
+        "narHash": "sha256-qKyegQ8NKWvDom8U3D/29U25QUNaVs0DAZesbt7RhZA=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nebula",
-        "rev": "e817394652e572a2468d6ef909d11f721e1ec18c",
+        "rev": "38b688dadf61e29825ec1a0030a0c492492bc32c",
         "type": "github"
       },
       "original": {
