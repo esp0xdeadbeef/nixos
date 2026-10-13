@@ -1484,8 +1484,8 @@ in
                   # The lighthouse's own overlay (mesh) address, so this
                   # client site builds its static-host-map without needing the
                   # lighthouse node locally (FS-460-HDS-010-SDS-010-SMS-010).
-                  addr4 = "10.80.0.1/32";
-                  addr6 = "fd42:dead:beef:80::1/128";
+                  addr4 = "10.80.0.1/24";
+                  addr6 = "fd42:dead:beef:80::1/64";
                   endpoint = "198.51.100.102";
                   endpointSourceFile = "/run/secrets/garnet-lighthouse-endpoint4";
                   port = 4243;
@@ -1493,8 +1493,8 @@ in
               };
               nodes = {
                 core-vpn-garnet-cobalt = {
-                  addr4 = "10.80.0.2/32";
-                  addr6 = "fd42:dead:beef:80::2/128";
+                  addr4 = "10.80.0.2/24";
+                  addr6 = "fd42:dead:beef:80::2/64";
                   # Target-only facts (FS-460-HDS-010-SDS-010-SMS-010): the
                   # container/interface this overlay node runs in, and its
                   # nebula group membership.
