@@ -254,6 +254,11 @@ let
   upstreamPolicyMgmtGarnetLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-garnet";
   upstreamPolicySvcGarnetLink = "p2p-policy-upstream-selector--access-access-svc--uplink-garnet";
   upstreamPolicyDmzGarnetLink = "p2p-policy-upstream-selector--access-access-dmz--uplink-garnet";
+  # FS-210/FS-230: the dmz hosts the publicly-ingress s-gameserver.  Its
+  # ingress/return transport lane (policy <-> upstream-selector) must be
+  # realized so the post-translation return path exists; this is a transport
+  # binding, not WAN egress for the dmz (access-dmz declares no selects).
+  upstreamPolicyDmzLink = "p2p-policy-upstream-selector--access-access-dmz--uplink-wan";
   policyDownstreamSvcLink = "p2p-downstream-selector-policy--access-access-svc";
   policyDownstreamClientsLink = "p2p-downstream-selector-policy--access-access-clients";
   policyDownstreamDmzLink = "p2p-downstream-selector-policy--access-access-dmz";
@@ -473,6 +478,13 @@ let
       bridge = "rt-upstream-policy-dmz-garnet";
       interfaceName = "policy-dmz-garnet";
     };
+
+    policy-dmz = p2pPort {
+      link = upstreamPolicyDmzLink;
+      adapterName = "prod-us-dmz";
+      bridge = "rt-upstream-policy-dmz";
+      interfaceName = "policy-dmz";
+    };
   };
 
   policy = mkNode "policy" {
@@ -585,6 +597,13 @@ let
       adapterName = "prod-p-us-dmz-xs";
       bridge = "rt-upstream-policy-dmz-garnet";
       interfaceName = "upstream-dmz-garnet";
+    };
+
+    upstream-dmz = p2pPort {
+      link = upstreamPolicyDmzLink;
+      adapterName = "prod-p-us-dmz";
+      bridge = "rt-upstream-policy-dmz";
+      interfaceName = "upstream-dmz";
     };
 
     downstream-svc = p2pPort {
@@ -1583,6 +1602,7 @@ in
           rt-policy-downstream-unlock = { };
           rt-policy-downstream-mgmt = { };
           rt-upstream-policy-svc = { };
+          rt-upstream-policy-dmz = { };
           rt-upstream-policy-clients = { };
           rt-upstream-policy-iot-srv = { };
           rt-upstream-policy-iot = { };
