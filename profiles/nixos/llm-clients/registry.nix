@@ -132,7 +132,6 @@ rec {
     "omp"
     "openclaw"
     "opencode"
-    "openfang"
     "openskills"
     "openspec"
     "openspecui"
@@ -442,12 +441,6 @@ rec {
         ".cache/opencode"
         ".local/share/opencode"
         ".local/state/opencode"
-      ];
-      files = [ ];
-    };
-    openfang = {
-      directories = [
-        ".openfang"
       ];
       files = [ ];
     };
