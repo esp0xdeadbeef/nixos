@@ -70,7 +70,6 @@
     "omp"
     "openclaw"
     "opencode"
-    "openfang"
     "pi"
     "picoclaw"
     "qwen-code"
