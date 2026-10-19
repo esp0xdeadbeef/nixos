@@ -15,6 +15,7 @@ in
     profiles.nixos.server.dell-vm-host
     profiles.nixos.users.sudo-nopasswd
     profiles.nixos.server.no-sleep
+    profiles.nixos.server.weekly-auto-upgrade
     profiles.nixos.llm-clients.cache
     profiles.nixos.network.nebula-mesh
     profiles.nixos.nix.remote-builder-server

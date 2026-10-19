@@ -16,6 +16,7 @@ in
     profiles.nixos.server.dell-vm-host
     profiles.nixos.users.sudo-nopasswd
     profiles.nixos.server.no-sleep
+    profiles.nixos.server.weekly-auto-upgrade
     profiles.nixos.llm-clients.agents
     profiles.nixos.network.nebula-mesh
     profiles.nixos.virtualization.pci-passthrough
