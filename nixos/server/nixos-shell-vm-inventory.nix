@@ -92,11 +92,13 @@ let
     host_interface=gamp-v2-host
     client_interface=gamp-v2-client
 
-    shopt -s nullglob
-    mkdir_candidates=(/nix/store/*-coreutils-*/bin/mkdir)
-    rm_candidates=(/nix/store/*-coreutils-*/bin/rm)
-    mkdir_bin=''${mkdir_candidates[0]:-}
-    rm_bin=''${rm_candidates[0]:-}
+    # Resolve coreutils at eval time. This block used to glob
+    # /nix/store/*-coreutils-*/bin/{mkdir,rm} and take [0], which picks an
+    # arbitrary coreutils from any generation in the store. The router guest
+    # has coreutils commented out of its systemPackages, so the tools are not
+    # at /run/current-system/sw/bin and a plain path cannot be used either.
+    mkdir_bin=${lib.getExe' pkgs.coreutils "mkdir"}
+    rm_bin=${lib.getExe' pkgs.coreutils "rm"}
 
     [[ -x "$mkdir_bin" && -x "$rm_bin" ]]
 
