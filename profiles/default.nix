@@ -77,6 +77,7 @@
       dell = import ./nixos/server/dell.nix;
       dell-vm-host = import ./nixos/server/dell-vm-host.nix;
       no-sleep = import ./nixos/server/no-sleep.nix;
+      weekly-auto-upgrade = import ./nixos/server/weekly-auto-upgrade.nix;
     };
     sops = {
       persist-root-age-key-file = import ./nixos/sops/persist-root-age-key-file.nix;
