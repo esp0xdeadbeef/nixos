@@ -21,9 +21,9 @@ in
     ];
   };
   users.users.root.openssh.authorizedKeys.keys = [
-    (keyFor "codex-jail")
+    (keyFor "admin")
   ];
   users.users.deadbeef.openssh.authorizedKeys.keys = [
-    (keyFor "codex-jail")
+    (keyFor "admin")
   ];
 }

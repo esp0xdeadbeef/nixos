@@ -97,7 +97,7 @@ in
   };
 
   users.users.root.openssh.authorizedKeys.keys = [
-    (keyFor "codex-jail")
+    (keyFor "admin")
     (keyFor "l-portal")
     (keyFor "l-esp")
   ];
