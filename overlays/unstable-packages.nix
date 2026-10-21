@@ -53,6 +53,26 @@ in
       };
     overlays = [
       pynfsclientMetadataVersion
+      # Qt 6.12's uic rejects the spurious templated promoted-widget class name
+      # `AddressableItemList<>` in Cutter 2.5.0's .ui files, so the unstable
+      # cutter fails to build ("Invalid class name").  Add a concrete alias and
+      # reference it from the .ui files; see the patch header.  Upstream still
+      # carries the `<>`.
+      (_unstableFinal: unstablePrev: {
+        cutter =
+          let
+            expectedVersion = "2.5.0";
+            actualVersion =
+              unstablePrev.cutter.version or (final.lib.getVersion unstablePrev.cutter.name);
+          in
+          assert final.lib.assertMsg (actualVersion == expectedVersion)
+            "cutter overlay expects ${expectedVersion}, got ${actualVersion}; review patches/cutter-qt6-uic-templated-class-name.patch before updating cutter.";
+          unstablePrev.cutter.overrideAttrs (old: {
+            patches =
+              (old.patches or [ ])
+              ++ [ ../patches/cutter-qt6-uic-templated-class-name.patch ];
+          });
+      })
     ];
   };
 

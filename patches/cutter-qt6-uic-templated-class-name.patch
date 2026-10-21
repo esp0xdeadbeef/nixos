@@ -1,0 +1,191 @@
+Qt 6.12's `uic` validates promoted-widget class names and rejects the templated
+name `AddressableItemList<>` that Cutter 2.5.0 puts in its .ui files:
+
+  BreakpointWidget.ui: Invalid class name: "AddressableItemList<>"
+
+`AddressableItemList` IS a template (with a default argument), so simply
+dropping the `<>` makes uic emit `AddressableItemList *member`, which then fails
+to compile ("missing template argument list").  Instead, add a concrete alias
+for the default instantiation and reference that from the .ui files.  Generated
+`ui-><member>` types are unchanged.  Upstream (rizinorg/cutter master as of
+2026-10) still has the `<>`, so this must stay a local patch.
+
+Apply in src/: `patch -p1 < cutter-qt6-uic-templated-class-name.patch`
+
+diff --git a/src/dialogs/XrefsDialog.ui b/src/dialogs/XrefsDialog.ui
+index 7b3356f..02380de 100644
+--- a/src/dialogs/XrefsDialog.ui
++++ b/src/dialogs/XrefsDialog.ui
+@@ -53,7 +53,7 @@
+         <widget class="QuickFilterView" name="toQuickFilter" native="true"/>
+        </item>
+        <item>
+-        <widget class="AddressableItemList&lt;&gt;" name="toTreeWidget">
++        <widget class="AddressableItemListView" name="toTreeWidget">
+          <property name="frameShape">
+           <enum>QFrame::Shape::Box</enum>
+          </property>
+@@ -79,7 +79,7 @@
+         <widget class="QuickFilterView" name="fromQuickFilter" native="true"/>
+        </item>
+        <item>
+-        <widget class="AddressableItemList&lt;&gt;" name="fromTreeWidget">
++        <widget class="AddressableItemListView" name="fromTreeWidget">
+          <property name="frameShape">
+           <enum>QFrame::Shape::Box</enum>
+          </property>
+@@ -148,7 +148,7 @@
+  </widget>
+  <customwidgets>
+   <customwidget>
+-   <class>AddressableItemList&lt;&gt;</class>
++   <class>AddressableItemListView</class>
+    <extends>QTreeView</extends>
+    <header>widgets/AddressableItemList.h</header>
+    <container>1</container>
+diff --git a/src/widgets/AddressableItemList.h b/src/widgets/AddressableItemList.h
+index e306699..4c56d9b 100644
+--- a/src/widgets/AddressableItemList.h
++++ b/src/widgets/AddressableItemList.h
+@@ -116,4 +116,9 @@ private:
+     MainWindow *mainWindow = nullptr;
+ };
+ 
++// uic (Qt >= 6.12) rejects a templated promoted-widget class name such as
++// `AddressableItemList<>`.  Provide a concrete, non-templated name for the
++// default instantiation so the .ui files can reference it.
++using AddressableItemListView = AddressableItemList<>;
++
+ #endif // ADDRESSABLE_ITEM_LIST_H
+diff --git a/src/widgets/BreakpointWidget.ui b/src/widgets/BreakpointWidget.ui
+index 92adbd8..0efecc5 100644
+--- a/src/widgets/BreakpointWidget.ui
++++ b/src/widgets/BreakpointWidget.ui
+@@ -28,7 +28,7 @@
+      <number>0</number>
+     </property>
+     <item>
+-     <widget class="AddressableItemList&lt;&gt;" name="breakpointTreeView">
++     <widget class="AddressableItemListView" name="breakpointTreeView">
+       <property name="styleSheet">
+        <string notr="true">CutterTreeView::item
+ {
+@@ -80,7 +80,7 @@
+  </widget>
+  <customwidgets>
+   <customwidget>
+-   <class>AddressableItemList&lt;&gt;</class>
++   <class>AddressableItemListView</class>
+    <extends>QTreeView</extends>
+    <header>widgets/AddressableItemList.h</header>
+    <container>1</container>
+diff --git a/src/widgets/FlagsWidget.ui b/src/widgets/FlagsWidget.ui
+index 2e20d37..eff060c 100644
+--- a/src/widgets/FlagsWidget.ui
++++ b/src/widgets/FlagsWidget.ui
+@@ -31,7 +31,7 @@
+      <number>0</number>
+     </property>
+     <item>
+-     <widget class="AddressableItemList&lt;&gt;" name="flagsTreeView">
++     <widget class="AddressableItemListView" name="flagsTreeView">
+       <property name="styleSheet">
+        <string notr="true">CutterTreeView::item
+ {
+@@ -124,7 +124,7 @@
+    <header>ItemCountLineEdit.h</header>
+   </customwidget>
+   <customwidget>
+-   <class>AddressableItemList&lt;&gt;</class>
++   <class>AddressableItemListView</class>
+    <extends>QTreeView</extends>
+    <header>widgets/AddressableItemList.h</header>
+    <container>1</container>
+diff --git a/src/widgets/GlobalsWidget.ui b/src/widgets/GlobalsWidget.ui
+index 57c47a1..8d294da 100644
+--- a/src/widgets/GlobalsWidget.ui
++++ b/src/widgets/GlobalsWidget.ui
+@@ -31,7 +31,7 @@
+      <number>0</number>
+     </property>
+     <item>
+-     <widget class="AddressableItemList&lt;&gt;" name="treeView">
++     <widget class="AddressableItemListView" name="treeView">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+@@ -96,7 +96,7 @@
+    <container>1</container>
+   </customwidget>
+   <customwidget>
+-   <class>AddressableItemList&lt;&gt;</class>
++   <class>AddressableItemListView</class>
+    <extends>QTreeView</extends>
+    <header>widgets/AddressableItemList.h</header>
+    <container>1</container>
+diff --git a/src/widgets/ListDockWidget.ui b/src/widgets/ListDockWidget.ui
+index 16e63e9..a8782ac 100644
+--- a/src/widgets/ListDockWidget.ui
++++ b/src/widgets/ListDockWidget.ui
+@@ -28,7 +28,7 @@
+      <number>0</number>
+     </property>
+     <item>
+-     <widget class="AddressableItemList&lt;&gt;" name="treeView">
++     <widget class="AddressableItemListView" name="treeView">
+       <property name="styleSheet">
+        <string notr="true">CutterTreeView::item
+ {
+@@ -58,7 +58,7 @@
+  </widget>
+  <customwidgets>
+   <customwidget>
+-   <class>AddressableItemList&lt;&gt;</class>
++   <class>AddressableItemListView</class>
+    <extends>QTreeView</extends>
+    <header>widgets/AddressableItemList.h</header>
+    <container>1</container>
+diff --git a/src/widgets/SearchWidget.ui b/src/widgets/SearchWidget.ui
+index 11a9881..9e2019a 100644
+--- a/src/widgets/SearchWidget.ui
++++ b/src/widgets/SearchWidget.ui
+@@ -31,7 +31,7 @@
+      <number>0</number>
+     </property>
+     <item>
+-     <widget class="AddressableItemList&lt;&gt;" name="searchTreeView">
++     <widget class="AddressableItemListView" name="searchTreeView">
+       <property name="styleSheet">
+        <string notr="true">CutterTreeView::item
+ {
+@@ -118,7 +118,7 @@
+  </widget>
+  <customwidgets>
+   <customwidget>
+-   <class>AddressableItemList&lt;&gt;</class>
++   <class>AddressableItemListView</class>
+    <extends>QTreeView</extends>
+    <header>widgets/AddressableItemList.h</header>
+    <container>1</container>
+diff --git a/src/widgets/StringsWidget.ui b/src/widgets/StringsWidget.ui
+index b14b265..d3fb7d7 100644
+--- a/src/widgets/StringsWidget.ui
++++ b/src/widgets/StringsWidget.ui
+@@ -31,7 +31,7 @@
+      <number>0</number>
+     </property>
+     <item>
+-     <widget class="AddressableItemList&lt;&gt;" name="stringsTreeView">
++     <widget class="AddressableItemListView" name="stringsTreeView">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+@@ -91,7 +91,7 @@
+  </widget>
+  <customwidgets>
+   <customwidget>
+-   <class>AddressableItemList&lt;&gt;</class>
++   <class>AddressableItemListView</class>
+    <extends>QTreeView</extends>
+    <header>widgets/AddressableItemList.h</header>
+    <container>1</container>
