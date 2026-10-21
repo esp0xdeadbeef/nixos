@@ -217,17 +217,13 @@ let
     ++
     lib.optionals
       (hasPackage [
-        "dropbox"
         "maestral"
         "maestral-gui"
         "maestral-qt"
       ])
       [
-        ".config/dropbox"
         ".config/maestral"
         ".local/share/maestral"
-        ".dropbox"
-        ".dropbox-dist"
       ]
     ++ lib.optionals (hasPackage [ "obsidian" ]) [
       ".config/obsidian"
