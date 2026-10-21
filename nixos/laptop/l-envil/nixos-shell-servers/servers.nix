@@ -7,7 +7,6 @@
       # only when the WAN adapter is connected.
       startOnBootInstances = [
         "s-nebula-cobalt"
-        "s-tang"
         "s-ap-nighthawk"
         "s-ap-alfa"
       ];
