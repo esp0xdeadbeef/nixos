@@ -2,12 +2,12 @@
 
 # nixos-shell VM host for s-nodus (BPI-R4 Pro 4E, aarch64).
 #
-# Runs exactly one instance -- s-router-cobalt-new -- through the same
+# Runs two instances -- s-router-cobalt-new and s-tang -- through the same
 # nixos-shell-vm-manager module the servers use.  It is NOT the shared
 # server/nixos-shell-vm-inventory.nix: that imports prod-network/current/
 # inventory-neon.nix (a protected production path) to derive one VLAN3 DNS
 # record for an s-router-prod health check and then enumerates the whole
-# fleet's VMs.  s-nodus runs a single VM, so pulling in the entire fleet
+# fleet's VMs.  s-nodus runs its own instances, so pulling in the entire fleet
 # inventory (and the protected tree) would be both unnecessary and out of
 # bounds.
 #
@@ -18,6 +18,8 @@
 # building rootfsImage.
 let
   vmName = "s-router-cobalt-new";
+
+  tangVmName = "s-tang";
 
   qgaSocketFor = name: "/run/nixos-shell-vm-manager/${name}/qga.sock";
 
@@ -158,6 +160,52 @@ in
         qemuArguments = [
           "-chardev"
           "socket,id=qga0,path=${qgaSocketFor vmName},server=on,wait=off"
+          "-device"
+          "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        ];
+      };
+    };
+
+    # Tang (NBDE) server for the cobalt unlock plane.  Hosted here alongside
+    # the cobalt router because both need the br-cobalt-lan trunk; the VM
+    # itself joins only mgmt (VLAN 10) and serves the unlock tenant (VLAN 90)
+    # to LUKS clients.
+    #
+    # Deliberately NOT behind a carrierControl: a booting laptop has to reach
+    # Tang to unlock its root disk, so the server must stay up even when the
+    # WAN transceiver is absent.
+    instances.${tangVmName} = {
+      description = "cobalt Tang (NBDE) server";
+
+      image = vmImages.${tangVmName};
+
+      activation.startOnBoot = true;
+      activation.restartOnGuestShutdown = true;
+
+      healthCheck = {
+        command = lib.escapeShellArgs [
+          (lib.getExe guestAgentHealth)
+          (qgaSocketFor tangVmName)
+        ];
+        timeoutSeconds = 10;
+        retries = 60;
+        intervalSeconds = 2;
+      };
+
+      # Tang's keypair must survive reboots, otherwise every Clevis-bound LUKS
+      # disk loses its NBDE unlock path.  The guest persist subvolume lives on
+      # this qcow2.
+      storage.persistentDisk = {
+        enable = true;
+        fileName = "state.qcow2";
+        size = "2G";
+      };
+
+      runner = {
+        stopGraceSeconds = 30;
+        qemuArguments = [
+          "-chardev"
+          "socket,id=qga0,path=${qgaSocketFor tangVmName},server=on,wait=off"
           "-device"
           "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
         ];

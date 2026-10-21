@@ -369,6 +369,9 @@
         # match the board.  This is the only place its architecture is set;
         # every other VM defaults to x86_64-linux.
         s-router-cobalt-new = "aarch64-linux";
+        # s-tang also runs under KVM on s-nodus (cobalt unlock plane), so the
+        # guest must match the board too.
+        s-tang = "aarch64-linux";
       };
 
       hostSystemFor = name: hostSystems.${name} or "x86_64-linux";
@@ -521,6 +524,8 @@
                     {
                       s-router-cobalt-new =
                         self.nixosConfigurations.s-router-cobalt-new.config.system.build.nixos-shell;
+                      s-tang =
+                        self.nixosConfigurations.s-tang.config.system.build.nixos-shell;
                     }
                   else
                     { };
