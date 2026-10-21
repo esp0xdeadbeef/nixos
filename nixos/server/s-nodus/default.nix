@@ -17,6 +17,10 @@
 #
 # Boots from microSD via the board's stock OpenWrt U-Boot. Board support is
 # mainline (kernel >= 6.19); no vendor/decompiled DTB is vendored.
+let
+  # Resolves a checked-in public key under ssh-keys/deadbeef/.
+  keyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/${host}.pub");
+in
 {
   imports = [
     inputs.disko.nixosModules.disko
@@ -155,6 +159,18 @@
   # keys).  sshd/gssapi/key-auth all off, so this is key-only for deadbeef.
   services.getty.autologinUser = "root";
   users.users.root.initialPassword = "changeme"; # change on first login
+
+  # Additional key on top of the shared deadbeef-authorized-keys profile
+  # (l-portal, l-esp, s-sigma, s-sigma-root): the fleet admin key.  Kept
+  # host-local rather than added to the shared profile so the grant stays
+  # scoped to this host.
+  #
+  # No root keys and no PermitRootLogin override: root SSH stays disabled
+  # (password-login profile) by design -- deadbeef is in wheel with NOPASSWD
+  # sudo below, so root access is unnecessary.
+  users.users.deadbeef.openssh.authorizedKeys.keys = [
+    (keyFor "admin")
+  ];
 
   # deadbeef in wheel so the sudo-nopasswd profile (NOPASSWD for group wheel)
   # grants passwordless sudo -- same arrangement as l-envil.
