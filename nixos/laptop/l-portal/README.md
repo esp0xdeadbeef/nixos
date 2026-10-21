@@ -54,7 +54,7 @@ swapon --show
 an SSS pin with threshold 1 over two Tang servers (any one reachable suffices):
 
 - neon: `http://192.168.1.75:7500`
-- cobalt: `http://10.2.90.10:7500` (dedicated Tang server on l-envil's unlock
+- cobalt: `http://10.2.90.10:7500` (dedicated Tang server on s-nodus's unlock
   plane, VLAN 90)
 
 The `tang.host` / `tang.port` options in `hardware/bootloader.nix` are
