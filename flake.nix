@@ -528,6 +528,34 @@
 
               modules = [
                 outputs.nixosModules.pythonPycachePrefix
+
+                # CVE-2026-111943: eMudhra intermediate CA compromise.
+                #
+                # Applied to EVERY host here, independent of per-host profile
+                # imports.  Two halves, both required:
+                #  - the overlay distrusted the roots on pkgs.cacert /
+                #    pkgs.nss-cacert (non-NixOS consumers: Go, containers,
+                #    anything reading the bundle directly) and traces a warning;
+                #  - caCertificateBlacklist must ALSO be set because
+                #    security.pki rebuilds its bundle with
+                #    `cacert.override { blacklist = cfg.caCertificateBlacklist; }`
+                #    on this (pre-fix) nixpkgs pin, so the system bundle needs
+                #    it here.
+                #
+                # The list is the exact upstream mitigation (nixpkgs #576485,
+                # PR #576390, NSS 3.131.1).  `emSign Root CA - G1` is
+                # deliberately not distrusted.  Remove this block once the
+                # `nixpkgs` pin contains PR #576390.
+                {
+                  nixpkgs.overlays = [ outputs.overlays.emudhra-ca-distrust ];
+                  security.pki.caCertificateBlacklist = [
+                    "Comodo AAA Services root"
+                    "emSign ECC Root CA - G3"
+                    "emSign Root CA - C1"
+                    "emSign ECC Root CA - C3"
+                  ];
+                }
+
                 (./. + "/${path}")
               ];
             }
