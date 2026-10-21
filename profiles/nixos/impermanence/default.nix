@@ -95,8 +95,30 @@ let
     ".cache/geary"
   ];
 
-  selectedLlmAgentPackageNames = [ ];
-  selectedLlmAgentPersistence = { };
+  # Hosts that enable local.llmClients.agents persist their agent config
+  # directories (e.g. ~/.pi, ~/.claude, ~/.codex). Hosts without the module
+  # fall back to empty lists, so the lookup must stay tolerant via attrByPath.
+  selectedLlmAgentPackageNames =
+    lib.attrByPath
+      [
+        "local"
+        "llmClients"
+        "agents"
+        "packageNames"
+      ]
+      [ ]
+      config;
+
+  selectedLlmAgentPersistence =
+    lib.attrByPath
+      [
+        "local"
+        "llmClients"
+        "agents"
+        "persistence"
+      ]
+      { }
+      config;
 
   normalUserNames = lib.filter
     (
