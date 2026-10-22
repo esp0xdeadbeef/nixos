@@ -551,8 +551,17 @@
                 # PR #576390, NSS 3.131.1).  `emSign Root CA - G1` is
                 # deliberately not distrusted.  Remove this block once the
                 # `nixpkgs` pin contains PR #576390.
+                #
+                # mdbook-skip-tests: same universal scope, because any host
+                # that has to build `nix` locally walks
+                # nix-manual -> mdbook, and mdbook 0.5.2's testsuite is broken
+                # in this pin without being substitutable.  See the overlay for
+                # details.
                 {
-                  nixpkgs.overlays = [ outputs.overlays.emudhra-ca-distrust ];
+                  nixpkgs.overlays = [
+                    outputs.overlays.emudhra-ca-distrust
+                    outputs.overlays.mdbook-skip-tests
+                  ];
                   security.pki.caCertificateBlacklist = [
                     "Comodo AAA Services root"
                     "emSign ECC Root CA - G3"
