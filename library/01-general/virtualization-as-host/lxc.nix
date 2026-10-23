@@ -1,8 +1,7 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
+{ config
+, pkgs
+, lib
+, ...
 }:
 let
   normalUserNames = lib.attrNames (
@@ -20,10 +19,12 @@ in
     unprivilegedContainers = true;
 
     defaultConfig = ''
-      lxc.net.0.type = veth
-      lxc.net.0.link = lxcbr0
-      lxc.net.0.flags = up
-      ##lxc.net.0.hwaddr = 00:16:3e:11:22:33
+      # Each lxc.* key may be specified once: repeated keys overwrite each other
+      # rather than merging, so duplicated net/include blocks are a silent trap
+      # (this file previously declared the net block three times).
+      lxc.include = /run/current-system/sw/share/lxc/config/common.conf
+      lxc.include = /run/current-system/sw/share/lxc/config/userns.conf
+
       lxc.apparmor.profile = generated
       lxc.apparmor.allow_nesting = 1
       lxc.idmap = u 0 100000 65535
@@ -38,14 +39,16 @@ in
       # lxc.idmap = u 1001 101001 64534
       # lxc.idmap = g 1001 101001 64534
 
-      # new, include common and userns:
-      lxc.include = /run/current-system/sw/share/lxc/config/common.conf
-      lxc.include = /run/current-system/sw/share/lxc/config/userns.conf
-
-      # enable network inside container(s):
+      # eth0 on the lxcbr0 bridge.
+      #
+      # hwaddr is pinned on purpose: guest NetworkManager keys its connection
+      # profiles to the MAC, so a new random MAC on every start leaves the guest
+      # with no matching profile. Give each container its own value here (or in
+      # the container config) rather than relying on the random default.
       lxc.net.0.type = veth
       lxc.net.0.link = lxcbr0
       lxc.net.0.flags = up
+      lxc.net.0.hwaddr = 00:16:3e:11:22:33
 
       # allow tun to be used in the lxc container:
       lxc.cgroup.devices.allow = c 10:200 rwm
@@ -54,19 +57,17 @@ in
     usernetConfig = usernetLines;
     lxcfs.enable = true;
     # doesn't work research needed:
+    # LXC's dnsmasq is started with --conf-file=/dev/null and gets its DHCP
+    # options on the command line, so LXC_DHCP_CONFILE is never read and
+    # dhcp-host reservations placed there are silently ignored. Per-container
+    # addresses are therefore assigned in the container's own LXC config via
+    # lxc.net.0.ipv4.address, not through a dnsmasq reservation.
     bridgeConfig = ''
       USE_LXC_BRIDGE="true"
       LXC_BRIDGE="lxcbr0"
-      LXC_DHCP_CONFILE="/etc/lxc/dnsmasq.conf"
       LXC_DOMAIN="lxc-net.local"
-      dhcp-host=osep-lxc,10.0.3.100
     '';
   };
-
-  # doesn't work, research needed:
-  environment.etc."lxc/dnsmasq.conf".text = ''
-    dhcp-host=osep-lxc,10.0.3.100
-  '';
 
   system.activationScripts.setLxcHomeACL.text = ''
     export PATH=${pkgs.acl}/bin:$PATH
