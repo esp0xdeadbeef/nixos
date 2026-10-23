@@ -11,6 +11,11 @@ let
   tangUrl = "http://${cfg.tang.host}:${toString cfg.tang.port}";
   wifiSecretPath = "/run/initrd-wpa_supplicant.conf";
 
+  # Device names are used inside systemd unit names; `root` needs no escaping,
+  # but mirror nixos/lib/utils.nix escapeSystemdPath for paths/dashes so a
+  # non-trivial deviceName still produces a valid unit.
+  escapedDevice = lib.replaceStrings [ "/" "\\" ] [ "-" "-" ] cfg.deviceName;
+
   # Legacy `secretFile` folds into the list so only `secretFiles` is used
   # downstream. Order is preserved and duplicates are dropped.
   resolvedSecretFiles = lib.unique (
@@ -197,11 +202,11 @@ in
     # servers be reachable at the same time.
     boot.initrd.systemd.services.${"clevis-try-bindings-" + cfg.deviceName} = {
       description = "Try per-site Clevis bindings for ${cfg.deviceName}";
-      wantedBy = [ "systemd-cryptsetup@${lib.escapeSystemdPath cfg.deviceName}.service" ];
+      wantedBy = [ "systemd-cryptsetup@${escapedDevice}.service" ];
       wants = [ "network-online.target" ];
       before = [
         "cryptsetup-clevis-${cfg.deviceName}.service"
-        "systemd-cryptsetup@${lib.escapeSystemdPath cfg.deviceName}.service"
+        "systemd-cryptsetup@${escapedDevice}.service"
         "initrd-switch-root.target"
         "shutdown.target"
       ];
