@@ -1,8 +1,7 @@
-{
-  config,
-  pkgs,
-  lib,
-  ...
+{ config
+, pkgs
+, lib
+, ...
 }:
 
 let
@@ -18,12 +17,23 @@ let
     mkdir -p "$SESSION_DIR" || true
     touch "$SESSION_FILE"
 
-    # grab the current container IP (adjust container name & iface if needed)
-    IP="$(lxc-attach osep-lxc -- ip -4 addr show eth0 \
-      | sed -n 's/.*inet \([0-9\.]\+\)\/.*/\1/p' | tr -d '\n')"
+    # Grab the container's IPv4 address on eth0.
+    #
+    # This is polled rather than read once: the container needs time to boot and
+    # for NetworkManager inside it to complete DHCP. The address is also scoped
+    # to `dev eth0` so docker0/br-* addresses inside the container can never be
+    # picked up by accident.
+    IP=""
+    for _ in $(seq 1 60); do
+      IP="$(lxc-attach osep-lxc -- \
+        ip -4 -o addr show dev eth0 2>/dev/null \
+        | awk '{ split($4, a, "/"); print a[1]; exit }' || true)"
+      [[ -n "$IP" ]] && break
+      sleep 2
+    done
 
     if [[ -z "$IP" ]]; then
-      echo "error: could not determine container IP" >&2
+      echo "error: could not determine container IP on eth0 after 120s" >&2
       exit 1
     fi
 
@@ -109,7 +119,10 @@ let
       echo
     } >> "$SESSION_FILE"
 
-    entry=$(lxc-attach osep-lxc -- bash -c "ip a s eth0 | sed -n 's/.*inet \([0-9\.]\+\)\/.*/\1/p' | tr -d '\n' ; echo -n ' ' ; cat /etc/ssh/ssh_host_rsa_key.pub")
+    # known_hosts entry for this container: "<ip> <ssh host pubkey>".
+    # Reuse the IP already resolved above instead of re-parsing eth0, so the two
+    # can never disagree.
+    entry="$IP $(lxc-attach osep-lxc -- cat /etc/ssh/ssh_host_rsa_key.pub)"
 
     if ! grep -Fxq "$entry" "$HOME/.ssh/known_hosts"; then
         echo "$entry" >> "$HOME/.ssh/known_hosts"
