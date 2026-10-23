@@ -14,10 +14,12 @@
   # used" set, so every radio must derive shared planes in the same order or
   # the 2.4GHz and 5GHz BSSes would disagree on the SSID. clients and
   # clients-vpn are served on both radios, so they are derived first.
+  # unlock is served on both radios too, so it follows the shared set.
   deriveOrder = [
     "cobalt-clients"
     "cobalt-clients-vpn"
     "cobalt-mgmt"
+    "cobalt-unlock"
   ];
 
   planes = [
@@ -46,7 +48,7 @@
       plane = "cobalt-unlock";
       bridge = "ap-unlock";
       keyMgmt = "WPA-PSK";
-      ssid = "secret:cobalt-unlock";
+      ssid = "derive:cobalt-unlock";
       pskKey = "cobalt-unlock";
     }
   ];
