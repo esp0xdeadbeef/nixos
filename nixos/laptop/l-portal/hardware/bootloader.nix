@@ -10,12 +10,34 @@
   # Stage-1 Wi-Fi association for Clevis/Tang unlock. The wpa_supplicant
   # config (with both the neon "diskunlock" and cobalt "cobalt-unlock"
   # networks) is SOPS-managed so the passphrases never sit in cleartext in
-  # the repo. sops-nix decrypts it at activation; see l-portal/README.md for
-  # the required `nixos-rebuild test` before `switch` on first provision.
+  # the repo.
+  #
+  # `sops.secrets...path` is /run/secrets/... -- a runtime path. systemd-boot
+  # instead *appends* initrd secrets at bootloader-install time, which requires
+  # a real /nix/store path, so the plain `.path` cannot be used as configFile
+  # (NixOS rejects it: "boot.initrd.secrets values must be unquoted paths").
+  #
+  # Stage the already-decrypted copy into the store with a pre-build hook
+  # instead: `nixos-rebuild test` makes sops-nix decrypt to /run/secrets, and
+  # the hook below snapshots that file into the store for the following
+  # `nixos-rebuild boot`. See README "Staging the initrd wifi config".
   sops.secrets."l-portal-initrd-wifi" = {
     sopsFile = relativeRepo.sourcePath "secrets/l-portal-initrd-wifi.yaml";
     format = "binary";
   };
+
+  # Only used when the decrypted secret has been staged (see README); the
+  # assertion in profiles/nixos/boot/clevis-tang-unlock.nix turns the failure
+  # into a readable message if it has not.
+  local.boot.clevisTangUnlock.wifi.configFile =
+    if builtins.pathExists /run/secrets/l-portal-initrd-wifi then
+      builtins.path
+        {
+          path = /run/secrets/l-portal-initrd-wifi;
+          name = "l-portal-initrd-wpa_supplicant.conf";
+        }
+    else
+      null;
 
   hardware.deviceTree = {
     enable = true;
@@ -95,7 +117,6 @@
     wifi = {
       enable = true;
       interface = "wlP6p1s0";
-      configFile = config.sops.secrets."l-portal-initrd-wifi".path;
       timeout = 25;
     };
     kernelModules = [
