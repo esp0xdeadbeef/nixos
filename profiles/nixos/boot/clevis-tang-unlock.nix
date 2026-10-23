@@ -10,6 +10,21 @@ let
 
   tangUrl = "http://${cfg.tang.host}:${toString cfg.tang.port}";
   wifiSecretPath = "/run/initrd-wpa_supplicant.conf";
+
+  # Legacy `secretFile` folds into the list so only `secretFiles` is used
+  # downstream. Order is preserved and duplicates are dropped.
+  resolvedSecretFiles = lib.unique (
+    cfg.secretFiles ++ lib.optional (cfg.secretFile != null) cfg.secretFile
+  );
+
+  # Staged into the initrd as /etc/clevis/<device>-N.jwe. Upstream's module only
+  # supports one JWE per device, so we stage them ourselves and drive clevis.
+  jweName = i: "${cfg.deviceName}-${toString i}";
+  jwePath = i: "/etc/clevis/${jweName i}.jwe";
+
+  stagedSecrets = lib.listToAttrs (
+    lib.imap0 (i: f: lib.nameValuePair (jwePath i) f) resolvedSecretFiles
+  );
 in
 {
   options.local.boot.clevisTangUnlock = {
@@ -24,7 +39,32 @@ in
     secretFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
-      description = "Clevis JWE file used to decrypt the generated LUKS key.";
+      description = ''
+        Clevis JWE file used to decrypt the generated LUKS key.
+
+        Deprecated in favour of `secretFiles`; when set it is appended to that
+        list. Prefer `secretFiles` so several site-specific bindings can be
+        staged independently.
+      '';
+    };
+
+    secretFiles = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      description = ''
+        Clevis JWE files tried in order when unlocking the initrd LUKS device.
+
+        Each file is an independent binding (typically one per Tang site), so
+        they can be generated separately, at different times, from different
+        networks -- a single site only has to be reachable when *its* binding
+        is created. At boot the first JWE whose Tang is reachable wins, so a
+        machine booted inside neon unlocks via the neon binding and the same
+        machine booted at cobalt unlocks via the cobalt binding, with no
+        requirement that both servers be reachable at once.
+
+        Every entry must wrap the *same* LUKS keyslot secret; use
+        `clevis-init-jwe.sh` per site to add successive bindings.
+      '';
     };
 
     tang = {
@@ -112,8 +152,8 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = cfg.secretFile != null;
-        message = "local.boot.clevisTangUnlock.secretFile must be set when Clevis/Tang unlock is enabled.";
+        assertion = cfg.secretFiles != [ ] || cfg.secretFile != null;
+        message = "local.boot.clevisTangUnlock.secretFiles (or the legacy secretFile) must be set when Clevis/Tang unlock is enabled.";
       }
       {
         assertion = !cfg.wifi.enable || cfg.wifi.interface != null;
@@ -139,7 +179,66 @@ in
 
     boot.initrd.clevis.enable = true;
     boot.initrd.clevis.useTang = true;
-    boot.initrd.clevis.devices.${cfg.deviceName}.secretFile = cfg.secretFile;
+
+    # Upstream's `boot.initrd.clevis.devices.<dev>.secretFile` only accepts a
+    # single JWE. We deliberately do NOT set it: instead every binding is staged
+    # as its own /etc/clevis/<device>-N.jwe and the service below tries them in
+    # order, so per-site bindings can be generated independently.
+    boot.initrd.secrets = lib.mkMerge [
+      stagedSecrets
+      (lib.mkIf cfg.wifi.enable { ${wifiSecretPath} = cfg.wifi.configFile; })
+    ];
+
+    # Upstream defines `cryptsetup-clevis-<device>` for its single JWE. Rather
+    # than override it, try the additional per-site bindings FIRST: whichever
+    # binding answers writes /clevis-<device>/decrypted and upstream's unit is
+    # skipped, so a machine booted at cobalt unlocks via the cobalt binding and
+    # one booted inside neon via the neon binding, with no requirement that both
+    # servers be reachable at the same time.
+    boot.initrd.systemd.services.${"clevis-try-bindings-" + cfg.deviceName} = {
+      description = "Try per-site Clevis bindings for ${cfg.deviceName}";
+      wantedBy = [ "systemd-cryptsetup@${lib.escapeSystemdPath cfg.deviceName}.service" ];
+      wants = [ "network-online.target" ];
+      before = [
+        "cryptsetup-clevis-${cfg.deviceName}.service"
+        "systemd-cryptsetup@${lib.escapeSystemdPath cfg.deviceName}.service"
+        "initrd-switch-root.target"
+        "shutdown.target"
+      ];
+      after = [
+        "systemd-modules-load.service"
+        "network-online.target"
+      ];
+      conflicts = [
+        "initrd-switch-root.target"
+        "shutdown.target"
+      ];
+      unitConfig.DefaultDependencies = "no";
+      serviceConfig.Type = "oneshot";
+      script = ''
+        set -u
+
+        out=/clevis-${cfg.deviceName}/decrypted
+        [ -s "$out" ] && exit 0
+
+        mkdir -p /clevis-${cfg.deviceName}
+        mountpoint -q /clevis-${cfg.deviceName} || mount -t ramfs none /clevis-${cfg.deviceName}
+        umask 277
+
+        ${lib.concatMapStrings (f: ''
+          if [ ! -s "$out" ] && [ -e "${f}" ]; then
+              echo "clevis: trying ${f}" >&2
+              if clevis decrypt < "${f}" > "$out.tmp" 2>/dev/null; then
+                  mv "$out.tmp" "$out"
+                  echo "clevis: unlocked via ${f}" >&2
+              else
+                  rm -f "$out.tmp"
+                  echo "clevis: ${f} could not unlock (tang unreachable?)" >&2
+              fi
+          fi
+        '') resolvedSecretFiles}
+      '';
+    };
 
     boot.initrd.systemd.network.enable = true;
     boot.initrd.systemd.network.wait-online.enable = true;
@@ -150,10 +249,6 @@ in
         matchConfig.Name = cfg.network.interface;
         inherit networkConfig;
       };
-    };
-
-    boot.initrd.secrets = lib.mkIf cfg.wifi.enable {
-      ${wifiSecretPath} = cfg.wifi.configFile;
     };
 
     boot.initrd.systemd.initrdBin = lib.mkIf cfg.wifi.enable (with pkgs; [
@@ -250,7 +345,8 @@ in
       '';
     };
 
-    boot.initrd.systemd.services."cryptsetup-clevis-${cfg.deviceName}" = {
+    # mkForce: upstream's clevis module also defines this unit (single JWE).
+    boot.initrd.systemd.services.${"cryptsetup-clevis-" + cfg.deviceName} = lib.mkForce {
       serviceConfig = {
         Restart = "on-failure";
         RestartSec = cfg.clevisService.restartSec;

@@ -71,13 +71,19 @@
   systemd.tpm2.enable = false;
 
   local.boot.clevisTangUnlock = {
-    enable = builtins.pathExists ./root.jwe;
+    enable = true;
     deviceName = "root";
-    secretFile =
-      if builtins.pathExists ./root.jwe then
-        ./root.jwe
-      else
-        null;
+    # One JWE per Tang site, staged together and tried in order at boot. Each is
+    # generated from its own site (see clevis-init-jwe.sh --site), so neither
+    # server has to be reachable when the other's binding is created.
+    #
+    # All of them wrap the same LUKS keyslot secret. A JWE whose Tang is
+    # unreachable simply fails to decrypt and the next one is tried, so a stale
+    # binding is harmless to keep -- regenerate it from its own site later.
+    secretFiles = [
+      ./root-cobalt.jwe
+      ./root-neon.jwe
+    ];
     tang = {
       host = "192.168.1.75";
       port = 7500;

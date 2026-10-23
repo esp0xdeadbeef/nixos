@@ -50,16 +50,79 @@ swapon --show
 
 ## Initrd Wi-Fi Unlock
 
-`l-portal` unlocks root through Clevis/Tang during initrd. The Tang binding is
-an SSS pin with threshold 1 over two Tang servers (any one reachable suffices):
+`l-portal` unlocks root through Clevis/Tang during initrd.
 
-- neon: `http://192.168.1.75:7500`
-- cobalt: `http://10.2.90.10:7500` (dedicated Tang server on s-nodus's unlock
-  plane, VLAN 90)
+There is **one JWE per Tang site**, not one combined binding:
+
+| file | Tang server | site |
+| --- | --- | --- |
+| `hardware/root-neon.jwe`   | `http://192.168.1.75:7500` | neon  |
+| `hardware/root-cobalt.jwe` | `http://10.2.90.10:7500`   | cobalt (l-envil unlock plane, VLAN 90) |
+
+All of them wrap the *same* LUKS keyslot secret and are staged into the initrd
+together. At boot `clevis-try-bindings-root.service` walks them in the order
+listed in `hardware/bootloader.nix` `secretFiles`; the first whose Tang answers
+unlocks root, and the rest are skipped. If none answer, boot falls back to the
+normal LUKS passphrase prompt.
+
+This split exists so each binding can be generated **from the site it belongs
+to**: only the Tang server of the site you are currently at has to be
+reachable. A single combined SSS JWE cannot be regenerated from one site alone,
+because `clevis encrypt sss` fetches every pin's advertisement live (with no
+timeout, so an unreachable server hangs the bind).
+
+### Staging a binding for a site
+
+Run from the site whose Tang you are binding:
+
+```bash
+cd ~/github/nixos/nixos/laptop/l-portal/hardware
+sudo -E ./clevis-init-jwe.sh --site cobalt     # or: --site neon
+```
+
+The script:
+
+- checks that site's Tang advertisement is reachable (fails fast, 10s timeout),
+- prompts for the current root LUKS passphrase,
+- writes `root-<site>.jwe`,
+- verifies the new JWE decrypts **before** touching LUKS,
+- adds and verifies the LUKS keyslot.
+
+`--site` is required; `--url` overrides the endpoint (e.g. a relocated Tang).
+Sites and their endpoints live in `SITE_TANG_URLS` at the top of the script —
+add an entry there and in `secretFiles` when a new Tang server appears.
+
+If `root-<site>.jwe` is not yet listed in `hardware/bootloader.nix`
+`secretFiles`, add it:
+
+```nix
+    secretFiles = [
+      ./root-neon.jwe
+      ./root-cobalt.jwe
+    ];
+```
+
+### Making a new JWE take effect
+
+The JWE is **baked into the initrd**, so rewriting the file is not enough:
+
+```bash
+git add nixos/laptop/l-portal/hardware/root-<site>.jwe
+git commit -m "fix(l-portal): rebind root LUKS to <site> tang"
+sudo nixos-rebuild boot --flake path:$HOME/github/nixos#l-portal
+```
+
+Verify before rebooting that the new initrd carries the bindings:
+
+```bash
+nix shell nixpkgs#cpio nixpkgs#zstd -c bash -c \
+  'lsinitrd /boot/EFI/nixos/*initrd* 2>/dev/null | grep clevis'
+```
+
+Note `lsinitrd` is not installed on l-portal by default.
 
 The `tang.host` / `tang.port` options in `hardware/bootloader.nix` are
-documentation only; the real endpoints are baked into `root.jwe` by
-`clevis-init-jwe.sh` (see `TANG_URLS` there).
+documentation only; the real endpoints are baked into the per-site JWEs.
 
 The initrd Wi-Fi config is SOPS-managed (`secrets/l-portal-initrd-wifi.yaml`,
 binary format) and contains both the neon `diskunlock` and cobalt
@@ -73,19 +136,7 @@ sudo nixos-rebuild test --flake .#l-portal    # decrypt sops secrets to /run/sec
 sudo nixos-rebuild switch --flake .#l-portal  # now bake them into the initrd
 ```
 
-Generate or refresh the Clevis JWE after formatting root LUKS:
-
-```bash
-cd /mnt/src/nixos/nixos/laptop/l-portal/hardware
-sudo ./clevis-init-jwe.sh
-```
-
-`clevis-init-jwe.sh` defaults to binding both Tang servers
-(`TANG_URLS="http://192.168.1.75:7500 http://10.2.90.10:7500"`). Override
-`TANG_URLS` if the endpoints change.
-
-Commit `nixos/laptop/l-portal/hardware/root.jwe` with the host config. The JWE
-is not the Wi-Fi password; it is the Tang-wrapped random unlock key.
+The JWE is not the Wi-Fi password; it is the Tang-wrapped random unlock key.
 
 ## Install With nixos-anywhere
 
@@ -178,14 +229,16 @@ printf '%s' "$new" | sudo cryptsetup open --test-passphrase \
   --key-file -
 ```
 
-Refresh the Clevis binding so initrd receives the new unlock secret:
+Refresh the per-site Clevis bindings so initrd receives the new unlock secret
+(run once per site, from that site):
 
 ```bash
 cd /home/deadbeef/github/nixos/nixos/laptop/l-portal/hardware
-sudo ./clevis-init-jwe.sh
+sudo -E ./clevis-init-jwe.sh --site cobalt
+sudo -E ./clevis-init-jwe.sh --site neon
 ```
 
-Rebuild after committing or syncing the updated `root.jwe`:
+Rebuild after committing the updated `root-<site>.jwe` files:
 
 ```bash
 cd /home/deadbeef/github/nixos
@@ -335,7 +388,8 @@ btrfs subvolume list /mnt/partition-root
 findmnt /mnt /mnt/nix /mnt/persist /mnt/partition-root /mnt/boot
 swapon --show
 test -e /mnt/persist/etc/diskunlock/wpa_supplicant.conf
-test -e /mnt/src/nixos/nixos/laptop/l-portal/hardware/root.jwe
+test -e /mnt/src/nixos/nixos/laptop/l-portal/hardware/root-cobalt.jwe
+ls /mnt/src/nixos/nixos/laptop/l-portal/hardware/root-*.jwe
 sudo efibootmgr -v
 ```
 
