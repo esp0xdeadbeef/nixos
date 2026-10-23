@@ -123,14 +123,7 @@ in
       configFile = lib.mkOption {
         type = lib.types.nullOr lib.types.path;
         default = null;
-        description = ''
-          Host-local wpa_supplicant config copied into initrd secrets.
-
-          Must be a *store* path: with `append-initrd-secrets` the file is baked
-          into the ESP at bootloader-install time, and any other path would have
-          to be copied world-readable into the Nix store. Use a pre-build hook
-          to write the decrypted file to a store path and point here.
-        '';
+        description = "Host-local wpa_supplicant config copied into initrd secrets.";
       };
 
       timeout = lib.mkOption {
@@ -175,21 +168,6 @@ in
         assertion = !cfg.wifi.enable || cfg.wifi.configFile != null;
         message = "local.boot.clevisTangUnlock.wifi.configFile must be set when initrd Wi-Fi unlock is enabled.";
       }
-      {
-        # With a loader that appends initrd secrets, NixOS requires the value to
-        # be a real store path. /run/secrets/... is not, and copying it into the
-        # store at build time would fail, so fail with a clear message instead.
-        assertion =
-          !cfg.wifi.enable
-          || !config.boot.loader.supportsInitrdSecrets
-          || lib.hasPrefix builtins.storeDir (toString cfg.wifi.configFile);
-        message = ''
-          local.boot.clevisTangUnlock.wifi.configFile must be a /nix/store path
-          when boot.loader.supportsInitrdSecrets is true (systemd-boot).
-          Stage the decrypted wpa_supplicant config into a store path first -- see
-          nixos/laptop/l-portal/README.md "Staging the initrd wifi config".
-        '';
-      }
     ];
 
     boot.initrd.systemd.enable = true;
@@ -206,6 +184,23 @@ in
 
     boot.initrd.clevis.enable = true;
     boot.initrd.clevis.useTang = true;
+
+    # Bake the bindings into the initrd instead of relying on
+    # `append-initrd-secrets`.
+    #
+    # With the default loader (systemd-boot) `supportsInitrdSecrets = true`, and
+    # secrets are appended to the ESP image at bootloader-install time. On
+    # l-portal that append did not produce a usable /.initrd-secrets, so the
+    # JWEs were never present in initrd and Tang unlock could not run. Forcing
+    # the copy path makes the initrd self-contained and verifiable with
+    # `zstd -dc initrd | cpio -it`.
+    #
+    # Safety note: this copies the JWE into the Nix store. The JWE is a
+    # Tang-wrapped ciphertext (already committed to git) and is useless without a
+    # reachable Tang, so this does not expose the LUKS key material.
+    # mkForce: systemd-boot.hardware?? no -- systemd-boot.nix sets this true
+    # unconditionally, so a plain assignment conflicts.
+    boot.loader.supportsInitrdSecrets = lib.mkForce false;
 
     # Upstream's `boot.initrd.clevis.devices.<dev>.secretFile` only accepts a
     # single JWE. We deliberately do NOT set it: instead every binding is staged
