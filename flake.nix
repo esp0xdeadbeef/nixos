@@ -534,38 +534,6 @@
               modules = [
                 outputs.nixosModules.pythonPycachePrefix
 
-                # CVE-2026-111943: eMudhra intermediate CA compromise.
-                #
-                # PR #576390 is now IN this nixpkgs pin: security.pki
-                # (nixos/modules/security/ca.nix) unconditionally blacklists the
-                # four affected roots, so the system bundle is protected without
-                # any of this.  What remains here:
-                #
-                #  - the overlay, because it darkens pkgs.cacert itself.  Plain
-                #    `pkgs.cacert` still ships `blacklist ? []`, so non-NixOS
-                #    consumers of the store closure (Go, containers, anything
-                #    reading the bundle directly) would still trust the
-                #    compromised subtree.  Keep until NSS 3.131.1+ ships in the
-                #    pin, which removes the roots upstream.
-                #
-                #  - caCertificateBlacklist is now redundant (the pin adds the
-                #    same four names itself) but harmless, so it is left as a
-                #    belt-and-braces guard against a future pin regression.
-                #
-                # `emSign Root CA - G1` is deliberately not distrusted.
-                #
-                {
-                  nixpkgs.overlays = [
-                    outputs.overlays.emudhra-ca-distrust
-                  ];
-                  security.pki.caCertificateBlacklist = [
-                    "Comodo AAA Services root"
-                    "emSign ECC Root CA - G3"
-                    "emSign Root CA - C1"
-                    "emSign ECC Root CA - C3"
-                  ];
-                }
-
                 (./. + "/${path}")
               ];
             }
