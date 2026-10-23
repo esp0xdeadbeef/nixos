@@ -552,16 +552,9 @@
                 # deliberately not distrusted.  Remove this block once the
                 # `nixpkgs` pin contains PR #576390.
                 #
-                # nix-manual-manpages-only / git-skip-tests: same universal
-                # scope for the same reason -- any host that has to build `nix`
-                # locally walks nix-manual -> mdbook and nix-functional-tests
-                # -> git, and both carry a build-blocking test problem in this
-                # pin.  See each overlay for details.
                 {
                   nixpkgs.overlays = [
                     outputs.overlays.emudhra-ca-distrust
-                    outputs.overlays.nix-manual-manpages-only
-                    outputs.overlays.git-skip-tests
                   ];
                   security.pki.caCertificateBlacklist = [
                     "Comodo AAA Services root"
