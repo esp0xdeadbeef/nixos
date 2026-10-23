@@ -536,21 +536,23 @@
 
                 # CVE-2026-111943: eMudhra intermediate CA compromise.
                 #
-                # Applied to EVERY host here, independent of per-host profile
-                # imports.  Two halves, both required:
-                #  - the overlay distrusted the roots on pkgs.cacert /
-                #    pkgs.nss-cacert (non-NixOS consumers: Go, containers,
-                #    anything reading the bundle directly) and traces a warning;
-                #  - caCertificateBlacklist must ALSO be set because
-                #    security.pki rebuilds its bundle with
-                #    `cacert.override { blacklist = cfg.caCertificateBlacklist; }`
-                #    on this (pre-fix) nixpkgs pin, so the system bundle needs
-                #    it here.
+                # PR #576390 is now IN this nixpkgs pin: security.pki
+                # (nixos/modules/security/ca.nix) unconditionally blacklists the
+                # four affected roots, so the system bundle is protected without
+                # any of this.  What remains here:
                 #
-                # The list is the exact upstream mitigation (nixpkgs #576485,
-                # PR #576390, NSS 3.131.1).  `emSign Root CA - G1` is
-                # deliberately not distrusted.  Remove this block once the
-                # `nixpkgs` pin contains PR #576390.
+                #  - the overlay, because it darkens pkgs.cacert itself.  Plain
+                #    `pkgs.cacert` still ships `blacklist ? []`, so non-NixOS
+                #    consumers of the store closure (Go, containers, anything
+                #    reading the bundle directly) would still trust the
+                #    compromised subtree.  Keep until NSS 3.131.1+ ships in the
+                #    pin, which removes the roots upstream.
+                #
+                #  - caCertificateBlacklist is now redundant (the pin adds the
+                #    same four names itself) but harmless, so it is left as a
+                #    belt-and-braces guard against a future pin regression.
+                #
+                # `emSign Root CA - G1` is deliberately not distrusted.
                 #
                 {
                   nixpkgs.overlays = [
