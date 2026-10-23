@@ -16,6 +16,10 @@ in
     root = {
       device = "/dev/disk/by-partlabel/disk-nvme0n1-luks";
       allowDiscards = true;
+      # mkForce on this attrset drops whatever the clevis profile set with
+      # mkDefault, including keyFile. Re-assert it here so initrd actually reads
+      # the key produced by clevis-try-bindings-root.
+      keyFile = "/clevis-root/decrypted";
     };
   };
 
