@@ -185,23 +185,6 @@ in
     boot.initrd.clevis.enable = true;
     boot.initrd.clevis.useTang = true;
 
-    # Bake the bindings into the initrd instead of relying on
-    # `append-initrd-secrets`.
-    #
-    # With the default loader (systemd-boot) `supportsInitrdSecrets = true`, and
-    # secrets are appended to the ESP image at bootloader-install time. On
-    # l-portal that append did not produce a usable /.initrd-secrets, so the
-    # JWEs were never present in initrd and Tang unlock could not run. Forcing
-    # the copy path makes the initrd self-contained and verifiable with
-    # `zstd -dc initrd | cpio -it`.
-    #
-    # Safety note: this copies the JWE into the Nix store. The JWE is a
-    # Tang-wrapped ciphertext (already committed to git) and is useless without a
-    # reachable Tang, so this does not expose the LUKS key material.
-    # mkForce: systemd-boot.hardware?? no -- systemd-boot.nix sets this true
-    # unconditionally, so a plain assignment conflicts.
-    boot.loader.supportsInitrdSecrets = lib.mkForce false;
-
     # Upstream's `boot.initrd.clevis.devices.<dev>.secretFile` only accepts a
     # single JWE. We deliberately do NOT set it: instead every binding is staged
     # as its own /etc/clevis/<device>-N.jwe and the service below tries them in
