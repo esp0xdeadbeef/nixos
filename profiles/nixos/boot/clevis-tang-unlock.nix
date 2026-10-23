@@ -30,6 +30,11 @@ let
   stagedSecrets = lib.listToAttrs (
     lib.imap0 (i: f: lib.nameValuePair (jwePath i) f) resolvedSecretFiles
   );
+
+  # The paths the JWEs appear at *inside the initrd*, after
+  # initrd-nixos-copy-secrets has placed boot.initrd.secrets. The unlock service
+  # must read these, not the source paths.
+  stagedPaths = lib.imap0 (i: _: jwePath i) resolvedSecretFiles;
 in
 {
   options.local.boot.clevisTangUnlock = {
@@ -195,53 +200,66 @@ in
     ];
 
     # Upstream defines `cryptsetup-clevis-<device>` for its single JWE. Rather
-    # than override it, try the additional per-site bindings FIRST: whichever
-    # binding answers writes /clevis-<device>/decrypted and upstream's unit is
-    # skipped, so a machine booted at cobalt unlocks via the cobalt binding and
-    # one booted inside neon via the neon binding, with no requirement that both
-    # servers be reachable at the same time.
+    # than override it, try the per-site bindings FIRST: whichever binding
+    # answers writes /clevis-<device>/decrypted and upstream's unit is skipped,
+    # so a machine booted at cobalt unlocks via the cobalt binding and one booted
+    # inside neon via the neon binding, with no requirement that both servers be
+    # reachable at the same time.
     boot.initrd.systemd.services.${"clevis-try-bindings-" + cfg.deviceName} = {
       description = "Try per-site Clevis bindings for ${cfg.deviceName}";
       wantedBy = [ "systemd-cryptsetup@${escapedDevice}.service" ];
-      wants = [ "network-online.target" ];
+      # network-online is what actually makes Tang reachable; copy-secrets is
+      # what puts the JWEs at their /etc/clevis paths (see initrd-secrets.nix).
+      wants = [
+        "network-online.target"
+        "initrd-nixos-copy-secrets.service"
+      ];
+      after = [
+        "systemd-modules-load.service"
+        "network-online.target"
+        "initrd-nixos-copy-secrets.service"
+      ];
       before = [
         "cryptsetup-clevis-${cfg.deviceName}.service"
         "systemd-cryptsetup@${escapedDevice}.service"
         "initrd-switch-root.target"
         "shutdown.target"
       ];
-      after = [
-        "systemd-modules-load.service"
-        "network-online.target"
-      ];
       conflicts = [
         "initrd-switch-root.target"
         "shutdown.target"
       ];
       unitConfig.DefaultDependencies = "no";
-      serviceConfig.Type = "oneshot";
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
       script = ''
         set -u
 
         out=/clevis-${cfg.deviceName}/decrypted
         [ -s "$out" ] && exit 0
 
-        mkdir -p /clevis-${cfg.deviceName}
-        mountpoint -q /clevis-${cfg.deviceName} || mount -t ramfs none /clevis-${cfg.deviceName}
-        umask 277
-
-        ${lib.concatMapStrings (f: ''
-          if [ ! -s "$out" ] && [ -e "${f}" ]; then
-              echo "clevis: trying ${f}" >&2
-              if clevis decrypt < "${f}" > "$out.tmp" 2>/dev/null; then
-                  mv "$out.tmp" "$out"
-                  echo "clevis: unlocked via ${f}" >&2
-              else
-                  rm -f "$out.tmp"
-                  echo "clevis: ${f} could not unlock (tang unreachable?)" >&2
-              fi
+        # Only mount the ramfs once a key is actually produced, so a failed
+        # unlock leaves the directory absent (systemd-cryptsetup then falls back
+        # to the passphrase prompt instead of reading an empty keyfile).
+        tmp=$(mktemp)
+        for f in ${lib.escapeShellArgs stagedPaths}; do
+          echo "clevis: trying $f" >&2
+          if clevis decrypt < "$f" > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+            mkdir -p "/clevis-${cfg.deviceName}"
+            mountpoint -q "/clevis-${cfg.deviceName}" || mount -t ramfs none "/clevis-${cfg.deviceName}"
+            install -m 0400 "$tmp" "$out"
+            echo "clevis: unlocked via $f" >&2
+            rm -f "$tmp"
+            exit 0
           fi
-        '') resolvedSecretFiles}
+          echo "clevis: $f could not unlock" >&2
+        done
+        rm -f "$tmp"
+
+        echo "clevis: no binding could unlock ${cfg.deviceName}; falling back to passphrase" >&2
+        exit 0
       '';
     };
 
