@@ -6,20 +6,15 @@
 # via OneCRL/CRLSets, but OpenSSL/libcurl and other clients that read a static
 # CA bundle do not consume revocation information, so they keep verifying.
 #
-# Our `nixpkgs` pin (26.05) predates the nixpkgs mitigation; `nixpkgs-unstable`
-# already carries it in nixos/modules/security/ca.nix (nixpkgs PRs #576390,
-# #576401, tracking issue #576485, NSS 3.131.1).  This overlay reproduces the
-# exact upstream blacklist so stable-pinned hosts (all NixOS hosts here) get the
-# same protection, and so non-NixOS consumers of pkgs.cacert / pkgs.nss-cacert
-# (Go, containers, anything reading the bundle directly) are covered too.
+# Our `nixpkgs` pin (26.05) now CONTAINS nixpkgs PR #576390: security.pki
+# blacklists these roots unconditionally, so NixOS' own system bundle is already
+# covered.  This overlay is still required for the other half: plain
+# `pkgs.cacert` ships `blacklist ? []`, so non-NixOS consumers of pkgs.cacert /
+# pkgs.nss-cacert (Go, containers, anything reading the bundle directly) would
+# still trust the compromised subtree.
 #
-# Note: `security.pki` rebuilds its bundle with
-# `cacert.override { blacklist = cfg.caCertificateBlacklist ++ [<upstream list>]; }`,
-# so for the SYSTEM bundle the same roots are applied via
-# `security.pki.caCertificateBlacklist` in flake.nix.  Both halves are needed.
-#
-# Remove this overlay (and the flake-level caCertificateBlacklist) once the
-# `nixpkgs` pin is advanced to a revision containing nixpkgs PR #576390.
+# Remove this overlay once the pin ships NSS 3.131.1+, which drops the roots
+# from the NSS bundle upstream, making the blacklist unnecessary.
 #
 # Upstream list (nixpkgs #576485):
 #   "Comodo AAA Services root"      # CVE-2026-111943
@@ -37,7 +32,7 @@ let
   ];
 
   warn = builtins.trace (
-    "WARNING: local eMudhra CA-distrust overlay is active (CVE-2026-111943): "
+    "NOTE: local eMudhra CA-distrust overlay is active (CVE-2026-111943): "
     + "cacert blacklist = [ ${builtins.concatStringsSep ", " (map (n: ''"${n}"'') blacklist)} ]; "
     + "remove it once the nixpkgs pin contains PR #576390."
   );
