@@ -463,6 +463,18 @@ in
 
                 persistFileScript =
                   pkgs.writeShellScript "persistence-persist-files" ''
+                    # The activation script runs with a minimal PATH (unlike the
+                    # per-file systemd services above, which set `path`). The
+                    # mount-file helper calls bare `findmnt`/`mount`/`touch`/
+                    # `getent`, so provide those tools explicitly or activation
+                    # aborts with "findmnt: command not found".
+                    export PATH=${
+                      lib.makeBinPath [
+                        pkgs.util-linux
+                        pkgs.coreutils
+                        pkgs.glibc.bin
+                      ]
+                    }:$PATH
                     _status=0
                     trap "_status=1" ERR
                     ${concatMapStrings mkPersistFile files}
