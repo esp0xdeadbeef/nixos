@@ -382,6 +382,7 @@ creation_rules:
           - *s-router-cobalt
           - *s-router-cobalt-new
           - *s-router-prod-cobalt
+          - *s-router-prod-cobalt
           - *s-ap-alfa
           - *s-nodus
   - path_regex: '^(secrets/)*s-router-cobalt.*\.(env|ya?ml)$'
