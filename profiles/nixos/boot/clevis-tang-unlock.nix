@@ -229,10 +229,27 @@ in
         "initrd-switch-root.target"
         "shutdown.target"
       ];
-      unitConfig.DefaultDependencies = "no";
+      unitConfig = {
+        DefaultDependencies = "no";
+        # Retry budget lives on the unit that actually performs the unlock. The
+        # single binding attempt below fails (exit 1) when no staged JWE can be
+        # decrypted; systemd then restarts the unit `startLimitBurst` times,
+        # `restartSec` apart, before giving up and letting systemd-cryptsetup
+        # fall back to the passphrase prompt.
+        StartLimitBurst = cfg.clevisService.startLimitBurst;
+        # The rate-limit window must be at least as long as the burst it is
+        # meant to cap, otherwise the default 10s window trips before the
+        # configured retries have been used. One minute per attempt is a
+        # generous window that comfortably covers the usual `restartSec` and
+        # makes `StartLimitBurst` the binding limit: after that many failed
+        # attempts systemd stops restarting and the passphrase fallback runs.
+        StartLimitIntervalSec = cfg.clevisService.startLimitBurst * 60;
+      };
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+        Restart = "on-failure";
+        RestartSec = cfg.clevisService.restartSec;
       };
       script = ''
         set -u
@@ -243,6 +260,12 @@ in
         # Only mount the ramfs once a key is actually produced, so a failed
         # unlock leaves the directory absent (systemd-cryptsetup then falls back
         # to the passphrase prompt instead of reading an empty keyfile).
+        #
+        # Each JWE carries its own Tang URL, so `clevis decrypt` reaches the
+        # right per-site server without us knowing (and possibly guessing
+        # wrong) which site we are at. A binding whose Tang is unreachable just
+        # fails and the next is tried; if every one fails we exit 1 so
+        # `Restart=on-failure` retries while the initrd network settles.
         tmp=$(mktemp)
         for f in ${lib.escapeShellArgs stagedPaths}; do
           echo "clevis: trying $f" >&2
@@ -258,8 +281,13 @@ in
         done
         rm -f "$tmp"
 
-        echo "clevis: no binding could unlock ${cfg.deviceName}; falling back to passphrase" >&2
-        exit 0
+        # Fail so `Restart=on-failure` retries: Tang may simply not have been
+        # reachable yet (address still settling, server busy). Once the restart
+        # budget is exhausted systemd leaves the unit failed, this unit's
+        # `Before=systemd-cryptsetup@${escapedDevice}.service` ordering ends, and
+        # systemd-cryptsetup falls back to the passphrase prompt.
+        echo "clevis: no binding could unlock ${cfg.deviceName}; will retry" >&2
+        exit 1
       '';
     };
 
@@ -365,18 +393,40 @@ in
           -i '${cfg.wifi.interface}' \
           -c '${wifiSecretPath}' \
           -C /run/wpa_supplicant
+
+        # Wait until wpa_supplicant has actually associated. Returning as soon as
+        # the daemon is backgrounded used to let the whole initrd race ahead while
+        # the radio was still scanning; when association lost that race the
+        # Clevis binding had no route to Tang and boot dropped to the passphrase
+        # prompt. Blocking here means systemd-networkd (ordered after this unit)
+        # only starts once there is a live link to DHCP on.
+        echo "initrd-wifi: waiting for association on '${cfg.wifi.interface}'" >&2
+        associated=0
+        for _ in $(seq 1 ${toString cfg.wifi.timeout}); do
+          if wpa_cli -p /run/wpa_supplicant -i '${cfg.wifi.interface}' status 2>/dev/null \
+              | grep -q 'wpa_state=COMPLETED'; then
+            associated=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$associated" != 1 ]; then
+          echo "initrd-wifi: no association on '${cfg.wifi.interface}' after ${toString cfg.wifi.timeout}s" >&2
+          dump_debug
+          # Do not exit non-zero: an unassociated link must not abort the boot.
+          # The clevis retry loop keeps trying, and systemd-cryptsetup falls back
+          # to the passphrase prompt if Tang never becomes reachable.
+        else
+          echo "initrd-wifi: associated on '${cfg.wifi.interface}'" >&2
+        fi
       '';
     };
 
-    # mkForce: upstream's clevis module also defines this unit (single JWE).
-    boot.initrd.systemd.services.${"cryptsetup-clevis-" + cfg.deviceName} = lib.mkForce {
-      serviceConfig = {
-        Restart = "on-failure";
-        RestartSec = cfg.clevisService.restartSec;
-      };
-
-      unitConfig.StartLimitBurst = cfg.clevisService.startLimitBurst;
-    };
+    # Upstream's `cryptsetup-clevis-<device>` (single JWE) is intentionally
+    # absent: we never set `boot.initrd.clevis.devices.<dev>.secretFile`, so the
+    # upstream module does not define it, and the per-site `clevis-try-bindings-`
+    # unit above is the sole producer of `/clevis-<device>/decrypted`. The retry
+    # settings live on that unit (see `clevisService`).
 
     boot.initrd.kernelModules = cfg.kernelModules;
   };
