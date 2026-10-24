@@ -19,7 +19,11 @@
 # image re-enters s-nodus and fails with `attribute '<vm>' missing` while
 # building rootfsImage.
 let
-  vmName = "s-router-cobalt-new";
+  # The managed cobalt router.  s-router-prod-cobalt is the production shape
+  # (prod-network/prod, -prod pinned network-* inputs); s-router-cobalt-new is
+  # the testing shape it replaced and is kept only as a rollback target, so it
+  # is deliberately NOT carrier-managed or started on boot.
+  vmName = "s-router-prod-cobalt";
 
   qgaSocketFor = name: "/run/nixos-shell-vm-manager/${name}/qga.sock";
 
@@ -137,14 +141,14 @@ in
       activation.restartOnGuestShutdown = true;
 
       # Only one cobalt router may own the shared br-cobalt-lan / br-cobalt-wan
-      # ports.  Declared in both directions so neither can be started while the
-      # other runs (see the matching Conflicts= on s-router-prod-cobalt).
+      # ports: running two duplicated every MAC on the trunk and left the
+      # downstream (APs, clients) flapping as the guests fought over the
+      # topology.  systemd stops the conflicting unit instead, which gives the
+      # intended one-at-a-time semantics.
       #
-      # Without this, starting the second router silently duplicated every MAC
-      # on the trunk and left the downstream (APs, clients) flapping as the two
-      # guests fought over the topology.  systemd stops the conflicting unit
-      # instead, which is the intended one-at-a-time semantics.
-      runner.serviceConfig.Conflicts = [ "s-router-prod-cobalt-vm.service" ];
+      # This is carrier-managed (see carrierControls below) and NOT started on
+      # boot; s-router-cobalt-new is retained purely as the rollback target.
+      runner.serviceConfig.Conflicts = [ "s-router-cobalt-new-vm.service" ];
 
       healthCheck = {
         command = lib.escapeShellArgs [
@@ -181,59 +185,6 @@ in
       };
     };
 
-    # Prod-shaped cobalt router (prod-network/prod, -prod pinned network-model
-    # inputs).  Declared alongside s-router-cobalt-new so the working VM stays
-    # available as a rollback target while the new one is proven.  Not started
-    # by the carrier watcher and not started on boot; bring it up explicitly
-    # with `systemctl start s-router-prod-cobalt-vm.service`.
-    #
-    # NOTE: both routers attach to br-cobalt-lan / br-cobalt-wan, so only one
-    # may hold the live topology at a time.  The mutual exclusion is enforced
-    # by the symmetric Conflicts= on both generated units rather than by this
-    # comment alone.
-    instances.s-router-prod-cobalt = {
-      description = "prod cobalt site router, aarch64 port (nixos-shell)";
-
-      image = vmImages.s-router-prod-cobalt;
-
-      activation.startOnBoot = false;
-      activation.restartOnGuestShutdown = true;
-
-      # See the matching declaration on s-router-cobalt-new: the two routers
-      # share physical bridge ports, so running both corrupts the topology for
-      # everything downstream.
-      runner.serviceConfig.Conflicts = [ "s-router-cobalt-new-vm.service" ];
-
-      healthCheck = {
-        command = lib.escapeShellArgs [
-          (lib.getExe guestAgentHealth)
-          (qgaSocketFor "s-router-prod-cobalt")
-        ];
-        # The guest runs systemd + container networking before it can answer on
-        # the QGA socket, and this board is memory/CPU constrained.  60 x 2s
-        # (2 min) leaves room for a slow boot, matching the router health
-        # budget used elsewhere in the fleet.
-        timeoutSeconds = 20;
-        retries = 60;
-        intervalSeconds = 2;
-      };
-
-      storage.persistentDisk = {
-        enable = true;
-        fileName = "state.qcow2";
-        size = "8G";
-      };
-
-      runner = {
-        stopGraceSeconds = 60;
-        qemuArguments = [
-          "-chardev"
-          "socket,id=qga0,path=${qgaSocketFor "s-router-prod-cobalt"},server=on,wait=off"
-          "-device"
-          "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
-        ];
-      };
-    };
 
     # Tang (NBDE) is no longer a nixos-shell VM: it runs as a plain NixOS
     # container on this host (./tang.nix), with its key database on /persist.
