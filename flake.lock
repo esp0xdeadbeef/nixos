@@ -2481,6 +2481,36 @@
         "type": "github"
       }
     },
+    "network-renderer-nebula-prod": {
+      "inputs": {
+        "network-control-plane-model": [
+          "network-control-plane-model-prod"
+        ],
+        "network-labs": [
+          "network-labs-prod-renderer"
+        ],
+        "network-realization-model": [
+          "network-realization-model-prod"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791853175,
+        "narHash": "sha256-yAxdV1VQY0opOBQkmxYDzoeO073QVTW4NXH0fJ1vgyU=",
+        "owner": "esp0xdeadbeef",
+        "repo": "network-renderer-nebula",
+        "rev": "4013bc1573773377e07e69961d3078c3d9dd7e98",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esp0xdeadbeef",
+        "repo": "network-renderer-nebula",
+        "rev": "4013bc1573773377e07e69961d3078c3d9dd7e98",
+        "type": "github"
+      }
+    },
     "network-renderer-nebula_2": {
       "inputs": {
         "network-control-plane-model": [
@@ -5103,6 +5133,7 @@
         "network-renderer-access-endpoint-nixos": "network-renderer-access-endpoint-nixos_5",
         "network-renderer-containerlab-linux-backend": "network-renderer-containerlab-linux-backend_5",
         "network-renderer-nebula": "network-renderer-nebula_5",
+        "network-renderer-nebula-prod": "network-renderer-nebula-prod",
         "network-renderer-nixos": "network-renderer-nixos_5",
         "network-renderer-nixos-legacy-prod": "network-renderer-nixos-legacy-prod",
         "network-renderer-nixos-prod": "network-renderer-nixos-prod",

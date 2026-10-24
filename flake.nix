@@ -171,6 +171,18 @@
       inputs.network-labs.follows = "network-labs-prod-renderer";
     };
 
+    # Pinned nebula renderer for the production cobalt router.  Cobalt models
+    # nebula overlays (unlike prod-network, which declares none), so the
+    # prod cobalt pipeline needs a nebula renderer on the -prod chain rather
+    # than following the unpinned main branch that s-router-cobalt-new uses.
+    network-renderer-nebula-prod = {
+      url = "github:esp0xdeadbeef/network-renderer-nebula/4013bc1573773377e07e69961d3078c3d9dd7e98";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
+      inputs.network-realization-model.follows = "network-realization-model-prod";
+      inputs.network-labs.follows = "network-labs-prod-renderer";
+    };
+
     # Frozen legacy production stack: the previous s-router-prod render
     # (prod-network/current), retained as s-router-legacy-prod.
     network-labs-legacy-prod = {
@@ -524,6 +536,11 @@
                     {
                       s-router-cobalt-new =
                         self.nixosConfigurations.s-router-cobalt-new.config.system.build.nixos-shell;
+                      # Prod-shaped cobalt router, run alongside s-router-cobalt-new
+                      # during the switch-over so the working VM stays available
+                      # as a rollback target until the new one is proven.
+                      s-router-prod-cobalt =
+                        self.nixosConfigurations.s-router-prod-cobalt.config.system.build.nixos-shell;
                       s-tang =
                         self.nixosConfigurations.s-tang.config.system.build.nixos-shell;
                     }

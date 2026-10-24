@@ -166,6 +166,49 @@ in
       };
     };
 
+    # Prod-shaped cobalt router (prod-network/prod, -prod pinned network-model
+    # inputs).  Declared alongside s-router-cobalt-new so the working VM stays
+    # available as a rollback target while the new one is proven.  Not started
+    # by the carrier watcher and not started on boot; bring it up explicitly
+    # with `systemctl start s-router-prod-cobalt-vm.service`.
+    #
+    # NOTE: both routers attach to br-cobalt-lan / br-cobalt-wan, so only one
+    # may hold the live topology at a time.
+    instances.s-router-prod-cobalt = {
+      description = "prod cobalt site router, aarch64 port (nixos-shell)";
+
+      image = vmImages.s-router-prod-cobalt;
+
+      activation.startOnBoot = false;
+      activation.restartOnGuestShutdown = true;
+
+      healthCheck = {
+        command = lib.escapeShellArgs [
+          (lib.getExe guestAgentHealth)
+          (qgaSocketFor "s-router-prod-cobalt")
+        ];
+        timeoutSeconds = 10;
+        retries = 60;
+        intervalSeconds = 2;
+      };
+
+      storage.persistentDisk = {
+        enable = true;
+        fileName = "state.qcow2";
+        size = "8G";
+      };
+
+      runner = {
+        stopGraceSeconds = 60;
+        qemuArguments = [
+          "-chardev"
+          "socket,id=qga0,path=${qgaSocketFor "s-router-prod-cobalt"},server=on,wait=off"
+          "-device"
+          "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+        ];
+      };
+    };
+
     # Tang (NBDE) server for the cobalt unlock plane.  Hosted here alongside
     # the cobalt router because both need the br-cobalt-lan trunk; the VM
     # itself joins only mgmt (VLAN 10) and serves the unlock tenant (VLAN 90)
