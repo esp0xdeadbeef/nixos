@@ -302,7 +302,17 @@ let
       install -m 0444 -o root -g root "$persistent_fullchain" "$runtime_fullchain"
       install -m 0400 -o root -g root "$persistent_key" "$runtime_key"
 
-      chown root:nginx "$runtime_dir" "$runtime_fullchain" "$runtime_key"
+      # The mail certificate is served by nginx (:443) but must also be usable
+      # when nginx is disabled and no `nginx` group exists. Chowning to a missing
+      # group fails the unit, and because the mail runtime config Requires this
+      # unit, that failure cascades into postfix and dovecot never starting at
+      # boot. Use the nginx group when present, root otherwise.
+      runtime_group="root"
+      if grep -q '^nginx:' /etc/group; then
+        runtime_group="nginx"
+      fi
+
+      chown "root:$runtime_group" "$runtime_dir" "$runtime_fullchain" "$runtime_key"
       chmod 0750 "$runtime_dir"
       chmod 0640 "$runtime_fullchain" "$runtime_key"
 
@@ -368,7 +378,7 @@ in
     systemd.tmpfiles.rules = [
       "d ${runtimeRoot} 0755 root root -"
       "d ${runtimeRoot}/mail 0755 root root -"
-      "d ${mailTlsRuntimeDir} 0750 root nginx -"
+      "d ${mailTlsRuntimeDir} 0750 root root -"
       "d ${mailAcmeDir} 0700 root root -"
     ];
 
