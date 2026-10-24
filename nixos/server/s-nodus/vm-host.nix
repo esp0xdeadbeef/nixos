@@ -2,8 +2,10 @@
 
 # nixos-shell VM host for s-nodus (BPI-R4 Pro 4E, aarch64).
 #
-# Runs two instances -- s-router-cobalt-new and s-tang -- through the same
-# nixos-shell-vm-manager module the servers use.  It is NOT the shared
+# Runs one instance -- s-router-cobalt-new -- through the same
+# nixos-shell-vm-manager module the servers use.  (Tang used to be a second
+# instance here; it is now a plain host container, see ./tang.nix.)
+# It is NOT the shared
 # server/nixos-shell-vm-inventory.nix: that imports prod-network/current/
 # inventory-neon.nix (a protected production path) to derive one VLAN3 DNS
 # record for an s-router-prod health check and then enumerates the whole
@@ -18,8 +20,6 @@
 # building rootfsImage.
 let
   vmName = "s-router-cobalt-new";
-
-  tangVmName = "s-tang";
 
   qgaSocketFor = name: "/run/nixos-shell-vm-manager/${name}/qga.sock";
 
@@ -235,51 +235,11 @@ in
       };
     };
 
-    # Tang (NBDE) server for the cobalt unlock plane.  Hosted here alongside
-    # the cobalt router because both need the br-cobalt-lan trunk; the VM
-    # itself joins only mgmt (VLAN 10) and serves the unlock tenant (VLAN 90)
-    # to LUKS clients.
-    #
-    # Deliberately NOT behind a carrierControl: a booting laptop has to reach
-    # Tang to unlock its root disk, so the server must stay up even when the
-    # WAN transceiver is absent.
-    instances.${tangVmName} = {
-      description = "cobalt Tang (NBDE) server";
-
-      image = vmImages.${tangVmName};
-
-      activation.startOnBoot = true;
-      activation.restartOnGuestShutdown = true;
-
-      healthCheck = {
-        command = lib.escapeShellArgs [
-          (lib.getExe guestAgentHealth)
-          (qgaSocketFor tangVmName)
-        ];
-        timeoutSeconds = 10;
-        retries = 60;
-        intervalSeconds = 2;
-      };
-
-      # Tang's keypair must survive reboots, otherwise every Clevis-bound LUKS
-      # disk loses its NBDE unlock path.  The guest persist subvolume lives on
-      # this qcow2.
-      storage.persistentDisk = {
-        enable = true;
-        fileName = "state.qcow2";
-        size = "2G";
-      };
-
-      runner = {
-        stopGraceSeconds = 30;
-        qemuArguments = [
-          "-chardev"
-          "socket,id=qga0,path=${qgaSocketFor tangVmName},server=on,wait=off"
-          "-device"
-          "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
-        ];
-      };
-    };
+    # Tang (NBDE) is no longer a nixos-shell VM: it runs as a plain NixOS
+    # container on this host (./tang.nix), with its key database on /persist.
+    # Keeping it off the carrier-control path is deliberate -- a booting laptop
+    # must reach Tang to unlock its root disk, so it has to be up even when no
+    # WAN transceiver is seated, which `containers.*` autoStart guarantees.
 
     # Start the cobalt router only while the WAN transceiver is present, the
     # same shape as s-sigma's `eno1-router-vms` rule on s-router-prod.
