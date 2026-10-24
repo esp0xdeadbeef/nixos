@@ -293,6 +293,20 @@ let
       activation.refreshPins = true;
     }
     {
+      name = "s-router-cobalt-new";
+      description = "cobalt site router, aarch64 port (nixos-shell)";
+      # refreshPins is pinned off deliberately.  The manager only runs
+      # `nix flake update --refresh` when REFRESH_PINS=1 (see
+      # maybe_refresh_pins in nixos-shell-vm-manager.sh), so this keeps
+      # every start on the host-pinned image instead of promoting whatever
+      # the newest pins build.  Stating it explicitly also overrides any
+      # inherited or stale REFRESH_PINS.  Rollout stays explicit via
+      # vm-rollout / vm-update.
+      activation = {
+        refreshPins = false;
+      };
+    }
+    {
       name = "s-router-vpn-egress";
       description = "VPN-egress VM (nixos-shell)";
     }
