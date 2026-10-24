@@ -542,9 +542,9 @@
                     {
                       s-router-cobalt-new =
                         self.nixosConfigurations.s-router-cobalt-new.config.system.build.nixos-shell;
-                      # Prod-shaped cobalt router, run alongside s-router-cobalt-new
-                      # during the switch-over so the working VM stays available
-                      # as a rollback target until the new one is proven.
+                      # Prod cobalt router is the carrier-managed instance (see
+                      # vm-host.nix); s-router-cobalt-new above is kept only as
+                      # the rollback target, so its image must stay buildable.
                       s-router-prod-cobalt =
                         self.nixosConfigurations.s-router-prod-cobalt.config.system.build.nixos-shell;
                     }
