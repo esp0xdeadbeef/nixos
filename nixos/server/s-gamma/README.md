@@ -190,6 +190,16 @@ The reusable mail-server profile supports account-driven retention, but
 host. Inbox cleanup is performed only by moving messages to stable destination
 mailboxes; `Junk` is a destination, never a deletion queue.
 
+The profile also ships a DANE consistency guardrail. `<host>-mail-dane-tlsa-check`
+derives the hosted domain list from the rendered Postfix `vdomains` (no domain
+names are stored in this repository), computes the live mail leaf SPKI SHA-256,
+and compares it with each domain's published `_25._tcp` TLSA. A domain passes when
+at least one published `3 1 1` pin matches; a domain fails only when it publishes
+`3 1 1` pins and none of them match, in which case the unit prints the exact
+value to publish. It is a oneshot with no `wantedBy`, so it runs nightly via
+`<host>-mail-dane-tlsa-check.timer` (not at boot) or on demand. Disable with
+`profiles.mail.server.daneTlsaCheck.enable = false`.
+
 The network address env secret is a shell env file for provider addresses:
 
 ```text
@@ -330,7 +340,9 @@ server is not an open relay.
 - `cert.nix`: ACME certificate renewal and runtime certificate paths
 - `dns.nix`: Knot authoritative DNS, zone secrets, DNS firewall ports
 - `mail.nix`: Postfix, Dovecot, Rspamd, mail secrets, mail firewall ports
-- `web.nix`: runtime webpage sync, contact backend, nginx, web firewall ports
+  (25/465/587/143/993), and the `mail-dane-tlsa-check` service/timer
+- `web.nix`: runtime webpage sync, contact backend, nginx (the reusable web
+  profile, not this file, owns the :80/:443 firewall ports)
 
 ## Web runtime
 

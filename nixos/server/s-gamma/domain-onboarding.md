@@ -64,9 +64,27 @@ the authoritative `dig @ns.theory7.net` result over the visual formatting.
 
 After deploying a certificate that adds names, recompute the live certificate
 SPKI hash and compare it with every `_25._tcp.<domain>` record that uses the
-shared mail certificate. ACME may issue a certificate with a new key when the SAN
-set changes; in that case, update the TLSA record for every existing hosted
-domain, not only the newly added one.
+shared mail certificate. The mail certificate renews with `lego --reuse-key`, so
+routine expiry renewals keep the same key and the published TLSA records stay
+valid; a new key is only issued when the SAN set changes (or the key file is
+absent). In that case, update the TLSA record for every existing hosted domain,
+not only the newly added one.
+
+`<host>-mail-dane-tlsa-check.service` runs nightly from
+`<host>-mail-dane-tlsa-check.timer` (it is a oneshot with no `wantedBy`, so it
+does not run at boot) and can be started on demand. It derives the hosted domain
+list from the rendered Postfix `vdomains` (it never hardcodes domain names),
+computes the live leaf SPKI SHA-256, and compares it against each domain's
+published `_25._tcp` TLSA. A domain fails only when it publishes `3 1 1` pins and
+none of them match; the failure output prints the exact `3 1 1 <hash>` value to
+publish per domain. Run it on demand with:
+
+```bash
+systemctl start <host>-mail-dane-tlsa-check.service
+journalctl -u <host>-mail-dane-tlsa-check.service -n 50 --no-pager
+```
+
+Manual recomputation of the live leaf SPKI hash (uppercase hex):
 
 ```bash
 ssh root@<server> "cat /persist/var/lib/acme/s-gamma-mail/fullchain.pem" |

@@ -4,6 +4,17 @@
     profiles.nixos.mail.server
   ];
 
+  # The mail firewall surface is owned by this file (see README.md). SMTP must be
+  # reachable from the outside world or inbound mail and DANE probing fail; the
+  # submission and IMAP ports carry authenticated client traffic.
+  networking.firewall.allowedTCPPorts = [
+    25 # smtp      (inbound MX + DANE)
+    465 # submissions (implicit TLS)
+    587 # submission  (STARTTLS)
+    143 # imap
+    993 # imaps
+  ];
+
   profiles.mail.server = {
     enable = true;
     sopsFile = relativeRepo.sourcePath "secrets/s-gamma-runtime.yaml";
