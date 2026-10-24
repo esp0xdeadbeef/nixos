@@ -83,6 +83,13 @@ in
     inputs.nixos-shell-vm-manager.nixosModules.default
     ./vm-host.nix
 
+    # Cobalt Tang (NBDE) as a host container instead of a nixos-shell VM.  The
+    # VM only ever wrapped this container and cost a whole QEMU process
+    # (250 MiB resident + 413 MiB swapped, 2 vCPU) for a ~25 MiB daemon on a
+    # 4-core / 3.8 GiB board that also hosts s-router-cobalt-new.  Its key
+    # database lives on /persist (not SOPS) so rotation is a file operation.
+    ./tang.nix
+
     # microSD layout.  Replicates the vendor GPT geometry (bl2/ubootenv/
     # factory/fip + production FIT + btrfs root) because the MT7988 BootROM,
     # BL2 and the stock U-Boot locate their payloads by fixed sector + GPT

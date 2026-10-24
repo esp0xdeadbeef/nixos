@@ -387,9 +387,9 @@
         # around an aarch64 guest: the runner dies with `Exec format error`
         # (exit 78/CONFIG) before the guest boots.
         s-router-prod-cobalt = "aarch64-linux";
-        # s-tang also runs under KVM on s-nodus (cobalt unlock plane), so the
-        # guest must match the board too.
-        s-tang = "aarch64-linux";
+        # NOTE: s-tang is intentionally absent -- Tang runs as a host container
+        # on s-nodus (nixos/server/s-nodus/tang.nix) instead of a nixos-shell
+        # VM, so it has no VM image and no guest architecture.
       };
 
       hostSystemFor = name: hostSystems.${name} or "x86_64-linux";
@@ -547,8 +547,6 @@
                       # as a rollback target until the new one is proven.
                       s-router-prod-cobalt =
                         self.nixosConfigurations.s-router-prod-cobalt.config.system.build.nixos-shell;
-                      s-tang =
-                        self.nixosConfigurations.s-tang.config.system.build.nixos-shell;
                     }
                   else
                     { };
