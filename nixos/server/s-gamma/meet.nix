@@ -196,8 +196,10 @@ in
     script = "${pkgs.bash}/bin/bash ${renderScript}";
   };
 
-  # appendHttpConfig is types.lines, so it merges with the web profile's.
-  services.nginx.appendHttpConfig = ''
+  # appendHttpConfig is types.lines, so it merges with the web profile's. Only
+  # add the meet vhost while public content is enabled; while the site is gated
+  # the maintenance config is the single default server for :80/:443.
+  services.nginx.appendHttpConfig = lib.mkIf config.profiles.web.server.content.enable ''
     include ${nginxRuntimeConf};
   '';
 
