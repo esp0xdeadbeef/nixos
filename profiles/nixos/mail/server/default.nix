@@ -14,6 +14,7 @@ let
   rspamdRuntimeConfigService = "${hostName}-rspamd-runtime-config";
   sharedSubscriptionsService = "${hostName}-mail-shared-subscriptions";
   mailRetentionService = "${hostName}-mail-retention";
+  daneTlsaCheckService = "${hostName}-mail-dane-tlsa-check";
   retentionMaxDays = cfg.retention.maxDays;
 
   runtimeRoot = cfg.runtimeRoot;
@@ -88,6 +89,16 @@ let
       mailboxSetEnvPathList
       pkgs
       retentionMaxDays
+      ;
+  };
+
+  verifyDaneTlsa = import ./dane-tlsa-check.nix {
+    inherit
+      hostName
+      lib
+      mailTlsFullchainPath
+      pkgs
+      postfixRuntimeDir
       ;
   };
 
@@ -218,6 +229,28 @@ in
         type = lib.types.nullOr lib.types.str;
         default = null;
         description = "Runtime private key path for SMTP and IMAP TLS.";
+      };
+    };
+
+    daneTlsaCheck = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether to verify that every hosted domain's published _25._tcp TLSA record matches the live mail leaf certificate.";
+      };
+
+      timer = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether to re-run the DANE/TLSA consistency check periodically in addition to after each certificate refresh.";
+        };
+
+        onCalendar = lib.mkOption {
+          type = lib.types.str;
+          default = "*-*-* 05:10:00";
+          description = "Calendar interval for the periodic DANE/TLSA consistency check.";
+        };
       };
     };
 
@@ -455,6 +488,33 @@ in
       timerConfig = {
         OnCalendar = "*-*-* 04:20:00";
         RandomizedDelaySec = "30min";
+        Persistent = true;
+      };
+    };
+
+    systemd.services.${daneTlsaCheckService} = lib.mkIf cfg.daneTlsaCheck.enable {
+      description = "Verify hosted domain DANE TLSA records match the live mail leaf certificate";
+      after = [
+        mailRuntimeConfigUnit
+        networkAddressesUnit
+      ];
+      requires = [ mailRuntimeConfigUnit ];
+      preStart = waitForReadableFiles "dane tlsa check" [
+        mailTlsFullchainPath
+        "${postfixRuntimeDir}/vdomains"
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = lib.getExe verifyDaneTlsa;
+      };
+    };
+
+    systemd.timers.${daneTlsaCheckService} = lib.mkIf (cfg.daneTlsaCheck.enable && cfg.daneTlsaCheck.timer.enable) {
+      description = "Periodic DANE TLSA consistency check";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = cfg.daneTlsaCheck.timer.onCalendar;
+        RandomizedDelaySec = "15min";
         Persistent = true;
       };
     };
