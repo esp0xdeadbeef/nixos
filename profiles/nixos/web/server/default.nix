@@ -233,6 +233,27 @@ in
       };
     };
 
+    content = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Serve the public website. When false, nginx and port 80/443 stay
+          up (so ACME HTTP-01 renewals keep working) but every request to the
+          site itself is proxied to the backend's maintenance response.
+        '';
+      };
+
+      maintenanceDownstream = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Also suppress the meet/galene vhosts. Use with `enable = false` when
+          the whole public surface has to be offline.
+        '';
+      };
+    };
+
     backend = {
       host = lib.mkOption {
         type = lib.types.str;
@@ -555,6 +576,43 @@ in
       ];
     };
 
+    # The rendered runtime config includes the web and meet vhosts. When the
+    # site content is disabled we keep nginx (and its :80 ACME listener) but
+    # feed it a config that only answers the challenge path.
+    environment.etc."${hostName}-nginx-maintenance.conf".text = ''
+      server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+
+        # Must stay above nginx's global :80 redirect to https. Without this
+        # the server-level `return 301` wins and the callback is never served.
+        location /.well-known/acme-challenge/ {
+          root /var/lib/acme/acme-challenge;
+          default_type text/plain;
+          try_files $uri =404;
+        }
+
+        location / {
+          default_type text/plain;
+          return 503 "Service temporarily unavailable\\n";
+        }
+      }
+
+      server {
+        listen 443 ssl default_server;
+        listen [::]:443 ssl default_server;
+        server_name _;
+        ssl_certificate ${mailTlsFullchainPath};
+        ssl_certificate_key ${mailTlsKeyPath};
+
+        location / {
+          default_type text/plain;
+          return 503 "Service temporarily unavailable\\n";
+        }
+      }
+    '';
+
     services.nginx = {
       enable = true;
       recommendedGzipSettings = true;
@@ -568,7 +626,12 @@ in
           'referer="$http_referer" user_agent="$http_user_agent"';
         access_log /var/log/nginx/access.log managed_web_host_combined;
 
-        include ${nginxRenderedHttpConfPath};
+        ${
+          if cfg.content.enable then
+            "include ${nginxRenderedHttpConfPath};"
+          else
+            "include /etc/${hostName}-nginx-maintenance.conf;"
+        }
       '';
     };
 
