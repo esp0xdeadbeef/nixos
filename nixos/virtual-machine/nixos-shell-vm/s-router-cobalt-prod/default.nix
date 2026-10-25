@@ -8,7 +8,7 @@
 , ...
 }:
 let
-  hostName = "s-router-prod-cobalt";
+  hostName = "s-router-cobalt-prod";
   # aarch64: this VM is meant to run on the BPI-R4 Pro 4E (MT7988A) under
   # KVM, so it must match the host architecture.  The whole GAMP pipeline
   # (CPM, realization model, nixos/wireguard/nebula renderers) is arch-generic
@@ -101,7 +101,7 @@ in
         modelSource
         ;
 
-      hostName = "s-router-prod-cobalt";
+      hostName = "s-router-cobalt-prod";
       # Production cobalt router: renders prod-network/prod against the
       # -prod pinned network-* inputs (same stability posture as
       # s-router-prod), so a rebuild cannot follow an unpinned test revision.
@@ -115,7 +115,7 @@ in
       intentFileName = "intent-cobalt.nix";
       inventoryFileName = "inventory-cobalt.nix";
       inherit system vmNics;
-      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-prod-cobalt/default.nix";
+      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-cobalt-prod/default.nix";
     })
   ];
 
