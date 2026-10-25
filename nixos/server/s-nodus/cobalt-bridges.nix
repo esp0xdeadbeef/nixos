@@ -24,12 +24,22 @@ let
   # Single source of truth for the Ethernet port map (DT label + role).
   portMap = import ./lan-port-map.nix { inherit lib; };
 
-  # VLAN used for the untagged access ports (matches the cobalt clients plane).
-  clientVlan = 30;
+  # VLANs the host terminates off the trunk for its untagged access ports.
+  #
+  #   clientsVlan = cobalt-clients (30): the host's own management/underlay
+  #                 rides here as DHCP (see the vlan30 rule below), and
+  #                 mxl_lan1 is the original access jack.
+  clientsVlan = 30;
+
+  # Every VLAN the host must terminate from the trunk (child netdev + bridge).
+  accessVlans = [ clientsVlan ];
+
+  # The bridge an access port joins for its VLAN.
+  accessBridge = vlan: "vlan${toString vlan}";
 
   # networkd `.network` stanza for one mapped port, keyed by its DT label.
   #   trunk      -> 802.1Q trunk into br-cobalt-lan
-  #   access     -> untagged clients VLAN into the vlan30 access bridge
+  #   access     -> untagged VLAN into that VLAN's access bridge (p.vlan)
   #   unused     -> realized netdev, no bridge (jack present, no cobalt role)
   #   management -> a plain, unaddressed jack.  The host's own management/
   #                 underlay no longer rides a dedicated physical jack: it now
@@ -52,7 +62,7 @@ let
         linkConfig.RequiredForOnline = "no";
         networkConfig = {
           Bridge =
-            if p.role == "trunk" then "br-cobalt-lan" else "vlan${toString clientVlan}";
+            if p.role == "trunk" then "br-cobalt-lan" else accessBridge p.vlan;
         };
       };
 
@@ -87,31 +97,37 @@ in
         Kind = "bridge";
       };
     };
-
-    # VLAN ${toString clientVlan} derived from the LAN trunk.  Its name must be
-    # <= 15 bytes (IFNAMSIZ); "br-cobalt-lan.30" would be 16 and is rejected.
-    "20-cobalt-lan.${toString clientVlan}" = {
-      netdevConfig = {
-        Name = "cobalt-lan.${toString clientVlan}";
-        Kind = "vlan";
+  }
+  # One VLAN child per access VLAN, derived from the LAN trunk.  Names must be
+  # <= 15 bytes (IFNAMSIZ); "br-cobalt-lan.30" would be 16 and is rejected.
+  // lib.listToAttrs (map
+    (vlan: {
+      name = "20-cobalt-lan.${toString vlan}";
+      value = {
+        netdevConfig = {
+          Name = "cobalt-lan.${toString vlan}";
+          Kind = "vlan";
+        };
+        vlanConfig.Id = vlan;
       };
-      vlanConfig.Id = clientVlan;
-    };
-
-    # Untagged VLAN ${toString clientVlan} segment the access ports join.
-    "20-vlan${toString clientVlan}" = {
-      netdevConfig = {
-        Name = "vlan${toString clientVlan}";
+    })
+    accessVlans)
+  # Untagged segment the access ports of each VLAN join.
+  // lib.listToAttrs (map
+    (vlan: {
+      name = accessBridge vlan;
+      value.netdevConfig = {
+        Name = accessBridge vlan;
         Kind = "bridge";
       };
-    };
-  };
+    })
+    accessVlans);
 
   systemd.network.networks = lanNetworks // {
     "10-br-cobalt-lan" = {
       matchConfig.Name = "br-cobalt-lan";
       linkConfig.RequiredForOnline = "no";
-      networkConfig.VLAN = [ "cobalt-lan.${toString clientVlan}" ];
+      networkConfig.VLAN = [ "cobalt-lan.${toString clientsVlan}" ];
     };
 
     "10-br-cobalt-wan" = {
@@ -130,26 +146,33 @@ in
       networkConfig.Bridge = "br-cobalt-wan";
     };
 
-    # VLAN child off the trunk -> untagged access bridge.
-    "20-cobalt-lan.${toString clientVlan}" = {
-      matchConfig.Name = "cobalt-lan.${toString clientVlan}";
-      linkConfig.RequiredForOnline = "no";
-      networkConfig.Bridge = "vlan${toString clientVlan}";
-    };
-
-    # The access bridge carries the host's own DHCP management address (the
+    # The access bridge carrying the host's own DHCP management address (the
     # host's management/underlay, used by nebula and for SSH, rides the trunk as
     # tagged VLAN 30 rather than a dedicated mgmt jack, so it survives a
     # missing/moved mgmt cable).  The cobalt VM still owns routing/NAT here.
-    "20-vlan${toString clientVlan}" = {
-      matchConfig.Name = "vlan${toString clientVlan}";
+    #
+    # Only VLAN 30 is host-addressed; any other access VLAN's bridge
+    # deliberately gets NO address, since it is a pass-through for clients.
+    "20-vlan${toString clientsVlan}" = {
+      matchConfig.Name = accessBridge clientsVlan;
       linkConfig.RequiredForOnline = "yes";
       networkConfig = {
         DHCP = "ipv4";
         LinkLocalAddressing = "no";
       };
     };
-  };
+  }
+    // lib.listToAttrs
+    (map
+      (vlan: {
+        name = "20-cobalt-lan.${toString vlan}";
+        value = {
+          matchConfig.Name = "cobalt-lan.${toString vlan}";
+          linkConfig.RequiredForOnline = "no";
+          networkConfig.Bridge = accessBridge vlan;
+        };
+      })
+      accessVlans);
 
   # QEMU attaches the VM's NICs with the setuid qemu-bridge-helper, which
   # refuses any bridge not listed in /etc/qemu/bridge.conf.  The libvirtd
