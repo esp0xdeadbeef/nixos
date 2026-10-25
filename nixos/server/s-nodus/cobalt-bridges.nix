@@ -176,6 +176,29 @@ in
       };
     };
   }
+    # Every remaining access VLAN still needs a `.network` file, even though it
+    # is deliberately unaddressed.  Without one, systemd-networkd never matches
+    # the bridge and leaves it `unmanaged`/DOWN: the .netdev creates vlan50, the
+    # jack (mxl_lan2) enslaves to it correctly, but the bridge carries no
+    # traffic, so the IoT bench jack is dead while looking wired up.
+    #
+    # These are pure L2 pass-throughs, so they take no address and no DHCP; the
+    # cobalt VM is the only thing that may address them.
+    // lib.listToAttrs
+    (map
+      (vlan: {
+        name = "20-vlan${toString vlan}";
+        value = {
+          matchConfig.Name = accessBridge vlan;
+          # A bench jack must never hold up boot: its cable may be unplugged.
+          linkConfig.RequiredForOnline = "no";
+          networkConfig = {
+            DHCP = "no";
+            LinkLocalAddressing = "no";
+          };
+        };
+      })
+      (lib.filter (vlan: vlan != clientsVlan) accessVlans))
     // lib.listToAttrs
     (map
       (vlan: {
