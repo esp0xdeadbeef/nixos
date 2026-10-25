@@ -4,10 +4,16 @@
 # (Banana Pi BPI-R4 Pro 4E).
 #
 # Role (mirrors nixos/laptop/l-envil/hardware/cobalt-bridges.nix):
-#   lan2  -> 802.1Q trunk into br-cobalt-lan   (carries the cobalt LAN trunk)
-#   lan3  -> access port, untagged (VLAN 30)    (clients)
-#   lan5  -> management (DHCP, host uplink/nebula) -- NOT part of the bridges
+#   mxl_lan0 -> 802.1Q trunk into br-cobalt-lan (carries the cobalt LAN trunk)
+#   mxl_lan1 -> access port, untagged (VLAN 30)  (clients)
+#   mxl_lan2 -> access port, untagged (VLAN 50)  (cobalt-iot; lab/OSEE bench)
+#   lan5     -> management (DHCP, host uplink/nebula) -- NOT part of the bridges
 #   sfp1/sfp2 -> SFP+ cages; sfp2 is the WAN source for VM activation
+#
+# VLAN 50 is `cobalt-iot`: one of the tenants the intent grants
+# `allowTenantToWan` (prio 120), so a device on mxl_lan2 gets DHCP from the
+# cobalt router AND Internet egress, on its own subnet (10.2.50.0/24) rather
+# than sharing VLAN 30 with this host (10.2.30.100) and the AP clients.
 #
 # This binds realization mechanics (which physical port carries which role,
 # runtime interface names, bridge/IPAM plumbing).  It adds no network meaning:
@@ -29,10 +35,16 @@ let
   #   clientsVlan = cobalt-clients (30): the host's own management/underlay
   #                 rides here as DHCP (see the vlan30 rule below), and
   #                 mxl_lan1 is the original access jack.
+  #   iotVlan     = cobalt-iot (50): mxl_lan2's bench plane.  Kept separate
+  #                 from clients so lab traffic cannot reach this host's own
+  #                 management address or the AP clients L2.
+  #
+  # Both are `allowTenantToWan` tenants, so both egress to the Internet.
   clientsVlan = 30;
+  iotVlan = 50;
 
   # Every VLAN the host must terminate from the trunk (child netdev + bridge).
-  accessVlans = [ clientsVlan ];
+  accessVlans = [ clientsVlan iotVlan ];
 
   # The bridge an access port joins for its VLAN.
   accessBridge = vlan: "vlan${toString vlan}";
@@ -127,6 +139,7 @@ in
     "10-br-cobalt-lan" = {
       matchConfig.Name = "br-cobalt-lan";
       linkConfig.RequiredForOnline = "no";
+      # Feed every access VLAN the host terminates off the trunk.
       networkConfig.VLAN = [ "cobalt-lan.${toString clientsVlan}" ];
     };
 
@@ -151,8 +164,9 @@ in
     # tagged VLAN 30 rather than a dedicated mgmt jack, so it survives a
     # missing/moved mgmt cable).  The cobalt VM still owns routing/NAT here.
     #
-    # Only VLAN 30 is host-addressed; any other access VLAN's bridge
-    # deliberately gets NO address, since it is a pass-through for clients.
+    # Only VLAN 30 is host-addressed.  VLAN 50's bridge deliberately gets NO
+    # address: it is a pass-through for the bench, and the host must not take a
+    # second management address on it.
     "20-vlan${toString clientsVlan}" = {
       matchConfig.Name = accessBridge clientsVlan;
       linkConfig.RequiredForOnline = "yes";

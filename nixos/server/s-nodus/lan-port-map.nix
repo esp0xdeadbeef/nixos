@@ -92,12 +92,21 @@ let
   #
   # The four 2.5G jacks are the real cobalt-facing ports: the trunk (tagged
   # VLAN 30) is on mxl_lan0 (verified on the wire: it carries tagged VLANs
-  # 20/30/31/50/51/90) and the untagged access port on mxl_lan1.
+  # 20/30/31/50/51/90).  The untagged access jacks are mxl_lan1 (VLAN 30,
+  # cobalt-clients) and mxl_lan2 (VLAN 50, cobalt-iot).
+  #
+  # mxl_lan2 is the lab/OSEE bench jack.  It sits on cobalt-iot rather than
+  # cobalt-clients because VLAN 30 is shared with THIS host's own management
+  # address (10.2.30.100) and the AP client BSSes, and its DHCP pool starts at
+  # 10.2.30.100 -- i.e. the same address this host holds.  cobalt-iot is a
+  # separate tenant with its own prefix (10.2.50.0/24) that is also granted
+  # allowTenantToWan (prio 120), so the bench still gets Internet egress.
+  #
   #   vlan = the untagged VLAN the jack terminates into (access role only)
   mxlPorts = [
     { port = 1; phyAddr = 0; label = "mxl_lan0"; role = "trunk"; }
     { port = 2; phyAddr = 1; label = "mxl_lan1"; role = "access"; vlan = 30; }
-    { port = 3; phyAddr = 2; label = "mxl_lan2"; role = "unused"; }
+    { port = 3; phyAddr = 2; label = "mxl_lan2"; role = "access"; vlan = 50; }
     { port = 4; phyAddr = 3; label = "mxl_lan3"; role = "unused"; }
   ];
 
@@ -244,7 +253,10 @@ in
   inherit internalPorts mxlPorts mgmtLabel baseFragment;
 
   # Every cobalt-owned netdev with its role:
-  #   lan5 -> management, lan2 -> trunk, lan3 -> access,
-  #   mxl_lan0..3 -> unused (jack exists, no cobalt role yet).
+  #   lan5 -> management,
+  #   mxl_lan0 -> trunk,
+  #   mxl_lan1 -> access VLAN 30 (cobalt-clients),
+  #   mxl_lan2 -> access VLAN 50 (cobalt-iot, lab bench),
+  #   mxl_lan3 -> unused (jack exists, no cobalt role yet).
   ports = internalPorts ++ mxlPorts;
 }
