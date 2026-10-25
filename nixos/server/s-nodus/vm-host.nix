@@ -19,11 +19,11 @@
 # image re-enters s-nodus and fails with `attribute '<vm>' missing` while
 # building rootfsImage.
 let
-  # The managed cobalt router.  s-router-prod-cobalt is the production shape
+  # The managed cobalt router.  s-router-cobalt-prod is the production shape
   # (prod-network/prod, -prod pinned network-* inputs); s-router-cobalt-new is
   # the testing shape it replaced and is kept only as a rollback target, so it
   # is deliberately NOT carrier-managed or started on boot.
-  vmName = "s-router-prod-cobalt";
+  vmName = "s-router-cobalt-prod";
 
   qgaSocketFor = name: "/run/nixos-shell-vm-manager/${name}/qga.sock";
 

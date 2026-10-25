@@ -103,13 +103,13 @@ that, use the managed-instance path on the board itself:
 vm-update s-router-cobalt-new /home/deadbeef/github/nixos
 systemctl start s-router-cobalt-new-vm.service   # after stopping prod
 systemctl stop  s-router-cobalt-new-vm.service
-systemctl start s-router-prod-cobalt-vm.service
+systemctl start s-router-cobalt-prod-vm.service
 ```
 
 Caveats learned the hard way:
 
 - `vm-update` only accepts **managed** instances. `s-router-cobalt-new` is not
-  one on s-nodus today (`vmName = "s-router-prod-cobalt"` in
+  one on s-nodus today (`vmName = "s-router-cobalt-prod"` in
   `nixos/server/s-nodus/vm-host.nix`), so `vm-update s-router-cobalt-new ...`
   fails with `nixos-shell-vm-manager: unmanaged VM: s-router-cobalt-new`.
 - **Do not stop `nixos-shell-wan-router-vms.service`.** It is the recovery
@@ -117,11 +117,11 @@ Caveats learned the hard way:
   is *remembered*:
 
   ```
-  s-router-prod-cobalt: carrier-up start preserved explicit-stop authority
+  s-router-cobalt-prod: carrier-up start preserved explicit-stop authority
   ```
 
   Which means: if you stop prod and your restore path fails, nothing brings it
   back. Keep the watcher running and restore with
-  `systemctl start s-router-prod-cobalt-vm.service`.
+  `systemctl start s-router-cobalt-prod-vm.service`.
 - `br-cobalt-lan` / `br-cobalt-wan` are shared with prod. Only one cobalt
   router can run at a time.
