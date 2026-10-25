@@ -51,18 +51,24 @@ let
   # mainline board dtsi (the vendor/OpenWrt name for the same jack is `lan0`).
   mgmtLabel = "lan5";
 
-  # Internal switch jacks (1G).  Port 0 (`lan5`) is management; ports 2 and 3
-  # exist as real jacks too (verified: the vendor OpenWrt links internal `lan2`
-  # at 1G), but the cobalt trunk and access roles are carried on the 2.5G MxL
-  # jacks (see mxlPorts), so these are left as plain unbridged ports.
+  # Internal switch jacks (1G).  This board is an 8X population: the internal
+  # MT7988 switch has exactly ONE jack, port 0 (`lan5`, management).  Ports 1, 2
+  # and 3 each have a PHY/LED but NO connector, so they must never be exposed as
+  # netdevs -- declaring them here produced /etc/systemd/network/10-lan2.network
+  # and 10-lan3.network rules matching nothing, on every boot.
+  #
+  # Verified against ./dtb/mt7988a-bananapi-bpi-r4-pro-4e-sd.dts, which is the
+  # tree this board actually boots: switch ports 1, 2 and 3 are all
+  # `status = "disabled"`, and only port 0 carries a label.  Confirmed on the
+  # running host: `ls /sys/class/net` has lan5 but no lan2/lan3.
+  #
+  # The cobalt trunk and access roles are carried on the 2.5G MxL jacks (see
+  # mxlPorts), so the internal switch contributes only the management jack.
   #
   #   switchPort = switch port index (port@N / ethernet-phy@N on &switch)
   #   label      = the netdev name the kernel gives it (IFNAMSIZ <= 15)
   #   role       = how cobalt-bridges.nix wires it
-  internalPorts = [
-    { switchPort = 2; label = "lan2"; role = "unused"; }
-    { switchPort = 3; label = "lan3"; role = "unused"; }
-  ];
+  internalPorts = [ ];
 
   # Internal switch port 1 has a PHY/LED but no connector; keep the LED alive
   # and leave the port disabled (mainline's board dtsi already does).
