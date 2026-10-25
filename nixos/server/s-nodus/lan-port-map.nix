@@ -93,9 +93,10 @@ let
   # The four 2.5G jacks are the real cobalt-facing ports: the trunk (tagged
   # VLAN 30) is on mxl_lan0 (verified on the wire: it carries tagged VLANs
   # 20/30/31/50/51/90) and the untagged access port on mxl_lan1.
+  #   vlan = the untagged VLAN the jack terminates into (access role only)
   mxlPorts = [
     { port = 1; phyAddr = 0; label = "mxl_lan0"; role = "trunk"; }
-    { port = 2; phyAddr = 1; label = "mxl_lan1"; role = "access"; }
+    { port = 2; phyAddr = 1; label = "mxl_lan1"; role = "access"; vlan = 30; }
     { port = 3; phyAddr = 2; label = "mxl_lan2"; role = "unused"; }
     { port = 4; phyAddr = 3; label = "mxl_lan3"; role = "unused"; }
   ];
