@@ -329,20 +329,10 @@ let
       storageSize = "4G";
       stopGraceSeconds = 30;
     }
-    {
-      name = "s-tang";
-      description = "cobalt Tang (NBDE) server";
-      persistentDisk = false;
-      stopGraceSeconds = 30;
-      qemuArguments = [
-        # Drop the nixos-shell default user-mode NAT NIC; the Tang host only
-        # needs the cobalt trunk (mgmt VLAN 10 + unlock VLAN 90).
-        "-net"
-        "none"
-        "-nic"
-        "bridge,br=br-cobalt-lan,model=virtio-net-pci"
-      ];
-    }
+    # NOTE: there is no `s-tang` instance.  Tang (NBDE) runs as a host
+    # container on s-nodus (nixos/server/s-nodus/tang.nix), not a nixos-shell
+    # VM, so it has no `nixosConfigurations.s-tang` image for this inventory to
+    # reference.
     {
       name = "s-ap-nighthawk";
       description = "cobalt Nighthawk AP (mt7925u) on the cobalt trunk";
