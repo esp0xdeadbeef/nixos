@@ -36,18 +36,21 @@ let
   #                 comes off the trunk as tagged VLAN 30 (see the vlan30 DHCP
   #                 rule below), so it survives losing/moving the mgmt cable.
   mkPortNetwork = p:
-    if p.role == "management" then
+    if p.role == "management" || p.role == "unused" then
       lib.nameValuePair "10-${p.label}"
         {
           matchConfig.Name = p.label;
           linkConfig.RequiredForOnline = "no";
+          # An `unused` jack is realized but deliberately inert: no bridge, no
+          # address.  It must not carry a `Bridge=` key at all -- emitting one
+          # under `mkIf false` still leaves a dangling directive in the unit.
           networkConfig = { };
         }
     else
       lib.nameValuePair "10-${p.label}" {
         matchConfig.Name = p.label;
         linkConfig.RequiredForOnline = "no";
-        networkConfig = lib.mkIf (p.role == "trunk" || p.role == "access") {
+        networkConfig = {
           Bridge =
             if p.role == "trunk" then "br-cobalt-lan" else "vlan${toString clientVlan}";
         };
