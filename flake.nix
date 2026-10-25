@@ -381,12 +381,12 @@
         # match the board.  This is the only place its architecture is set;
         # every other VM defaults to x86_64-linux.
         s-router-cobalt-new = "aarch64-linux";
-        # s-router-prod-cobalt is the prod-shaped cobalt router; it also runs
+        # s-router-cobalt-prod is the prod-shaped cobalt router; it also runs
         # under KVM on s-nodus, so it must match the board.  Without this it
         # falls back to x86_64-linux, which builds an x86_64 runner wrapper
         # around an aarch64 guest: the runner dies with `Exec format error`
         # (exit 78/CONFIG) before the guest boots.
-        s-router-prod-cobalt = "aarch64-linux";
+        s-router-cobalt-prod = "aarch64-linux";
         # NOTE: s-tang is intentionally absent -- Tang runs as a host container
         # on s-nodus (nixos/server/s-nodus/tang.nix) instead of a nixos-shell
         # VM, so it has no VM image and no guest architecture.
@@ -545,8 +545,8 @@
                       # Prod cobalt router is the carrier-managed instance (see
                       # vm-host.nix); s-router-cobalt-new above is kept only as
                       # the rollback target, so its image must stay buildable.
-                      s-router-prod-cobalt =
-                        self.nixosConfigurations.s-router-prod-cobalt.config.system.build.nixos-shell;
+                      s-router-cobalt-prod =
+                        self.nixosConfigurations.s-router-cobalt-prod.config.system.build.nixos-shell;
                     }
                   else
                     { };
