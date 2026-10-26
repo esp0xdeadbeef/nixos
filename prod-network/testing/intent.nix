@@ -8,6 +8,22 @@ let
   traceroutePorts = builtins.genList (x: 33434 + x) 90;
 
   trafficTypes = [
+    # The full outbound internet class: any protocol to anywhere outside the
+    # site. This exists so a tenant's internet permission can name a real,
+    # declared class (FS-180) instead of relying on the validator's synthetic
+    # `"any"`. It is deliberately broad; narrower classes (dns, icmp,
+    # traceroute, per-service ports) are declared separately and take their own
+    # precedence.
+    {
+      name = "internet";
+      match = [
+        {
+          proto = "any";
+          family = "any";
+        }
+      ];
+    }
+
     {
       name = "icmp";
       match = [
@@ -208,6 +224,21 @@ let
     }
   ];
 
+  # A tenant's outbound internet permission, as a bounded FS-180 tuple.
+  #
+  # This used to name no traffic class and no exit scope:
+  #
+  #   to = { kind = "external"; };   # no scope
+  #   # no trafficType                  -> compiler fills in "any"
+  #
+  # `"any"` is a validator-level class the compiler synthesises, never a
+  # declared traffic type, and the control-plane model drops a relation whose
+  # class it cannot resolve to a match -- so every tenant got DNS (its own
+  # explicit relation) and nothing else. That is why the IoT bench had no
+  # internet while ping appeared to work over an unrelated Wi-Fi path.
+  #
+  # FS-180 requires the tuple to name the destination scope and the traffic
+  # class, so name them: the `wan` exit scope and the `internet` class below.
   allowTenantToWan = tenant: priority: {
     id = "allow-${tenant}-to-wan";
     inherit priority;
@@ -217,7 +248,9 @@ let
     };
     to = {
       kind = "external";
+      scope = "core";
     };
+    trafficType = "internet";
     action = "allow";
     returnBehavior = "symmetric";
   };
@@ -3434,8 +3467,26 @@ in
         (allowTenantToWan "cobalt-clients" 100)
         (allowTenantToWan "cobalt-svc" 110)
         (allowTenantToWan "cobalt-iot" 120)
-        (allowTenantToWan "cobalt-iot-srv" 130)
         (allowTenantToWan "cobalt-mgmt" 140)
+        # cobalt-iot-srv is not an ordinary egress tenant: it is the
+        # underlayAccess carrier for the onyx/opal VPN overlays. Its WAN need
+        # is exactly the WireGuard transport (udp/1637), so it names that class
+        # instead of the blanket `internet` one. The overlay validator
+        # (E_OVERLAY_UNDERLAY_ACCESS_WAN_EGRESS_REQUIRED) requires the underlay
+        # tenant to have an allow to the underlay's target external; naming the
+        # real class states that intent precisely rather than widening it.
+        {
+          id = "allow-cobalt-iot-srv-to-wan";
+          priority = 130;
+          from = {
+            kind = "tenant";
+            name = "cobalt-iot-srv";
+          };
+          to = { kind = "external"; scope = "core"; };
+          trafficType = "wireguard-1637";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
         {
           id = "allow-mgmt-to-garnet";
           priority = 150;
