@@ -3866,11 +3866,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792837885,
-        "narHash": "sha256-QuSsOdI7KnVQZbFoY9t+/VUobB1eFJoh5xsFyFxTI0s=",
+        "lastModified": 1793022018,
+        "narHash": "sha256-elS8EdB69Fbgdm3K+FtXXtNoCf3OKNEMhGNb/V/BIbc=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-shell-vm-manager",
-        "rev": "6db40c4ed470833f7930338ca220abb063b3cd76",
+        "rev": "3d472ba4b9201c3486b58bdb332bf4833663e40c",
         "type": "github"
       },
       "original": {
