@@ -140,7 +140,12 @@ in
       matchConfig.Name = "br-cobalt-lan";
       linkConfig.RequiredForOnline = "no";
       # Feed every access VLAN the host terminates off the trunk.
-      networkConfig.VLAN = [ "cobalt-lan.${toString clientsVlan}" ];
+      # Terminate EVERY access VLAN the host carries off the trunk, not just
+      # the host-addressed clients VLAN.  Tagging only VLAN 30 left the bench
+      # (vlan50 / mxl_lan2) with no path to the cobalt router: the jack
+      # enslaved to vlan50 and the bridge came up, but its frames had no
+      # tagged child on the trunk to cross, so the port was silently dead.
+      networkConfig.VLAN = map (vlan: "cobalt-lan.${toString vlan}") accessVlans;
     };
 
     "10-br-cobalt-wan" = {
