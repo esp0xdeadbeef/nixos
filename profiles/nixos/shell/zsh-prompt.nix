@@ -21,6 +21,28 @@ let
       null;
   isServer = hostPath != null && lib.hasPrefix "nixos/server/" hostPath;
 
+  # oh-my-zsh's compinit is the single largest fixed cost of an interactive
+  # shell (~0.5 s cold vs ~35 ms warm).  Two things must be true for it to stay
+  # warm:
+  #
+  #   1. compinit must run ONCE.  NixOS defaults `enableGlobalCompInit` to true,
+  #      which emits a bare `compinit` into /etc/zshrc that writes
+  #      `$HOME/.zcompdump`; oh-my-zsh then runs compinit again with its own
+  #      dump path.  Both were cold on every shell and each paid the full cost.
+  #      oh-my-zsh owns compinit here, so the global one is disabled.
+  #   2. The dump must survive a reboot.  These hosts boot from a tmpfs root, so
+  #      anything under $HOME is discarded and the dump was cold after every
+  #      boot.  The dump is redirected under /persist when it is mounted.
+  #
+  # The dump path is fixed (not host/version templated) because a single
+  # persistent path can only back one dump; omz validates the content anyway
+  # (it appends its revision + fpath and rebuilds when they change).
+  #
+  # NOTE: the /persist check is resolved at *runtime* on purpose.  Evaluating it
+  # with `builtins.pathExists "/persist"` would probe the machine running the
+  # evaluation (the builder / CI), not the host booting the config, and would
+  # bake in the wrong answer.
+
   role =
     if isServer then
       "server"
@@ -76,6 +98,10 @@ in
     programs.zsh = {
       enable = true;
 
+      # oh-my-zsh below runs compinit itself; the NixOS-generated one in
+      # /etc/zshrc would duplicate it (see the compinit note in this module).
+      enableGlobalCompInit = lib.mkDefault false;
+
       shellInit = lib.mkBefore ''
         if [[ -n "$HOME" && "$HOME" != "/" && ! -e "$HOME/.zshrc" ]]; then
           touch -- "$HOME/.zshrc" 2>/dev/null || true
@@ -88,6 +114,20 @@ in
           zstyle ':omz:update' mode disabled
           DISABLE_AUTO_UPDATE=true
           DISABLE_UPDATE_PROMPT=true
+
+          # Keep the compinit dump and omz cache off the tmpfs root so a warm
+          # dump survives reboots (see the compinit note in this module).
+          # Both variables are read by $ZSH/oh-my-zsh.sh, which is sourced after
+          # this block.
+          if [[ -d /persist ]]; then
+            ZSH_CACHE_DIR=/persist/var/cache/oh-my-zsh
+          else
+            ZSH_CACHE_DIR="$HOME/.cache/oh-my-zsh"
+          fi
+          ZSH_COMPDUMP="''${ZSH_CACHE_DIR}/.zcompdump"
+          if [[ ! -d "$ZSH_CACHE_DIR" ]]; then
+            mkdir -p -- "$ZSH_CACHE_DIR"
+          fi
         '';
         plugins = [
           "fzf"
