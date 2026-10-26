@@ -131,59 +131,83 @@ in
 
     persistentDirectory = "/persist/vm-persists";
 
-    instances.${vmName} = {
-      description = "cobalt site router, aarch64 port (nixos-shell)";
+    # Both cobalt router images are managed so either can be started by name.
+    # They share the trunk, so each conflicts with the other: systemd stops the
+    # conflicting unit, giving the one-at-a-time semantics the shared
+    # br-cobalt-lan / br-cobalt-wan ports require (running both duplicated every
+    # MAC on the trunk and made the downstream flap as the guests fought over
+    # the topology).
+    #
+    #   s-router-cobalt-prod  production shape  prod-network/prod + -prod pins
+    #   s-router-cobalt-new   testing/rollback  prod-network/testing + main pins
+    #
+    # Only the prod instance is carrier-managed (see carrierControls below).
+    # cobalt-new is never started on boot and never touched by the carrier
+    # watcher; it is started by hand when testing a candidate.
+    instances =
+      lib.genAttrs
+        [
+          "s-router-cobalt-prod"
+          "s-router-cobalt-new"
+        ]
+        (
+          name:
+          let
+            other =
+              if name == "s-router-cobalt-prod" then "s-router-cobalt-new" else "s-router-cobalt-prod";
+          in
+          {
+            description =
+              if name == "s-router-cobalt-prod" then
+                "cobalt site router, aarch64 port, production shape (nixos-shell)"
+              else
+                "cobalt site router, aarch64 port, testing shape (nixos-shell)";
 
-      image = vmImages.${vmName};
+            image = vmImages.${name};
 
-      # Started/stopped by carrierControls below, not unconditionally on boot.
-      activation.startOnBoot = false;
-      activation.restartOnGuestShutdown = true;
+            # Never started unconditionally on boot. The prod instance is
+            # started by carrierControls; the testing instance is started by
+            # hand and must not race it at boot.
+            activation.startOnBoot = false;
+            activation.restartOnGuestShutdown = true;
 
-      # Only one cobalt router may own the shared br-cobalt-lan / br-cobalt-wan
-      # ports: running two duplicated every MAC on the trunk and left the
-      # downstream (APs, clients) flapping as the guests fought over the
-      # topology.  systemd stops the conflicting unit instead, which gives the
-      # intended one-at-a-time semantics.
-      #
-      # This is carrier-managed (see carrierControls below) and NOT started on
-      # boot; s-router-cobalt-new is retained purely as the rollback target.
-      runner.serviceConfig.Conflicts = [ "s-router-cobalt-new-vm.service" ];
+            runner.serviceConfig.Conflicts = [ "${other}-vm.service" ];
 
-      healthCheck = {
-        command = lib.escapeShellArgs [
-          (lib.getExe guestAgentHealth)
-          (qgaSocketFor vmName)
-        ];
-        # The guest has to finish booting systemd + 15 containers before it can
-        # answer on the QGA socket.  The old 10s timeout regularly expired while
-        # QEMU itself was healthy but the guest was still starting, which read
-        # as a failed health check and triggered another restart -- each one a
-        # visible link flap on the trunk.
-        timeoutSeconds = 20;
-        retries = 60;
-        intervalSeconds = 2;
-      };
+            healthCheck = {
+              command = lib.escapeShellArgs [
+                (lib.getExe guestAgentHealth)
+                (qgaSocketFor name)
+              ];
+              # The guest has to finish booting systemd + 15 containers before
+              # it can answer on the QGA socket. The old 10s timeout regularly
+              # expired while QEMU itself was healthy but the guest was still
+              # starting, which read as a failed health check and triggered
+              # another restart -- each one a visible link flap on the trunk.
+              timeoutSeconds = 20;
+              retries = 60;
+              intervalSeconds = 2;
+            };
 
-      storage.persistentDisk = {
-        enable = true;
-        fileName = "state.qcow2";
-        size = "8G";
-      };
+            storage.persistentDisk = {
+              enable = true;
+              fileName = "state.qcow2";
+              size = "8G";
+            };
 
-      runner = {
-        stopGraceSeconds = 60;
-        # QGA device so the health check and graceful shutdown work.
-        # The NICs (br-cobalt-lan / br-cobalt-wan) are set by the VM's own
-        # virtualisation.qemu.networkingOptions.
-        qemuArguments = [
-          "-chardev"
-          "socket,id=qga0,path=${qgaSocketFor vmName},server=on,wait=off"
-          "-device"
-          "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
-        ];
-      };
-    };
+            runner = {
+              stopGraceSeconds = 60;
+              # QGA device so the health check and graceful shutdown work.
+              # The NICs (br-cobalt-lan / br-cobalt-wan) are set by the VM's own
+              # virtualisation.qemu.networkingOptions.
+              qemuArguments = [
+                "-chardev"
+                "socket,id=qga0,path=${qgaSocketFor name},server=on,wait=off"
+                "-device"
+                "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"
+              ];
+            };
+          }
+        );
 
 
     # Tang (NBDE) is no longer a nixos-shell VM: it runs as a plain NixOS
