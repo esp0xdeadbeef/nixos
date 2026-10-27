@@ -21,6 +21,21 @@ let
       null;
   isServer = hostPath != null && lib.hasPrefix "nixos/server/" hostPath;
 
+  # oh-my-zsh's cache holds one compinit dump for every shell on the host (see
+  # the compinit note below), so its owner and mode have to be ones every
+  # shell can write, not the ones of whichever user happened to log in first.
+  # oh-my-zsh refreshes the dump with `rm -f "$ZSH_COMPDUMP"`, so a cache
+  # created by another user (root via `sudo -i`, then the normal user again)
+  # makes every later shell print a permission-denied error and rebuild cold.
+  # A plain `mkdir` in the shell init cannot fix that, because a normal user
+  # cannot chgrp to a group it is not a member of and root must not own a
+  # cache the normal user then updates, so the directory is declared in
+  # `config` below.
+  zshCacheDir = "/persist/var/cache/oh-my-zsh";
+  zshCacheGroup = config.users.users.${defaultUser}.group or "users";
+  persistMount = config.local.impermanence.persistPath or "/persist";
+  hasPersistentRoot = config.local.impermanence.enable or false;
+
   # oh-my-zsh's compinit is the single largest fixed cost of an interactive
   # shell (~0.5 s cold vs ~35 ms warm).  Two things must be true for it to stay
   # warm:
@@ -93,6 +108,19 @@ in
       };
     };
 
+    # Declare the shared shell cache next to the variable that points at it.
+    # `d` creates it on hosts that predate this rule and `Z` re-applies the
+    # shared ownership on every boot (tmpfiles processes lines in listed
+    # order), so a cache one user already claimed is repaired.  The setgid bit
+    # keeps files created inside it on the shared group.  Hosts without a
+    # persistent root use the per-user `$HOME/.cache/oh-my-zsh` fallback and
+    # need no rule.
+    systemd.tmpfiles.rules =
+      lib.optionals (hasPersistentRoot && zshCacheDir != persistMount) [
+        "d ${zshCacheDir} 2775 root ${zshCacheGroup} -"
+        "Z ${zshCacheDir} 2775 root ${zshCacheGroup} -"
+      ];
+
     users.defaultUserShell = lib.mkOverride 900 pkgs.zsh;
 
     programs.zsh = {
@@ -119,14 +147,17 @@ in
           # dump survives reboots (see the compinit note in this module).
           # Both variables are read by $ZSH/oh-my-zsh.sh, which is sourced after
           # this block.
-          if [[ -d /persist ]]; then
-            ZSH_CACHE_DIR=/persist/var/cache/oh-my-zsh
+          if [[ -d ${persistMount} ]]; then
+            ZSH_CACHE_DIR=${zshCacheDir}
           else
             ZSH_CACHE_DIR="$HOME/.cache/oh-my-zsh"
           fi
           ZSH_COMPDUMP="''${ZSH_CACHE_DIR}/.zcompdump"
+          # The directory is declared by this module's tmpfiles rule on hosts
+          # with a persistent root; only step in when it is genuinely missing so
+          # a shell never mistakes a permission problem for a missing cache.
           if [[ ! -d "$ZSH_CACHE_DIR" ]]; then
-            mkdir -p -- "$ZSH_CACHE_DIR"
+            mkdir -p -- "$ZSH_CACHE_DIR" 2>/dev/null || true
           fi
         '';
         plugins = [
