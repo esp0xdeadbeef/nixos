@@ -200,16 +200,22 @@ drift apart:
 
 | netdev | role | bridge |
 |---|---|---|
-| `lan1` | 802.1Q trunk (tagged) | `br-cobalt-lan` |
-| `lan2` | untagged clients access | `vlan30` |
-| `lan3` | untagged clients access | `vlan30` |
+| `mxl_lan0` | 802.1Q trunk (tagged) | `br-cobalt-lan` |
+| `mxl_lan1` | untagged access | `vlan50` |
+| `mxl_lan2` | untagged access | `vlan50` |
+| `mxl_lan3` | untagged clients access | `vlan30` |
 | `lan5` | management (DHCP) | not bridged |
 
-`br-cobalt-lan` terminates VLAN 30 off the trunk (`cobalt-lan.30`) into the
-untagged `vlan30` bridge that `lan2`/`lan3` join. The cobalt VM attaches its
-LAN NIC to `br-cobalt-lan` and its WAN NIC to `br-cobalt-wan`; it starts only
-while the WAN SFP is present (`./vm-host.nix`), but `lan1` stays wired
-regardless.
+`br-cobalt-lan` terminates the access VLANs off the trunk (`cobalt-lan.30`,
+`cobalt-lan.50`) into the untagged `vlan30`/`vlan50` bridges that the access
+jacks join. The cobalt VM attaches its LAN NIC to `br-cobalt-lan` and its WAN
+NIC to `br-cobalt-wan`; it starts only while the WAN SFP is present
+(`./vm-host.nix`), but `mxl_lan0` stays wired regardless.
+
+Because the VM terminates the VLANs itself, the access jacks reach the router
+only through the trunk: with `mxl_lan0` unplugged, `vlan50` has no uplink into
+the VM and its jacks see link but never get DHCP. Wire `mxl_lan0` to the cobalt
+router's switch trunk before expecting the access jacks to pass traffic.
 
 ### Verifying the trunk
 
