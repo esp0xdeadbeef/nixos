@@ -59,4 +59,42 @@ in
   #    instead of defaulting to /var/cache/locatedb.
   ######################################################################
   environment.variables.LOCATE_PATH = "/persist/var/cache/locatedb";
+
+  ######################################################################
+  # D) Make a bare `sudo updatedb` write the same DB as the timer.
+  #
+  #    impermanence bind-mounts /persist/var/cache/locatedb onto
+  #    /var/cache/locatedb, and updatedb builds its database in a temporary
+  #    file and rename()s it into place.  rename(2) cannot replace a mount
+  #    point, so the stock default output fails with
+  #
+  #      updatedb: error replacing `/var/cache/locatedb':
+  #        Device or resource busy
+  #
+  #    The update-locatedb.service timer is unaffected because it is invoked
+  #    with --output=/persist/var/cache/locatedb (what services.locate.output
+  #    configures).  Wrap the command so an interactive invocation defaults to
+  #    the persisted path too, and keeps working if the bind mount is absent.
+  #
+  #    Any user-supplied --output/-o must not be duplicated: mlocate rejects
+  #    "--output specified twice" rather than letting the last one win.  So the
+  #    wrapper only injects the flag when the caller did not pass one.
+  ######################################################################
+  environment.systemPackages = [
+    (pkgs.writeShellScriptBin "updatedb" ''
+      have_output=
+      for arg in "$@"; do
+        case "$arg" in
+          -o | -o* | --output | --output=*) have_output=1 ;;
+        esac
+      done
+
+      if [ -n "''${have_output-}" ]; then
+        exec ${lib.getExe' pkgs.mlocate "updatedb"} "$@"
+      fi
+
+      exec ${lib.getExe' pkgs.mlocate "updatedb"} \
+        --output="''${LOCATE_PATH:-/persist/var/cache/locatedb}" "$@"
+    '')
+  ];
 }
