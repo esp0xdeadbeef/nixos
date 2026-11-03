@@ -98,6 +98,31 @@ in
           networkConfig.DHCP = "ipv4";
           dhcpV4Config.UseDNS = false;
         };
+
+        # The access-local lane is DNS-only; assert the DHCP lease and the
+        # gateway route here, not WAN reachability.
+        systemd.services.dhcp-lease-assert = {
+          description = "Assert DHCP lease and default gateway on eth0";
+          after = [ "network.target" ];
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          script = ''
+            set -eu
+            for _ in $(/run/current-system/sw/bin/seq 1 60); do
+              if /run/current-system/sw/bin/ip -4 addr show dev eth0 \
+                   | /run/current-system/sw/bin/grep -q 'inet 10\.54\.46\.' \
+                 && /run/current-system/sw/bin/ip -4 route show default \
+                   | /run/current-system/sw/bin/grep -q 'via 10\.54\.46\.1'; then
+                exit 0
+              fi
+              /run/current-system/sw/bin/sleep 1
+            done
+            exit 1
+          '';
+        };
       };
     };
   };
