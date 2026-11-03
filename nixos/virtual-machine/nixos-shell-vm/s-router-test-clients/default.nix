@@ -69,11 +69,6 @@ in
     })
   ];
 
-  _module.args.sRouterTestClientsRenderers = {
-    inherit canonicalBundle controlPlaneArtifact;
-    cpm = cpmBuilt;
-  };
-
   # Dedicated test fixture: request a real DHCP lease from the access-local
   # Kea server and put the client on the same access segment as the lab
   # clients. This belongs on s-router-test-clients, not on the router host.
