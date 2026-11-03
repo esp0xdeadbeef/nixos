@@ -211,34 +211,95 @@ centralized onto the remote builders (s-sigma / s-tau, ssh-ng + binfmt), but the
 resulting store paths never flow back to the other hosts as substitutable
 artifacts, so each host rebuilds the same flake outputs locally.
 
-The fix is a fleet-wide binary cache, not new builders:
+Two things are true today and both matter for the design:
 
-- **Cache = the builders' own stores, served over HTTP.** `services.nix-serve`
-  already runs on s-sigma/s-tau but is scoped to VMs/LXC via a loopback socket.
-  Rebind it to the nebula overlay IP so every physical host can read it. No
-  separate cache directory is needed.
-- **Warm it ahead of demand.** A systemd timer on each builder prebuilds every
-  `nixosConfigurations.<host>.config.system.build.toplevel` and flake package,
-  so the cache is populated before a laptop asks. (Hydra is the heavyweight
-  version of this: jobset -> builds -> cache; adopt it only if we want
-  per-commit status, logs, and a UI.)
-- **Subscribe every host.** Add `extra-substituters` (the two builder URLs) and
-  `extra-trusted-public-keys` (the two cache public keys, committed to the repo)
-  in a shared profile imported by all hosts. This is the same mechanism already
-  used for cache.nixos.org, numtide, and the CUDA cache.
-- **Signing trust model.** One signing keypair per builder; only the public keys
-  are shared. A host downloads only from caches whose key it lists.
-- **Keep GC from evicting the cache.** Pin the fleet closure (or protect cached
-  paths) on the builders, or a `nix-collect-garbage` wipes the prebuilt
-  artifacts.
-- **Builders must also consume the cache.** With the cache in the substituter
-  list and `builders-use-substitutes = true` (already set), s-sigma and s-tau
-  download each other's results instead of rebuilding.
+- `services.nix-serve` exists but is **not enabled anywhere**. The module
+  `nixos/server/{s-sigma,s-tau}/cache-for-vms-and-lxc-containers/default.nix` is
+  not imported by either host, and `/etc/nix/nix.conf` on s-sigma lists no
+  loopback substituter, so nothing is being served. The module is also an
+  unfinished sketch (it generates the signing key with a `make-key` service on
+  every boot, which would invalidate all previously signed paths).
+- Every physical host already reaches the builders over nebula for *building*,
+  so the path for *substituting* is already there.
 
-Optional variant: a real shared cache directory on the NAS
-(`nix copy --to file:///mnt/nas/nix-cache`, nix-serve pointed at that dir).
-Reach for it only if the cache should live off the servers' disks; SMB is a more
-fragile live-cache backing store than serving the local store.
+### The dedicated build-and-cache VM
+
+**Status: proposal only. Nothing in this section exists in the repo yet** — no
+`s-cache` host config, no `services.nixosShellVmManager` entry, no signing key in
+SOPS, no `binary-cache.nix` profile.
+
+The preferred shape is one dedicated guest on the big builder, not the hypervisor
+root store. Working name `s-cache`: a new nixos-shell VM on s-sigma that would be
+declared through `services.nixosShellVmManager` alongside the existing guests
+(e.g. `s-router-prod`) so it is managed, restarted and supervised the same way.
+Standing it up is step 12 of the action list.
+
+Why a guest rather than serving s-sigma's own `/nix`:
+
+- **Blast radius.** A prebuild/warm job that misbehaves can only fill the
+  guest's disk, not the hypervisor's root store. Keeping a multi-hundred-GB
+  fleet closure out of `/nix` on s-sigma also avoids fighting the host's GC.
+- **Independent GC policy.** The cache can pin and retain fleet closures without
+  changing when s-sigma collects its own garbage.
+- **It is a real NixOS config**, so it is reproducible and rebuildable from this
+  repo instead of a hand-tuned host directory.
+- **Two failure domains.** s-sigma can reboot or reinstall without taking the
+  cache with it — the guest is a store path, so it comes back.
+
+Trade-offs to accept knowingly: the guest needs its own disk (a `virtio` disk on
+`/persist`, sized to the fleet closure, NOT a bind-mount of the host store), and
+it duplicates anything it builds rather than sharing s-sigma's already-built
+paths. Mitigate the duplication by making s-sigma a substituter *for the guest*,
+so the guest pulls instead of rebuilding what the host already has.
+
+Resource shape (s-sigma measured: **64 cores, 503 GiB RAM, 2.7 TiB free on
+`/persist`**):
+
+- **Never 100%.** The intent is a cache that fills gradually, not a second
+  build farm competing with interactive work and the router VMs. Cap the guest
+  at a fraction of the host and cap Nix *inside* it independently:
+  - guest `cores = 12` (of 64) and `memory = 48G` (of 503 GiB) — leaves the
+    hypervisor, the router VMs and the interactive load untouched;
+  - inside the guest, `nix.settings.max-jobs = 4` and `cores = 3`, so one
+    rebuild cannot explode into 12-wide parallelism;
+  - `systemd` `CPUQuota=75%` on the warm service and
+    `IOSchedulingClass=idle` / `Nice=19`, so it yields to everything else;
+  - this is the 80% rule in practice: **use at most ~80% of an allocated slice,
+    and allocate a slice well under the host.** Never size the guest to the
+    whole machine and rely on `nice` to save you.
+- **Disk sizing.** Start at ~500 GiB for the guest store; measure the real fleet
+  closure (`nix path-info -Sh ./result` summed over hosts) before committing to
+  a size. s-sigma has 2.7 TiB free, so this is cheap to be generous with.
+
+### Making it actually serve: the pieces
+
+1. **Sign the cache once, with a key that persists.** Generate one keypair,
+   store the private half in SOPS under the existing shared-secret convention
+   (`secrets/general-*.yaml`, whose `.sops.yaml` rule already encrypts to every
+   host key), and install it at a stable path. **Do not** regenerate per boot —
+   every path signed by a previous key becomes untrusted. The existing
+   `make-key` service in the VM/LXC module is exactly the bug to avoid.
+2. **Serve over nebula, not loopback.** `services.nix-serve.enable = true` in the
+   guest, bound to the guest's nebula address, with `secretKeyFile` pointing at
+   the SOPS-installed key. Clients reach it as `http://100.64.0.<x>:5000`.
+   The loopback-socket-plus-socat arrangement in the old module was a workaround
+   for VMs that could not reach the host's port; with the guest on nebula it is
+   unnecessary.
+3. **Subscribe every host** through one shared profile
+   (`profiles/nixos/nix/binary-cache.nix`) that sets `extra-substituters` and
+   `extra-trusted-public-keys`. This is the same mechanism already used for
+   cache.nixos.org, numtide and the CUDA cache, so it composes with them.
+4. **Warm on a timer, not on demand.** A systemd timer in the guest enumerates
+   `nixosConfigurations.<host>.config.system.build.toplevel` plus the flake's
+   packages and `nix build`s them, so the cache is warm before a laptop asks.
+   Run it nightly and let it be slow (`CPUQuota`, idle IO) — that is the whole
+   point of the 80% cap.
+5. **Keep GC from evicting it.** Pin the fleet closure with a root or
+   `nix-store --add-root`, or the guest's GC will delete exactly the artifacts
+   the cache exists to serve.
+6. **Clients must fail soft.** A cache that is down must degrade to "build
+   locally", never to "cannot rebuild". Every host keeps its normal
+   substituters and `fallback = true`.
 
 ### Multi-site build coordination
 
@@ -581,10 +642,15 @@ is explicitly gated.
     `system.build.toplevel` before and after — a pure rename must produce an
     identical derivation. See "Host naming (routers)".
 
-12. Fleet binary cache.
-    Rebind `services.nix-serve` on s-sigma/s-tau to the nebula overlay IP, add
-    a prebuild timer, and add a shared `profiles.nixos.nix.binary-cache` profile
-    with the builder URLs and public keys for every host. See "Build
+12. Fleet binary cache via a dedicated build VM — **not implemented, design only.**
+    Stand up `s-cache` as a supervised nixos-shell guest on s-sigma, with its own
+    persisted store disk, a SOPS-held signing key installed at a stable path, and
+    `services.nix-serve` bound to its nebula address. Cap it to a slice of the
+    host (12 of 64 cores, 48 of 503 GiB, `CPUQuota=75%`, idle IO, `max-jobs = 4`
+    inside) so it warms gradually and never saturates the machine. Add a nightly
+    warm timer, pin the fleet closure against GC, and add the shared
+    `profiles/nixos/nix/binary-cache.nix` profile to every host. Do this per site
+    only after step 13 decides which site is the authority. See "Build
     distribution and shared binary cache" above.
 
 13. Single build authority across sites.
