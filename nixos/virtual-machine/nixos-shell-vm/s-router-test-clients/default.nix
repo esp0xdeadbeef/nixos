@@ -13,32 +13,26 @@ let
     {
       nicId = "nic0";
       bridge = "vmbr4";
-      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
     {
       nicId = "nic1";
       bridge = "vmbr4";
-      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
     {
       nicId = "nic2";
       bridge = "vmbr4";
-      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
     {
       nicId = "nic3";
       bridge = "vmbr4";
-      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
     {
       nicId = "nic4";
       bridge = "vmbr4";
-      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
     {
       nicId = "nic5";
       bridge = "vmbr4";
-      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
   ];
   labPath = "${inputs.network-labs}/${labSource}";
