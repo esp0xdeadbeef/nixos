@@ -1,4 +1,6 @@
 { inputs
+, lib
+, config
 , relativeRepo
 , profiles
 , ...
@@ -70,5 +72,33 @@ in
   _module.args.sRouterTestClientsRenderers = {
     inherit canonicalBundle controlPlaneArtifact;
     cpm = cpmBuilt;
+  };
+
+  # Dedicated test fixture: request a real DHCP lease from the access-local
+  # Kea server and put the client on the same access segment as the lab
+  # clients. This belongs on s-router-test-clients, not on the router host.
+  options.sRouterTestClientsDhcpClient.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = "Run the lab DHCP test client on the access-local bridge";
+  };
+
+  config = lib.mkIf config.sRouterTestClientsDhcpClient.enable {
+    containers.dhcp-test = {
+      autoStart = true;
+      privateNetwork = true;
+      hostBridge = "dns545nl";
+      config = {
+        system.stateVersion = "26.05";
+        networking.useHostResolvConf = false;
+        services.resolved.enable = true;
+        systemd.network.enable = true;
+        systemd.network.networks."10-eth0" = {
+          matchConfig.Name = "eth0";
+          networkConfig.DHCP = "ipv4";
+          dhcpV4Config.UseDNS = false;
+        };
+      };
+    };
   };
 }
