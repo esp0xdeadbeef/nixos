@@ -5,6 +5,7 @@
 , selectorFile
 , system
 , hostName ? "s-router-nixos"
+, vmNics ? [ ]
 ,
 }:
 
@@ -36,6 +37,13 @@ let
     rootLockIdentity = builtins.hashString "sha256" (builtins.readFile ../../../../flake.lock);
   };
 
+  # FS-982-SMS-130: the VM NIC platform binding is produced by the producer
+  # boundary from the host profile's vmNics list.
+  platformBinding = producer.vmNicsPlatformBinding {
+    inherit hostName vmNics;
+    bundle = canonicalBundle;
+  };
+
   rendererInput = {
     inherit hostName;
     bundle = canonicalBundle;
@@ -46,6 +54,9 @@ let
       rendererInput
       // {
         inherit lib selectorFile;
+      }
+      // lib.optionalAttrs (platformBinding != null) {
+        inherit platformBinding;
       }
     );
 

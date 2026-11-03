@@ -60,10 +60,12 @@ let
     {
       nicId = "lan-trunk";
       bridge = "br-cobalt-lan";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
     {
       nicId = "wan";
       bridge = "br-cobalt-wan";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
     }
   ];
 in

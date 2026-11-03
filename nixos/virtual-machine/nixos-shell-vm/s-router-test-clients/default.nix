@@ -9,6 +9,38 @@ let
   system = "x86_64-linux";
   labSource = "active-lab";
   hostName = "s-router-test-clients";
+  vmNics = [
+    {
+      nicId = "nic0";
+      bridge = "vmbr4";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
+    }
+    {
+      nicId = "nic1";
+      bridge = "vmbr4";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
+    }
+    {
+      nicId = "nic2";
+      bridge = "vmbr4";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
+    }
+    {
+      nicId = "nic3";
+      bridge = "vmbr4";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
+    }
+    {
+      nicId = "nic4";
+      bridge = "vmbr4";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
+    }
+    {
+      nicId = "nic5";
+      bridge = "vmbr4";
+      model = "virtio-net-pci,vhost=on,mq=on,queues=4";
+    }
+  ];
   labPath = "${inputs.network-labs}/${labSource}";
   intentPath = "${labPath}/intent-${hostName}.nix";
   inventoryPath = "${labPath}/inventory-${hostName}.nix";
@@ -48,6 +80,16 @@ let
         or inputs.network-realization-model.dirtyRev
         or "uncommitted";
   };
+
+  producer = import (relativeRepo.module "library/10-vms/nixos-shell-vm/renderer-pipeline-producer.nix") {
+    inherit lib;
+  };
+
+  platformBinding = producer.vmNicsPlatformBinding {
+    inherit hostName vmNics;
+    bundle = canonicalBundle;
+    target = "access-endpoint-nixos";
+  };
 in
 {
   imports = [
@@ -60,7 +102,7 @@ in
     })
 
     (inputs.network-renderer-access-endpoint-nixos.libBySystem.${system}.renderer.canonical.hostModule {
-      inherit hostName labSource;
+      inherit hostName labSource platformBinding;
 
       bundle = canonicalBundle;
       inventory = inventoryPath;

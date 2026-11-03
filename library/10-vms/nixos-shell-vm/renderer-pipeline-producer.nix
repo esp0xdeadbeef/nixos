@@ -32,15 +32,15 @@ let
 
   # Build the canonical realization bundle from intent + inventory.
   realizeBundle =
-    {
-      controlPlaneModelInput,
-      networkRealizationModelInput,
-      system,
-      intentPath,
-      inventory,
-      hostName,
-      rootLockIdentity,
-      controlPlaneTransform ? cpm: cpm,
+    { controlPlaneModelInput
+    , networkRealizationModelInput
+    , system
+    , intentPath
+    , inventory
+    , hostName
+    , rootLockIdentity
+    , controlPlaneTransform ? cpm: cpm
+    ,
     }:
     (realizeAll {
       inherit
@@ -59,15 +59,15 @@ let
   # platform-neutral deployment facts (for example deploymentHosts) without
   # calling the CPM itself.
   realizeAll =
-    {
-      controlPlaneModelInput,
-      networkRealizationModelInput,
-      system,
-      intentPath,
-      inventory,
-      hostName,
-      rootLockIdentity,
-      controlPlaneTransform ? cpm: cpm,
+    { controlPlaneModelInput
+    , networkRealizationModelInput
+    , system
+    , intentPath
+    , inventory
+    , hostName
+    , rootLockIdentity
+    , controlPlaneTransform ? cpm: cpm
+    ,
     }:
     let
       resolvedInventory = realizeInventory { inventoryInput = inventory; inherit hostName; };
@@ -120,7 +120,7 @@ let
   # here (FS-982-SMS-130) so the host profile passes platform-binding material
   # to the producer instead of assembling it inline.
   vmNicsPlatformBinding =
-    { hostName, vmNics, bundle }:
+    { hostName, vmNics, bundle, target ? "nixos" }:
     if vmNics == [ ] then
       null
     else
@@ -147,7 +147,7 @@ let
           kind = "network-platform-binding-bundle";
           schemaRevision = "network-platform-binding/v1";
           bundleIdentity = bundle.bundleIdentity;
-          target = "nixos";
+          inherit target;
           requestScope = bundle.requestScope;
           categories.deployment.vmTargets.${hostName} = {
             explicitNicSet = true;
