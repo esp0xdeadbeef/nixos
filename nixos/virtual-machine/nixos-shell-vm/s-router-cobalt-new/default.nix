@@ -66,14 +66,21 @@ let
       # up DOWN and isolated, so this must not be enabled before that unit is
       # active (it now runs on VM start, not only at boot -- see vm-host.nix).
       #
-      # Measured on s-nodus 2026-11-04, guest -> internet, single TCP stream:
+      # Measured on s-nodus 2026-11-04, guest -> internet.
+      #
+      # Single TCP stream (a single flow uses one queue, so mq cannot help):
       #   plain bridge, 1 rx/1 tx queue:  91.5 112.9 111.8 104.0 MB/s  (median ~108)
-      #   vhost mq,     4 rx/4 tx queues: 94.8 91.8 94.0 106.1 93.6 95.7 89.3 98.0 MB/s
+      #   vhost mq,     4 rx/4 tx queues: 94.8 91.8 94.0 106.1 93.6 95.7 89.3 98.0
       #                                                               (median ~95)
-      # The guest does report rx=4 tx=4, so the mechanism works, but a single
-      # flow cannot use more than one queue and multiqueue overhead costs about
-      # 10% here. Keep it only if parallel-flow throughput (many concurrent
-      # streams) proves better; do not cite single-stream gains for it.
+      #
+      # Four concurrent streams (cachefly, two samples each):
+      #   plain bridge:  149.3 MB/s / 218.1 MB/s   (median ~184  ~1.47 Gbps)
+      #   vhost mq:      332.5 MB/s / 243.2 MB/s   (median ~288  ~2.30 Gbps)
+      #
+      # So: no single-stream gain (slightly worse), ~1.6x aggregate throughput
+      # across parallel flows. That is the case this box exists for -- 8 Gbps of
+      # WAN with many clients -- so the trade is worth taking. Do not cite
+      # single-stream numbers as a reason for multiqueue.
       vhost = true;
       queues = 4;
     }
