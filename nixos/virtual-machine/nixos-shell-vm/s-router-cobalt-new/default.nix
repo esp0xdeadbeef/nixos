@@ -60,10 +60,16 @@ let
     {
       nicId = "lan-trunk";
       bridge = "br-cobalt-lan";
+      # vhost-net moves the virtio datapath into the host kernel so forwarding
+      # is not serialised through a single QEMU userspace loop. On the 4-core
+      # BPI-R4 this is the difference between ~700 Mbps and link-rate; the tap
+      # path showed no separate vhost threads in `ps -T` (QEMU pinned at 197%).
+      model = "virtio-net-pci,vhost=on";
     }
     {
       nicId = "wan";
       bridge = "br-cobalt-wan";
+      model = "virtio-net-pci,vhost=on";
     }
   ];
 in
