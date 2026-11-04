@@ -103,6 +103,7 @@ in
       inventory = inventoryPath;
       clients = clientsPath;
       sops = "${labPath}/sops-routing-${hostName}.nix";
+
     })
   ];
 
