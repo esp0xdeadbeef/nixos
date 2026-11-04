@@ -285,12 +285,24 @@ if [ "$NO_UPDATE" -eq 1 ]; then
   echo "[$(ts)] prebuild skipped (--no-update)"
 else
   echo "[$(ts)] prebuild $NEW (prod remains active)"
+  # Keep the update output so spec warnings can be reported instead of scrolling
+  # past. `vm-update`/register warnings are findings, not failures: they name a
+  # requirement (e.g. FS-540 recursion intent) whose fix is an intent change.
+  PREBUILD_LOG=$(mktemp)
   if [ -n "$IMAGE" ]; then
-    nixos-shell-vm-manager register "$NEW_CONF" "$IMAGE" local-working-tree "$SOURCE"
+    nixos-shell-vm-manager register "$NEW_CONF" "$IMAGE" local-working-tree "$SOURCE" 2>&1 | tee "$PREBUILD_LOG"
   else
-    vm-update "$NEW" "$SOURCE"
+    vm-update "$NEW" "$SOURCE" 2>&1 | tee "$PREBUILD_LOG"
   fi
   echo "[$(ts)] prebuild complete"
+  if grep -q 'evaluation warning' "$PREBUILD_LOG"; then
+    while IFS= read -r line; do
+      echo "[$(ts)] SPEC-WARNING: $line"
+    done < <(grep -o 'evaluation warning: .*' "$PREBUILD_LOG" | sed -e 's/[[:space:]]*$//' | sort -u)
+  else
+    echo "[$(ts)] SPEC-WARNING: none"
+  fi
+  rm -f "$PREBUILD_LOG"
 fi
 systemctl stop "$NEW_UNIT" >/dev/null 2>&1 || true
 
