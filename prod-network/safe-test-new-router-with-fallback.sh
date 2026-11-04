@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/run/current-system/sw/bin/bash
 # safe-test-new-router-with-fallback.sh
 #
 # Generic safe trial for s-router-<router>-new with s-router-<router>-prod as
@@ -243,7 +243,7 @@ systemctl stop "$NEW_UNIT" >/dev/null 2>&1 || true
 # comes back after the hold window plus five minutes.
 if [ "$NO_FAILSAFE" -eq 0 ]; then
   cat >"$FAILSAFE" <<EOF
-#!/usr/bin/env bash
+#! /run/current-system/sw/bin/bash
 set -u
 export PATH=/run/current-system/sw/bin:/run/current-system/sw/sbin:/usr/bin:/bin
 exec >>"${FAILSAFE_LOG}" 2>&1
