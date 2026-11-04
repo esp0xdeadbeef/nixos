@@ -102,11 +102,6 @@ let
   };
 in
 {
-  # Publish the tap/bridge pairs through the host profile's own option so the
-  # vhost-tap-attach unit can consume them. A plain option is evaluation-order
-  # independent, unlike _module.args.
-  local.vhostTapAttachments = vhostTapAttachments;
-
   imports = [
     render-nixos
     render-nebula
