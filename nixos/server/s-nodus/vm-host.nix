@@ -194,12 +194,12 @@ in
 
             runner = {
               stopGraceSeconds = 60;
-              # Two instances attach to the same host bridge ports, so they must
-              # never run together. NOTE: systemd reports "Unknown key 'Conflicts'
-              # in section [Service], ignoring" because this lands in [Service];
-              # the [Unit]-level home is the manager's runner option, which is
-              # tracked separately. The trial script serialises the two instances.
-              runner.serviceConfig.Conflicts = [ "${other}-vm.service" ];
+              # Two instances attach to the same host bridge ports, so they
+              # must never run together. `Conflicts=` is a [Unit] directive;
+              # serviceConfig renders into [Service], where systemd ignores it
+              # ("Unknown key 'Conflicts' in section [Service]"), so it is
+              # set through the manager's unitConfig instead.
+              unitConfig.Conflicts = [ "${other}-vm.service" ];
               # QGA device so the health check and graceful shutdown work.
               # The NICs (br-cobalt-lan / br-cobalt-wan) are set by the VM's own
               # virtualisation.qemu.networkingOptions.
