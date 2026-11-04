@@ -60,10 +60,20 @@ let
     {
       nicId = "lan-trunk";
       bridge = "br-cobalt-lan";
+      # vhost-net multiqueue: one virtqueue per vCPU instead of a single
+      # emulated queue, so forwarding is not bound to one QEMU thread. The
+      # host's vhost-tap-attach unit enslaves the rendered tap (tap-lan-trunk,
+      # tap-wan) into its bridge; without it the NIC comes up DOWN and
+      # isolated, so this must not be enabled before that unit is active.
+      vhost = true;
+      queues = 4;
     }
     {
       nicId = "wan";
       bridge = "br-cobalt-wan";
+      # See lan-trunk above.
+      vhost = true;
+      queues = 4;
     }
   ];
 in
