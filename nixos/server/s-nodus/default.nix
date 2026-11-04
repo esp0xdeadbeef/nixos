@@ -112,6 +112,18 @@ in
   # RPS was also tried on eth1/taps and was strictly worse (639/454, 42 ms), so
   # it stays disabled. The board is mains-powered, so governor ramp-up latency
   # is not worth the few watts schedutil saves on a saturating uplink.
+  #
+  # Host baseline, measured on the bare board (not through the VM) so the VM
+  # numbers above can be attributed correctly:
+  #   curl 100 MiB from proof.ovh.net: 104857600 bytes in 1.24 s = 84.6 MB/s
+  #   ~= 677 Mbps as a single TCP stream, load 1.97-2.65 on 4 cores while the
+  #   prod VM held ~170-200% CPU.
+  # A single stream therefore tops out in the same 700-850 Mbps band with or
+  # without the router VM in the path. The remaining ceiling is per-flow, not a
+  # misconfiguration: mtk_soc_eth exposes one RX queue (32 TX), `ethtool -l` is
+  # unsupported, and the VM forwards on one busy QEMU thread (~148%). Raising it
+  # needs vhost-net multiqueue taps (see the vhost-tap-attach host unit) so the
+  # guest can use one queue per vCPU instead of a single emulated queue.
   powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
   time.timeZone = "Europe/Amsterdam";
 
