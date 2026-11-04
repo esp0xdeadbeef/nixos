@@ -197,19 +197,23 @@ diagnostics() {
 # A healthy image must have real routes, not just loopback. This is the
 # assertion the previous trial lacked; it fails before the hold window.
 assert_routes() {
-  local c routes bad=0
+  local c raw routes bad=0 pid
   for c in $(guest_bash 'nixos-container list' 2>/dev/null); do
-    routes=$(run_in "$c" /run/current-system/sw/bin/ip -4 route show table all 2>/dev/null \
-      | grep -vE '^(local |broadcast )' | head -1)
+    pid=$(container_init_pid "$c" 2>/dev/null || true)
+    raw=$(run_in "$c" /run/current-system/sw/bin/ip -4 route show table all 2>&1)
+    routes=$(printf '%s\n' "$raw" | grep -vE '^(local |broadcast )' | grep -E '^[^ ]' | head -3)
     if [ -z "$routes" ]; then
-      echo "[$(ts)] ASSERT: $c has no non-loopback IPv4 route"
+      echo "[$(ts)] ASSERT: $c has no non-loopback IPv4 route (init_pid=${pid:-none})"
+      printf '%s\n' "$raw" | head -12 | sed 's/^/[$(ts)]   raw: /'
       bad=1
     fi
   done
 
-  if ! run_in access-clients-vpn /run/current-system/sw/bin/ip -6 route show table all 2>/dev/null \
-    | grep -vE '^(local |broadcast )' | grep -q .; then
-    echo "[$(ts)] ASSERT: access-clients-vpn has no non-loopback IPv6 route"
+  pid=$(container_init_pid access-clients-vpn 2>/dev/null || true)
+  raw=$(run_in access-clients-vpn /run/current-system/sw/bin/ip -6 route show table all 2>&1)
+  if ! printf '%s\n' "$raw" | grep -vE '^(local |broadcast )' | grep -qE '^[^ ]'; then
+    echo "[$(ts)] ASSERT: access-clients-vpn has no non-loopback IPv6 route (init_pid=${pid:-none})"
+    printf '%s\n' "$raw" | head -12 | sed 's/^/[$(ts)]   raw: /'
     bad=1
   fi
 
