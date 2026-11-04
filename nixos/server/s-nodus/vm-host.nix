@@ -257,7 +257,12 @@ in
     # lease. Bind the attach to the VM units so it re-runs on every start.
     wantedBy = [ "s-router-cobalt-new-vm.service" "s-router-cobalt-prod-vm.service" ];
     after = [ "s-router-cobalt-new-vm.service" "s-router-cobalt-prod-vm.service" ];
-    partOf = [ "s-router-cobalt-new-vm.service" "s-router-cobalt-prod-vm.service" ];
+    # NOTE: no `partOf`. PartOf propagates in BOTH directions: when this unit
+    # is restarted during `nixos-rebuild switch`, systemd also stops/restarts
+    # the listed VM units. That took the production cobalt router down for 13
+    # minutes (23:39:57 -> 23:52:48 on 2026-11-04, no carrier trigger to bring
+    # it back) while the host itself kept its internet connection. wantedBy +
+    # after are enough to run the attach after each VM start.
     path = [
       pkgs.iproute2
       pkgs.coreutils
