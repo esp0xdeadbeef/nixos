@@ -129,6 +129,64 @@ in
           networkConfig.DHCP = "ipv4";
           dhcpV4Config.UseDNS = false;
         };
+
+        # Prove the modelled service, not just the lease.
+        #
+        # `local-client` is allowed DNS to the access-local resolver (FS-540
+        # relation `local-client-to-access`, dports 53) and nothing else: the
+        # access-local input policy is `drop` with only DHCP + DNS permitted,
+        # so ICMP is blocked BY DESIGN. Asserting the allowed path (TCP/53 to
+        # the DHCP-supplied gateway) is what actually exercises the modelled
+        # relation; a ping test would "fail" on a correct configuration.
+        systemd.services.dhcp-service-assert = {
+          description = "Assert the DHCP lease and the allowed DNS service path";
+          wantedBy = [ "multi-user.target" ];
+          after = [ "network.target" ];
+          wants = [ "network.target" ];
+          # NixOS units get a minimal PATH; name every tool the script uses so
+          # the assertion cannot fail for a reason unrelated to the network.
+          path = with pkgs; [
+            bash
+            coreutils
+            gawk
+            iproute2
+          ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          script = ''
+            set -u
+
+            gw=""
+            i=0
+            while [ "$i" -lt 60 ]; do
+              gw=$(ip -4 route show default | awk '/^default/ { print $3; exit }')
+              [ -n "$gw" ] && break
+              i=$((i + 1))
+              sleep 1
+            done
+
+            if [ -z "$gw" ]; then
+              echo "ASSERT FAIL: no DHCP default gateway on eth0" >&2
+              exit 1
+            fi
+            echo "lease gateway: $gw"
+
+            i=0
+            while [ "$i" -lt 30 ]; do
+              if timeout 3 bash -c "exec 3<>/dev/tcp/$gw/53" 2>/dev/null; then
+                echo "ASSERT OK: allowed DNS service reachable at $gw:53"
+                exit 0
+              fi
+              i=$((i + 1))
+              sleep 1
+            done
+
+            echo "ASSERT FAIL: modelled DNS service unreachable at $gw:53" >&2
+            exit 1
+          '';
+        };
       };
     };
   };
