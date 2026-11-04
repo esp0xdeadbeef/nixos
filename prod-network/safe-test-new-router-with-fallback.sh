@@ -297,6 +297,22 @@ for i in $(seq 1 "$HEALTH_RETRIES"); do
 done
 [ "$ok" -eq 1 ] || die "new health check failed"
 
+# QGA liveness fires long before the guest finishes booting (containers only
+# get their routes once their own network units run). Wait for real boot
+# completion first, otherwise the route assertions race the boot and report a
+# false failure while prod is already stopped.
+echo "[$(ts)] waiting for guest boot completion"
+booted=0
+for i in $(seq 1 120); do
+  if guest_bash 'test "$(systemctl is-system-running)" = running' >/dev/null 2>&1; then
+    booted=1
+    echo "[$(ts)] guest reached running after $((i * 5))s"
+    break
+  fi
+  sleep 5
+done
+[ "$booted" -eq 1 ] || die "guest did not reach running state"
+
 diagnostics
 assert_routes || die "route assertion failed"
 
