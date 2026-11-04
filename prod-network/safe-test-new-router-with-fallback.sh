@@ -176,6 +176,28 @@ diagnostics() {
   echo "[$(ts)] === diagnostics end ==="
 }
 
+# A healthy image must have real routes, not just loopback. This is the
+# assertion the previous trial lacked; it fails before the hold window.
+assert_routes() {
+  local c routes bad=0
+  for c in $(guest_bash 'nixos-container list' 2>/dev/null); do
+    routes=$(run_in "$c" /run/current-system/sw/bin/ip -4 route show table all 2>/dev/null \
+      | grep -vE '^(local |broadcast )' | head -1)
+    if [ -z "$routes" ]; then
+      echo "[$(ts)] ASSERT: $c has no non-loopback IPv4 route"
+      bad=1
+    fi
+  done
+
+  if ! run_in access-clients-vpn /run/current-system/sw/bin/ip -6 route show table all 2>/dev/null \
+    | grep -vE '^(local |broadcast )' | grep -q .; then
+    echo "[$(ts)] ASSERT: access-clients-vpn has no non-loopback IPv6 route"
+    bad=1
+  fi
+
+  return "$bad"
+}
+
 rolled=0
 rollback() {
   [ "$rolled" -eq 1 ] && return 0
@@ -276,6 +298,7 @@ done
 [ "$ok" -eq 1 ] || die "new health check failed"
 
 diagnostics
+assert_routes || die "route assertion failed"
 
 fails=0
 for i in $(seq 1 "$HOLD"); do
