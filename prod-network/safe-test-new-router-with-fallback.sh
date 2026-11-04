@@ -220,6 +220,26 @@ assert_routes() {
   return "$bad"
 }
 
+# Prove the intended lanes actually carry traffic, not just that routes exist.
+# access-clients must reach core, and access-clients-vpn must leave via its VPN
+# underlay; both are probed from inside the container that owns the lane.
+assert_egress() {
+  local bad=0 out
+  out=$(run_in access-clients /run/current-system/sw/bin/ip -4 route get 10.1.0.1 2>&1 | head -2)
+  echo "[$(ts)] EGRESS access-clients -> core: $(printf '%s' "$out" | tr '\n' ' ')"
+  printf '%s' "$out" | grep -q 'dev access-clients' || { echo "[$(ts)] ASSERT: access-clients does not route via its fabric interface"; bad=1; }
+
+  out=$(run_in access-clients-vpn /run/current-system/sw/bin/ip -4 route get 10.1.0.3 2>&1 | head -2)
+  echo "[$(ts)] EGRESS access-clients-vpn -> vpn underlay: $(printf '%s' "$out" | tr '\n' ' ')"
+  printf '%s' "$out" | grep -q 'dev acce-clie-vpn' || { echo "[$(ts)] ASSERT: access-clients-vpn does not route via its vpn interface"; bad=1; }
+
+  out=$(run_in core /run/current-system/sw/bin/ip -4 route get 10.1.0.1 2>&1 | head -2)
+  echo "[$(ts)] EGRESS core -> access fabric: $(printf '%s' "$out" | tr '\n' ' ')"
+  printf '%s' "$out" | grep -qE 'dev (ens3|eth0|core)' || { echo "[$(ts)] ASSERT: core has no fabric route"; bad=1; }
+
+  return "$bad"
+}
+
 rolled=0
 rollback() {
   [ "$rolled" -eq 1 ] && return 0
@@ -337,6 +357,7 @@ done
 
 diagnostics
 assert_routes || die "route assertion failed"
+assert_egress || die "egress assertion failed"
 
 fails=0
 for i in $(seq 1 "$HOLD"); do
