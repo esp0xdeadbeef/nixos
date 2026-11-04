@@ -216,6 +216,20 @@ assert_routes() {
     bad=1
   fi
 
+  # The VPN underlays must themselves reach core: that is the "underlays
+  # connect to core" requirement. Assert a default-carrying route exists via
+  # each overlay interface rather than a fixed address, so the check tracks
+  # whatever the model allocates.
+  local u
+  for u in core-vpn-onyx core-vpn-opal; do
+    out=$(run_in "$u" /run/current-system/sw/bin/ip -4 route show table all 2>&1 | grep -m1 '^default')
+    echo "[$(ts)] EGRESS $u -> upstream: ${out:-<none>}"
+    if [ -z "$out" ]; then
+      echo "[$(ts)] ASSERT: $u has no default route to its underlay"
+      bad=1
+    fi
+  done
+
   return "$bad"
 }
 
