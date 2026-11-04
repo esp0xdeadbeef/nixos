@@ -216,6 +216,22 @@ assert_routes() {
     bad=1
   fi
 
+  # The WAN must hold a real (non-link-local) IPv4 address: the ISP hands the
+  # core its public lease over s88-udhcpc-wan, and a vhost NIC whose tap was
+  # never enslaved silently keeps the interface up but addressless, which every
+  # route assertion above still passes. Observed exactly that on the first
+  # vhost trial, so assert the lease explicitly.
+  local wan_raw wan_addr
+  wan_raw=$(run_in core /run/current-system/sw/bin/ip -4 -o addr show wan 2>&1)
+  wan_addr=$(printf '%s\n' "$wan_raw" | sed -n 's/.* inet \([0-9.]*\/[0-9]*\) .*/\1/p' | head -1)
+  if [ -z "$wan_addr" ]; then
+    echo "[$(ts)] ASSERT: core wan has no IPv4 address (no ISP lease)"
+    printf '%s\n' "$wan_raw" | head -6 | sed 's/^/[$(ts)]   raw: /'
+    bad=1
+  else
+    echo "[$(ts)] WAN lease on core wan: $wan_addr"
+  fi
+
   # The VPN underlays must themselves reach core: that is the "underlays
   # connect to core" requirement. Assert a default-carrying route exists via
   # each overlay interface rather than a fixed address, so the check tracks
