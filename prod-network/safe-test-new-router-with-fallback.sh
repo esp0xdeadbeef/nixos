@@ -381,7 +381,21 @@ done
 [ "$booted" -eq 1 ] || die "guest did not reach running state"
 
 diagnostics
-assert_routes || die "route assertion failed"
+# Containers are still converging when the guest first answers: one trial
+# failed here with the container's IPv6 routes visible in the raw dump taken
+# immediately *after* the check, i.e. they landed microseconds too late. Retry
+# until the routing table settles instead of asserting once.
+routes_ok=0
+for attempt in 1 2 3 4 5 6; do
+  if assert_routes; then
+    routes_ok=1
+    echo "[$(ts)] routes settled after ${attempt} attempt(s)"
+    break
+  fi
+  echo "[$(ts)] routes not settled yet (attempt ${attempt}/6); retrying in 10s"
+  sleep 10
+done
+[ "$routes_ok" -eq 1 ] || die "route assertion failed"
 assert_egress || die "egress assertion failed"
 
 fails=0
