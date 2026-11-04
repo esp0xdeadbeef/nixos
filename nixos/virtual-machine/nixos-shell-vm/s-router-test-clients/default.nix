@@ -116,6 +116,74 @@ in
   };
 
   config = lib.mkIf config.sRouterTestClientsDhcpClient.enable {
+    # Second fixture on the *recursive* lane. The renderer-emitted
+    # `recursive-dns-nixos-client` cannot be extended from the host (FS-983
+    # keeps its container definition renderer-owned), so this container is
+    # host-declared and asserts the modelled `recursive-client` contract from
+    # the only side the host is allowed to own: its own test container.
+    containers.dhcp-recursive-test = {
+      autoStart = true;
+      privateNetwork = true;
+      hostBridge = "dns545nr";
+      config = {
+        system.stateVersion = "26.05";
+        networking.useHostResolvConf = false;
+        services.resolved.enable = true;
+        systemd.network.enable = true;
+        systemd.network.networks."10-eth0" = {
+          matchConfig.Name = "eth0";
+          networkConfig.DHCP = "ipv4";
+          dhcpV4Config.UseDNS = false;
+        };
+        systemd.services.recursive-lane-assert = {
+          description = "Assert the recursive-client lane lease and web egress";
+          wantedBy = [ "multi-user.target" ];
+          after = [ "network.target" ];
+          wants = [ "network.target" ];
+          path = with pkgs; [
+            bash
+            coreutils
+            curl
+            gawk
+            iproute2
+          ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          script = ''
+            set -u
+
+            gw=""
+            i=0
+            while [ "$i" -lt 60 ]; do
+              gw=$(ip -4 route show default | awk '/^default/ { print $3; exit }')
+              [ -n "$gw" ] && break
+              i=$((i + 1))
+              sleep 1
+            done
+            if [ -z "$gw" ]; then
+              echo "ASSERT FAIL: recursive lane got no DHCP gateway" >&2
+              exit 1
+            fi
+            echo "recursive lease gateway: $gw"
+
+            i=0
+            while [ "$i" -lt 30 ]; do
+              if curl -m 8 -sS -o /dev/null http://1.1.1.1 2>/dev/null; then
+                echo "ASSERT OK: recursive-client web egress works"
+                exit 0
+              fi
+              i=$((i + 1))
+              sleep 2
+            done
+            echo "ASSERT FAIL: recursive-client web egress blocked" >&2
+            exit 1
+          '';
+        };
+      };
+    };
+
     containers.dhcp-test = {
       autoStart = true;
       privateNetwork = true;
