@@ -90,6 +90,10 @@ in
     # database lives on /persist (not SOPS) so rotation is a file operation.
     ./tang.nix
 
+    # Reboot the board when BOTH internet probes stay unreachable for the whole
+    # window; one reachable target means a DNS/CDN problem, not a dead uplink.
+    ./internet-guard.nix
+
     # microSD layout.  Replicates the vendor GPT geometry (bl2/ubootenv/
     # factory/fip + production FIT + btrfs root) because the MT7988 BootROM,
     # BL2 and the stock U-Boot locate their payloads by fixed sector + GPT
@@ -98,6 +102,8 @@ in
   ];
 
   networking.hostName = lib.mkForce name;
+
+  local.internetGuard.enable = true;
   time.timeZone = "Europe/Amsterdam";
 
   # Run sops as a systemd unit rather than an activation script.
