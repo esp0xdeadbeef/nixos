@@ -9,7 +9,7 @@
 ,
 }:
 
-{ ... }:
+{ config, ... }:
 
 let
   labPath = "${inputs.network-labs}/${labSource}";
@@ -44,6 +44,25 @@ let
     bundle = canonicalBundle;
   };
 
+  # vhost NICs render as `-netdev tap,ifname=tap-<nicId>,vhost=on`, which qemu
+  # does NOT bridge itself, so the host must enslave the tap. Derive the exact
+  # pairs from the same platform binding the renderer consumes.
+  vhostTapAttachments =
+    if platformBinding == null then
+      [ ]
+    else
+      let
+        target = platformBinding.categories.deployment.vmTargets.${hostName} or null;
+        nics =
+          if builtins.isAttrs target && builtins.isList (target.nics or null) then target.nics else [ ];
+      in
+      map
+        (nic: {
+          tap = "tap-${nic.nicId}";
+          bridge = nic.attachment.name;
+        })
+        (builtins.filter (nic: (nic.vhost or false) == true) nics);
+
   rendererInput = {
     inherit hostName;
     bundle = canonicalBundle;
@@ -73,6 +92,7 @@ let
   # routing module are exported.
   renderer-contract = {
     inherit
+      vhostTapAttachments
       canonicalBundle
       render-nebula
       render-nixos
@@ -82,6 +102,11 @@ let
   };
 in
 {
+  # Publish the tap/bridge pairs through the host profile's own option so the
+  # vhost-tap-attach unit can consume them. A plain option is evaluation-order
+  # independent, unlike _module.args.
+  local.vhostTapAttachments = vhostTapAttachments;
+
   imports = [
     render-nixos
     render-nebula
