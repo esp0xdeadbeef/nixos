@@ -143,19 +143,15 @@ guest_bash() {
 
 # Enter a container network namespace.
 #
-# The container's MainPID is the systemd-nspawn process on the host; the guest
-# PID 1 is its child. Resolve the guest PID through the machine cgroup so a
-# missing/renumbered child does not silently produce "no route" (which would
-# look like a router failure rather than a helper failure).
+# The containers run inside the GUEST, not on the hypervisor host: `container@`
+# units and /proc/<pid> only exist there. Resolve both the nspawn MainPID and
+# its guest-init child from inside the guest, then nsenter into that netns.
 container_init_pid() {
-  local c="$1" pid
-  pid=$(systemctl show -p MainPID --value "container@${c}.service" 2>/dev/null || true)
-  [ -n "$pid" ] && [ "$pid" != "0" ] || return 1
-  # Prefer the lowest child of the nspawn process (the guest's PID 1).
-  local child
-  child=$(tr ' ' '\n' < "/proc/${pid}/task/${pid}/children" 2>/dev/null \
-    | grep -E '^[0-9]+$' | sort -n | head -1 || true)
-  [ -n "$child" ] || return 1
+  local c="$1" pid child
+  pid=$(guest_bash "systemctl show -p MainPID --value container@${c}.service" 2>/dev/null | tr -d ' \r\n')
+  [ -n "${pid:-}" ] && [ "$pid" != "0" ] || return 1
+  child=$(guest_bash "tr ' ' '\\n' < /proc/${pid}/task/${pid}/children | grep -E '^[0-9]+\$' | sort -n | head -1" 2>/dev/null | tr -d ' \r\n')
+  [ -n "${child:-}" ] || return 1
   echo "$child"
 }
 
@@ -163,10 +159,13 @@ run_in() {
   local c="$1" pid
   shift
   pid=$(container_init_pid "$c") || {
-    echo "### ${c}: cannot resolve container init pid" >&2
+    echo "### ${c}: cannot resolve container init pid (guest-side lookup)" >&2
     return 1
   }
-  /run/current-system/sw/bin/nsenter -t "$pid" -n -- "$@"
+  # Build one argv for the guest shell so quoting survives the QGA hop.
+  local q="" a
+  for a in "$@"; do q="$q $(printf '%q' "$a")"; done
+  guest_bash "/run/current-system/sw/bin/nsenter -t ${pid} -n --${q}"
 }
 
 diagnostics() {
