@@ -104,6 +104,15 @@ in
   networking.hostName = lib.mkForce name;
 
   local.internetGuard.enable = true;
+
+  # 4 cores is very little for a box that also forwards a 10G WAN into a VM.
+  # Measured with `nix run nixpkgs#fast` on the live prod router:
+  #   schedutil : 682-779 Mbps down / 626-627 up
+  #   performance: 836 Mbps down / 658 up   (12 ms, best of all variants)
+  # RPS was also tried on eth1/taps and was strictly worse (639/454, 42 ms), so
+  # it stays disabled. The board is mains-powered, so governor ramp-up latency
+  # is not worth the few watts schedutil saves on a saturating uplink.
+  powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
   time.timeZone = "Europe/Amsterdam";
 
   # Run sops as a systemd unit rather than an activation script.
