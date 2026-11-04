@@ -1,4 +1,4 @@
-{ config, lib, inputs, pkgs, vmImages, ... }:
+{ config, lib, inputs, pkgs, vmImages, vmNics, ... }:
 
 # nixos-shell VM host for s-nodus (BPI-R4 Pro 4E, aarch64).
 #
@@ -218,6 +218,17 @@ in
 
     # Start the cobalt router only while the WAN transceiver is present, the
     # same shape as s-sigma's `eno1-router-vms` rule on s-router-prod.
+    # --- vhost tap attachment (host side) -------------------------------
+    #
+    # vhost NICs render as `-netdev tap,ifname=tap-<nicId>,vhost=on,queues=N`
+    # because qemu rejects vhost/queues inside `-nic` and `-netdev bridge`. A
+    # bare tap is NOT bridged by qemu, and the tap lives in THIS host netns, so
+    # the attach must happen here (a guest-side unit cannot see it).
+    #
+    # `vmNics` (flake.nix) is the single source of truth for the map. The unit
+    # polls because the tap only appears once qemu opened the netdev. It is
+    # inert while a VM still uses `-nic bridge`, since nothing matches.
+
     carrierControls.wan-router-vms = {
       interface = "wan-carrier";
       requiredInterfaces = [
@@ -228,5 +239,46 @@ in
       pollIntervalSeconds = 5;
       description = "Start or stop the cobalt router VM from the WAN transceiver state";
     };
+  };
+
+  # vhost tap attachment lives at module top level: the taps exist in this
+  # host netns, so the unit must not be nested under the VM manager option tree.
+  systemd.services.vhost-tap-attach = {
+    description = "Enslave vhost-net tap devices of the router VMs to their bridges";
+    wantedBy = [ "multi-user.target" ];
+    path = [
+      pkgs.iproute2
+      pkgs.coreutils
+    ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      set -u
+
+      attach() {
+        tap="$1"
+        bridge="$2"
+        i=0
+        while [ "$i" -lt 120 ]; do
+          if ip link show dev "$tap" >/dev/null 2>&1; then
+            ip link set dev "$tap" master "$bridge"
+            ip link set dev "$tap" up
+            echo "attached $tap -> $bridge"
+            return 0
+          fi
+          i=$((i + 1))
+          sleep 1
+        done
+        echo "NOTE: $tap did not appear (VM not using vhost, or not running)"
+        return 0
+      }
+    ''
+    + lib.concatMapStringsSep "\n"
+      (
+        nic: "attach ${lib.escapeShellArg "tap-${nic.nicId}"} ${lib.escapeShellArg nic.bridge}"
+      )
+      (lib.unique (lib.concatLists (lib.attrValues vmNics)));
   };
 }
