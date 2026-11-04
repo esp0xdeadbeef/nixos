@@ -135,6 +135,15 @@ let
             };
             model = nic.model or "virtio-net-pci";
           }
+          // lib.optionalAttrs (nic.vhost or false) {
+            # vhost-net / multiqueue request. The renderer turns this into
+            # -netdev tap,...,vhost=on,queues=N + -device ...,mq=on,vectors=N
+            # because qemu rejects vhost/queues inside -nic and -netdev bridge.
+            vhost = true;
+          }
+          // lib.optionalAttrs (builtins.isInt (nic.queues or null)) {
+            inherit (nic) queues;
+          }
           // lib.optionalAttrs (nic.mac or null != null) {
             mac = {
               sourceClass = "public";
