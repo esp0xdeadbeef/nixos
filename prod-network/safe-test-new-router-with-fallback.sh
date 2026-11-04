@@ -141,13 +141,31 @@ guest_bash() {
   vm-exec "$NEW" /run/current-system/sw/bin/bash -lc "$1"
 }
 
-run_in() {
-  local c="$1" pid child
-  shift
+# Enter a container network namespace.
+#
+# The container's MainPID is the systemd-nspawn process on the host; the guest
+# PID 1 is its child. Resolve the guest PID through the machine cgroup so a
+# missing/renumbered child does not silently produce "no route" (which would
+# look like a router failure rather than a helper failure).
+container_init_pid() {
+  local c="$1" pid
   pid=$(systemctl show -p MainPID --value "container@${c}.service" 2>/dev/null || true)
-  [ -n "$pid" ] || { echo "### ${c}: no MainPID"; return 1; }
-  child=$(cat "/proc/${pid}/task/${pid}/children" 2>/dev/null | awk '{print $1}' || true)
-  [ -n "$child" ] && pid="$child"
+  [ -n "$pid" ] && [ "$pid" != "0" ] || return 1
+  # Prefer the lowest child of the nspawn process (the guest's PID 1).
+  local child
+  child=$(tr ' ' '\n' < "/proc/${pid}/task/${pid}/children" 2>/dev/null \
+    | grep -E '^[0-9]+$' | sort -n | head -1 || true)
+  [ -n "$child" ] || return 1
+  echo "$child"
+}
+
+run_in() {
+  local c="$1" pid
+  shift
+  pid=$(container_init_pid "$c") || {
+    echo "### ${c}: cannot resolve container init pid" >&2
+    return 1
+  }
   /run/current-system/sw/bin/nsenter -t "$pid" -n -- "$@"
 }
 
