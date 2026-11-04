@@ -249,7 +249,15 @@ in
   # host netns, so the unit must not be nested under the VM manager option tree.
   systemd.services.vhost-tap-attach = {
     description = "Enslave vhost-net tap devices of the router VMs to their bridges";
-    wantedBy = [ "multi-user.target" ];
+    # /run/nixos-shell-vm-manager/... The taps are created by the VM's own
+    # -netdev tap,ifname=... argument, i.e. AFTER the VM unit starts -- not at
+    # boot. A boot-only oneshot therefore never sees them: it ran at 17:31 and
+    # logged "tap-lan-trunk did not appear" three minutes before the trial
+    # started the VM, so the guest's wan tap stayed unenslaved and got no DHCP
+    # lease. Bind the attach to the VM units so it re-runs on every start.
+    wantedBy = [ "s-router-cobalt-new-vm.service" "s-router-cobalt-prod-vm.service" ];
+    after = [ "s-router-cobalt-new-vm.service" "s-router-cobalt-prod-vm.service" ];
+    partOf = [ "s-router-cobalt-new-vm.service" "s-router-cobalt-prod-vm.service" ];
     path = [
       pkgs.iproute2
       pkgs.coreutils
