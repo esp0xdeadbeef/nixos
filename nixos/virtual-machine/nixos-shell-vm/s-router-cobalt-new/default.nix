@@ -73,9 +73,11 @@ let
       #   vhost mq,     4 rx/4 tx queues: 94.8 91.8 94.0 106.1 93.6 95.7 89.3 98.0
       #                                                               (median ~95)
       #
-      # Four concurrent streams (cachefly, two samples each):
-      #   plain bridge:  149.3 MB/s / 218.1 MB/s   (median ~184  ~1.47 Gbps)
-      #   vhost mq:      332.5 MB/s / 243.2 MB/s   (median ~288  ~2.30 Gbps)
+      # Four concurrent streams (cachefly, three serialised samples each,
+      # 20s apart so CDN throttling settles):
+      #   plain bridge:  149.5 / 181.2 / 190.8 MB/s  (median 181.2  ~1.45 Gbps)
+      #   vhost mq:      286.0 / 353.4 / 344.7 MB/s  (median 344.7  ~2.76 Gbps)
+      #                                              -> ~1.9x aggregate
       #
       # So: no single-stream gain (slightly worse), ~1.6x aggregate throughput
       # across parallel flows. That is the case this box exists for -- 8 Gbps of
