@@ -61,10 +61,19 @@ let
       nicId = "lan-trunk";
       bridge = "br-cobalt-lan";
       # vhost-net multiqueue: one virtqueue per vCPU instead of a single
-      # emulated queue, so forwarding is not bound to one QEMU thread. The
-      # host's vhost-tap-attach unit enslaves the rendered tap (tap-lan-trunk,
-      # tap-wan) into its bridge; without it the NIC comes up DOWN and
-      # isolated, so this must not be enabled before that unit is active.
+      # emulated queue. The host's vhost-tap-attach unit enslaves the rendered
+      # tap (tap-lan-trunk, tap-wan) into its bridge; without it the NIC comes
+      # up DOWN and isolated, so this must not be enabled before that unit is
+      # active (it now runs on VM start, not only at boot -- see vm-host.nix).
+      #
+      # Measured on s-nodus 2026-11-04, guest -> internet, single TCP stream:
+      #   plain bridge, 1 rx/1 tx queue:  91.5 112.9 111.8 104.0 MB/s  (median ~108)
+      #   vhost mq,     4 rx/4 tx queues: 94.8 91.8 94.0 106.1 93.6 95.7 89.3 98.0 MB/s
+      #                                                               (median ~95)
+      # The guest does report rx=4 tx=4, so the mechanism works, but a single
+      # flow cannot use more than one queue and multiqueue overhead costs about
+      # 10% here. Keep it only if parallel-flow throughput (many concurrent
+      # streams) proves better; do not cite single-stream gains for it.
       vhost = true;
       queues = 4;
     }
