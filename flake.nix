@@ -85,6 +85,13 @@
       inputs.network-labs.follows = "network-labs";
     };
 
+    # Testing-chain WireGuard renderer, bound to the *main* realization model.
+    #
+    # Consumers on a -prod chain must NOT inherit this default: their
+    # `networkRealizationModelInput` is `network-realization-model-prod`, and a
+    # bundle stamped by the main model fails the prod model's release check
+    # closed with `NR_RENDERER_BUNDLE_UNVALIDATED`. Use
+    # network-renderer-wireguard-prod below for those.
     network-renderer-wireguard = {
       url = "github:esp0xdeadbeef/network-renderer-wireguard";
       inputs.nixpkgs.follows = "nixpkgs";
