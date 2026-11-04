@@ -2077,11 +2077,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793773679,
-        "narHash": "sha256-9qrpq8Dd1LrsqsgGCOCF5QcO25J3qlGgJJjdtX0D7wM=",
+        "lastModified": 1793773756,
+        "narHash": "sha256-c/n1v2Czvd7C2UacnBFx70X1eQVySihSsRcZyWiVcDc=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-access-endpoint-nixos",
-        "rev": "8680e7e897bfb90675c35f7e4badc63de469f692",
+        "rev": "9e48fcacb0027d6c5d8cef6b1b4d643fb60e00c4",
         "type": "github"
       },
       "original": {
