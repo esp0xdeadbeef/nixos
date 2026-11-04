@@ -112,6 +112,7 @@ in
       networkRealizationModelInput = inputs.network-realization-model-prod;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
       nebulaRendererInput = inputs.network-renderer-nebula-prod;
+      wireguardRendererInput = inputs.network-renderer-wireguard-prod;
       intentFileName = "intent-cobalt.nix";
       inventoryFileName = "inventory-cobalt.nix";
       inherit system vmNics;

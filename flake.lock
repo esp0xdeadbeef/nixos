@@ -3337,6 +3337,33 @@
         "type": "github"
       }
     },
+    "network-renderer-wireguard-prod": {
+      "inputs": {
+        "network-control-plane-model": [
+          "network-control-plane-model-prod"
+        ],
+        "network-realization-model": [
+          "network-realization-model-prod"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788273198,
+        "narHash": "sha256-3B0KKvVLeeou3gp1oH2P+IZ+sgz19zyKCAD4jssbiho=",
+        "owner": "esp0xdeadbeef",
+        "repo": "network-renderer-wireguard",
+        "rev": "6b583f554598d7d1567fc7776e13184eccb51ea2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esp0xdeadbeef",
+        "repo": "network-renderer-wireguard",
+        "rev": "6b583f554598d7d1567fc7776e13184eccb51ea2",
+        "type": "github"
+      }
+    },
     "network-renderer-wireguard_2": {
       "inputs": {
         "network-control-plane-model": [
@@ -5138,6 +5165,7 @@
         "network-renderer-nixos-legacy-prod": "network-renderer-nixos-legacy-prod",
         "network-renderer-nixos-prod": "network-renderer-nixos-prod",
         "network-renderer-wireguard": "network-renderer-wireguard_5",
+        "network-renderer-wireguard-prod": "network-renderer-wireguard-prod",
         "nix-index-database": "nix-index-database",
         "nixos-aarch64-widevine": "nixos-aarch64-widevine",
         "nixos-hardware": "nixos-hardware",
