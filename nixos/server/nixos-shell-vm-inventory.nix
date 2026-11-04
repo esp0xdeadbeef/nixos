@@ -31,6 +31,23 @@ let
       (qgaSocketFor vmName)
     ];
 
+
+  # vhost tap attachment data (host side). A vhost NIC renders as
+  # `-netdev tap,ifname=tap-<nicId>,vhost=on,queues=N`, which qemu does NOT
+  # bridge, so the host must enslave it. Inert while a VM uses `-nic bridge`.
+  vhostBridge = "vmbr4";
+  vhostNics = {
+    s-router-nixos = [
+      "nic0"
+      "nic1"
+      "nic2"
+      "nic3"
+      "nic4"
+      "nic5"
+    ];
+  };
+  attachLine = nic: "attach tap-" + nic + " " + vhostBridge;
+
   qgaArgumentsFor = vmName: [
     "-chardev"
     "socket,id=qga0,path=${qgaSocketFor vmName},server=on,wait=off"
@@ -414,6 +431,41 @@ in
       message = "Unknown nixos-shell excluded instances: ${lib.concatStringsSep ", " unknownExcludeInstances}";
     }
   ];
+
+  systemd.services.vhost-tap-attach = {
+    description = "Enslave vhost-net tap devices of router VMs to their bridges";
+    wantedBy = [ "multi-user.target" ];
+    path = [
+      pkgs.iproute2
+      pkgs.coreutils
+    ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      set -u
+
+      attach() {
+        tap="$1"
+        bridge="$2"
+        i=0
+        while [ "$i" -lt 120 ]; do
+          if ip link show dev "$tap" >/dev/null 2>&1; then
+            ip link set dev "$tap" master "$bridge"
+            ip link set dev "$tap" up
+            echo "attached $tap -> $bridge"
+            return 0
+          fi
+          i=$((i + 1))
+          sleep 1
+        done
+        echo "NOTE: $tap did not appear (VM not using vhost, or not running)"
+        return 0
+      }
+    ''
+    + lib.concatMapStringsSep "\n" attachLine (lib.unique (lib.concatLists (lib.attrValues vhostNics)));
+  };
 
   services.nixosShellVmManager = {
     enable = true;
