@@ -537,6 +537,38 @@
                 # it surfaces as `attribute '<vm>' missing` while building the
                 # host's rootfsImage.  Computing the mapping at the flake level,
                 # where nixosConfigurations is complete, cannot cycle.
+                # NIC map for the cobalt router VMs, computed here for the same
+                # no-cycle reason as vmImages: the hypervisor host needs to know
+                # which tap belongs to which bridge (vhost NICs are rendered as
+                # `-netdev tap,ifname=tap-<nicId>` and qemu does not bridge a
+                # bare tap). This is the single source of truth for those NICs.
+                vmNics =
+                  if name == "s-nodus" then
+                    {
+                      s-router-cobalt-new = [
+                        {
+                          nicId = "lan-trunk";
+                          bridge = "br-cobalt-lan";
+                        }
+                        {
+                          nicId = "wan";
+                          bridge = "br-cobalt-wan";
+                        }
+                      ];
+                      s-router-cobalt-prod = [
+                        {
+                          nicId = "lan-trunk";
+                          bridge = "br-cobalt-lan";
+                        }
+                        {
+                          nicId = "wan";
+                          bridge = "br-cobalt-wan";
+                        }
+                      ];
+                    }
+                  else
+                    { };
+
                 vmImages =
                   if name == "s-nodus" then
                     {
