@@ -183,6 +183,20 @@
       inputs.network-labs.follows = "network-labs-prod-renderer";
     };
 
+    # Pinned WireGuard renderer for the production cobalt router.  Cobalt
+    # models WireGuard overlays (core-vpn-onyx / core-vpn-opal), so the prod
+    # cobalt pipeline needs a WireGuard renderer bound to the -prod chain.  It
+    # previously fell back to the unpinned `network-renderer-wireguard`, whose
+    # own `network-realization-model` input followed main -- so the prod
+    # realization model (a97b1a0) validated a bundle stamped by the testing
+    # model, failing closed with NR_RENDERER_BUNDLE_UNVALIDATED.
+    network-renderer-wireguard-prod = {
+      url = "github:esp0xdeadbeef/network-renderer-wireguard/6b583f554598d7d1567fc7776e13184eccb51ea2";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.network-control-plane-model.follows = "network-control-plane-model-prod";
+      inputs.network-realization-model.follows = "network-realization-model-prod";
+    };
+
     # Frozen legacy production stack: the previous s-router-prod render
     # (prod-network/current), retained as s-router-legacy-prod.
     network-labs-legacy-prod = {
