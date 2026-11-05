@@ -126,6 +126,15 @@ in
     productionSelector = hostName;
   };
 
+  # Diagnostics for the testing/rollback router only. `selftest` records
+  # DNS/WAN/TCP results on the persisted state disk; `ensureDnsForwarders`
+  # keeps a public-resolver forwarder in the core container's unbound because
+  # the modelled upstream (10.2.60.1) is unreachable and core otherwise runs as
+  # a pure iterator that SERVFAILs while warming a cold root anchor. Off for
+  # the production router: its intent does not model those resolvers.
+  local.routerDiagnostics.selftest = true;
+  local.routerDiagnostics.ensureDnsForwarders = true;
+
   networking.hostName = lib.mkForce hostName;
 
   # No per-VM secrets/<host>.yaml: this VM reuses the cobalt site's existing
