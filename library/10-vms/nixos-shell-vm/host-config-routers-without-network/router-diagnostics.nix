@@ -30,6 +30,22 @@ let
     "9.9.9.9"
   ];
 
+  # One probe, run inside the core container. The guest's own namespace has no
+  # `wan`/`mgmt` and no NAT, so every fact that describes the router has to be
+  # read there; and one `nixos-container run` is far cheaper than six, each of
+  # which sets up a namespace and can exceed the unit's start timeout.
+  coreProbe = pkgs.writeShellScript "router-core-probe" ''
+    for iface in wan mgmt; do
+      a=$(ip -4 -o addr show dev "$iface" 2>/dev/null | awk '{print $4}' | head -1)
+      printf 'addr-%s=%s\n' "$iface" "''${a:-none}"
+    done
+    printf 'gateway=%s\n' "$(ip -4 route show default 2>/dev/null | awk '/^default/ {print $3; exit}')"
+    printf 'forwards=%s\n' "$(unbound-control list_forwards 2>/dev/null | head -1)"
+    w=$(ip -4 -o addr show dev wan 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+    printf 'conntrack=%s\n' "$(wc -l < /proc/net/nf_conntrack 2>/dev/null)"
+    printf 'wan-snat=%s\n' "$(grep -c "$w" /proc/net/nf_conntrack 2>/dev/null)"
+  '';
+
   # Everything the checks need, resolved at build time so the script does not
   # depend on the runtime PATH of a minimal systemd unit.
   tools = with pkgs; [
@@ -82,21 +98,14 @@ in
 
           stamp "=== router-selftest start (hostname=$(cat /etc/hostname)) ==="
 
-          # 1. WAN lease. A router whose wan has no address cannot NAT anything,
-          #    and every route assertion on the hypervisor still passes. The
-          #    address lives in the core container, not in the guest's own
-          #    namespace, so ask the container: checking the root namespace
-          #    reports "<none>" on a perfectly healthy router.
-          for iface in wan mgmt; do
-            addr=$(nixos-container run core -- ip -4 -o addr show dev "$iface" 2>/dev/null \
-              | awk '{print $4}' | head -1)
-            stamp "addr $iface=''${addr:-<none>}"
-            [ "$iface" = wan ] && wan_addr=$(printf '%s' "$addr" | cut -d/ -f1)
+          # 1. Everything the router itself knows: WAN/mgmt addresses, default
+          #    gateway, resolver forwarders, and how many conntrack entries exist
+          #    and are translated to the WAN address. A client flow that is absent
+          #    from conntrack never traversed this router.
+          core=$(nixos-container run core -- ${coreProbe} 2>/dev/null)
+          printf '%s\n' "$core" | while read -r line; do
+            [ -n "$line" ] && stamp "core $line"
           done
-
-          gw=$(nixos-container run core -- ip -4 route show default 2>/dev/null \
-            | awk '/^default/ {print $3; exit}')
-          stamp "default-gateway=''${gw:-<none>}"
 
           # 2. Name resolution through the modelled resolver, then through a
           #    public one. DNS succeeding while TCP fails (or the reverse) is the
@@ -104,11 +113,8 @@ in
           #    modelled resolver by address: the guest's own /etc/resolv.conf is
           #    not what clients are told to use.
           dns_local=$(dig +short +time=3 +tries=1 @10.2.30.1 www.google.com 2>&1 | head -1)
-          dns_forward=$(nixos-container run core -- \
-            /run/current-system/sw/bin/unbound-control list_forwards 2>/dev/null | head -1)
           dns_public=$(dig +short +time=3 +tries=1 @1.1.1.1 www.google.com 2>&1 | head -1)
           stamp "dig-modeled=10.2.30.1 ''${dns_local:-<empty>}"
-          stamp "unbound-forwards=''${dns_forward:-<empty>}"
           stamp "dig-public-1.1.1.1=''${dns_public:-<empty>}"
 
           # 3. TCP egress. Small bodies, short timeouts.
@@ -120,19 +126,6 @@ in
           # 4. Record the busiest tasks so a wedged/spinning guest shows what was
           #    burning CPU instead of only the aftermath.
           stamp "top-cpu: $(ps -eo pcpu,comm --sort=-pcpu | sed -n '2,4p' | tr '\n' ' ' | tr -s ' ')"
-
-          # 5. Client-plane evidence. The hypervisor sees the guest's tap but not
-          #    how NAT translated a client flow, so record the translated
-          #    conntrack entries: a client connection that never appears here did
-          #    not traverse this router, which is the difference between a router
-          #    bug and a client with its own overlay/proxy path.
-          stamp "conntrack-count: $(nixos-container run core -- sh -c 'wc -l < /proc/net/nf_conntrack' 2>/dev/null)"
-          if [ -n ''${wan_addr:-} ]; then
-            snat=$(nixos-container run core -- grep -c "''${wan_addr}" /proc/net/nf_conntrack 2>/dev/null)
-            stamp "wan-snat-entries: ''${snat:-0} (addr ''${wan_addr})"
-          else
-            stamp "wan-snat-entries: <no wan address>"
-          fi
 
           stamp "=== router-selftest end ==="
         '';
