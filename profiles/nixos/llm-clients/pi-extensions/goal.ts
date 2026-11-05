@@ -7,12 +7,12 @@
  * validated evidence, either that the next step is now proven done, or that it
  * is genuinely impossible.
  *
- * Files can be part of the goal too: any whitespace-separated token that looks
- * like a path (contains a `/`, ends in `.md`/`.txt`, or is an `@path`) is
- * resolved relative to the project root and its ENTIRE content is read from
- * disk at the start of every turn and injected verbatim under a `[Goal file]`
- * block, so the agent never has to (and cannot forget to) open it. A goal that
- * names a file that cannot be read aborts the turn instead of running half-armed.
+ * A goal is plain text. Nothing in it is ever treated as a file unless the
+ * user explicitly marks it with `@`: `@path/to/spec.md` (relative to the
+ * project root) or `@~/x/spec.md`. Only `@` tokens are read from disk at the
+ * start of every turn and injected verbatim under a `[Goal file]` block. An
+ * `@` file that cannot be read rejects the goal (or aborts the turn) instead
+ * of running half-armed.
  *
  * Usage:
  *   /goal              show the active goal
@@ -26,10 +26,12 @@
  *
  * Self-continuation replaces the "nudge the pane with a dot every 10 seconds"
  * loop: with auto armed the extension requests the next turn itself and keeps
- * going up to 2000 turns / 24 h. It does not stop on a bare marker: GOAL DONE
- * or GOAL BLOCKED must carry a proof that is re-verified here (sha256 of all
- * the goal's words, plus a real solution commit for DONE in a git repo).
- * It is off by default and never persisted as on.
+ * going up to 2000 turns / 24 h. It does not stop on a bare marker, and a hash
+ * alone is not an escape: GOAL DONE and GOAL BLOCKED both require
+ *   - spec: sha256 of all the goal's words (recomputed here), and
+ *   - solution: a git commit created DURING THIS RUN in the goal repo; for
+ *     GOAL BLOCKED its message must document the blocker (contain BLOCKED).
+ * An effort complaint is not a blocker. Off by default, never persisted on.
  *
  * The goal is stored in the session, so it follows the active branch and is
  * restored on resume / branch navigation. Only the raw goal text is stored;
@@ -82,9 +84,12 @@ const AUTO_PROMPT =
 	"Proof format (one per line, lowercase labels):\n" +
 	"  spec: <64-hex sha256 of all the words of the goal files, concatenated in the order listed in this message:\n" +
 	"        cat file1 file2 ... | sha256sum — or of the goal text itself when there are no files>\n" +
-	"  solution: <git commit hash that implements the goal, present in the repo>  (required for GOAL DONE)\n" +
+	"  solution: <git commit hash created DURING THIS RUN, in the goal repo>  (required for both escapes)\n" +
+	"    GOAL DONE  — the commit implements the goal.\n" +
+	"    GOAL BLOCKED — the commit documents the blocker and its message contains the word BLOCKED;\n" +
+	"        there is no escape by hash alone, and an effort complaint is not a blocker.\n" +
 	"Compute the spec hash yourself with the exact cat|sha256sum command; do not invent hex. " +
-	"Commit your work before claiming GOAL DONE.";
+	"Commit before claiming either escape; the extension verifies the commit exists, is new, and matches the escape.";
 
 interface GoalState {
 	goal: string | null;
@@ -108,20 +113,12 @@ const PROOF_CONTRACT = [
 // Goal files
 // ---------------------------------------------------------------------------
 
-// A whitespace token is treated as a goal file when it is `@path`, contains a
-// directory separator, or ends in a known text extension. Deliberately liberal:
-// a false positive costs one failed lookup that is reported loudly, while a
-// false negative means the file is silently not inlined — the exact bug this
-// code exists to prevent.
+// A goal file is OPT-IN and only ever an `@path` token. Everything else in
+// the goal is text: no extension sniffing, no slash detection, no glob/URL
+// heuristics. `/goal URS / FS` is text; `/goal @spec.md` inlines a file.
 function looksLikePath(token: string): boolean {
-	let t = token.trim();
-	if (!t) return false;
-	// strip surrounding quotes/backticks/emphasis and trailing punctuation
-	t = t.replace(/^[`'"*_(<\[]+/, "").replace(/[`'"*_>)\],.;:]+$/, "");
-	if (!t) return false;
-	if (t.startsWith("@")) return t.length > 1;
-	if (t.includes("/")) return true;
-	return /\.(md|markdown|txt|rst|adoc|ya?ml|json|toml|ini|nix|sh|bash|py|ts|js|go|rs|c|h|cpp|hpp|java|sql)$/i.test(t);
+	const t = token.trim();
+	return t.startsWith("@") && t.length > 1;
 }
 
 function normalizePathToken(token: string): string {
@@ -132,7 +129,7 @@ function normalizePathToken(token: string): string {
 	return t;
 }
 
-function goalFileTokens(goal: string | null): string[] {
+function goalFileTokens(goal: string | null, _cwd?: string): string[] {
 	if (!goal) return [];
 	const out: string[] = [];
 	for (const raw of goal.split(/\s+/)) {
@@ -155,7 +152,7 @@ interface LoadedFile {
 // turn aborts instead of running with the goal half-inlined.
 function loadGoalFiles(cwd: string, goal: string | null): LoadedFile[] {
 	const files: LoadedFile[] = [];
-	for (const token of goalFileTokens(goal)) {
+	for (const token of goalFileTokens(goal, cwd)) {
 		const abs = isAbsolute(token) ? token : resolve(cwd, token);
 		if (!existsSync(abs)) {
 			throw new Error(
@@ -223,6 +220,29 @@ function repoDir(cwd: string, goal: string | null): string | null {
 	}
 }
 
+interface CommitInfo {
+	hash: string;
+	ct: number; // committer timestamp, seconds
+	msg: string;
+}
+
+// Read a commit's timestamp + message, or null if it does not exist.
+function commitInfo(repo: string, hash: string): CommitInfo | null {
+	if (!repo || !/^[0-9a-f]{7,40}$/i.test(hash)) return null;
+	try {
+		const out = execFileSync("git", ["-C", repo, "show", "-s", "--format=%ct%x00%s", `${hash}^{commit}`], {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		});
+		const [ctRaw, ...msg] = out.split("\0");
+		const ct = Number.parseInt(ctRaw, 10);
+		if (!Number.isFinite(ct)) return null;
+		return { hash, ct, msg: msg.join("\0").trim() };
+	} catch {
+		return null;
+	}
+}
+
 function commitExists(repo: string, hash: string): boolean {
 	if (!repo || !/^[0-9a-f]{7,40}$/i.test(hash)) return false;
 	try {
@@ -264,6 +284,18 @@ function parseEscape(text: string): EscapeProof | null {
 		spec: spec ? spec[1].toLowerCase() : null,
 		solution: sol ? sol[1].toLowerCase() : null,
 	};
+}
+
+// The short continuation prompt plus the live list of words to hash, so the
+// escape instructions always name the exact files. Used both for the settle
+// continuation and for the self-start kick when /goal auto is armed.
+function autoPrompt(goal: string | null, _cwd: string): string {
+	const files = goalFileTokens(goal);
+	const hashTargets =
+		files.length > 0
+			? `\n\nWords to hash for the spec proof — run exactly:\n  cat ${files.join(" ")} | sha256sum`
+			: `\n\nWords to hash for the spec proof — run exactly:\n  printf '%s' '${goal}' | sha256sum`;
+	return `${AUTO_PROMPT}${hashTargets}`;
 }
 
 export default function goalExtension(pi: ExtensionAPI) {
@@ -313,7 +345,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 
 	// The verbatim goal plus the fixed proof contract. Nothing here is ever
 	// written back into `goal`, so the stored text stays 1:1 with what you typed.
-	function goalHeader(): string {
+	function goalHeader(_cwd: string): string {
 		const files = goalFileTokens(goal);
 		const note =
 			files.length > 0
@@ -380,6 +412,18 @@ export default function goalExtension(pi: ExtensionAPI) {
 						: "Auto-continue disarmed.",
 					"info",
 				);
+				// Self-start: arming while idle kicks the first turn, so no
+				// external dot/nudge is needed to get the loop moving.
+				if (on && ctx.isIdle()) {
+					pi.sendMessage(
+						{
+							customType: ENTRY_TYPE,
+							content: autoPrompt(goal, ctx.cwd),
+							display: true,
+						},
+						{ triggerTurn: true },
+					);
+				}
 				return;
 			}
 
@@ -452,7 +496,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 		// A broken goal file must not degrade into a silent no-op turn.
 		const files = loadGoalFiles(ctx.cwd, goal);
 		const body = files.length > 0 ? `\n\n${fileHeader(files)}` : "";
-		return { action: "transform", text: `${goalHeader()}${body}\n\n${event.text}` };
+		return { action: "transform", text: `${goalHeader(ctx.cwd)}${body}\n\n${event.text}` };
 	});
 
 	// Track the assistant's own words so auto-continue can stop when the agent
@@ -485,10 +529,17 @@ export default function goalExtension(pi: ExtensionAPI) {
 			const want = specHash(cwd, goal);
 			const specOk = proof.spec === want;
 			const repo = repoDir(cwd, goal);
-			const solOk = proof.solution !== null && commitExists(repo ?? "", proof.solution);
+			const runStartSec = autoStartedAt > 0 ? Math.floor(autoStartedAt / 1000) : 0;
+			const sol = proof.solution ? commitInfo(repo ?? "", proof.solution) : null;
+			const solExists = sol !== null;
+			const solFresh = solExists && (runStartSec === 0 || sol.ct >= runStartSec - 1);
+			const solSaysBlocked = solExists && /BLOCK/i.test(sol.msg);
 
-			const doneOk = proof.kind === "done" && specOk && (repo === null || solOk);
-			const blockedOk = proof.kind === "blocked" && specOk;
+			// No commit-based escapes outside a git repo; hash alone is nothing.
+			const doneOk =
+				proof.kind === "done" && specOk && repo !== null && solExists && solFresh;
+			const blockedOk =
+				proof.kind === "blocked" && specOk && repo !== null && solExists && solFresh && solSaysBlocked;
 
 			if (doneOk || blockedOk) {
 				autoRun = false;
@@ -497,8 +548,8 @@ export default function goalExtension(pi: ExtensionAPI) {
 					updateStatus(lastCtx);
 					lastCtx.ui.notify(
 						doneOk
-							? `Auto-continue stopped: GOAL DONE proof verified (spec hash + solution commit).`
-							: `Auto-continue stopped: GOAL BLOCKED accepted with verified spec hash.`,
+							? `Auto-continue stopped: GOAL DONE proof verified (spec hash + solution commit ${sol?.hash}).`
+							: `Auto-continue stopped: GOAL BLOCKED accepted (spec hash + blocker commit ${sol?.hash}).`,
 						"info",
 					);
 				}
@@ -509,13 +560,20 @@ export default function goalExtension(pi: ExtensionAPI) {
 			const reasons: string[] = [];
 			if (!specOk) {
 				reasons.push(
-					`spec hash rejected (yours: ${proof.spec ?? "missing"}; it does not match the words on disk — run sha256sum over them yourself)`,
+					`spec hash rejected (yours: ${proof.spec ?? "missing"}; it does not match the words on disk — run the exact cat|sha256sum command)`,
 				);
 			}
-			if (proof.kind === "done" && repo !== null && !solOk) {
-				reasons.push(
-					`solution rejected (${proof.solution ?? "missing"} is not a commit in ${repo})`,
-				);
+			if (repo === null) {
+				reasons.push(`no git repo at ${cwd} — commit the work and the blocker, then escape with a solution line`);
+			} else {
+				if (!solExists) {
+					reasons.push(`solution missing (commit your work first, then give its hash)`);
+				} else if (!solFresh) {
+					reasons.push(`solution ${sol.hash} is not from this run — the commit must be created after auto-continue was armed`);
+				}
+				if (proof.kind === "blocked" && solExists && !solSaysBlocked) {
+					reasons.push(`blocker commit ${sol.hash} does not document a blocker — its message must contain BLOCKED`);
+				}
 			}
 			autoIterations += 1;
 			if (lastCtx) updateStatus(lastCtx);
@@ -528,8 +586,10 @@ export default function goalExtension(pi: ExtensionAPI) {
 						display: true,
 						content:
 							`Your escape was REJECTED by the goal extension: ${reasons.join("; ")}. ` +
-							`Compute the spec hash yourself over the goal files exactly as listed, use your tools to commit the work, ` +
-							`then end your turn with GOAL DONE or GOAL BLOCKED plus valid spec/solution lines.\n\n` +
+							`For GOAL BLOCKED the blocker must be real and committed: write the blocker analysis into the goal repo ` +
+							`(a written note in the repo, or a commit whose message contains BLOCKED), commit it, and give that commit as the solution line. ` +
+							`An effort complaint ("too much work", "context too small") is not a blocker. ` +
+							`For GOAL DONE the solution commit must implement the goal and be created during this run.\n\n` +
 							`${AUTO_PROMPT}`,
 					},
 				],
@@ -552,20 +612,13 @@ export default function goalExtension(pi: ExtensionAPI) {
 		}
 		if (lastCtx) updateStatus(lastCtx);
 
-		// The short continuation prompt plus the live list of words to hash, so
-		// the escape instructions always name the exact files.
-		const files = goalFileTokens(goal);
-		const hashTargets =
-			files.length > 0
-				? `\n\nWords to hash for the spec proof — run exactly:\n  cat ${files.join(" ")} | sha256sum`
-				: `\n\nWords to hash for the spec proof — run exactly:\n  printf '%s' '${goal}' | sha256sum`;
 		return {
 			continue: true,
 			entries: [
 				{
 					type: "custom_message" as const,
 					customType: ENTRY_TYPE,
-					content: `${AUTO_PROMPT}${hashTargets}`,
+					content: autoPrompt(goal, lastCtx?.cwd ?? process.cwd()),
 					display: true,
 				},
 			],
