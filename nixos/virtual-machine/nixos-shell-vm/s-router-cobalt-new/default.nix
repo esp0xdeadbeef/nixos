@@ -185,6 +185,20 @@ in
   # error" on the board.  l-portal sets hostPlatform the same way.
   nixpkgs.hostPlatform = lib.mkForce system;
 
+  # Boot-time tuning, scoped to the candidate.
+  #
+  # This guest manages many links whose members are regularly carrier-less (the
+  # LAN/WAN taps before their peer is up, dmz and vpn planes, the management
+  # bridge). networkd treats every managed link as required, so anything that
+  # pulls network-online.target waits on links that may never come up. One
+  # online link is enough for consumers that order against the link they use.
+  #
+  # Deliberately NOT in the shared host-config-routers-without-network module:
+  # nine router guests import that module, including the protected production
+  # and legacy-production shapes, whose boot behaviour must not change as a
+  # side effect of tuning this candidate.
+  systemd.network.wait-online.anyInterface = true;
+
   # vm-settings.nix sizes every router VM for the Dell servers (42 cores,
   # 40 GiB RAM, 20 GiB disk) and attaches it to the x86-only `vmbr4` bridge.
   # The board is a 4-core/4 GiB MT7988A, so override both to fit.
