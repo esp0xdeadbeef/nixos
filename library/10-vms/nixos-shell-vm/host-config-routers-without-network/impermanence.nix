@@ -18,7 +18,12 @@
 
       directories = [
         #"/var/lib"
-        #"/var/log"
+        # Journald is volatile by default in these guests, so a failed boot
+        # (e.g. egress/DNS timeouts that only appear at runtime) leaves no
+        # evidence to inspect: mounting the qcow2 showed var/lib/{containers,
+        # docker} and no journal at all. Persist /var/log so the guest keeps
+        # its journal across restarts.
+        "/var/log"
         "/var/lib/nixos"
         {
           directory = "/root/.ssh";
