@@ -68,7 +68,7 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = false;
-          TimeoutStartSec = "180s";
+          TimeoutStartSec = "90s";
           Nice = 10;
         };
 
@@ -130,13 +130,17 @@ in
       # again until it warms a root anchor. Re-assert it on a timer.
       systemd.services.router-dns-forwarders = {
         description = "Ensure the core resolver forwards to reachable public resolvers";
-        wantedBy = [ "multi-user.target" ];
         after = [ "container@core.service" ];
         wants = [ "container@core.service" ];
         path = [ pkgs.nixos-container ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = false;
+          # Never on the boot path (only the timer triggers this): `nixos-container
+          # run` waits for the container's systemd, so as a multi-user.target job
+          # it can hold the whole guest in "starting" — which is exactly what
+          # happened, leaving the site without a router until the trial timed out.
+          TimeoutStartSec = "60s";
         };
         script = ''
           set -u
@@ -144,7 +148,9 @@ in
             echo "core container is not up yet"
             exit 0
           fi
-          nixos-container run core -- /run/current-system/sw/bin/unbound-control \
+          # timeout(1) as well: a wedged container must not turn this unit into
+          # the thing that never finishes.
+          timeout 45 nixos-container run core -- /run/current-system/sw/bin/unbound-control \
             forward ${lib.concatStringsSep " " dnsForwarders}
         '';
       };
