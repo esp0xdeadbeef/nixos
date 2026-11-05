@@ -387,9 +387,13 @@ done
 echo "[$(ts)] waiting for guest boot completion"
 # Bounded on purpose: every second spent here is a second prod is stopped, so a
 # candidate that never stops booting must roll back quickly rather than hold the
-# site offline for the length of the old 10 minute budget.
+# site offline for the length of the old 10 minute budget. The budget is set from
+# measurement: `systemd-analyze critical-chain` on a converged router shows
+# multi-user.target at 3min27s, because each rendered container's own
+# systemd-networkd-wait-online takes 90s. 300s covers that with margin while
+# still failing an actually-stuck guest in five minutes rather than ten.
 booted=0
-for i in $(seq 1 36); do
+for i in $(seq 1 60); do
   # `degraded` means boot finished with some unit failed: accepted here, because
   # a diagnostics unit that fails must not make a working router look unbooted.
   # Only `starting`/`initializing` mean boot is still in progress.
@@ -408,7 +412,7 @@ if [ "$booted" -ne 1 ]; then
   guest_bash 'systemctl list-jobs --no-pager' 2>&1 | tail -20 || true
   echo "[$(ts)] failed units:"
   guest_bash 'systemctl list-units --state=failed --no-pager' 2>&1 | tail -20 || true
-  die "guest did not reach running state within $((36 * 5))s"
+  die "guest did not reach running state within $((60 * 5))s"
 fi
 
 diagnostics
