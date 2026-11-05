@@ -83,6 +83,15 @@ let
       #   vhost mq:      281.8 / 330.4 MB/s          (median 306    ~2.45 Gbps)
       #                                              -> ~1.9x aggregate
       #
+      # CAVEAT on all of the above: those figures are bounded by the upstream
+      # path, not by this router. The bare host (no VM involved) measured
+      # 1 stream 67 MB/s, 4 parallel 21.7 MB/s, 6 parallel 28.4 MB/s against
+      # ovh/cachefly on 2026-11-05, i.e. more flows got *slower* in aggregate.
+      # eth1/eth2 negotiate speed=10000 with 0 tx errors, so the local wiring
+      # is fine and the limiter is upstream of the box. Do not read 2.45 Gbps
+      # as the router ceiling; re-measure against a local target or a known
+      # 8 Gbps-capable peer before drawing conclusions about router capacity.
+      #
       # So: no single-stream gain (slightly worse), ~1.6x aggregate throughput
       # across parallel flows. That is the case this box exists for -- 8 Gbps of
       # WAN with many clients -- so the trade is worth taking. Do not cite
