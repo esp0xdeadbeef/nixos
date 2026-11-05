@@ -56,12 +56,13 @@ in
       systemd.services.router-selftest = {
         description = "Record guest-side DNS/WAN/TCP reachability for offline diagnosis";
 
-        # Runs once the containers and their routes have had a chance to settle,
-        # and again on a timer so a later failure is captured rather than only
-        # the boot-time state.
-        wantedBy = [ "multi-user.target" ];
-        after = [ "network-online.target" ];
-        wants = [ "network-online.target" ];
+        # Timer-driven only. A diagnostics unit must never sit on the boot
+        # path: `wantedBy = multi-user.target` plus `wants = network-online`
+        # pulls in systemd-networkd-wait-online, and a router guest that manages
+        # carrier-less bridges can stall there long enough that the guest never
+        # reaches "running" — which is how a trial left the site without a
+        # router. The timer below samples the same state shortly after boot.
+        after = [ "container@core.service" ];
 
         path = tools;
 

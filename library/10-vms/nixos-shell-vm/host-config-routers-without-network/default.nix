@@ -30,5 +30,13 @@
     # and the manager restores the previous image. Declared here so every
     # router guest (cobalt-new, nixos lab, prod) answers by construction.
     services.qemuGuest.enable = true;
+
+    # A router guest manages many links whose members are regularly
+    # carrier-less (the LAN/WAN taps before their peer is up, dmz and vpn
+    # planes, the management bridge). networkd treats every managed link as
+    # required, so anything that pulls network-online.target inherits a wait
+    # that can expire instead of succeeding. One online link is enough for a
+    # target whose consumers order against the specific link they need.
+    systemd.network.wait-online.anyInterface = true;
   };
 }
