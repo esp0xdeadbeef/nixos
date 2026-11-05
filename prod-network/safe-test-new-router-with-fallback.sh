@@ -390,7 +390,10 @@ echo "[$(ts)] waiting for guest boot completion"
 # site offline for the length of the old 10 minute budget.
 booted=0
 for i in $(seq 1 36); do
-  if guest_bash 'test "$(systemctl is-system-running)" = running' >/dev/null 2>&1; then
+  # `degraded` means boot finished with some unit failed: accepted here, because
+  # a diagnostics unit that fails must not make a working router look unbooted.
+  # Only `starting`/`initializing` mean boot is still in progress.
+  if guest_bash 'test "$(systemctl is-system-running)" != starting -a "$(systemctl is-system-running)" != initializing' >/dev/null 2>&1; then
     booted=1
     echo "[$(ts)] guest reached running after $((i * 5))s"
     break
