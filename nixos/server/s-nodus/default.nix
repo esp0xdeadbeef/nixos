@@ -103,6 +103,15 @@ in
 
   networking.hostName = lib.mkForce name;
 
+  # The board carries many managed bridges whose members are often carrier-less
+  # (AP radios before hostapd starts, the cobalt LAN/WAN taps, the dmz/vpn
+  # planes). systemd-networkd-wait-online treats every managed link as required
+  # unless it opts out, so the boot-time wait expired with
+  # "Timeout occurred while waiting for network connectivity" while the host was
+  # in fact reachable. Satisfy the target as soon as any managed link is online;
+  # units that genuinely need a specific link already order against it.
+  systemd.network.wait-online.anyInterface = true;
+
   local.internetGuard.enable = true;
 
   # 4 cores is very little for a box that also forwards a 10G WAN into a VM.
