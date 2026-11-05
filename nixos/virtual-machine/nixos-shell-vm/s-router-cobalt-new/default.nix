@@ -83,6 +83,17 @@ let
       #   vhost mq:      281.8 / 330.4 MB/s          (median 306    ~2.45 Gbps)
       #                                              -> ~1.9x aggregate
       #
+      # WAN-free measurement through the actual virtio NIC (iperf3, host ->
+      # guest mgmt plane over ap-mgmt, 2026-11-05):
+      #   plain bridge, 1 rx/1 tx queue : 1.71 Gbits/sec  (4 streams)
+      #   vhost mq,     4 rx/4 tx queues: 1.99 Gbits/sec  (1 stream)
+      #                                   3.88 Gbits/sec  (4 streams)
+      #                                   4.28 Gbits/sec  (8 streams)
+      # Guest confirms eth0/eth1 rx=4 tx=4. So the NIC itself gains ~2.3x on
+      # parallel flows with no WAN in the path, and the board's own L2 fabric
+      # does 8.84-8.97 Gbits/sec, so neither the NIC nor the box is the limit
+      # of the 8 Gbps link.
+      #
       # CAVEAT on all of the above: those figures are bounded by the upstream
       # path, not by this router. The bare host (no VM involved) measured
       # 1 stream 67 MB/s, 4 parallel 21.7 MB/s, 6 parallel 28.4 MB/s against
