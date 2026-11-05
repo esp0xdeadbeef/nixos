@@ -261,15 +261,20 @@ in
     # is restarted during `nixos-rebuild switch`, systemd also stops/restarts
     # the listed VM units. That took the production cobalt router down for 13
     # minutes (23:39:57 -> 23:52:48 on 2026-11-04, no carrier trigger to bring
-    # it back) while the host itself kept its internet connection. wantedBy +
-    # after are enough to run the attach after each VM start.
+    # it back) while the host itself kept its internet connection.
+    #
+    # `RemainAfterExit` must stay false: with it true the unit stays "active"
+    # after the first boot-time run, so a later VM start does not re-trigger it
+    # through `wantedBy`, and the taps are never enslaved (measured: no attach
+    # events at all, then "core wan has no ISP lease"). Exiting after the
+    # attempt lets every VM start pull it in again.
     path = [
       pkgs.iproute2
       pkgs.coreutils
     ];
     serviceConfig = {
       Type = "oneshot";
-      RemainAfterExit = true;
+      RemainAfterExit = false;
     };
     script = ''
       set -u
