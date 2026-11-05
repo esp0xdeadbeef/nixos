@@ -385,8 +385,11 @@ done
 # completion first, otherwise the route assertions race the boot and report a
 # false failure while prod is already stopped.
 echo "[$(ts)] waiting for guest boot completion"
+# Bounded on purpose: every second spent here is a second prod is stopped, so a
+# candidate that never stops booting must roll back quickly rather than hold the
+# site offline for the length of the old 10 minute budget.
 booted=0
-for i in $(seq 1 120); do
+for i in $(seq 1 36); do
   if guest_bash 'test "$(systemctl is-system-running)" = running' >/dev/null 2>&1; then
     booted=1
     echo "[$(ts)] guest reached running after $((i * 5))s"
@@ -394,7 +397,16 @@ for i in $(seq 1 120); do
   fi
   sleep 5
 done
-[ "$booted" -eq 1 ] || die "guest did not reach running state"
+if [ "$booted" -ne 1 ]; then
+  # Dump what is holding boot before rolling back, otherwise the evidence dies
+  # with the candidate.
+  echo "[$(ts)] guest state: $(guest_bash 'systemctl is-system-running' 2>&1 | tail -1)"
+  echo "[$(ts)] still-activating units:"
+  guest_bash 'systemctl list-jobs --no-pager' 2>&1 | tail -20 || true
+  echo "[$(ts)] failed units:"
+  guest_bash 'systemctl list-units --state=failed --no-pager' 2>&1 | tail -20 || true
+  die "guest did not reach running state within $((36 * 5))s"
+fi
 
 diagnostics
 # Containers are still converging when the guest first answers: one trial
