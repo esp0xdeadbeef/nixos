@@ -438,7 +438,10 @@ for i in $(seq 1 "$HOLD"); do
   fi
   if [ $((i % 10)) -eq 0 ] && ! health; then
     fails=$((fails + 1))
-    echo "[$(ts)] health lost ${fails}/3 at ${i}s"
+    # Record the state that failed the check: "health lost" alone cannot tell a
+    # stopped unit from one that is still activating, and that ambiguity has
+    # already sent this investigation the wrong way once.
+    echo "[$(ts)] health lost ${fails}/3 at ${i}s (state=$(systemctl show "$NEW_UNIT" -p ActiveState,SubState --value 2>/dev/null | tr '\n' '/'))"
     [ "$fails" -ge 3 ] && exit 1
   fi
 done
