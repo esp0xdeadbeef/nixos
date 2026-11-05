@@ -13,6 +13,7 @@
     ./ssh.nix
     ./impermanence.nix
     ./persist-state-disk.nix
+    ./router-selftest.nix
   ];
 
 
