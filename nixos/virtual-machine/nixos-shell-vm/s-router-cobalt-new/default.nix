@@ -73,10 +73,14 @@ let
       #   vhost mq,     4 rx/4 tx queues: 94.8 91.8 94.0 106.1 93.6 95.7 89.3 98.0
       #                                                               (median ~95)
       #
-      # Four concurrent streams (cachefly, three serialised samples each,
-      # 20s apart so CDN throttling settles):
+      # Four concurrent streams (cachefly, serialised samples 20s apart so CDN
+      # throttling settles).
+      # Pre-deploy build:
       #   plain bridge:  149.5 / 181.2 / 190.8 MB/s  (median 181.2  ~1.45 Gbps)
       #   vhost mq:      286.0 / 353.4 / 344.7 MB/s  (median 344.7  ~2.76 Gbps)
+      # Re-measured on the deployed generation (44756bc7 / x9rsc61j), 2 samples:
+      #   plain bridge:  162.7 / 165.2 MB/s          (median 164    ~1.31 Gbps)
+      #   vhost mq:      281.8 / 330.4 MB/s          (median 306    ~2.45 Gbps)
       #                                              -> ~1.9x aggregate
       #
       # So: no single-stream gain (slightly worse), ~1.6x aggregate throughput
