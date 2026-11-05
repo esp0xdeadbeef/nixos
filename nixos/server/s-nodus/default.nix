@@ -113,6 +113,18 @@ in
   # it stays disabled. The board is mains-powered, so governor ramp-up latency
   # is not worth the few watts schedutil saves on a saturating uplink.
   #
+  # Local fabric capacity, measured 2026-11-05 with iperf3 between netns pairs
+  # on the board itself (no WAN involved), 4 parallel streams:
+  #   veth pair:                     8.97 Gbits/sec
+  #   via br-cobalt-lan (L2 paths):   8.84 Gbits/sec
+  # eth1/eth2 negotiate speed=10000 with 0 tx_errors.
+  # So the hardware, kernel and bridge paths do ~9 Gbps: the router is not the
+  # bottleneck. Against internet test endpoints the same box managed only
+  # 67 MB/s one stream and 21-28 MB/s across 4-6 parallel streams (more flows,
+  # LOWER aggregate), i.e. the upstream path currently limits everything.
+  # Capacity questions must be answered with a local/known-fast peer, never
+  # with WAN speedtests.
+  #
   # Host baseline, measured on the bare board (not through the VM) so the VM
   # numbers above can be attributed correctly:
   #   curl 100 MiB from proof.ovh.net: 104857600 bytes in 1.24 s = 84.6 MB/s
