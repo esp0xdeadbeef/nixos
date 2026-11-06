@@ -284,14 +284,22 @@ assert_egress() {
   local gw url out ok total
   gw=$(ip -4 route show default 2>/dev/null | awk '/^default/ {print $3; exit}')
   if [ -n "${CLIENT_PATH_URLS:-}" ] && [ -n "$gw" ]; then
-    ok=0; total=0
-    for url in $CLIENT_PATH_URLS; do
-      total=$((total + 1))
-      out=$(curl -4 -sS -m 10 -o /dev/null -w '%{http_code} %{time_total}s' "$url" 2>&1 | tail -1)
-      echo "[$(ts)] CLIENT-PATH gw $gw $url: $out"
-      case "$out" in 2*|3*) ok=$((ok + 1)) ;; esac
+    # Patient, like the route assertions: the containers that own the client
+    # NAT need ~2.5 minutes to converge, and this runs seconds after the route
+    # table settles. Measured: 0/3 at 10s after settle, 200 at 7s a minute later.
+    local attempt
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+      ok=0; total=0
+      for url in $CLIENT_PATH_URLS; do
+        total=$((total + 1))
+        out=$(curl -4 -sS -m 10 -o /dev/null -w '%{http_code} %{time_total}s' "$url" 2>&1 | tail -1)
+        echo "[$(ts)] CLIENT-PATH attempt $attempt gw $gw $url: $out"
+        case "$out" in 2*|3*) ok=$((ok + 1)) ;; esac
+      done
+      echo "[$(ts)] CLIENT-PATH summary: $ok/$total reachable (attempt $attempt)"
+      [ "$ok" -ge $((total / 2 + 1)) ] && break
+      [ "$attempt" -lt 12 ] && sleep 10
     done
-    echo "[$(ts)] CLIENT-PATH summary: $ok/$total reachable through the router"
     # Some destinations are expected to be unreachable from this site (measured
     # on production too), so require most of them rather than all: a total
     # failure is the condition that means the client path is broken.
