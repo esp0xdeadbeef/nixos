@@ -100,5 +100,23 @@ copy again would re-create the drift this work is removing, so the fixture
 migration is blocked on that canonical source (or on permission to add the
 example to `network-labs`).
 
+Concrete migration attempts this run (all reverted, no repo left half-migrated):
+
+1. Copied the forwarding model's compiler-clean tri-site intent into
+   `network-labs` with the renderer's private inventory: failed with
+   `inventory.realization.nodes.esp-edge-example-router-nebula-core.ports.east-west.uplink:
+   references unknown site uplink 'east-west'` — the private inventory encodes
+   the pre-FS-460 model (overlay name as a routed site uplink).
+2. Removed that legacy overlay-uplink port and re-used the forwarding model's
+   intent over the private inventory: the inventory lint passed, then the
+   forwarding model rejected the result with
+   `forwardingModel.enterprise.esp.site.edge.domains.tenants: tenant 'client'
+   requires a derived dnsDomain or zone reference for DHCP advertisement
+   derivation` — the private inventory's DHCP advertisements do not carry the
+   tenant domain facts the current forwarding model derives from.
+
+So the canonical example needs a purpose-written inventory against the current
+FS-460/FS-322 domain and overlay contracts, not a port of the private one.
+
 Recorded upstream: `network-renderer-nixos:docs/blockers.md` (`c378477`) and
 `network-control-plane-model:docs/blockers/remaining-ci-reds.md` (`de27394`).
