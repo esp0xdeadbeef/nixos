@@ -70,6 +70,7 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model-prod;
       networkRealizationModelInput = inputs.network-realization-model-prod;
       nixosRendererInput = inputs.network-renderer-nixos-prod;
+      wireguardRendererInput = inputs.network-renderer-wireguard-prod;
       intentFileName = "intent-neon.nix";
       inventoryFileName = "inventory-neon.nix";
       inherit vmNics;

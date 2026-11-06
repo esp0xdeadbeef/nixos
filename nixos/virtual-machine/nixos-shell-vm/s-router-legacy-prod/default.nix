@@ -65,6 +65,7 @@ in
       controlPlaneModelInput = inputs.network-control-plane-model-legacy-prod;
       networkRealizationModelInput = inputs.network-realization-model-legacy-prod;
       nixosRendererInput = inputs.network-renderer-nixos-legacy-prod;
+      wireguardRendererInput = inputs.network-renderer-wireguard-prod;
       intentFileName = "intent-neon.nix";
       inventoryFileName = "inventory-neon.nix";
       system = "x86_64-linux";

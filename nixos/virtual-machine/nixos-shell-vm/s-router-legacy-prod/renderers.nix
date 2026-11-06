@@ -8,7 +8,7 @@
 , networkRealizationModelInput ? inputs.network-realization-model
 , controlPlaneTransform ? cpm: cpm
 , nixosRendererInput ? inputs.network-renderer-nixos
-, wireguardRendererInput ? inputs.network-renderer-wireguard
+, wireguardRendererInput
 , hostName ? "s-router-prod"
 , inventoryFileName ? "inventory.nix"
 , intentFileName ? "intent.nix"
