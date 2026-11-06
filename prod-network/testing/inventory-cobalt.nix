@@ -230,9 +230,6 @@ let
   policyDownstreamUnlockLink = "p2p-downstream-selector-policy--access-access-unlock";
   downstreamAccessUnlockLink = "p2p-access-unlock-downstream-selector";
   upstreamPolicyMgmtLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-wan";
-  upstreamPolicyMgmtGarnetLink = "p2p-policy-upstream-selector--access-access-mgmt--uplink-garnet";
-  upstreamPolicySvcGarnetLink = "p2p-policy-upstream-selector--access-access-svc--uplink-garnet";
-  upstreamPolicyDmzGarnetLink = "p2p-policy-upstream-selector--access-access-dmz--uplink-garnet";
   policyDownstreamMgmtLink = "p2p-downstream-selector-policy--access-access-mgmt";
   downstreamAccessMgmtLink = "p2p-access-mgmt-downstream-selector";
 
@@ -348,26 +345,8 @@ let
       interfaceName = "policy-mgmt";
     };
 
-    policy-mgmt-garnet = p2pPort {
-      link = upstreamPolicyMgmtGarnetLink;
-      adapterName = "cb-us-mgmt-xs";
-      bridge = "rt-upstream-policy-mgmt-garnet";
-      interfaceName = "policy-mgmt-garnet";
-    };
 
-    policy-svc-garnet = p2pPort {
-      link = upstreamPolicySvcGarnetLink;
-      adapterName = "cb-us-svc-xs";
-      bridge = "rt-upstream-policy-svc-garnet";
-      interfaceName = "policy-svc-garnet";
-    };
 
-    policy-dmz-garnet = p2pPort {
-      link = upstreamPolicyDmzGarnetLink;
-      adapterName = "cb-us-dmz-xs";
-      bridge = "rt-upstream-policy-dmz-garnet";
-      interfaceName = "policy-dmz-garnet";
-    };
   };
 
   policy = mkNode "policy" {
@@ -420,26 +399,8 @@ let
       interfaceName = "upstream-mgmt";
     };
 
-    upstream-mgmt-garnet = p2pPort {
-      link = upstreamPolicyMgmtGarnetLink;
-      adapterName = "cb-p-mgmt-xs";
-      bridge = "rt-upstream-policy-mgmt-garnet";
-      interfaceName = "upstream-mgmt-garnet";
-    };
 
-    upstream-svc-garnet = p2pPort {
-      link = upstreamPolicySvcGarnetLink;
-      adapterName = "cb-p-svc-xs";
-      bridge = "rt-upstream-policy-svc-garnet";
-      interfaceName = "upstream-svc-garnet";
-    };
 
-    upstream-dmz-garnet = p2pPort {
-      link = upstreamPolicyDmzGarnetLink;
-      adapterName = "cb-p-dmz-xs";
-      bridge = "rt-upstream-policy-dmz-garnet";
-      interfaceName = "upstream-dmz-garnet";
-    };
 
     downstream-svc = p2pPort {
       link = policyDownstreamSvcLink;
