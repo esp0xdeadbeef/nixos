@@ -126,6 +126,10 @@ fi
 
 # shellcheck disable=SC1090
 . "$NEW_CONF"
+# End-to-end client check: a small body from a public CDN, fetched from the host
+# (a real LAN client) so forward + NAT are exercised, not just the router's own
+# routing table. Override with an empty value to skip.
+CLIENT_PATH_URL="${CLIENT_PATH_URL-https://speed.cloudflare.com/__down?bytes=100000}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-60}"
 # The managed conf carries the steady-state tolerance. A candidate still has its
 # 15 containers converging while the hold runs, so the QEMU guest agent can miss
@@ -271,6 +275,19 @@ assert_egress() {
   out=$(run_in core /run/current-system/sw/bin/ip -4 route get 10.1.0.1 2>&1 | head -2)
   echo "[$(ts)] EGRESS core -> access fabric: $(printf '%s' "$out" | tr '\n' ' ')"
   printf '%s' "$out" | grep -qE 'dev (ens3|eth0|core)' || { echo "[$(ts)] ASSERT: core has no fabric route"; bad=1; }
+
+  # The lane assertions above only prove the router's own view. The path that
+  # actually matters is a LAN client's: this host is such a client (it sits on
+  # the site LAN and its default gateway is the router under test), so a request
+  # from here exercises forward + NAT end to end. Skip it when the host is not
+  # a client of this router rather than failing for the wrong reason.
+  local gw
+  gw=$(ip -4 route show default 2>/dev/null | awk '/^default/ {print $3; exit}')
+  if [ -n "${CLIENT_PATH_URL:-}" ] && [ -n "$gw" ]; then
+    out=$(curl -4 -sS -m 10 -o /dev/null -w '%{http_code} %{time_total}s via '"$gw" "$CLIENT_PATH_URL" 2>&1 | tail -1)
+    echo "[$(ts)] CLIENT-PATH $CLIENT_PATH_URL (gw $gw): $out"
+    printf '%s' "$out" | grep -q '^200 ' || { echo "[$(ts)] ASSERT: a LAN client cannot reach $CLIENT_PATH_URL through the router"; bad=1; }
+  fi
 
   return "$bad"
 }
