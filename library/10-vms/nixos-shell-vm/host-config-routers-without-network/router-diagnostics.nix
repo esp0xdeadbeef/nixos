@@ -214,7 +214,12 @@ in
       systemd.timers.router-dns-forwarders = {
         wantedBy = [ "timers.target" ];
         timerConfig = {
-          OnBootSec = "2min";
+          # Containers only become addressable ~2.5 minutes in (each one's own
+          # systemd-networkd-wait-online takes 90s), so a run at 2min is a
+          # guaranteed no-op that just logs "not up yet". Start after the guest
+          # has converged, then keep re-asserting every five minutes so an
+          # unbound restart cannot leave the resolver without a forwarder.
+          OnBootSec = "7min";
           OnUnitActiveSec = "5min";
           Unit = "router-dns-forwarders.service";
         };
