@@ -1,10 +1,9 @@
 # network-* CI validation status
 
-This note records the current, verified state of the `~/github/network-*`
-check suites and the one upstream contract that blocks the remaining reds.
-It is the blocker record for the "everything validated" goal.
+Verified state of the `~/github/network-*` check suites, the fixes landed this
+run, and the one remaining contract gap that blocks the rest.
 
-## Verified green (GitHub Actions, this run)
+## Verified green (GitHub Actions)
 
 | repo | commit | result |
 | --- | --- | --- |
@@ -16,65 +15,73 @@ It is the blocker record for the "everything validated" goal.
 | network-access-endpoint | `01de9c3` | success |
 | network-renderer-nebula | `7054765` | success (15/15) |
 | network-renderer-wireguard | `dc39a38` | success (PR #1) |
-| network-renderer-containerlab-linux-backend | `f90dc63` | success (all cases, incl. FS-540-020/035) |
-
-The containerlab renderer now consumes only a validated canonical realization
-bundle (FS-310-HDS-040-SDS-010-SMS-100); a raw `control_plane_model` payload is
-rejected with `GAMP-MODEL-BOUNDARY-VIOLATION`.
+| network-renderer-containerlab-linux-backend | `f90dc63` | success (full suite) |
 
 ## Fixed this run (network-control-plane-model)
 
-- `64ec24f`: named-core DNS listener/forwarder is the relation's emitted
-  terminal attachment endpoint, never the resolver loopback
-  (FS-540-HDS-010-SDS-010-SMS-020 "An ownership loopback is not a substitute";
-  SMS-035 "a node loopback ... shall not be substituted"). FS-540-010/020/025/
-  030/035/040/045 are green in CI.
-- `7a4a1c6`: FS-525 named-core and egress-selection cases assert the emitted
-  endpoint identity and the declared `egressSurface` determinism.
+- `64ec24f`: named-core DNS listener/forwarder is the relation's emitted terminal
+  attachment endpoint, never the resolver loopback (FS-540-HDS-010-SDS-010-SMS-020
+  "An ownership loopback is not a substitute"; SMS-035 "a node loopback ... shall
+  not be substituted"). FS-540-010/020/025/030/035/040/045 green in CI.
+- `7a4a1c6`: FS-525 named-core and egress cases assert the emitted endpoint and
+  the declared `egressSurface` determinism.
+- `f7903c9`: requester-lane resolver endpoint reachability. SMS-020 requires
+  "relation-owned requester-lane route authority containing policy table,
+  outgoing lane, selected next-hop identity, and provenance for each requested
+  family and resolver endpoint prefix", and SMS-040 defines its keying. The
+  control plane is the owning writer: the admitted relation, the resolver
+  endpoint, the requester access lane and the lane next hop are all modelled
+  inputs, so emitting the requester leg materializes existing authority (URS
+  "Only modeled authority can create network behavior") and does not re-derive
+  upstream meaning (FS-171). It is emitted only on admitted downstream access
+  lanes, never on exit/uplink lanes (FS-550), never fanned out to unadmitted
+  siblings (SMS-040), and deduplicated against the destination pass (FS-315).
+  `test-dns-service-policy-routes`, `test-runtime-origin-loopback-egress` and
+  `test-network-labs-inventory-sweep` (21 outputs) pass; CPM suite 224 PASS with
+  the same 18 pre-existing reds as `64ec24f^`.
 
-## Remaining reds and their owner
+The earlier claim that this requester lane "violates FS-171" was wrong and is
+retracted: both the URS layer-ownership rules and FS-171 assign the
+realization-of-modelled-authority case to the layer that writes the canonical
+target routes, which is the control plane, not the forwarding model.
 
-`network-control-plane-model` is at 19 reds. Every one was reproduced against
-the pre-change revision (`git worktree` at `64ec24f^`), so none is a regression
-of the FS-540 fix. They split into two groups:
+## Remaining contract gap (BLOCKED)
 
-1. **Requester-lane resolver service route (blocked).**
-   `test-dns-service-policy-routes`, `test-sitec-overlay-service-ingress`,
-   `test-s-router-hetz-overlay-dns-ingress`,
-   `test-example-overlay-upstream-policy-defaults-preserved`,
-   `test-preferred-uplink-defaults`, `FS-460-HDS-010-SDS-010-SMS-050`.
-   The resolver's own lane carries the emitted endpoint host route
-   (`service-endpoint-reachability`, relation identity, policy-table
-   provenance). There is no requester-lane leg. FS-540 SMS-020 requires
-   "relation-owned requester-lane route authority containing policy table,
-   outgoing lane, selected next-hop identity, and provenance for each requested
-   family and resolver endpoint prefix". That leg is a forwarding-model
-   relation-path output; deriving it in CPM would place forwarding meaning in
-   the wrong layer and violate FS-171 (consumers import, never re-derive).
-2. **Pre-existing module/example migrations (not blocked, unfinished).**
-   `FS-260-015`, `FS-310-120`, `FS-380-050`, `FS-410-030`, `FS-420-030`,
-   `FS-500-040`, `FS-720-030`, `FS-740-010`, `FS-770-010`, `FS-800-010/012/030`,
-   `FS-970-040`.
+`test-preferred-uplink-defaults` (and the four sibling cases below) needs the
+policy point's access-uplink lane to carry the per-family default of the exit
+the access scope selected.
 
-`network-renderer-nixos` still has 5 reds: `test-client2-policy-uplink-firewall`,
-`test-overlay-core-local-hostile-return-routes`,
-`test-transit-endpoint-return-routes` (tri-site fixture needs one complete
-FS-322 migration), `test-policy-cpm-firewall-parity`, and
-`test-runtime-origin-loopback-egress-render` (fixture has no modelled egress
-surface).
+Evidence (compiled `s-router-overlay-dns-lane-policy`, inventory-nixos):
 
-## Blocked reason
+    policy      p2p-...--access-s-router-access-client--uplink-isp-a  v4d=0 v6d=0
+    upstream    p2p-...--access-s-router-access-client--uplink-isp-a  v4d=2 v6d=2
 
-AGENTS requires the owning requirement to be fixed in URS/FS first, in the same
-change, before implementation. The requirement text for the missing
-requester-lane leg is in `network-codex-agent/GAMP`, which the operator
-explicitly excluded from this run ("codex-agent can be skipped"), and that repo
-also owns the forwarding-model requirement for the leg. Without either
-permission to edit that GAMP set plus the forwarding-model emission, or a
-confirmation that the leg is already emitted upstream and merely unconsumed,
-the remaining reds cannot be closed without violating the fork's own layer
-discipline.
+The forwarding model places the access-selected defaults on the upstream
+selector's side of the lane. The policy point, where the selection becomes a
+policy table, has none. `normalize-runtime-routes.nix` already complements
+policy-lane routes from a peer interface, but that complement is gated on
+`isUpstreamSelectorCoreDefaultInterface`, i.e. it only accepts core-facing
+default interfaces; a selector access lane is not one. A policy target sees only
+its own interfaces, so it cannot see the peer lane's default at all.
 
-The blocker is recorded upstream as well:
-`network-control-plane-model:docs/blockers/remaining-ci-reds.md` (commit
-`f0f0ef2`).
+Closing this needs a forwarding-model output (the per-lane selected default
+bound to the policy-facing end of the lane) and the matching FS text for that
+output. Per AGENTS, the owning requirement must be fixed in URS/FS first, in the
+same change, and the authoritative GAMP set lives in `network-codex-agent`,
+which this run was instructed to skip ("codex-agent can be skipped"). Producing
+the default by inference in the control plane would synthesize a next hop the
+model did not declare (FS-315) and is therefore not an acceptable workaround.
+
+Same chain: `test-sitec-overlay-service-ingress`,
+`test-s-router-hetz-overlay-dns-ingress`,
+`test-example-overlay-upstream-policy-defaults-preserved`,
+`FS-460-HDS-010-SDS-010-SMS-050`.
+
+Other pre-existing reds (`FS-260-015`, `FS-310-120`, `FS-380-050`, `FS-410-030`,
+`FS-420-030`, `FS-500-040`, `FS-720-030`, `FS-740-010`, `FS-770-010`,
+`FS-800-010/012/030`, `FS-970-040`) and the five `network-renderer-nixos` reds
+are module/example migrations that reproduce on the pre-change revisions.
+
+Unblock: permission to edit `network-codex-agent` GAMP plus the
+forwarding-model lane-default emission, or confirmation that the policy-facing
+lane default is already emitted upstream and merely unconsumed.
