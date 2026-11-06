@@ -95,6 +95,13 @@ in
         };
 
         script = ''
+          # The unit-script generator prefixes this with `set -e`, so a single
+          # failing probe (a dig that times out, a curl that gets no answer)
+          # aborts the script before it reaches its own `exit 0` and marks the
+          # whole guest degraded — which the manager's "no failed units" health
+          # check then reports as a dead router. Diagnostics report; they do not
+          # fail.
+          set +e
           set -u
           exec >>${logFile} 2>&1
 
