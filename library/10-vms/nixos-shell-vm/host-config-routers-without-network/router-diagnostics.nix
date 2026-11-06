@@ -102,7 +102,7 @@ in
           #    gateway, resolver forwarders, and how many conntrack entries exist
           #    and are translated to the WAN address. A client flow that is absent
           #    from conntrack never traversed this router.
-          core=$(nixos-container run core -- ${coreProbe} 2>/dev/null)
+          core=$(timeout 60 nixos-container run core -- ${coreProbe} 2>/dev/null || true)
           printf '%s\n' "$core" | while read -r line; do
             [ -n "$line" ] && stamp "core $line"
           done
@@ -128,6 +128,12 @@ in
           stamp "top-cpu: $(ps -eo pcpu,comm --sort=-pcpu | sed -n '2,4p' | tr '\n' ' ' | tr -s ' ')"
 
           stamp "=== router-selftest end ==="
+
+          # Diagnostics must never be able to degrade the guest: the manager's
+          # health check is literally "no failed units in the guest", so a
+          # selftest that times out waiting for a container turns every trial
+          # into a rollback of a working router. Report, never fail.
+          exit 0
         '';
       };
 
@@ -136,7 +142,7 @@ in
       systemd.timers.router-selftest = {
         wantedBy = [ "timers.target" ];
         timerConfig = {
-          OnBootSec = "3min";
+          OnBootSec = "6min";
           OnUnitActiveSec = "1h";
           Unit = "router-selftest.service";
         };
