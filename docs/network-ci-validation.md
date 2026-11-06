@@ -67,27 +67,38 @@ target routes, which is the control plane, not the forwarding model.
   contract (FS-180/FS-540).
 - CI: 22 PASS / 4 FAIL (was 21/5).
 
+## This run: policy-table parity fixed, tri-site fixture blocker confirmed
+
+- `network-control-plane-model` `c2cb1dc…2c7d382`: the ingress policy lane now
+  carries the selected exit default for each modeled accept rule (access lanes
+  only, deduplicated, stamped with the family), so the ingress table resolves
+  the exit (FS-315). Full suite unchanged at 225 PASS / 17 FAIL with no
+  regressions.
+- `network-renderer-nixos` `26de894`: the policy-table parity case asserts the
+  kernel table carries the default (tables are global) instead of pinning the
+  network it is attached to. Renderer suite is now 23 PASS / 3 FAIL (was 22/4).
+
 ## Remaining gap (BLOCKED)
 
-`network-renderer-nixos` still has four reds:
+`network-renderer-nixos` has three reds:
 
 1. `test-overlay-core-local-hostile-return-routes.sh` and
    `test-transit-endpoint-return-routes.sh` use the private fixture
    `tests/fixtures/tri-site-s-router-overlay-egress`, which predates FS-322
    (access `selects`), FS-460 (overlay `peerNodes` endpoint identity, overlay as
-   egress surface) and now fails four successive compiler diagnostics. A partial
-   migration was attempted and reverted rather than left half-applied. The
-   authoritative replacement must be a canonical tri-site example in
-   `network-labs`; that repository has no tri-site overlay example, and the
-   forwarding model's tri-site fixture is intent-only (no host inventory), so the
-   renderer cannot derive the fixture from an authoritative source today.
-2. `test-policy-cpm-firewall-parity.sh` and the remaining flags of
-   `test-runtime-origin-loopback-egress-render.sh` need the per-ingress policy
-   table to carry the selected exit default. FS-315 requires the ingress table,
-   forward path and return path to share one modeled owner/lane; the canonical
-   record currently carries the default on the egress lane only, and no modeled
-   ingress-table relation exists to copy. Specifying that relation belongs to the
-   GAMP set (which this run was told not to touch), and inventing the mapping in
-   CPM would violate FS-171/FS-315.
+   egress surface) and fails successive compiler diagnostics. A partial
+   migration was attempted and reverted rather than left half-applied.
+2. `test-runtime-origin-loopback-egress-render.sh` asserts an older topology
+   (`up-client-b`, `pol-client-a/-b`, core runtime-origin `10.19.0.8/32`) that
+   the fixture no longer models (it now carries `up-cli-ew`, `up-client-a` and
+   tenant DNS origin prefixes). The main-table leak it guards is fixed.
 
-Recorded upstream: `network-renderer-nixos:docs/blockers.md` (commit `d41bba6`).
+All three need one authoritative tri-site overlay example with a host inventory
+in `network-labs`; that repository has no tri-site overlay example, and the
+forwarding model's tri-site fixture is intent-only. Hand-editing the private
+copy again would re-create the drift this work is removing, so the fixture
+migration is blocked on that canonical source (or on permission to add the
+example to `network-labs`).
+
+Recorded upstream: `network-renderer-nixos:docs/blockers.md` (`c378477`) and
+`network-control-plane-model:docs/blockers/remaining-ci-reds.md` (`de27394`).
