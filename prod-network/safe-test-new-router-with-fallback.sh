@@ -465,9 +465,25 @@ echo "[$(ts)] waiting for guest boot completion"
 #   guest root: ip rule is only 0/32766/32767, so this is not policy routing
 # i.e. the client's packet reaches the guest and is dropped inside the container
 # path for that destination, while the router's own traffic and other
-# destinations are fine. The candidate runs main-pinned renderers and prod runs
-# prod-pinned ones, so this looks like a renderer-side forwarding difference and
-# must be chased there (with its URS/FS updated first), not patched here.
+# destinations are fine.
+#
+# Root cause, narrowed 2026-11-06 14:30:
+#   path: client -> access-clients -> policy (10.1.0.25) -> upstream-selector
+#     (10.1.0.41) -> 10.1.0.18 = core-vpn-garnet-cobalt -> back to the selector
+#   candidate selector table 1001 default: via 10.1.0.18 dev pcvgcus
+#   production selector table 1001 default: via 10.1.0.16 dev p2p-core-up-sel
+#   garnet's own rule `1002: from all iif up-sel lookup 1002` has
+#     `default via 10.1.0.19 dev up-sel` -> packets are returned to the selector,
+#     a loop, and TX drops on pcvgcus confirm packets dying there
+#   prod renders 14 containers and has NO core-vpn-garnet-cobalt at all; the
+#     candidate renders 15, because prod-network/testing/intent.nix declares
+#     garnet relations (allow-mgmt-to-garnet, allow-wan-to-s-nebula-garnet, ...)
+#     that prod-network/prod/intent.nix does not have.
+# BLOCKED on a decision that is not the harness's to make: either the testing
+# intent should stop declaring garnet uplinks (making the candidate a faithful
+# build of the production topology), or the garnet peering must actually be up.
+# Until one is chosen, the candidate correctly fails at CLIENT-PATH and rolls
+# back, which is why the site keeps working.
 booted=0
 for i in $(seq 1 60); do
   # `degraded` means boot finished with some unit failed: accepted here, because
