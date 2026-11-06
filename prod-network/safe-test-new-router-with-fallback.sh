@@ -127,7 +127,13 @@ fi
 # shellcheck disable=SC1090
 . "$NEW_CONF"
 HEALTH_RETRIES="${HEALTH_RETRIES:-60}"
-HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-20}"
+# The managed conf carries the steady-state tolerance. A candidate still has its
+# 15 containers converging while the hold runs, so the QEMU guest agent can miss
+# a short deadline while the router is demonstrably healthy: measured during a
+# trial, health passed every 10s for the first minute and then failed in bursts,
+# with the VM unit itself still active/running and zero failed units in the guest.
+# Give the agent room to answer instead of rolling back a working router.
+HEALTH_TIMEOUT_SECONDS="${TRIAL_HEALTH_TIMEOUT_SECONDS:-60}"
 
 health() {
   if [ -n "${HEALTH_COMMAND:-}" ]; then
