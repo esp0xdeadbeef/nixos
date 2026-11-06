@@ -45,43 +45,49 @@ retracted: both the URS layer-ownership rules and FS-171 assign the
 realization-of-modelled-authority case to the layer that writes the canonical
 target routes, which is the control plane, not the forwarding model.
 
-## Remaining contract gap (BLOCKED)
+## Update: this run (FS-540/FS-550 control-plane work)
 
-`test-preferred-uplink-defaults` (and the four sibling cases below) needs the
-policy point's access-uplink lane to carry the per-family default of the exit
-the access scope selected.
+`network-control-plane-model`:
+- `f7903c9` requester-lane resolver endpoint reachability (FS-540 SMS-020/040).
+- `b93dc61`, `36237e7`, `ccf641b`, `45b313a` policy-lane selected-exit defaults
+  complemented from the peer end of the modeled link, gated on the modeled
+  runtime-origin source relation (FS-540 SMS-045, FS-550, FS-315), and the
+  lane-less runtime-origin prefix removed from policy exit main tables.
+- `adc93ea` blocker note updated.
+- Full suite: 225 PASS / 17 FAIL; every remaining failure also fails on the
+  pre-change revision.
 
-Evidence (compiled `s-router-overlay-dns-lane-policy`, inventory-nixos):
+`network-renderer-containerlab-linux-backend`: CI success (`f90dc63`).
 
-    policy      p2p-...--access-s-router-access-client--uplink-isp-a  v4d=0 v6d=0
-    upstream    p2p-...--access-s-router-access-client--uplink-isp-a  v4d=2 v6d=2
+`network-renderer-nixos`:
+- `320bb23` maps the canonical route `table` field to systemd `Table` and drops
+  the lane-less twin of a lane-assigned route (FS-315), which removes the
+  runtime-origin prefix from policy exit main tables.
+- `1381a05` client2 policy test migrated to the source-scoped deny-by-default
+  contract (FS-180/FS-540).
+- CI: 22 PASS / 4 FAIL (was 21/5).
 
-The forwarding model places the access-selected defaults on the upstream
-selector's side of the lane. The policy point, where the selection becomes a
-policy table, has none. `normalize-runtime-routes.nix` already complements
-policy-lane routes from a peer interface, but that complement is gated on
-`isUpstreamSelectorCoreDefaultInterface`, i.e. it only accepts core-facing
-default interfaces; a selector access lane is not one. A policy target sees only
-its own interfaces, so it cannot see the peer lane's default at all.
+## Remaining gap (BLOCKED)
 
-Closing this needs a forwarding-model output (the per-lane selected default
-bound to the policy-facing end of the lane) and the matching FS text for that
-output. Per AGENTS, the owning requirement must be fixed in URS/FS first, in the
-same change, and the authoritative GAMP set lives in `network-codex-agent`,
-which this run was instructed to skip ("codex-agent can be skipped"). Producing
-the default by inference in the control plane would synthesize a next hop the
-model did not declare (FS-315) and is therefore not an acceptable workaround.
+`network-renderer-nixos` still has four reds:
 
-Same chain: `test-sitec-overlay-service-ingress`,
-`test-s-router-hetz-overlay-dns-ingress`,
-`test-example-overlay-upstream-policy-defaults-preserved`,
-`FS-460-HDS-010-SDS-010-SMS-050`.
+1. `test-overlay-core-local-hostile-return-routes.sh` and
+   `test-transit-endpoint-return-routes.sh` use the private fixture
+   `tests/fixtures/tri-site-s-router-overlay-egress`, which predates FS-322
+   (access `selects`), FS-460 (overlay `peerNodes` endpoint identity, overlay as
+   egress surface) and now fails four successive compiler diagnostics. A partial
+   migration was attempted and reverted rather than left half-applied. The
+   authoritative replacement must be a canonical tri-site example in
+   `network-labs`; that repository has no tri-site overlay example, and the
+   forwarding model's tri-site fixture is intent-only (no host inventory), so the
+   renderer cannot derive the fixture from an authoritative source today.
+2. `test-policy-cpm-firewall-parity.sh` and the remaining flags of
+   `test-runtime-origin-loopback-egress-render.sh` need the per-ingress policy
+   table to carry the selected exit default. FS-315 requires the ingress table,
+   forward path and return path to share one modeled owner/lane; the canonical
+   record currently carries the default on the egress lane only, and no modeled
+   ingress-table relation exists to copy. Specifying that relation belongs to the
+   GAMP set (which this run was told not to touch), and inventing the mapping in
+   CPM would violate FS-171/FS-315.
 
-Other pre-existing reds (`FS-260-015`, `FS-310-120`, `FS-380-050`, `FS-410-030`,
-`FS-420-030`, `FS-500-040`, `FS-720-030`, `FS-740-010`, `FS-770-010`,
-`FS-800-010/012/030`, `FS-970-040`) and the five `network-renderer-nixos` reds
-are module/example migrations that reproduce on the pre-change revisions.
-
-Unblock: permission to edit `network-codex-agent` GAMP plus the
-forwarding-model lane-default emission, or confirmation that the policy-facing
-lane default is already emitted upstream and merely unconsumed.
+Recorded upstream: `network-renderer-nixos:docs/blockers.md` (commit `d41bba6`).
