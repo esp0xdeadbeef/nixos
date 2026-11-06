@@ -110,6 +110,11 @@ in
   # "Timeout occurred while waiting for network connectivity" while the host was
   # in fact reachable. Satisfy the target as soon as any managed link is online;
   # units that genuinely need a specific link already order against it.
+  # Verified 2026-11-06: this renders `--any` into
+  # systemd-networkd-wait-online's ExecStart. It is NOT yet active on the running
+  # host (deployed generation still fails that unit with exit-code, and has no
+  # `--any`), so the next host rebuild is what actually clears it -- the router
+  # guests and everything proven about the cobalt candidate do not depend on it.
   systemd.network.wait-online.anyInterface = true;
 
   local.internetGuard.enable = true;
