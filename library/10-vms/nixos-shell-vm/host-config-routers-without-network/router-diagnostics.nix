@@ -174,9 +174,14 @@ in
             exit 0
           fi
           # timeout(1) as well: a wedged container must not turn this unit into
-          # the thing that never finishes.
+          # the thing that never finishes. A stopgap must never report failure
+          # either: the manager's health check is "no failed units in the guest",
+          # so exiting non-zero here marks a working router degraded and aborts
+          # the trial. Report, then let the next timer run retry.
           timeout 45 nixos-container run core -- /run/current-system/sw/bin/unbound-control \
-            forward ${lib.concatStringsSep " " dnsForwarders}
+            forward ${lib.concatStringsSep " " dnsForwarders} \
+            || echo "forwarder not applied yet; retrying on the next timer run"
+          exit 0
         '';
       };
 

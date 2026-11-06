@@ -452,6 +452,9 @@ for i in $(seq 1 "$HOLD"); do
     # stopped unit from one that is still activating, and that ambiguity has
     # already sent this investigation the wrong way once.
     echo "[$(ts)] health lost ${fails}/3 at ${i}s (state=$(systemctl show "$NEW_UNIT" -p ActiveState,SubState --value 2>/dev/null | tr '\n' '/'))"
+    # The guest-side health command is "no failed units", so name them here:
+    # "health lost" alone has already hidden a diagnostics unit failing.
+    echo "[$(ts)] failed units: $(guest_bash 'systemctl list-units --state=failed --no-legend --plain --no-pager' 2>&1 | tr '\n' ';' | cut -c1-160)"
     [ "$fails" -ge 3 ] && exit 1
   fi
 done
