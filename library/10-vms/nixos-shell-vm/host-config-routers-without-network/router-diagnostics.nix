@@ -44,6 +44,11 @@ let
     w=$(ip -4 -o addr show dev wan 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
     printf 'conntrack=%s\n' "$(wc -l < /proc/net/nf_conntrack 2>/dev/null)"
     printf 'wan-snat=%s\n' "$(grep -c "$w" /proc/net/nf_conntrack 2>/dev/null)"
+    # Boot instrumentation: every container's own networkd-wait-online takes ~90s
+    # on this shape, which makes each container@ unit take ~3 minutes and holds
+    # multi-user.target at ~3min27s. Record the slowest units so the next round
+    # of optimisation works from measurement instead of from the summary line.
+    printf 'blame=%s\n' "$(systemd-analyze blame 2>/dev/null | head -3 | tr '\n' ' ' | tr -s ' ')"
   '';
 
   # Everything the checks need, resolved at build time so the script does not
@@ -56,6 +61,7 @@ let
     iproute2
     iputils
     procps
+    systemd
   ];
 in
 {
@@ -137,6 +143,9 @@ in
           # 4. Record the busiest tasks so a wedged/spinning guest shows what was
           #    burning CPU instead of only the aftermath.
           stamp "top-cpu: $(ps -eo pcpu,comm --sort=-pcpu | sed -n '2,4p' | tr '\n' ' ' | tr -s ' ')"
+
+          # 5. Where the guest's boot time goes, for the same reason as above.
+          stamp "guest-blame: $(systemd-analyze blame 2>/dev/null | head -4 | tr '\n' ' ' | tr -s ' ')"
 
           stamp "=== router-selftest end ==="
 
