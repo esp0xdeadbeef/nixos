@@ -87,6 +87,7 @@ in
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;
       nebulaRendererInput = inputs.network-renderer-nebula;
+      wireguardRendererInput = inputs.network-renderer-wireguard;
       intentFileName = "intent-cobalt.nix";
       inventoryFileName = "inventory-cobalt.nix";
       inherit system vmNics;

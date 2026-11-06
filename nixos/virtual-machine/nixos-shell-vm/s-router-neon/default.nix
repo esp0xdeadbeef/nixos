@@ -68,6 +68,7 @@ in
       networkRealizationModelInput = inputs.network-realization-model;
       nixosRendererInput = inputs.network-renderer-nixos;
       nebulaRendererInput = inputs.network-renderer-nebula;
+      wireguardRendererInput = inputs.network-renderer-wireguard;
       intentFileName = "intent-neon.nix";
       inventoryFileName = "inventory-neon.nix";
       inherit vmNics;
