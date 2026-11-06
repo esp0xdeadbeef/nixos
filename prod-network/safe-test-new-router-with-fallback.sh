@@ -448,6 +448,13 @@ echo "[$(ts)] waiting for guest boot completion"
 # /nix/store/27ldp1pp...): WAN lease held, both overlay lanes and the access
 # fabric asserted, routes settled on the first attempt, 420s hold completed with
 # no health failures, prod restored in 1s.
+#
+# Client-path A/B, 2026-11-06 08:30-08:45, twelve samples per destination from
+# the host (a real LAN client), 6s apart:
+#   production shape: cloudflare 12/12  google 12/12  ifconfig 12/12
+#   candidate       : cloudflare 12/12  google 12/12  ifconfig 12/12
+# i.e. no client-path regression. The single 2/3 sample in the candidate's own
+# trial was taken during container convergence, which is why the probe retries.
 booted=0
 for i in $(seq 1 60); do
   # `degraded` means boot finished with some unit failed: accepted here, because
