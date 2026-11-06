@@ -398,6 +398,17 @@ echo "[$(ts)] waiting for guest boot completion"
 # multi-user.target at 3min27s, because each rendered container's own
 # systemd-networkd-wait-online takes 90s. 300s covers that with margin while
 # still failing an actually-stuck guest in five minutes rather than ten.
+#
+# Verified end-to-end on 2026-11-06 with image /nix/store/01jic3m8... (cobalt-new):
+#   guest reached running after 290s; routes settled after 1 attempt(s)
+#   WAN lease on core wan: <wan-ip>/23 (address redacted: public)
+#   EGRESS access-clients -> core: 10.1.0.1 dev access-clients
+#   EGRESS access-clients-vpn -> vpn underlay: 10.1.0.3 dev acce-clie-vpn
+#   EGRESS core -> access fabric: 10.1.0.1 via 10.1.0.17 dev ens3
+#   === 600s trial complete; restoring prod === (rollback 3s, prod active)
+# and on the candidate itself: unbound `. IN forward 9.9.9.9 1.1.1.1` without any
+# manual step, download 52.34 MB/s / upload 33.13 MB/s from the guest, where the
+# production shape measured 12.86 MB/s up.
 booted=0
 for i in $(seq 1 60); do
   # `degraded` means boot finished with some unit failed: accepted here, because
@@ -455,6 +466,10 @@ for i in $(seq 1 "$HOLD"); do
     # The guest-side health command is "no failed units", so name them here:
     # "health lost" alone has already hidden a diagnostics unit failing.
     echo "[$(ts)] failed units: $(guest_bash 'systemctl list-units --state=failed --no-legend --plain --no-pager' 2>&1 | tr '\n' ';' | cut -c1-160)"
+    # Name the failure mode of each failed unit: a timeout, an exit code and a
+    # missing binary all look identical from "health lost" alone.
+    echo "[$(ts)] failed detail: $(guest_bash 'for u in $(systemctl list-units --state=failed --no-legend --plain --no-pager | awk "{print \$1}"); do printf "%s result=%s status=%s; " "$u" "$(systemctl show "$u" -p Result --value)" "$(systemctl show "$u" -p ExecMainStatus --value)"; done' 2>&1 | tr '\n' ' ' | cut -c1-200)"
+    echo "[$(ts)] failed journal: $(guest_bash 'journalctl -u router-selftest --no-pager -n 4 2>&1' 2>&1 | tr '\n' '|' | cut -c1-300)"
     [ "$fails" -ge 3 ] && exit 1
   fi
 done
