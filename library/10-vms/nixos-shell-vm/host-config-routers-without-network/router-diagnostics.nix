@@ -145,7 +145,13 @@ in
           stamp "top-cpu: $(ps -eo pcpu,comm --sort=-pcpu | sed -n '2,4p' | tr '\n' ' ' | tr -s ' ')"
 
           # 5. Where the guest's boot time goes, for the same reason as above.
+          #    Container start times matter most: measured on a converged router
+          #    each container@ unit takes ~2.5 minutes because the container's own
+          #    systemd-networkd-wait-online takes 90s, which is what sets
+          #    multi-user.target at ~3min27s. Recording the numbers here means the
+          #    next optimisation round does not have to re-measure from outside.
           stamp "guest-blame: $(systemd-analyze blame 2>/dev/null | head -4 | tr '\n' ' ' | tr -s ' ')"
+          stamp "container-core-start: $(systemctl show container@core.service -p ActiveEnterTimestampMonotonic --value 2>/dev/null)s uptime=$(cut -d. -f1 /proc/uptime)s"
 
           stamp "=== router-selftest end ==="
 
