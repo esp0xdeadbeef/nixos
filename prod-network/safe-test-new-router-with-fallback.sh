@@ -409,6 +409,11 @@ echo "[$(ts)] waiting for guest boot completion"
 # and on the candidate itself: unbound `. IN forward 9.9.9.9 1.1.1.1` without any
 # manual step, download 52.34 MB/s / upload 33.13 MB/s from the guest, where the
 # production shape measured 12.86 MB/s up.
+#
+# Rebuilt from the tree at 631d912c and re-tested 2026-11-06 07:19 (image
+# /nix/store/27ldp1pp...): WAN lease held, both overlay lanes and the access
+# fabric asserted, routes settled on the first attempt, 420s hold completed with
+# no health failures, prod restored in 1s.
 booted=0
 for i in $(seq 1 60); do
   # `degraded` means boot finished with some unit failed: accepted here, because
