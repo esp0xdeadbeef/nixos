@@ -61,4 +61,18 @@ in
   # The clevis profile deliberately disables systemd.tpm2, and that stays:
   # without the Clevis JWE the machine must still boot, so TPM enrollment is
   # only ever a second, optional keyslot added with cryptsetup manually.
+  #
+  # TPM is working as of generation 250: /dev/tpm0 + /dev/tpmrm0 exist and
+  # dmesg reports "using dTPM TPM backend" (tpm2_getcap: TPM 2.0, spec 1.59,
+  # manufacturer NTC). The LUKS keyslot has NOT been enrolled yet. Doing so
+  # needs an existing keyslot unlocked, i.e. either the LUKS passphrase or the
+  # Clevis key, so it is left as an explicit operator step:
+  #
+  #   systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 \
+  #     /dev/disk/by-partlabel/disk-nvme0n1-luks
+  #
+  # Verify afterwards that a tpm2 entry appears under `Tokens:` in
+  # `cryptsetup luksDump`; an earlier attempt added a keyslot with no token,
+  # which would never auto-unlock. That slot was removed again, leaving the
+  # original four slots (passphrase + the two Clevis bindings) intact.
 }
