@@ -455,6 +455,19 @@ echo "[$(ts)] waiting for guest boot completion"
 #   candidate       : cloudflare 12/12  google 12/12  ifconfig 12/12
 # i.e. no client-path regression. The single 2/3 sample in the candidate's own
 # trial was taken during container convergence, which is why the probe retries.
+#
+# Open forward-path finding, 2026-11-06 09:08 (candidate live, prod stopped):
+#   laptop -> github.com (140.82.121.3) : SYN seen on the guest's LAN tap and
+#     retransmitted, NEVER on tap-wan, request times out
+#   the candidate's own core -> same IP : 443 connects OK
+#   same laptop through the production shape, minutes later: gh=200, SYN present
+#     on both taps
+#   guest root: ip rule is only 0/32766/32767, so this is not policy routing
+# i.e. the client's packet reaches the guest and is dropped inside the container
+# path for that destination, while the router's own traffic and other
+# destinations are fine. The candidate runs main-pinned renderers and prod runs
+# prod-pinned ones, so this looks like a renderer-side forwarding difference and
+# must be chased there (with its URS/FS updated first), not patched here.
 booted=0
 for i in $(seq 1 60); do
   # `degraded` means boot finished with some unit failed: accepted here, because
