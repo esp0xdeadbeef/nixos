@@ -96,7 +96,11 @@ in
           # probe, two dig queries and two 12s curls. At 90s systemd killed the
           # script mid-run and the unit entered "failed", which the manager's
           # "no failed units" health check then reported as a dead router.
-          TimeoutStartSec = "240s";
+          # Worst case: a bounded wait for the core container, one probe (60s), two digs
+          # and two 12s curls. At 240s the unit was killed mid-run (status=15),
+          # which the manager's "no failed units" health check reads as a dead
+          # router, so keep clear margin above the script's own bounds.
+          TimeoutStartSec = "600s";
           Nice = 10;
         };
 
@@ -195,8 +199,22 @@ in
         };
         script = ''
           set -u
+          # Wait (bounded) for the core container to become addressable instead
+          # of relying on the timer firing after convergence: `nixos-container
+          # run` needs the container's systemd, which is up ~2.5 minutes in, and
+          # the guest's monotonic clock under TCG follows the host so OnBootSec
+          # is only approximate. Applying the forwarder late means the modelled
+          # resolver iterates (and can SERVFAIL) for that whole window.
+          waited=0
+          while [ "$waited" -lt 90 ]; do
+            nixos-container list 2>/dev/null | grep -qx core \
+              && nixos-container run core -- /run/current-system/sw/bin/true 2>/dev/null \
+              && break
+            sleep 10
+            waited=$((waited + 10))
+          done
           if ! nixos-container list 2>/dev/null | grep -qx core; then
-            echo "core container is not up yet"
+            echo "core container did not become addressable within ''${waited}s"
             exit 0
           fi
           # timeout(1) as well: a wedged container must not turn this unit into
@@ -219,7 +237,7 @@ in
           # guaranteed no-op that just logs "not up yet". Start after the guest
           # has converged, then keep re-asserting every five minutes so an
           # unbound restart cannot leave the resolver without a forwarder.
-          OnBootSec = "7min";
+          OnBootSec = "90s";
           OnUnitActiveSec = "5min";
           Unit = "router-dns-forwarders.service";
         };
