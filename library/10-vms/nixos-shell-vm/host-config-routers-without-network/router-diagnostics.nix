@@ -86,7 +86,11 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = false;
-          TimeoutStartSec = "90s";
+          # Must exceed the script's own worst case: a 60s bounded container
+          # probe, two dig queries and two 12s curls. At 90s systemd killed the
+          # script mid-run and the unit entered "failed", which the manager's
+          # "no failed units" health check then reported as a dead router.
+          TimeoutStartSec = "240s";
           Nice = 10;
         };
 
@@ -112,8 +116,8 @@ in
           #    signature we are chasing, so record them separately. Query the
           #    modelled resolver by address: the guest's own /etc/resolv.conf is
           #    not what clients are told to use.
-          dns_local=$(dig +short +time=3 +tries=1 @10.2.30.1 www.google.com 2>&1 | head -1)
-          dns_public=$(dig +short +time=3 +tries=1 @1.1.1.1 www.google.com 2>&1 | head -1)
+          dns_local=$(dig +short +time=2 +tries=1 @10.2.30.1 www.google.com 2>&1 | head -1)
+          dns_public=$(dig +short +time=2 +tries=1 @1.1.1.1 www.google.com 2>&1 | head -1)
           stamp "dig-modeled=10.2.30.1 ''${dns_local:-<empty>}"
           stamp "dig-public-1.1.1.1=''${dns_public:-<empty>}"
 
