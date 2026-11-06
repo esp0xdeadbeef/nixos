@@ -3488,51 +3488,6 @@ in
           returnBehavior = "symmetric";
         }
         {
-          id = "allow-mgmt-to-garnet";
-          priority = 150;
-          from = {
-            kind = "tenant";
-            name = "cobalt-mgmt";
-          };
-          to = {
-            kind = "external";
-            name = "garnet";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
-        {
-          id = "allow-svc-to-garnet";
-          priority = 151;
-          from = {
-            kind = "tenant";
-            name = "cobalt-svc";
-          };
-          to = {
-            kind = "external";
-            name = "garnet";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
-        {
-          id = "allow-dmz-to-garnet";
-          priority = 152;
-          from = {
-            kind = "tenant";
-            name = "cobalt-dmz";
-          };
-          to = {
-            kind = "external";
-            name = "garnet";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
-        {
           id = "allow-iot-srv-nebula-garnet-underlay-to-isp";
           priority = 153;
           from = {
