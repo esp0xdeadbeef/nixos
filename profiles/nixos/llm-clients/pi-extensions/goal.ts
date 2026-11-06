@@ -19,7 +19,7 @@
  *   /goal <text>       set (or replace) the active goal
  *   /goal <text> file  also inline that file every turn
  *   /goal status       goal + which files are inlined + auto state
- *   /goal auto         keep working on the goal by itself (no bot, no Enter)
+ *   /goal auto         arm self-continuation (already ON by default)
  *   /goal auto off     stop continuing automatically
  *   /goal clear        clear the active goal
  *   /goal off          same as clear
@@ -31,7 +31,8 @@
  *   - spec: sha256 of all the goal's words (recomputed here), and
  *   - solution: a git commit created DURING THIS RUN in the goal repo; for
  *     GOAL BLOCKED its message must document the blocker (contain BLOCKED).
- * An effort complaint is not a blocker. Off by default, never persisted on.
+ * An effort complaint is not a blocker. ON by default (setting a goal starts
+ * the loop), never persisted on.
  *
  * The goal is stored in the session, so it follows the active branch and is
  * restored on resume / branch navigation. Only the raw goal text is stored;
@@ -39,9 +40,10 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const ENTRY_TYPE = "goal";
@@ -61,7 +63,8 @@ const HUGE_FILE_BYTES = 2_000_000;
 // ---------------------------------------------------------------------------
 // When armed, the extension continues the goal by itself instead of waiting for
 // a human (or a tmux nudge bot) to press Enter. Guards:
-//   - off unless explicitly armed with `/goal auto`, never persisted as "on";
+//   - ON by default: `/goal <text>` arms it and kicks the first turn; never
+//     persisted as "on", so a resumed session re-arms only when a goal is set;
 //   - re-sends only the SHORT continuation prompt, because the goal + full file
 //     are already in the transcript and re-inlining 60 KB per turn is waste;
 //   - stops on a hard iteration cap (2000 turns) and a wall-clock cap (24 h);
@@ -77,6 +80,16 @@ const HUGE_FILE_BYTES = 2_000_000;
 const AUTO_MAX_ITERATIONS = 2000;
 const AUTO_MAX_WALL_CLOCK_MS = 24 * 60 * 60 * 1000;
 const STOP_WORDS = ["GOAL DONE", "GOAL BLOCKED"];
+
+// Scratch path for goal bookkeeping (completion records, blocker notes). It is
+// deliberately OUTSIDE the goal repo: /tmp/<uuid>-goal.md, one per process.
+// Writing a `.goal/` dir (or any goal note) into the repo pollutes the tree and
+// ends up in a commit, so the contract below points here instead.
+const GOAL_NOTE_PATH = join(tmpdir(), `${randomUUID()}-goal.md`);
+const NO_REPO_GOAL_DIR =
+	`Do NOT create a .goal/ directory, .goal file, or any goal/completion note inside the repo — ` +
+	`those are throwaway scratch and belong at ${GOAL_NOTE_PATH} (write it there if you want a note; it is never committed).`;
+
 const AUTO_PROMPT =
 	"Continue the goal. Do the next concrete step now, using tools, and do not summarize or ask permission. " +
 	"You may only stop this loop by ending your turn with GOAL DONE or GOAL BLOCKED plus an escape proof. " +
@@ -88,6 +101,7 @@ const AUTO_PROMPT =
 	"    GOAL DONE  — the commit implements the goal.\n" +
 	"    GOAL BLOCKED — the commit documents the blocker and its message contains the word BLOCKED;\n" +
 	"        there is no escape by hash alone, and an effort complaint is not a blocker.\n" +
+	`Write any goal bookkeeping note to ${GOAL_NOTE_PATH} (never into the repo: no .goal/ dir, no .goal file).\n` +
 	"Compute the spec hash yourself with the exact cat|sha256sum command; do not invent hex. " +
 	"Commit before claiming either escape; the extension verifies the commit exists, is new, and matches the escape.";
 
@@ -107,6 +121,7 @@ const PROOF_CONTRACT = [
 	"     (what you tried, the exact error/blocker, and why no workaround exists).",
 	"3. Only after that evidence, proceed. If you cannot supply evidence, say so",
 	"   explicitly instead of claiming progress.",
+	NO_REPO_GOAL_DIR,
 ].join("\n");
 
 // ---------------------------------------------------------------------------
@@ -190,6 +205,9 @@ function fileHeader(files: LoadedFile[]): string {
 // ---------------------------------------------------------------------------
 // Escape proof (GAMP-style verification of the agent's claim)
 // ---------------------------------------------------------------------------
+// Scratch notes the agent wants to keep (completion records, blocker analyses)
+// go to /tmp/<uuid>-goal.md via GOAL_NOTE_PATH — never into the repo as a
+// `.goal/` directory, which used to end up committed alongside real work.
 
 // sha256 of "all the words", reproducible by the agent with one command:
 //   with goal files:  cat file1 file2 ... | sha256sum   (in the listed order)
@@ -300,9 +318,11 @@ function autoPrompt(goal: string | null, _cwd: string): string {
 
 export default function goalExtension(pi: ExtensionAPI) {
 	let goal: string | null = null;
-	// Session-local, intentionally never persisted: a resumed session must not
-	// silently start burning tokens without the user arming it again.
-	let autoRun = false;
+	// Auto-continue is ON by default: setting a goal with /goal starts the loop
+	// without a separate /goal auto. Still session-local and never persisted, so
+	// a resumed session does not silently resume burning tokens — it re-arms only
+	// when a goal is set (or /goal auto is issued) in that session.
+	let autoRun = true;
 	let autoIterations = 0;
 	let autoStartedAt = 0;
 	// The last assistant text seen this run, used to detect the stop words.
@@ -330,7 +350,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 
 	function restore(ctx: ExtensionContext): void {
 		goal = null;
-		autoRun = false;
+		autoRun = true;
 		autoIterations = 0;
 		autoStartedAt = 0;
 		const entries = ctx.sessionManager.getBranch();
@@ -408,7 +428,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 				updateStatus(ctx);
 				ctx.ui.notify(
 					on
-						? `Auto-continue armed (max ${AUTO_MAX_ITERATIONS} turns / 24 h). It stops only on "${STOP_WORDS[0]}" or "${STOP_WORDS[1]}" with a proof verified by the extension.`
+						? `Auto-continue armed (default ON; max ${AUTO_MAX_ITERATIONS} turns / 24 h). Stop it with /goal auto off. It stops only on "${STOP_WORDS[0]}" or "${STOP_WORDS[1]}" with a proof verified by the extension.`
 						: "Auto-continue disarmed.",
 					"info",
 				);
@@ -432,7 +452,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 					[
 						`Goal: ${goal ?? "(none)"}`,
 						`Files inlined each turn: ${goalFileTokens(goal).join(", ") || "(none)"}`,
-						`Auto-continue: ${autoRun ? `on, ${autoIterations}/${AUTO_MAX_ITERATIONS} turns` : "off"}`,
+						`Auto-continue: ${autoRun ? `on (default), ${autoIterations}/${AUTO_MAX_ITERATIONS} turns` : "off (/goal auto to re-arm)"}`,
 					].join("\n"),
 					"info",
 				);
@@ -466,6 +486,11 @@ export default function goalExtension(pi: ExtensionAPI) {
 			}
 
 			goal = next;
+			// Auto-continue is ON by default: setting a goal arms the loop in the
+			// same step, anchored now so the solution commit must be from this run.
+			autoRun = true;
+			autoIterations = 0;
+			autoStartedAt = Date.now();
 			persist();
 			updateStatus(ctx);
 			const fileLines = files.map(
@@ -473,10 +498,18 @@ export default function goalExtension(pi: ExtensionAPI) {
 			);
 			const huge = files.filter((f) => f.bytes > HUGE_FILE_BYTES);
 			ctx.ui.notify(
-				`Goal set:\n${goal}${fileLines.length ? `\n\nInlined each turn:${fileLines.join("")}` : ""}` +
+				`Goal set (auto-continue ON — /goal auto off to stop):\n${goal}${fileLines.length ? `\n\nInlined each turn:${fileLines.join("")}` : ""}` +
 					(huge.length ? `\n\nWarning: ${huge.length} file(s) over ${HUGE_FILE_BYTES} bytes — this will be expensive every turn.` : ""),
 				"info",
 			);
+			// Self-start when idle, so /goal <text> alone begins the loop with no
+			// extra /goal auto and no external nudge.
+			if (ctx.isIdle()) {
+				pi.sendMessage(
+					{ customType: ENTRY_TYPE, content: autoPrompt(goal, ctx.cwd), display: true },
+					{ triggerTurn: true },
+				);
+			}
 		},
 	});
 
@@ -586,8 +619,9 @@ export default function goalExtension(pi: ExtensionAPI) {
 						display: true,
 						content:
 							`Your escape was REJECTED by the goal extension: ${reasons.join("; ")}. ` +
-							`For GOAL BLOCKED the blocker must be real and committed: write the blocker analysis into the goal repo ` +
-							`(a written note in the repo, or a commit whose message contains BLOCKED), commit it, and give that commit as the solution line. ` +
+							`For GOAL BLOCKED the blocker must be real and committed: write the blocker analysis to ${GOAL_NOTE_PATH}, ` +
+							`commit the repo work (or a commit whose message contains BLOCKED), and give that commit as the solution line. ` +
+							`Never write a .goal/ dir or a goal note into the repo — only ${GOAL_NOTE_PATH}. ` +
 							`An effort complaint ("too much work", "context too small") is not a blocker. ` +
 							`For GOAL DONE the solution commit must implement the goal and be created during this run.\n\n` +
 							`${AUTO_PROMPT}`,
