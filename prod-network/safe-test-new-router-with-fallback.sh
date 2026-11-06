@@ -479,9 +479,27 @@ echo "[$(ts)] waiting for guest boot completion"
 #     candidate renders 15, because prod-network/testing/intent.nix declares
 #     garnet relations (allow-mgmt-to-garnet, allow-wan-to-s-nebula-garnet, ...)
 #     that prod-network/prod/intent.nix does not have.
-# BLOCKED on a decision that is not the harness's to make: either the testing
-# intent should stop declaring garnet uplinks (making the candidate a faithful
-# build of the production topology), or the garnet peering must actually be up.
+# WHERE it breaks, and why it is the core container and not policy: `policy`
+# only classifies tenants and hands the flow on; `upstream-selector` chooses the
+# uplink; the uplink's termination lives in the per-uplink core container. So a
+# wrong default shows up as selector table 1001 `via 10.1.0.18` and then dies in
+# core-vpn-garnet-cobalt, whose table 1002 default is `via 10.1.0.19 dev up-sel`
+# (a hairpin back to the selector). The working counterpart, core-vpn-opal, has
+# the VPN-gate shape instead: `default dev overlay-opal`, `default dev up-sel`
+# (scope link), fwmark table 52266, and suppress_prefixlength rules 11003/31042.
+# Garnet has none of that: no tunnel default, no fwmark table.
+#
+# WHAT the intent actually says, which reframes the fix: the garnet rules are
+# tenant-scoped, not uplink claims --
+#   allow-mgmt-to-garnet priority 150, from tenant neon-mgmt, to external
+#   "garnet", trafficType "any", returnBehavior one-way (svc 151, dmz 152),
+#   i.e. BELOW allowTenantToWan for the same tenants (100..140).
+# So the rendered selector-wide default via garnet is a realization mistake, not
+# what the intent asked for: garnet should be one lane among several, with WAN
+# preferred. Fixing that belongs in the realization model (uplink precedence),
+# with the URS/FS stating it first, which is why this is BLOCKED and not patched
+# here. The alternative remains dropping the garnet relations from the testing
+# intent so the candidate builds the production topology.
 # Until one is chosen, the candidate correctly fails at CLIENT-PATH and rolls
 # back, which is why the site keeps working.
 booted=0
