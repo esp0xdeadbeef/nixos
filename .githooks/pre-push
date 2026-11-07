@@ -383,6 +383,40 @@ def parse_updates() -> list[tuple[str, str, str, str]]:
     return updates
 
 
+# Well-known anycast/public resolvers and timeservers that legitimately appear in
+# configuration: these are not site identity and must not trip the scan.
+PUBLIC_LITERAL_ALLOWLIST = {
+    "1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9", "149.112.112.112",
+    "8.26.56.26", "64.6.64.6", "208.67.222.222", "208.67.220.220",
+    "::1",
+}
+
+IPV4_LITERAL = re.compile(r"(?<![\d.])(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?![\d.])")
+
+
+def scan_global_ip_literals(text: str, label: str) -> set[tuple[str, int, str]]:
+    """Flag any public IP literal, independent of the current lease.
+
+    The lease-derived denylist only knows the address the provider hands out at
+    push time, so yesterday's address is invisible once it changes -- which is
+    exactly how a site address reached a commit message. This rule does not care
+    which address it is: if it is global, it does not belong in history.
+    """
+    findings: set[tuple[str, int, str]] = set()
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        for raw in IPV4_LITERAL.findall(line):
+            if raw in PUBLIC_LITERAL_ALLOWLIST:
+                continue
+            try:
+                addr = ipaddress.ip_address(raw)
+            except ValueError:
+                continue
+            if not addr.is_global or addr.is_multicast or addr.is_reserved:
+                continue
+            findings.add((label, lineno, "<global ipv4 literal>"))
+    return findings
+
+
 def main() -> int:
     # Protected production pins first: if flake.lock moves a *-prod or
     # *-legacy-prod input without a matching approved snapshot, the push stops
@@ -420,6 +454,8 @@ def main() -> int:
         findings: set[tuple[str, int, str]] = set()
         scanned_blobs: set[str] = set()
         for commit in sorted(commits):
+            message = git(repo, "log", "-1", "--format=%B", commit).decode("utf-8", "replace")
+            findings.update(scan_global_ip_literals(message, f"{commit[:12]}:message"))
             for object_id, path in commit_diff_blobs(repo, commit):
                 if object_id in scanned_blobs:
                     continue
