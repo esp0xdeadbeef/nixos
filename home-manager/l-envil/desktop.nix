@@ -16,7 +16,6 @@ in
     let
       stable = with pkgs; [
         black
-        brave
         chromium
         discord
         google-chrome
