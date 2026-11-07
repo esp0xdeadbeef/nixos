@@ -139,5 +139,18 @@ FS-460/FS-322 domain and overlay contracts, not a port of the private one.
    needs a purpose-written intent *and* inventory, not a port of either existing
    artifact. The attempt was reverted; `network-labs` and the renderer are clean.
 
+4. Continued the same attempt: added `scope = "<site>-example-router-core-*"` to
+   all 17 bare `from = { kind = "external"; }` relations (the compiler accepts
+   `scope`), then re-ran the port/bridge synthesis. The synthesized ports kept
+   landing on the wrong end (`upstream-hostile-wan` ended up in the upstream
+   selector's `ports` instead of the policy node, producing a duplicate
+   `interface.name`), i.e. the two artifacts disagree about which node owns the
+   lane ends and about host/bridge placement. Automated port synthesis cannot
+   resolve that disagreement without a modeling decision per lane.
+
+   The upstream selector lane set, the access-to-uplink lane set, and the host /
+   bridge placement must therefore be authored deliberately for the example.
+   Every attempt was reverted; no repository is left half-migrated.
+
 Recorded upstream: `network-renderer-nixos:docs/blockers.md` (`c378477`) and
 `network-control-plane-model:docs/blockers/remaining-ci-reds.md` (`de27394`).
