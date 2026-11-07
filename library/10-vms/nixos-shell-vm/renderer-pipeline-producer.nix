@@ -86,23 +86,12 @@ let
         inventoryPath = resolvedInventory;
       };
       cpmForRenderer = controlPlaneTransform cpmBuilt;
-      # FS-310-SMS-100 / network-realization-schema: the artifact's
-      # `control_plane_model` is the control-plane envelope
-      # (`{ data = <enterprise -> site map>; version; ... }`). `compileAndBuild`
-      # returns a build result that also carries `endpointInventory` and
-      # `forwardingOut`; passing that whole result makes `network.data` a
-      # non-site shape and the schema rejects it (`expected attribute set`).
-      cpmEnvelope =
-        if builtins.isAttrs cpmForRenderer && builtins.isAttrs (cpmForRenderer.control_plane_model or null) then
-          cpmForRenderer.control_plane_model
-        else
-          cpmForRenderer;
-      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmEnvelope);
+      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmForRenderer);
       controlPlaneArtifact = {
         kind = "network-control-plane-artifact";
         artifactIdentity = artifactDigest;
         inherit artifactDigest;
-        control_plane_model = cpmEnvelope;
+        control_plane_model = cpmForRenderer;
         authorityConflicts = [ ];
         provenance = {
           producer = "nixos/${hostName}";
