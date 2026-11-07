@@ -261,3 +261,23 @@ The remaining work is (a) the forwarding-model lane decision above, and (b) the
 operator-owned tri-site intent/inventory for the three renderer cases. Both are
 model decisions outside what this run may invent (URS: intent is user-owned;
 FS-171 single writer).
+
+## Lane-model finding for the last control-plane red
+
+`test-example-overlay-upstream-policy-defaults-preserved` expects the upstream
+selector's core-facing interface to carry a per-access default with
+`lane.uplink = "isp-a"` for all five site-a accesses. The compiled model shows:
+
+- `admin`, `mgmt`, `streaming`: per-uplink defaults on the selector core link;
+- `client`, `client2`: defaults exist, but as `lane.kind = "access-edge"` with
+  `uplink = null` on the downstream-selector -> policy link (e.g.
+  `via 10.10.0.27` / `10.10.0.29`), never on the selector core link.
+
+All five accesses model the same selection (`isp-a` only per the intent), so the
+asymmetry is a lane-construction decision in the forwarding model: some defaults
+are represented as combined/edge lanes and propagated downstream, others as
+per-uplink lanes at the selector. FS-315 allows a lane as its own selection
+authority, so either representation can be correct, but the two cannot differ
+for the same modeled selection. Deciding which form is authoritative (and making
+it uniform) is a forwarding-model change, not a control-plane repair; the test
+must then assert that form.
