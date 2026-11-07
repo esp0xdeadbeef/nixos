@@ -615,8 +615,33 @@
                       # Prod cobalt router is the carrier-managed instance (see
                       # vm-host.nix); s-router-cobalt-new above is kept only as
                       # the rollback target, so its image must stay buildable.
+                      #
+                      # PINNED BY CONTENT. Deriving this from
+                      # `self.nixosConfigurations...` meant the production image
+                      # was rebuilt from every input on every host build: on
+                      # 2026-11-07 a transitive bump changed its store path
+                      # (7mdq7c7f -> 3ja6ivx0), the manager booted the new one,
+                      # and the guest never brought QGA up -- the site lost its
+                      # router while every *-prod pin was provably unchanged.
+                      #
+                      # This copies the known-good image into a derivation whose
+                      # output path is content-addressed, so input bumps cannot
+                      # move it; changing the production image requires editing
+                      # the literal below. `builtins.pathExists` keeps the flake
+                      # evaluable on hosts that do not hold the image (they get the
+                      # derived build), so only the machine that actually runs
+                      # prod is pinned.
                       s-router-cobalt-prod =
-                        self.nixosConfigurations.s-router-cobalt-prod.config.system.build.nixos-shell;
+                        let
+                          pinned = "/nix/store/7mdq7c7f6l9i651v8idi2lxl886js87j-nixos-vm";
+                        in
+                        if builtins.pathExists pinned then
+                          (nixpkgs.legacyPackages.${hostSystemFor name}).runCommandLocal
+                            "s-router-cobalt-prod-pinned-nixos-vm"
+                            { preferredLocalBuilders = [ "@none" ]; }
+                            "cp -L ${builtins.storePath pinned} $out"
+                        else
+                          self.nixosConfigurations.s-router-cobalt-prod.config.system.build.nixos-shell;
                     }
                   else
                     { };
