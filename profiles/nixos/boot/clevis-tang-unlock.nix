@@ -46,6 +46,19 @@ in
       description = "Name of the boot.initrd.luks.devices entry to unlock.";
     };
 
+    luksDevice = lib.mkOption {
+      type = lib.types.str;
+      description = ''
+        Backing device for `deviceName`, used when this unit opens the mapping
+        itself instead of handing a keyfile to systemd-cryptsetup.
+
+        Defaults to the device recorded in `boot.initrd.luks.devices`.'';
+      default = config.boot.initrd.luks.devices.${cfg.deviceName}.device;
+      defaultText = lib.literalExpression ''
+        config.boot.initrd.luks.devices.''${cfg.deviceName}.device
+      '';
+    };
+
     secretFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
@@ -162,20 +175,35 @@ in
       type = lib.types.enum [
         "disable"
         "fallback"
+        "chain"
       ];
       default = "disable";
       description = ''
-        Whether initrd unlocks may use a TPM2 keyslot as a fallback.
+        How the TPM2 participates in the initrd unlock.
 
         `"disable"` (the default) is for hosts with no usable TPM: stage-1 gets
         no TPM2 userspace and `systemd.tpm2_wait=0` is passed, so systemd never
         blocks waiting for a device that will not appear.
 
-        `"fallback"` is for hosts that have a working TPM and an enrolled
-        systemd-tpm2 token. Stage-1 then carries the TPM2 stack and systemd
-        waits for the device before unsealing. Clevis/Tang stays the *first*
-        unlock path — the `keyFile` is still tried before the token — so this
-        only changes what happens when Tang is unreachable.
+        `"fallback"` adds the TPM2 stack to stage-1 and a separate legacy
+        `systemd-tpm2` LUKS token is allowed to unlock the device on its own,
+        via `crypttabExtraOpts = [ "tpm2-device=auto" ]` on the host. Clevis/Tang
+        remains first. Use this when the TPM is a *convenience* path.
+
+        `"chain"` is for a JWE whose Clevis pin is `sss` with `t >= 2` over a
+        Tang share *and* a `tpm2` share, i.e. the device opens only when the
+        Tang server answers AND this machine's TPM unseals its share, because
+        `clevis decrypt` cannot reconstruct the secret from one share alone.
+        Stage-1 then needs the full TPM2 stack plus `TPM2_Startup` before the
+        unseal, which this module provides. A host using `"chain"` must NOT
+        also set `tpm2-device=auto` in `crypttabExtraOpts`: a legacy
+        `systemd-tpm2` token would let the TPM unlock the disk by itself and
+        collapse the two factors back into one.
+
+        Generate a chained binding with `clevis-chain-jwe.sh` in this directory.
+        When Tang is unreachable the unseal fails by design, and boot falls
+        through to the LUKS passphrase prompt (or the `manual-unlock`
+        specialisation, where Clevis is disabled entirely).
       '';
     };
   };
@@ -204,8 +232,8 @@ in
     # `systemd.tpm2_wait=0` onto hosts that did have a TPM, which then unsealed
     # before the device had probed. Hosts with a TPM opt in via `tpm2 =
     # "fallback"`; see nixos/laptop/l-portal/hardware/tpm.nix.
-    boot.initrd.systemd.tpm2.enable = lib.mkDefault (cfg.tpm2 == "fallback");
-    systemd.tpm2.enable = lib.mkDefault (cfg.tpm2 == "fallback");
+    boot.initrd.systemd.tpm2.enable = lib.mkDefault (cfg.tpm2 != "disable");
+    systemd.tpm2.enable = lib.mkDefault (cfg.tpm2 != "disable");
     # Exactly one value is ever emitted: `tpm2_wait=0` when the host has no TPM
     # (never block initrd on a device that will not appear), `tpm2_wait=1` when
     # it does (initrd must wait for the device before unsealing, otherwise the
@@ -213,7 +241,54 @@ in
     # appending with mkAfter used to do — made the effective value depend on
     # systemd's last-wins parsing across two separate command lines.
     boot.kernelParams =
-      if cfg.tpm2 == "fallback" then [ "systemd.tpm2_wait=1" ] else [ "systemd.tpm2_wait=0" ];
+      if cfg.tpm2 != "disable" then [ "systemd.tpm2_wait=1" ] else [ "systemd.tpm2_wait=0" ];
+
+    # ---------------------------------------------------------------------
+    # TPM2 readiness in stage-1 (shared by every host that uses the TPM).
+    # ---------------------------------------------------------------------
+    # `clevis-decrypt-tpm2` shells out to tpm2_createprimary / tpm2_flushcontext
+    # / tpm2_load / tpm2_unseal, and those binaries are only in the initrd if the
+    # package is in the initrd *closure*. Setting a unit's `path` is not enough
+    # — it only sets $PATH — which is why tpm2-tools goes into initrdBin
+    # (merged together with the Wi-Fi tooling further down, since two plain
+    # assignments to this option would conflict).
+    # boot.initrd.systemd.initrdBin = ... see the mkMerge below.
+
+    # A power-cycled TPM (such as the QSEECOM dTPM on the X13s) is non-orderly
+    # and refuses sessions until it has been started, so run TPM2_Startup(CLEAR)
+    # before anything tries to unseal. `tpm2_startup -c` is TPM2_Startup(CLEAR)
+    # and is harmless on an already-started TPM (it returns TPM2_RC_INITIALIZE,
+    # which the `|| true` tolerates).
+    boot.initrd.systemd.services.tpm2-startup = lib.mkIf (cfg.tpm2 != "disable") {
+      description = "Start the TPM2 before LUKS unlock";
+      wantedBy = [ "sysinit.target" ];
+      before = [
+        "systemd-cryptsetup@${escapedDevice}.service"
+        "clevis-try-bindings-${cfg.deviceName}.service"
+        "cryptsetup-pre.target"
+      ];
+      wants = [ "systemd-udev-settle.service" ];
+      after = [ "systemd-udev-settle.service" ];
+      unitConfig.DefaultDependencies = false;
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      path = [ pkgs.tpm2-tools pkgs.coreutils pkgs.gnugrep ];
+      script = ''
+        set -u
+        for _ in $(seq 1 20); do
+          [ -e /dev/tpmrm0 ] && break
+          sleep 1
+        done
+        [ -e /dev/tpmrm0 ] || exit 0
+
+        echo "tpm2-startup: TPM2_Startup(CLEAR)" >&2
+        tpm2_startup -c -T device:/dev/tpmrm0 2>&1 || true
+        tpm2_getcap -T device:/dev/tpmrm0 properties-variable 2>&1 \
+          | grep -A4 TPM2_PT_STARTUP_CLEAR >&2 || true
+      '';
+    };
 
     boot.initrd.luks.devices.${cfg.deviceName} = {
       allowDiscards = lib.mkDefault true;
@@ -307,6 +382,30 @@ in
             mountpoint -q "/clevis-${cfg.deviceName}" || mount -t ramfs none "/clevis-${cfg.deviceName}"
             install -m 0400 "$tmp" "$out"
             echo "clevis: unlocked via $f" >&2
+
+            # Open the device HERE, with the decrypted key, rather than leaving
+            # it for systemd-cryptsetup to slurp as a keyfile.
+            #
+            # Why: systemd-cryptsetup does not chain "keyfile then TPM". If a
+            # key-file argument is present it keeps failing on that source and
+            # never lets `tpm2-device=auto` reach the enrolled token -- measured
+            # on this host as `TPM2 operation failed ... State not recoverable`
+            # with the keyfile path set, versus a clean unseal with the keyfile
+            # field `-`/none. So the Clevis key must not be handed to cryptsetup
+            # as the primary key-file; it is used directly to activate the
+            # mapping, and cryptsetup is left free to try the TPM token on its
+            # own if this mapping is not yet up.
+            if cryptsetup status '${cfg.deviceName}' >/dev/null 2>&1; then
+              echo "clevis: ${cfg.deviceName} already active" >&2
+            elif ${pkgs.cryptsetup}/bin/cryptsetup open \
+                   --key-file "$out" \
+                   --allow-discards \
+                   '${cfg.luksDevice}' '${cfg.deviceName}'; then
+              echo "clevis: opened ${cfg.deviceName} with the decrypted key" >&2
+            else
+              echo "clevis: could not open ${cfg.deviceName}; leaving it to systemd-cryptsetup" >&2
+            fi
+
             rm -f "$tmp"
             exit 0
           fi
@@ -335,16 +434,26 @@ in
       };
     };
 
-    boot.initrd.systemd.initrdBin = lib.mkIf cfg.wifi.enable (with pkgs; [
-      coreutils
-      gnugrep
-      gnused
-      iw
-      iproute2
-      kmod
-      util-linux
-      wpa_supplicant
-    ]);
+    # Both the TPM tooling and the Wi-Fi tooling must land in the initrd
+    # *closure*: a unit's `path` only sets $PATH. They are merged into a single
+    # `initrdBin` definition because two plain list assignments to the same
+    # option conflict.
+    boot.initrd.systemd.initrdBin = lib.mkMerge [
+      (lib.mkIf (cfg.tpm2 != "disable") [ pkgs.tpm2-tools ])
+      (lib.mkIf cfg.wifi.enable (
+        with pkgs;
+        [
+          coreutils
+          gnugrep
+          gnused
+          iw
+          iproute2
+          kmod
+          util-linux
+          wpa_supplicant
+        ]
+      ))
+    ];
 
     boot.initrd.systemd.services.initrd-wifi = lib.mkIf cfg.wifi.enable {
       description = "Associate Wi-Fi for Clevis/Tang unlock";

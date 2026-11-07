@@ -16,16 +16,22 @@ in
     root = {
       device = "/dev/disk/by-partlabel/disk-nvme0n1-luks";
       allowDiscards = true;
-      # mkForce on this attrset drops whatever the clevis profile set with
-      # mkDefault, including keyFile. Re-assert it here so initrd actually reads
-      # the key produced by clevis-try-bindings-root.
-      keyFile = "/clevis-root/decrypted";
-      # Same reason: this attrset replaces every other contribution, so options
-      # set from other modules (e.g. hardware/tpm.nix) must be listed here or
-      # they are silently discarded. tpm2-device=auto lets systemd-cryptsetup
-      # fall back to the enrolled TPM2 token when the Clevis/Tang key is not
-      # available (Tang unreachable); the keyFile above is still tried first.
-      crypttabExtraOpts = [ "tpm2-device=auto" ];
+      # Deliberately NO keyFile.
+      #
+      # `keyFile = null` makes the generated initrd crypttab use `-` in the
+      # key-file field, which is what lets the mapping be opened by the Clevis
+      # unit (which runs `cryptsetup open` itself with the decrypted key) and, if
+      # that fails, fall through to the passphrase prompt on the console.
+      #
+      # Also deliberately NO `tpm2-device=auto`: root must require BOTH Tang and
+      # this machine's TPM, and a legacy standalone `systemd-tpm2` token would
+      # let the TPM unlock the disk by itself, collapsing the two factors back
+      # into one. The TPM is instead a share inside the Clevis `sss` binding —
+      # see local.boot.clevisTangUnlock.tpm2 = "chain" in bootloader.nix.
+      #
+      # Resulting order: Clevis (Tang share + TPM share, both required)
+      #               -> LUKS passphrase prompt.
+      crypttabExtraOpts = [ ];
     };
   };
 
