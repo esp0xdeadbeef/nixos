@@ -584,6 +584,29 @@
                   else
                     { };
 
+                # IMPORTANT: `vmImages` is a BUILD, not a pin.
+                #
+                # The `*-prod` / `*-legacy-prod` inputs above are safe: their
+                # URLs name exact commits, so `nix flake update` provably cannot
+                # move them (verified 2026-11-07: a full `nix flake update`
+                # followed by scripts/check-prod-pins.sh reports
+                # "protected production pins unchanged").
+                #
+                # The production VM *image* is not protected by that at all. It
+                # is derived from `self.nixosConfigurations.<vm>...nixos-shell`,
+                # so every host rebuild rebuilds it from every input -- including
+                # inputs nobody considers production, such as a transitive
+                # nixpkgs. On 2026-11-07 such a bump produced a new image path,
+                # the manager booted it, the guest never brought QGA up, and the
+                # site lost its router while every -prod pin was untouched.
+                #
+                # BLOCKED: pinning the artifact needs its own rev-pinned flake
+                # input for the production router config (URL naming an exact
+                # commit, like the -prod inputs), because a store path literal is
+                # rejected (types.package) and `builtins.storePath` makes the
+                # whole flake evaluate only on a machine that already has the
+                # image. Until that exists, treat any host rebuild as capable of
+                # changing the production image, and verify with vm-status after.
                 vmImages =
                   if name == "s-nodus" then
                     {
