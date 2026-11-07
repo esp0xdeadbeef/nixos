@@ -3475,6 +3475,24 @@ in
         # (E_OVERLAY_UNDERLAY_ACCESS_WAN_EGRESS_REQUIRED) requires the underlay
         # tenant to have an allow to the underlay's target external; naming the
         # real class states that intent precisely rather than widening it.
+        # The garnet overlay is carried by the same underlay tenant, but its
+        # transport class is nebula-garnet (udp/tcp 4243), not the WireGuard
+        # class above. Without this the underlay could only reach garnet
+        # *through* the garnet overlay -- circular, which is exactly what
+        # E_OVERLAY_UNDERLAY_ACCESS_WAN_EGRESS_REQUIRED rejects, and what left
+        # iot-srv (the VPN underlay gateway) with no egress at all.
+        {
+          id = "allow-cobalt-iot-srv-to-wan-nebula-garnet";
+          priority = 131;
+          from = {
+            kind = "tenant";
+            name = "cobalt-iot-srv";
+          };
+          to = { kind = "external"; scope = "core"; };
+          trafficType = "nebula-garnet";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
         {
           id = "allow-cobalt-iot-srv-to-wan";
           priority = 130;
@@ -3486,20 +3504,6 @@ in
           trafficType = "wireguard-1637";
           action = "allow";
           returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-nebula-garnet-underlay-to-isp";
-          priority = 153;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot-srv";
-          };
-          to = {
-            kind = "external";
-          };
-          trafficType = "nebula-garnet";
-          action = "allow";
-          returnBehavior = "one-way";
         }
         {
           id = "allow-garnet-underlay-to-core";
