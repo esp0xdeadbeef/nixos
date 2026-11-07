@@ -70,7 +70,6 @@ in
     "pd_ignore_unused"
     "arm64.nopauth"
     "pci=realloc,resource_alignment=21@0006:00:00.0"
-    "systemd.tpm2_wait=0"
   ];
 
   boot.initrd.kernelModules = [
@@ -107,14 +106,19 @@ in
   boot.loader.grub.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.systemd-boot.enable = true;
-  boot.loader.systemd-boot.configurationLimit = 10;
-
-  boot.initrd.systemd.tpm2.enable = false;
-  systemd.tpm2.enable = false;
+  boot.loader.systemd-boot.configurationLimit = lib.mkDefault 3;
 
   local.boot.clevisTangUnlock = {
     enable = true;
     deviceName = "root";
+
+    # TPM is an unlock *fallback* here, not the primary path: the Clevis keyFile
+    # is still tried first by systemd-cryptsetup, so a machine with Tang
+    # reachable boots exactly as before. This only adds the tss2 userspace to
+    # stage-1 and makes systemd wait for the device before unsealing. Hosts
+    # without a TPM must leave this at the profile default ("disable"). See
+    # hardware/tpm.nix for the QSEECOM transport and the enrollment notes.
+    tpm2 = "fallback";
     # One JWE per Tang site, staged together and tried in order at boot. Each is
     # generated from its own site (see clevis-init-jwe.sh --site), so neither
     # server has to be reachable when the other's binding is created.

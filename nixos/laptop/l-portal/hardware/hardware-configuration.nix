@@ -20,6 +20,12 @@ in
       # mkDefault, including keyFile. Re-assert it here so initrd actually reads
       # the key produced by clevis-try-bindings-root.
       keyFile = "/clevis-root/decrypted";
+      # Same reason: this attrset replaces every other contribution, so options
+      # set from other modules (e.g. hardware/tpm.nix) must be listed here or
+      # they are silently discarded. tpm2-device=auto lets systemd-cryptsetup
+      # fall back to the enrolled TPM2 token when the Clevis/Tang key is not
+      # available (Tang unreachable); the keyFile above is still tried first.
+      crypttabExtraOpts = [ "tpm2-device=auto" ];
     };
   };
 
