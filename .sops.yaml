@@ -41,6 +41,9 @@ keys:
   - &s-router-clab age1dug0ualmuqd5akne2y7zdmwztdwua35c9zle9j3e2540f2me2p3qpp6m6v
   - &hetz-test age1757z4z4t392kxuzfeajuaukh93na90e2p08t06k9ggpw6wa75dsshhqpzw
   - &s-router-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
+  # Inert prod copy: its persist is copied from s-router-prod, so it carries
+  # prod's age identity. Same public key; rotation is a separate change.
+  - &s-router-neon-prod age18yc5wyyj8mh67r626z0y0n3fpjmh3fq85nd6mk59yedsfs0jea9spfg2zj
   - &s-router-legacy-prod age1d53ydnf0dfzxpkt4lkea23yrhfl30hksqnj8wp2cn2up3as43sjsk4wsvv
   - &s-router-neon age1tyy7562g9jry5ppjmf05m5xw253mnpykcshv87c9ppns5sa5xfmqg5p2fr
   - &s-router-cobalt age1fqla0mcf7dp5hytm6mvukjhe8pas636rtn3ts38pj3fv4mxjzyesj9ewms
@@ -362,6 +365,17 @@ creation_rules:
           - *l-esp-root
           - *l-esp-deadbeef
           - *s-router-legacy-prod
+  # Must precede the generic s-router-neon.* rule so the prod-copy files do
+  # not get captured by the neon-testing key group.
+  - path_regex: '^(secrets/)*s-router-neon-prod.*\.(env|ya?ml)$'
+    encrypted_regex: ".*"
+    key_groups:
+      - age:
+          - *l-esp-root
+          - *l-esp-deadbeef
+          - *s-router-neon-prod
+          - *s-router-core
+          - *s-router-legacy-core
   - path_regex: '^(secrets/)*s-router-neon.*\.(env|ya?ml)$'
     encrypted_regex: ".*"
     key_groups:
