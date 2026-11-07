@@ -87,7 +87,6 @@ in
   home.packages =
     let
       stable = with pkgs; [
-        brave
         chromium
         discord
         obsidian
