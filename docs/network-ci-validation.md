@@ -229,3 +229,35 @@ overlay reachability emission (peer endpoint identity, per-lane route authority)
 that must be checked against FS-460 and the URS overlay-transport sentence before
 landing, and the ACL normalization needs a decision on whether the overlay node
 address or its subnet is the modeled requester identity for that relation.
+
+## This run: two overlay DNS cases fixed, one lane-decision case remains
+
+`network-control-plane-model`:
+- `31f27bc`: overlay endpoints are host identities. The overlay node record
+  (route destinations) and the cross-site DNS ACL entries now use `/32` and
+  `/128` instead of the interface subnet mask, with the node's own address
+  compared by host part. `test-sitec-overlay-service-ingress` passes.
+- `d8aaea7`: `overlay-ingress-routes.nix` emits, on the overlay termination
+  node, one route per provider tenant prefix through the modeled underlay uplink
+  lane (relation id + `overlay-ingress-return` provenance).
+  `test-s-router-hetz-overlay-dns-ingress` passes after migrating its assertion
+  from a snapshot interface name to the modeled lane kind/uplink.
+- `50ab58d`: blocker note updated.
+- Full suite: **227 PASS / 15 FAIL** (was 225/17), no new failures.
+
+Remaining overlay case: `test-example-overlay-upstream-policy-defaults-preserved`
+expects a per-uplink default on all five site-a access lanes at the upstream
+selector; the forwarding model emits three and places `client`/`client2` on a
+combined lane (`lane.uplink = null`). Deciding whether the combined lane or the
+per-uplink lane is authoritative is a forwarding-model lane decision (FS-315),
+not a control-plane repair.
+
+The three `network-renderer-nixos` reds are unchanged (tri-site fixture needs
+operator-owned intent; see the blocker below).
+
+## Blocker status
+
+The remaining work is (a) the forwarding-model lane decision above, and (b) the
+operator-owned tri-site intent/inventory for the three renderer cases. Both are
+model decisions outside what this run may invent (URS: intent is user-owned;
+FS-171 single writer).
