@@ -281,3 +281,34 @@ authority, so either representation can be correct, but the two cannot differ
 for the same modeled selection. Deciding which form is authoritative (and making
 it uniform) is a forwarding-model change, not a control-plane repair; the test
 must then assert that form.
+
+## This run: forwarding-model default attribution fixed; 13 control-plane reds left
+
+- `network-forwarding-model` `6c1bfca`: a path whose source is a tenant-set was
+  attributed only to the first member's access unit, so `client`/`client2` never
+  received the selected exit default and fell back to an edge lane (FS-315). The
+  fix matches membership in the modeled source set. NFM suite: 82 PASS / 0 FAIL;
+  NFM CI on `6c1bfca`: success.
+- `network-control-plane-model` `c840a97`: pin NFM `6c1bfca`, and migrate
+  `test-example-overlay-upstream-policy-defaults-preserved` to derive its expected
+  per-uplink access sets from the intent's compiled `selects` (FS-322) instead of
+  assuming every access selects every uplink.
+- Full control-plane suite: **229 PASS / 13 FAIL** (was 227/15), no new failures;
+  the same pin also fixes `FS-500-HDS-010-SDS-010-SMS-040` (DNS p2p gateways
+  off-link).
+- `network-renderer-nixos` remains 23 PASS / 3 FAIL.
+
+## Why the remaining 13 + 3 are blocked
+
+The 13 control-plane reds (`FS-260-015`, `FS-310-120`, `FS-380-050`,
+`FS-410-030`, `FS-420-030`, `FS-460-050`, `FS-720-030`, `FS-740-010`,
+`FS-770-010`, `FS-800-010/012/030`, `FS-970-040`) are module/example migrations
+whose resolution changes modeled behavior or acceptance expectations in specific
+FS areas (PPPoE/host-uplink, NAT, public ingress, runtime-origin). Each such
+change requires the owning FS contract to move first (AGENTS: fix URS/FS first,
+same change), and this engagement was explicitly scoped to not touch the URS/FS
+("don't touch the URS / FS"). The three renderer reds need the operator-owned
+tri-site intent/inventory (URS assigns intent to the user; FS-171 single writer).
+
+So the blocker is ownership/permission, not effort: the agent may not invent
+user intent and may not change the FS contract.
