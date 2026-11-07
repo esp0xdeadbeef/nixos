@@ -547,8 +547,20 @@ fails=0
 for i in $(seq 1 "$HOLD"); do
   sleep 1
   if ! is_active "$NEW_UNIT"; then
-    echo "[$(ts)] new went inactive at ${i}s"
-    exit 1
+    # One sample is not evidence: the unit passes through short non-active
+    # states (activating on a supervisor restart, deactivating), and reporting
+    # those as "the candidate died" aborts trials that were fine. Require the
+    # inactive state to persist before failing.
+    persisted=0
+    for _ in $(seq 1 6); do
+      sleep 5
+      if is_active "$NEW_UNIT"; then persisted=0; break; fi
+      persisted=$((persisted + 1))
+    done
+    if [ "$persisted" -ge 6 ]; then
+      echo "[$(ts)] new stayed inactive at ${i}s (state=$(systemctl show "$NEW_UNIT" -p ActiveState,SubState --value 2>/dev/null | tr '\n' '/'))"
+      exit 1
+    fi
   fi
   if [ $((i % 10)) -eq 0 ] && ! health; then
     fails=$((fails + 1))
