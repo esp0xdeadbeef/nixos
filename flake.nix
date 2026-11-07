@@ -110,7 +110,7 @@
     };
 
     # Pinned production stack (frozen: never advanced by `nix flake update`).
-    # s-router-prod consumes these; s-router-neon tracks the same model on main.
+    # s-router-prod consumes these; s-router-neon-new tracks the same model on main.
     #
     # The prod compilers and models declare their own `network-labs` input; pin
     # it explicitly so a non-prod `network-labs` bump can never be dragged into

@@ -21,7 +21,8 @@
         # Lab / prod router VMs owned by other hosts.
         "s-router-clab"
         "s-router-nixos"
-        "s-router-neon"
+        "s-router-neon-new"
+        "s-router-neon-prod"
         "s-router-prod"
         "s-router-legacy-prod"
         "s-router-test-clients"

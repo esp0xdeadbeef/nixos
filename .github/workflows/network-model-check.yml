@@ -33,10 +33,10 @@ jobs:
           # realization model, and NixOS renderer. Evaluating their toplevel
           # derivations is the cheapest way to catch an infinitely-recursive
           # rendered config (e.g. a forwarding-model normalization cycle)
-          # before it reaches a host rebuild. s-router-neon and s-router-cobalt
+          # before it reaches a host rebuild. s-router-neon-new and s-router-cobalt
           # track the unpinned network-* main inputs; s-router-prod renders the
           # same neon site against the pinned -prod inputs.
-          for host in s-router-neon s-router-cobalt s-router-prod; do
+          for host in s-router-neon-new s-router-cobalt s-router-prod; do
             echo "::group::Checking ${host}"
             nix derivation show \
               ".#nixosConfigurations.${host}.config.system.build.toplevel" \

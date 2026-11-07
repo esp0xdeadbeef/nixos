@@ -10,7 +10,7 @@ let
 in
 {
   # The gameserver is dual-homed on the neon 802.1Q trunk (l-envil's vmbr4,
-  # the trunk s-router-neon terminates):
+  # the trunk s-router-neon-new terminates):
   #
   #   VLAN 20 `svc` -> the VM host's own network; DHCP on the vlan20 bridge.
   #                    Podman pulls its container images here, and

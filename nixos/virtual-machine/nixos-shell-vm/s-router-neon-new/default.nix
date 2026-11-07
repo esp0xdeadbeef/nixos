@@ -7,7 +7,7 @@
 , ...
 }:
 let
-  hostName = "s-router-neon";
+  hostName = "s-router-neon-new";
   modelSource = relativeRepo.sourceModule "prod-network/testing";
   # Eval-time directory listing (readDir): needs a real path (sourceModule).
   deviceDir = relativeRepo.sourceModule "prod-network/testing/secrets/devices";
@@ -73,14 +73,14 @@ in
       inventoryFileName = "inventory-neon.nix";
       inherit vmNics;
       system = "x86_64-linux";
-      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-neon/default.nix";
+      selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-neon-new/default.nix";
     })
   ];
 
   system.stateVersion = lib.mkForce "26.05";
 
   # Per-device protected DHCP reservations (MACs). Encrypted to l-esp and
-  # s-router-neon; bound into the access containers so kea can serve the
+  # s-router-neon-new; bound into the access containers so kea can serve the
   # static vlan2 leases without the legacy full-lease JSON exports.
   sops.secrets =
     lib.listToAttrs
@@ -99,14 +99,14 @@ in
       )
     // {
       "neon-lan-trunk-mac" = {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-neon-vm-macs.yaml";
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-neon-new-vm-macs.yaml";
         key = "lan-trunk";
         format = "yaml";
         path = "/run/secrets/neon-lan-trunk-mac";
       };
 
       "neon-wan-mac" = {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-neon-vm-macs.yaml";
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-neon-new-vm-macs.yaml";
         key = "wan";
         format = "yaml";
         path = "/run/secrets/neon-wan-mac";
@@ -123,7 +123,7 @@ in
         "garnet-lighthouse-endpoint4"
       ]
       (name: {
-        sopsFile = relativeRepo.sourcePath "secrets/s-router-neon-garnet.yaml";
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-neon-new-garnet.yaml";
         format = "yaml";
       })
     );
@@ -155,7 +155,7 @@ in
   # The QEMU NICs receive random MACs; the stable per-NIC identities live in
   # SOPS and are applied before networkd creates the trunk/WAN bridges so the
   # bridge and VLAN interfaces inherit them.
-  systemd.services.s-router-neon-vm-nic-macs = {
+  systemd.services.s-router-neon-new-vm-nic-macs = {
     description = "Apply SOPS-backed VM NIC MACs before networkd";
     wantedBy = [ "systemd-networkd.service" ];
     before = [ "systemd-networkd.service" ];

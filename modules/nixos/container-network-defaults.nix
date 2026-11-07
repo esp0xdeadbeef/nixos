@@ -2,7 +2,7 @@
 # injects, so the network renderers own the full network realization and can
 # set plain values without fighting `mkDefault`/`mkForce` priorities.
 #
-# Applied explicitly by the router hosts (s-router-cobalt / s-router-neon) so
+# Applied explicitly by the router hosts (s-router-cobalt / s-router-neon-new) so
 # the override is visible and opt-in, and the stock container defaults stay
 # available for everything else.
 #
