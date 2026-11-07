@@ -110,12 +110,18 @@ in
   # "Timeout occurred while waiting for network connectivity" while the host was
   # in fact reachable. Satisfy the target as soon as any managed link is online;
   # units that genuinely need a specific link already order against it.
-  # Verified 2026-11-06: this renders `--any` into
-  # systemd-networkd-wait-online's ExecStart. It is NOT yet active on the running
-  # host (deployed generation still fails that unit with exit-code, and has no
-  # `--any`), so the next host rebuild is what actually clears it -- the router
-  # guests and everything proven about the cobalt candidate do not depend on it.
-  systemd.network.wait-online.anyInterface = true;
+  # Verified 2026-11-06 on generation vdl5yv7l: `--any` IS in the unit's argv
+  # and the unit still times out -- "Timeout occurred while waiting for network
+  # connectivity" after 120s -- because no managed link on this board reaches
+  # online within that window (the board's own uplink is the router VM it hosts,
+  # and the AP/bridge/vlan links are carrier-less at boot). The result is two
+  # minutes of boot spent waiting and a unit left in `failed`, which makes the
+  # whole host report `degraded` and hides real failures.
+  #
+  # Nothing here needs the wait: the only consumers are the internet guard (which
+  # probes and retries on its own window) and nixos-upgrade. Disable the unit so
+  # boot stops depending on guest-facing links.
+  systemd.services.systemd-networkd-wait-online.enable = lib.mkForce false;
 
   local.internetGuard.enable = true;
 
