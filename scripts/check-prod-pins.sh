@@ -39,6 +39,33 @@ for name, node in d["nodes"].items():
 print(json.dumps(prod, indent=2, sort_keys=True))
 PY
 
+# Mutable input sources defeat pinning entirely: a `path:` (or file/git+file)
+# input follows the working tree, so a rebuild silently produces different
+# artifacts with flake.lock unchanged -- the same failure mode as a derived image,
+# and the reason the protected pins are rev-pinned in flake.nix URLs. Refuse to
+# let one into the tree at all.
+mutable=$(grep -nE 'url[[:space:]]*=[[:space:]]*"(path|file|git\+file):' "$repo_root/flake.nix" || true)
+pathnodes=$(python3 - "$lock" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+for name, node in d["nodes"].items():
+    if name == "root":
+        continue
+    locked = node.get("locked") or {}
+    if locked.get("type") == "path":
+        print(f"{name}: path:{locked.get('path')}")
+PY
+)
+if [ -n "$mutable" ] || [ -n "$pathnodes" ]; then
+  echo "mutable (unpinnable) flake inputs are not allowed:" >&2
+  [ -n "$mutable" ] && printf '%s\n' "$mutable" >&2
+  [ -n "$pathnodes" ] && printf '%s\n' "$pathnodes" >&2
+  echo >&2
+  echo "A path:/file:/git+file: input follows the working tree, so builds change" >&2
+  echo "with flake.lock untouched. Pin an exact commit or a rev-pinned URL instead." >&2
+  exit 1
+fi
+
 if [ "${1:-}" = "--write" ]; then
   [ "${PROD_PINS_APPROVED:-0}" = "1" ] || {
     echo "refusing to rewrite ci/prod-pins.lock: set PROD_PINS_APPROVED=1 to approve the bump" >&2
