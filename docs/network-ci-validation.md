@@ -118,5 +118,26 @@ Concrete migration attempts this run (all reverted, no repo left half-migrated):
 So the canonical example needs a purpose-written inventory against the current
 FS-460/FS-322 domain and overlay contracts, not a port of the private one.
 
+3. Authored `network-labs/examples/tri-site-s-router-overlay-egress` from the
+   forwarding model's compiler-clean intent plus the private inventory, then
+   iterated against the compiler/FM:
+   - tenant prefixes lacked `dnsDomain` (added `dnsDomain = "lan."` to all 33
+     tenant prefixes: `forwardingModel…domains.tenants: tenant 'client' requires
+     a derived dnsDomain or zone reference for DHCP advertisement derivation`);
+   - the inventory had no port realization for the current access-to-uplink
+     lanes (`…requires explicit port realization for backing link
+     'link::esp.home::p2p-…-hostile--uplink-isp-a'`); added both ends of each
+     lane plus the host bridge;
+   - the intent then failed semantic validation at the forwarding model:
+     `forwardingModel.enterprise.esp.site.home.communicationContract.relations.allow-wan-to-dmz-nebula.from:
+     service exposure scope binding requires requester scope to name an external
+     or uplink`.
+
+   In other words the forwarding model's tri-site intent is itself stale against
+   the current compiler contract (service-exposure requester scopes), while its
+   inventory is stale against FS-460. Producing a conforming example therefore
+   needs a purpose-written intent *and* inventory, not a port of either existing
+   artifact. The attempt was reverted; `network-labs` and the renderer are clean.
+
 Recorded upstream: `network-renderer-nixos:docs/blockers.md` (`c378477`) and
 `network-control-plane-model:docs/blockers/remaining-ci-reds.md` (`de27394`).
