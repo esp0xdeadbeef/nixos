@@ -154,3 +154,48 @@ FS-460/FS-322 domain and overlay contracts, not a port of the private one.
 
 Recorded upstream: `network-renderer-nixos:docs/blockers.md` (`c378477`) and
 `network-control-plane-model:docs/blockers/remaining-ci-reds.md` (`de27394`).
+
+## Final CI sweep (all 11 repositories)
+
+Checked via the GitHub API (latest workflow run per repository):
+
+| repo | head | conclusion |
+| --- | --- | --- |
+| network-compiler | `27080ef` | success |
+| network-forwarding-model | `ec16160` | success |
+| network-labs | `3a710c3` | success |
+| network-control-plane-model | `de27394` | failure: 17 known reds, identical to the pre-change baseline |
+| network-realization-model | `b6ab76a` | success |
+| network-realization-schema | `6881bff` | success |
+| network-access-endpoint | `01de9c3` | success (last recorded run) |
+| network-renderer-nebula | `7054765` | success |
+| network-renderer-wireguard | `dc39a38` | success |
+| network-renderer-containerlab-linux-backend | `f90dc63` | success |
+| network-renderer-nixos | `c378477` | failure: 23 PASS / 3 FAIL |
+
+The control plane's 17 reds are the pre-existing module/example migrations listed
+above; every one also fails on `64ec24f^` (two more were fixed during this work:
+`FS-525-…-SMS-010` and `test-dns-service-policy-routes`, plus the policy-table
+parity case in the renderer).
+
+## Why the last three reds are blocked (ownership, not effort)
+
+`test-overlay-core-local-hostile-return-routes`, `test-transit-endpoint-return-routes`
+and `test-runtime-origin-loopback-egress-render` need a conforming tri-site
+overlay example. The URS assigns intent to the user: "Intent: User-owned desired
+behavior such as tenants, services, DNS policy, what each scope reaches and
+offers…" and the repository AGENTS forbids inventing behavior. Authoring the
+example therefore requires operator-owned modeling decisions that this run
+cannot make:
+
+- which exit scopes each access selects (the stale intent names none; the
+  compiler rejects bare external scopes once service exposure is modeled),
+- the tenant DNS domains for DHCP advertisement derivation,
+- the overlay endpoint identities and underlay provider facts (FS-460),
+- the access-to-uplink lane set and the host/bridge placement for each lane end.
+
+Every attempt to derive these from the two existing artifacts was reproduced and
+reverted (unknown site uplink, missing tenant dnsDomain, service-exposure scope
+binding, and a lane-end/host placement disagreement that duplicated
+`interface.name`). The example must be authored deliberately, with those
+operator decisions, before the three cases can be validated.
