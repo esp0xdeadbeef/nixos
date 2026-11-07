@@ -199,3 +199,33 @@ reverted (unknown site uplink, missing tenant dnsDomain, service-exposure scope
 binding, and a lane-end/host placement disagreement that duplicated
 `interface.name`). The example must be authored deliberately, with those
 operator decisions, before the three cases can be validated.
+
+## New evidence on the two overlay service-ingress reds (control plane)
+
+`test-sitec-overlay-service-ingress` was decomposed with the same predicate the
+case uses. Current model output versus the case's expectation:
+
+| predicate | model | case expects |
+| --- | --- | --- |
+| `dns.allowFrom` host entries | `100.96.10.1/24`, `100.96.10.254/24`, `fd42:dead:beef:ee::1/64`, … | `100.96.10.1/32`, `fd42:dead:beef:ee::1/128` |
+| policy dmz lane route to the overlay endpoint | absent | `100.96.10.1/32 via 10.80.0.17` |
+| overlay interface link route | absent | `100.96.10.1/32` with `intent.kind = "overlay-node-reachability"` |
+| upstream forward and return rules | present | present |
+
+So two distinct defects remain in the control plane, both owning-layer work:
+the DNS `allowFrom` uses overlay-subnet masks where the modeled resolver-source
+identity is a host address (an ACL widening under FS-171 least privilege), and
+the overlay peer endpoint reachability is not emitted on the policy lane or the
+overlay interface for this site (FS-460 overlay reachability).
+
+`test-s-router-hetz-overlay-dns-ingress` fails on the same missing overlay
+reachability; `test-example-overlay-upstream-policy-defaults-preserved` could not
+complete because the remote builder refused the connection
+(`cannot build on 'ssh-ng://nix-ssh@s-tau-builder'`), which is an environment
+failure to retry, not a model result.
+
+These are actionable but not completed: each needs a deliberate change to the
+overlay reachability emission (peer endpoint identity, per-lane route authority)
+that must be checked against FS-460 and the URS overlay-transport sentence before
+landing, and the ACL normalization needs a decision on whether the overlay node
+address or its subnet is the modeled requester identity for that relation.
