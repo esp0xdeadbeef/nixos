@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Protected production pins are a commit-time gate, not a CI one: the prod and
+# legacy-prod network shapes are what a live site runs on, and the whole point is
+# that a bump cannot leave this workstation without someone approving it. The
+# snapshot in ci/prod-pins.lock makes the change an explicit diff in the commit.
+if git diff --cached --name-only -- flake.lock | grep -qx flake.lock; then
+  scripts/check-prod-pins.sh
+fi
+
 mapfile -d '' changed < <(
   git diff --cached --name-only --diff-filter=ACMR -z -- '*.nix'
 )
