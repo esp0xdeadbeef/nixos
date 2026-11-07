@@ -112,24 +112,34 @@ in
     enable = true;
     deviceName = "root";
 
-    # TPM is an unlock *fallback* here, not the primary path: the Clevis keyFile
-    # is still tried first by systemd-cryptsetup, so a machine with Tang
-    # reachable boots exactly as before. This only adds the tss2 userspace to
-    # stage-1 and makes systemd wait for the device before unsealing. Hosts
-    # without a TPM must leave this at the profile default ("disable"). See
-    # hardware/tpm.nix for the QSEECOM transport and the enrollment notes.
-    tpm2 = "fallback";
-    # One JWE per Tang site, staged together and tried in order at boot. Each is
-    # generated from its own site (see clevis-init-jwe.sh --site), so neither
-    # server has to be reachable when the other's binding is created.
+    # Root requires BOTH the cobalt Tang server AND this machine's TPM.
     #
-    # All of them wrap the same LUKS keyslot secret. A JWE whose Tang is
-    # unreachable simply fails to decrypt and the next one is tried, so a stale
-    # binding is harmless to keep -- regenerate it from its own site later.
-    secretFiles = [
-      ./root-cobalt.jwe
-      ./root-neon.jwe
-    ];
+    # `"chain"` means the staged JWE is a Clevis `sss` binding with t = 2 over
+    # two shares: a `tang` share and a `tpm2` share sealed to PCR 7. Neither one
+    # alone can reconstruct the LUKS key, so a detached disk cannot be opened
+    # with the TPM alone and the Tang server alone cannot open it either.
+    #
+    # This module also provides what stage-1 needs for the TPM share:
+    # `boot.initrd.systemd.tpm2.enable`, tpm2-tools in the initrd closure, and a
+    # `tpm2-startup` unit that runs TPM2_Startup(CLEAR) before the unseal (the
+    # QSEECOM dTPM comes up non-orderly after a power cycle).
+    #
+    # Failure behaviour is intentional: if Wi-Fi/Tang is unreachable the chain
+    # cannot be satisfied, so boot falls through to the LUKS passphrase prompt —
+    # or use the `manual-unlock` specialisation, which disables Clevis entirely.
+    tpm2 = "chain";
+
+    # The chained binding. Generated with
+    #   profiles/nixos/boot/clevis-chain-jwe.sh \
+    #     --url http://10.2.90.10:7500 --source-jwe hardware/root-cobalt.jwe
+    # (the source JWE supplied the already-working Tang keyslot secret, so the
+    # LUKS header was not modified). Regenerate it from the neon site when
+    # booting there, since a `tpm2` share is local to this machine and the Tang
+    # share names one site.
+    #
+    # Only the chained binding is staged. Staging a plain Tang-only JWE as well
+    # would let one factor unlock root and silently defeat the chain.
+    secretFiles = [ ./root-cobalt-chain.jwe ];
     tang = {
       host = "192.168.1.75";
       port = 7500;
