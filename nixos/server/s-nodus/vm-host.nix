@@ -282,8 +282,14 @@ in
       attach() {
         tap="$1"
         bridge="$2"
+        # Idempotent: this runs on every VM start AND every timer tick, so the
+        # already-attached case must be a silent no-op.
+        if ip link show dev "$tap" >/dev/null 2>&1 \
+          && [ "$(basename "$(readlink /sys/class/net/"$tap"/master 2>/dev/null)" 2>/dev/null)" = "$bridge" ]; then
+          return 0
+        fi
         i=0
-        while [ "$i" -lt 120 ]; do
+        while [ "$i" -lt 30 ]; do
           if ip link show dev "$tap" >/dev/null 2>&1; then
             ip link set dev "$tap" master "$bridge"
             ip link set dev "$tap" up
@@ -293,7 +299,8 @@ in
           i=$((i + 1))
           sleep 1
         done
-        echo "NOTE: $tap did not appear (VM not using vhost, or not running)"
+        # Not an error: the VM may simply not be running. The timer re-checks,
+        # which is what makes a manager-initiated VM restart recover by itself.
         return 0
       }
     ''
@@ -302,5 +309,24 @@ in
         nic: "attach ${lib.escapeShellArg "tap-${nic.nicId}"} ${lib.escapeShellArg nic.bridge}"
       )
       (lib.unique (lib.concatLists (lib.attrValues vmNics)));
+  };
+
+  # `wantedBy` on the VM units only fires when a unit *starts*; a manager-driven
+  # restart (guest shutdown, carrier flap, rollback) recreates the taps and left
+  # them unenslaved, so the guest's wan tap carried nothing and udhcpc looped on
+  # "broadcasting discover" with no lease -- the site lost its uplink while the
+  # link itself reported 10G up with the correct provider MAC.
+  #
+  # Re-check periodically instead of relying on one start edge; the script is
+  # idempotent and a no-op when the VM is down.
+  systemd.timers.vhost-tap-attach = {
+    description = "Re-enslave vhost-net taps after a VM restart";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "20s";
+      OnUnitActiveSec = "20s";
+      AccuracySec = "5s";
+      Unit = "vhost-tap-attach.service";
+    };
   };
 }
