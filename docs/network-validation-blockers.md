@@ -2,55 +2,52 @@
 
 ## Green
 
-network-compiler, network-forwarding-model, network-labs,
-network-realization-model, network-realization-schema, network-renderer-nebula,
-network-renderer-wireguard, network-renderer-access-endpoint-nixos and
-network-renderer-containerlab-linux-backend: latest CI run success.
-nixos: `nix flake check --no-build` passes; the dispatched "Flake.lock: update
-and push" run and the "Network model check" push run both succeed.
+network-compiler, network-forwarding-model (82/82), network-labs,
+network-realization-model, network-realization-schema,
+network-renderer-containerlab-linux-backend, network-renderer-nebula,
+network-renderer-wireguard and network-renderer-access-endpoint-nixos: latest
+CI run success. network-control-plane-model: **242 PASS / 0 FAIL** and CI
+success (all 11 previously red GAMP cases fixed). network-renderer-nixos:
+24 PASS / 2 FAIL (the two cases below). nixos: `nix flake check --no-build`
+passes; the dispatched "Flake.lock: update and push" and "Network model check"
+runs succeed.
 
 ## Fixed in this work
 
-FS-540 named-core DNS endpoints, requester-lane resolver reachability,
-policy-lane and ingress policy-table defaults, overlay endpoint host identities
-and overlay DNS ingress transit (control plane); tenant-set default attribution
-(forwarding model); canonical route-table mapping (renderer); removal of the
-obsolete nixos-network-compiler input and of brave in nixos; wrapped-CPM schema
-validation (network-realization-schema 30e7372).
+Control plane: FS-540 named-core DNS endpoints, requester-lane resolver
+reachability, policy-lane and ingress policy-table defaults, overlay endpoint
+host identities, overlay DNS ingress transit, delegated peer return routes on
+the WAN core (`dst = null` records were filtered out), FS-410 NAT66 authority,
+MSS clamp from modeled MTU, FS-770 canonical-profile equivalence, FS-420
+translation authority, FS-380 selection-derived lane set, FS-460 overlay return
+next hops and FS-315 lane defaults, FS-720 checker row id, FS-800 PPPoE/PD
+contract cases, FS-970 reservation-source conflict, and removal of the last
+name-inference in the CPM. Forwarding model: tenant-set default attribution and
+FS-315 generic-default lane gating. Renderer: canonical route-table mapping,
+source-scoped deny-by-default and policy-table parity cases, plus the transit
+endpoint return case. nixos: removal of the obsolete nixos-network-compiler
+input and of brave. network-realization-schema: wrapped-CPM validation.
 
 ## Blocked
 
-- network-control-plane-model: 13 pre-existing module/example migrations
-  (FS-260-015, FS-310-120, FS-380-050, FS-410-030, FS-420-030, FS-460-050,
-  FS-720-030, FS-740-010, FS-770-010, FS-800-010/012/030, FS-970-040) change
-  modeled behavior or acceptance in specific FS areas; AGENTS requires the FS
-  contract to move first and this engagement must not touch the URS/FS.
-- network-renderer-nixos: 3 cases need an authoritative tri-site overlay example
-  with a host inventory; the URS assigns intent to the user, and every
-  derivation attempt from existing artifacts failed and was reverted.
+- network-renderer-nixos `test-overlay-core-local-hostile-return-routes.sh`:
+  its private tri-site fixture models the overlay as a routed core uplink that
+  carries specific prefixes, which the forwarding model now rejects
+  (`overlay-core-uplink-dedicated`). Migrating it means re-expressing the
+  imported prefixes as `transport.overlays.<name>.prefixes.imported` and
+  re-deriving the host inventory's overlay lane ports — i.e. authoring a
+  canonical tri-site example (URS assigns intent to the user; the attempts are
+  captured in the renderer `docs/blockers.md`).
+- network-renderer-nixos `test-runtime-origin-loopback-egress-render.sh`:
+  asserts the pre-FS-315 model (overlay core installs a generic default with
+  `PreferredSource` for the router loopback). The current model renders the
+  runtime-origin source rule on the overlay core ingress pointing at the overlay
+  lane table, while the modeled egress defaults live in the per-access underlay
+  lane tables and the overlay core has no main-table default (FS-315). Whether
+  that source selector must bind the egress lane table is an FS-550
+  route-selection-authority decision owned by the control plane, not a renderer
+  assertion; the renderer may not invent a table the CPM did not model.
 
-Both are ownership/permission limits, not effort.
-
-## Live `curl` failure through s-router-cobalt-new (l-esp)
-
-Observed: DNS (`dig`) and ICMP work, `curl`/TLS fail (hang or "unexpected eof").
-Diagnosis: size-dependent forwarding failure (MTU blackhole), not permission —
-the rendered policy container carries an unsourced accept for client prefixes
-(`allow-cobalt-clients-to-wan`), so TCP is permitted.
-
-The cobalt test model terminates provider sessions (onyx/opal) on
-`core-vpn-onyx`/`core-vpn-opal` with `overlay-*-mtu = 1320`. The control plane
-published clamp authority only inside the core NAT intent (WAN interfaces), so a
-container forwarding into a reduced-MTU tunnel had no explicit clamp set; the
-renderer's fallback is skipped when a p2p transit exists.
-
-Fixed in `network-control-plane-model` `3f25981`: every target now publishes
-`clampMssInterfaces` from its modeled interfaces with `mtu < 1500`
-(`core-vpn-onyx -> ["overlay-onyx"]`, `core-vpn-opal -> ["overlay-opal"]`), which
-the renderer installs as `tcp flags syn tcp option maxseg size set`. Control
-plane suite: 231 PASS / 11 FAIL, no new failures.
-
-Still needs live confirmation on the box (route MTU, `ip link show wan`,
-`sysctl net.ipv4.tcp_mtu_probing`, `tcpdump` on the tunnel/wan) to distinguish a
-provider-side MTU/PMTUD blackhole from provider filtering; the model-side clamp
-gap is fixed.
+Neither blocker is "pre-existing and therefore ignorable": both are documented
+with the owning spec item and the concrete next step in
+`network-renderer-nixos/docs/blockers.md`.
