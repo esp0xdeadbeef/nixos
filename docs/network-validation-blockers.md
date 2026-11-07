@@ -30,3 +30,27 @@ validation (network-realization-schema 30e7372).
   derivation attempt from existing artifacts failed and was reverted.
 
 Both are ownership/permission limits, not effort.
+
+## Live `curl` failure through s-router-cobalt-new (l-esp)
+
+Observed: DNS (`dig`) and ICMP work, `curl`/TLS fail (hang or "unexpected eof").
+Diagnosis: size-dependent forwarding failure (MTU blackhole), not permission —
+the rendered policy container carries an unsourced accept for client prefixes
+(`allow-cobalt-clients-to-wan`), so TCP is permitted.
+
+The cobalt test model terminates provider sessions (onyx/opal) on
+`core-vpn-onyx`/`core-vpn-opal` with `overlay-*-mtu = 1320`. The control plane
+published clamp authority only inside the core NAT intent (WAN interfaces), so a
+container forwarding into a reduced-MTU tunnel had no explicit clamp set; the
+renderer's fallback is skipped when a p2p transit exists.
+
+Fixed in `network-control-plane-model` `3f25981`: every target now publishes
+`clampMssInterfaces` from its modeled interfaces with `mtu < 1500`
+(`core-vpn-onyx -> ["overlay-onyx"]`, `core-vpn-opal -> ["overlay-opal"]`), which
+the renderer installs as `tcp flags syn tcp option maxseg size set`. Control
+plane suite: 231 PASS / 11 FAIL, no new failures.
+
+Still needs live confirmation on the box (route MTU, `ip link show wan`,
+`sysctl net.ipv4.tcp_mtu_probing`, `tcpdump` on the tunnel/wan) to distinguish a
+provider-side MTU/PMTUD blackhole from provider filtering; the model-side clamp
+gap is fixed.
