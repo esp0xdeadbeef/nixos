@@ -494,14 +494,33 @@ echo "[$(ts)] waiting for guest boot completion"
 #   allow-mgmt-to-garnet priority 150, from tenant neon-mgmt, to external
 #   "garnet", trafficType "any", returnBehavior one-way (svc 151, dmz 152),
 #   i.e. BELOW allowTenantToWan for the same tenants (100..140).
-# So the rendered selector-wide default via garnet is a realization mistake, not
-# what the intent asked for: garnet should be one lane among several, with WAN
-# preferred. Fixing that belongs in the realization model (uplink precedence),
-# with the URS/FS stating it first, which is why this is BLOCKED and not patched
-# here. The alternative remains dropping the garnet relations from the testing
-# intent so the candidate builds the production topology.
-# Until one is chosen, the candidate correctly fails at CLIENT-PATH and rolls
-# back, which is why the site keeps working.
+#
+# RESOLVED 2026-11-07. The selector-wide default via garnet was a forwarding-model
+# defect, not an intent or realization-precedence problem, so nothing here or in
+# the intent needed to change.
+#
+# Root cause: `addDefaultTowardNearestUplinkCore` gated the generic default on
+#   skipOverlayGenericDefault = nonOverlayUplinkNames != [ ] && selectedIsOverlayUplink
+# which asked whether the site also has a non-overlay uplink instead of whether
+# this lane offers a default, and it read `topo.uplinkNames`, which is empty at
+# that stage for this intent. The guard therefore failed open and installed a
+# 0.0.0.0/0 toward the upstream selector on a core that anchors no uplink and
+# offers no default. The selector has no default back on that adjacency, so the
+# packet died there: the box itself kept reaching the internet while every client
+# behind it was blackholed -- which is exactly why this trial asserts the LAN
+# client path and not just the router's own egress.
+#
+# Fixed in network-forwarding-model cc11e80: the default is installed only on a
+# lane whose modeled uplink actually offers one, per address family, so an
+# overlay that carries peer prefixes stays a peer-prefix path (matched first by
+# specificity) and is never a default path unless the model grants it one
+# (delegated public egress). s-router-cobalt-new now pins that revision; the
+# candidate's garnet lane carries 192.168.3.0/24 over the overlay and no generic
+# default, and every other node's route set is unchanged.
+#
+# The intent keeps its garnet relations: they are tenant-scoped and correct.
+# Apply on s-nodus with `--yes` after the candidate boots; the CLIENT-PATH check
+# remains the acceptance gate, and this script still rolls back on failure.
 booted=0
 for i in $(seq 1 60); do
   # `degraded` means boot finished with some unit failed: accepted here, because
