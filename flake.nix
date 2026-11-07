@@ -70,15 +70,9 @@
       inputs.network-realization-schema.follows = "network-realization-schema";
     };
 
-    nixos-network-compiler = {
-      url = "github:esp0xdeadbeef/nixos-network-compiler";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.network-labs.follows = "network-labs";
-    };
     network-renderer-nixos = {
       url = "github:esp0xdeadbeef/network-renderer-nixos";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nixos-network-compiler.follows = "nixos-network-compiler";
       inputs.network-control-plane-model.follows = "network-control-plane-model";
       inputs.network-forwarding-model.follows = "network-forwarding-model";
       inputs.network-realization-model.follows = "network-realization-model";
