@@ -64,15 +64,23 @@ in
   #
   # TPM is working as of generation 250: /dev/tpm0 + /dev/tpmrm0 exist and
   # dmesg reports "using dTPM TPM backend" (tpm2_getcap: TPM 2.0, spec 1.59,
-  # manufacturer NTC). The LUKS keyslot has NOT been enrolled yet. Doing so
-  # needs an existing keyslot unlocked, i.e. either the LUKS passphrase or the
-  # Clevis key, so it is left as an explicit operator step:
+  # manufacturer NTC). A TPM2 keyslot is enrolled (keyslot 5, token 1 of type
+  # systemd-tpm2, PCR 7) and was validated by unlocking a copy of the header
+  # with `systemd-cryptsetup attach ... tpm2-device=auto,headless=1`, which
+  # succeeded without any passphrase or keyfile.
   #
-  #   systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 \
-  #     /dev/disk/by-partlabel/disk-nvme0n1-luks
+  # Ordering: the Clevis `keyFile` stays the primary unlock path, so Tang is
+  # tried first and a machine with Tang reachable never needs the TPM.
+  # `tpm2-device=auto` is what lets systemd-cryptsetup fall back to the enrolled
+  # TPM2 token when Tang is unreachable, with the passphrase prompt last.
   #
-  # Verify afterwards that a tpm2 entry appears under `Tokens:` in
-  # `cryptsetup luksDump`; an earlier attempt added a keyslot with no token,
-  # which would never auto-unlock. That slot was removed again, leaving the
-  # original four slots (passphrase + the two Clevis bindings) intact.
+  # That option has to be set in hardware-configuration.nix, not here: it does
+  # `boot.initrd.luks.devices = lib.mkForce { ... }`, which replaces the whole
+  # attrset and therefore discards any contribution made from this module.
+  #
+  # Stage-1 also needs the TPM2 userspace, and systemd must wait for the device
+  # before unsealing. Both are host facts, so they are declared through the
+  # clevis profile's `tpm2` option (which this host's bootloader.nix imports)
+  # rather than fought against with mkForce here. See bootloader.nix's
+  # `local.boot.clevisTangUnlock.tpm2 = "fallback"`.
 }

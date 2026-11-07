@@ -157,6 +157,27 @@ in
       default = [ ];
       description = "Additional kernel modules required for initrd networking.";
     };
+
+    tpm2 = lib.mkOption {
+      type = lib.types.enum [
+        "disable"
+        "fallback"
+      ];
+      default = "disable";
+      description = ''
+        Whether initrd unlocks may use a TPM2 keyslot as a fallback.
+
+        `"disable"` (the default) is for hosts with no usable TPM: stage-1 gets
+        no TPM2 userspace and `systemd.tpm2_wait=0` is passed, so systemd never
+        blocks waiting for a device that will not appear.
+
+        `"fallback"` is for hosts that have a working TPM and an enrolled
+        systemd-tpm2 token. Stage-1 then carries the TPM2 stack and systemd
+        waits for the device before unsealing. Clevis/Tang stays the *first*
+        unlock path — the `keyFile` is still tried before the token — so this
+        only changes what happens when Tang is unreachable.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -177,10 +198,22 @@ in
 
     boot.initrd.systemd.enable = true;
 
-    # Clevis/Tang handles unlock over initrd networking; do not wait on TPM paths.
-    boot.initrd.systemd.tpm2.enable = false;
-    boot.kernelParams = lib.mkBefore [ "systemd.tpm2_wait=0" ];
-    systemd.tpm2.enable = false;
+    # Whether a TPM2 keyslot may be used as an unlock fallback is a property of
+    # the *host* (does it have a working TPM with an enrolled token?), not of the
+    # Clevis binding. Setting it unconditionally here used to force
+    # `systemd.tpm2_wait=0` onto hosts that did have a TPM, which then unsealed
+    # before the device had probed. Hosts with a TPM opt in via `tpm2 =
+    # "fallback"`; see nixos/laptop/l-portal/hardware/tpm.nix.
+    boot.initrd.systemd.tpm2.enable = lib.mkDefault (cfg.tpm2 == "fallback");
+    systemd.tpm2.enable = lib.mkDefault (cfg.tpm2 == "fallback");
+    # Exactly one value is ever emitted: `tpm2_wait=0` when the host has no TPM
+    # (never block initrd on a device that will not appear), `tpm2_wait=1` when
+    # it does (initrd must wait for the device before unsealing, otherwise the
+    # unseal runs too early and fails with ENOENT). Emitting both — which is what
+    # appending with mkAfter used to do — made the effective value depend on
+    # systemd's last-wins parsing across two separate command lines.
+    boot.kernelParams =
+      if cfg.tpm2 == "fallback" then [ "systemd.tpm2_wait=1" ] else [ "systemd.tpm2_wait=0" ];
 
     boot.initrd.luks.devices.${cfg.deviceName} = {
       allowDiscards = lib.mkDefault true;
@@ -328,9 +361,25 @@ in
       ];
       unitConfig.DefaultDependencies = false;
       serviceConfig = {
-        Type = "forking";
-        PIDFile = "/run/initrd-wpa_supplicant.pid";
+        # Type=forking made the whole association wait below dead code: with
+        # `wpa_supplicant -B` the parent exits as soon as the daemon is
+        # backgrounded, so systemd marked the unit started immediately and
+        # released the units ordered after it (systemd-networkd, then
+        # systemd-cryptsetup) while the radio was still scanning. Boot then
+        # raced: at the 2026-11-06 boot the kernel only associated at t=10.46s,
+        # long after networkd had given up and Clevis had fallen through to the
+        # passphrase prompt ("no association on 'wlP6p1s0' after 25s" while the
+        # kernel log shows `wlP6p1s0: associated` a few hundred ms later).
+        #
+        # oneshot runs the script to completion, so the association wait is
+        # actually part of the unit's start transaction and the ordering of
+        # `before = [ systemd-networkd.service ... ]` holds.
+        Type = "oneshot";
         RemainAfterExit = true;
+        # The daemon is backgrounded by `-B`, not by PIDFile tracking; the pid
+        # file is kept only so the log/dump can name it. `-B` writes it inside
+        # the script, so no ExecStartPost is needed.
+        TimeoutStartSec = 90;
       };
       script = ''
         set -euo pipefail
@@ -403,11 +452,17 @@ in
         echo "initrd-wifi: waiting for association on '${cfg.wifi.interface}'" >&2
         associated=0
         for _ in $(seq 1 ${toString cfg.wifi.timeout}); do
-          if wpa_cli -p /run/wpa_supplicant -i '${cfg.wifi.interface}' status 2>/dev/null \
-              | grep -q 'wpa_state=COMPLETED'; then
-            associated=1
-            break
-          fi
+          # `wpa_cli` exits non-zero whenever the daemon is not yet answering
+          # (socket not created, interface busy). Under `set -e` a bare command
+          # substitution would abort the script, so the status is captured
+          # explicitly and a failed poll just means "not associated yet".
+          status=$(wpa_cli -p /run/wpa_supplicant -i '${cfg.wifi.interface}' status 2>/dev/null || true)
+          case "$status" in
+            *wpa_state=COMPLETED*)
+              associated=1
+              break
+              ;;
+          esac
           sleep 1
         done
         if [ "$associated" != 1 ]; then
