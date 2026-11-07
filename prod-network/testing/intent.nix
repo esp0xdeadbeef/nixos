@@ -239,20 +239,182 @@ let
   #
   # FS-180 requires the tuple to name the destination scope and the traffic
   # class, so name them: the `wan` exit scope and the `internet` class below.
-  allowTenantToWan = tenant: priority: {
-    id = "allow-${tenant}-to-wan";
-    inherit priority;
-    from = {
-      kind = "tenant";
-      name = tenant;
-    };
-    to = {
-      kind = "external";
-      scope = "core";
-    };
-    trafficType = "internet";
+  allowTenantToWan = tenant: priority:
+    allowFromTo "allow-${tenant}-to-wan" priority (tenantRef tenant) coreScope "internet";
+
+  # -------------------------------------------------------------------------
+  # Relation shapes
+  #
+  # Almost every relation in the contract is the same fixed shape with only
+  # the endpoints and the traffic class varying, so state the shape once here
+  # and let the relation lists name only what actually differs. Each helper
+  # expands to exactly the attribute set it replaces.
+  # -------------------------------------------------------------------------
+
+  allowFromTo = id: priority: from: to: trafficType: {
+    inherit id priority from to trafficType;
     action = "allow";
     returnBehavior = "symmetric";
+  };
+
+  # A tenant account (the `from` side of most relations).
+  tenantRef = name: {
+    kind = "tenant";
+    inherit name;
+  };
+
+  # A modeled service (the `to` side of most relations).
+  serviceRef = name: {
+    kind = "service";
+    inherit name;
+  };
+
+  # The site's own WAN exit, named as a scope rather than by resource name.
+  coreScope = {
+    kind = "external";
+    scope = "core";
+  };
+
+  # `allow-<tenant>-to-<service>`, the tenant-reaches-its-own-resolver shape.
+  allowTenantToService = tenant: service: priority:
+    allowFromTo "allow-${tenant}-to-${service}" priority
+      (tenantRef tenant)
+      (serviceRef service)
+      "dns";
+
+  # The denied counterpart of `allowFromTo`. The endpoints may be any scope,
+  # so the id is always explicit.
+  denyFromTo = id: priority: from: to: trafficType: {
+    inherit id priority from to trafficType;
+    action = "deny";
+  };
+
+  # One access resolver querying another resolver directly.
+  allowResolverToResolver = from: to: priority:
+    allowFromTo "allow-${from}-to-${to}" priority
+      (serviceRef from)
+      (serviceRef to)
+      "dns";
+
+  # An access resolver forwarding to the site's core recursive resolver.
+  allowResolverToCoreDns = resolver: priority:
+    allowFromTo "allow-${resolver}-to-core-dns" priority
+      (serviceRef resolver)
+      (serviceRef "core-dns")
+      "dns";
+
+  # Every tenant of a site reaching the site's Tang box. Relation ids drop the
+  # site prefix (`allow-clients-to-tang`, not `allow-neon-clients-to-tang`), so
+  # the short id name is derived from the tenant name here. The three probe
+  # classes are emitted as three families over the same tenant list.
+  allowTenantsToTang = { site, tenants, unlock }:
+    let
+      short = tenant: builtins.replaceStrings [ "${site}-" ] [ "" ] tenant;
+      family = class: priority: suffix:
+        map
+          (tenant:
+            allowFromTo "allow-${short tenant}-to-tang${suffix}" priority
+              (tenantRef tenant)
+              (tenantRef unlock)
+              class)
+          tenants;
+    in
+    family "tang" 85 "" ++ family "icmp" 84 "-icmp" ++ family "traceroute" 83 "-traceroute";
+
+  # A public-ingress relation: the WAN surface binds ports on a service. Only
+  # the target service, its traffic class, the target port, the address family
+  # and the tuple list vary; the FS-210/FS-220/FS-230/FS-310 authority fields
+  # are the same for every binding.
+  #
+  # One relation carries one `targetPort` (the CPM inherits it onto every
+  # tuple), so a service reachable on several ports needs one binding per port.
+  publicIngress = { id, priority, service, trafficType, targetPort, tuples, family ? null }:
+    let
+      ipv6 = family == "ipv6";
+    in
+    # No top-level `returnBehavior`: the return path is stated once, inside the
+      # authority, as `stateful-return`.
+    builtins.removeAttrs
+      (allowFromTo id priority { kind = "external"; scope = "core"; } (serviceRef service) trafficType)
+      [ "returnBehavior" ]
+    // {
+      publicIngressTupleAuthority = {
+        sourceScope = "internet";
+        publicSurface = "wan";
+        targetService = service;
+        targetEndpoint = service;
+        inherit targetPort;
+        returnBehavior = "stateful-return";
+        # IPv4 traverses the site's single public address, so it is rewritten
+        # (NAPT) and a hairpin/asymmetry statement is meaningful. IPv6 has no
+        # translation surface: it keeps its source, states no translation
+        # mode, and so carries neither hairpin nor asymmetricRouting.
+        sourcePreservation = if ipv6 then "preserve-source" else "rewritten";
+        translationMode = if ipv6 then "none" else "napt";
+        inherit tuples;
+      }
+      // (if ipv6 then { inherit family; } else {
+        hairpin = "not-modeled";
+        asymmetricRouting = "not-allowed";
+      });
+    };
+
+  # A tenant reaching the cross-site garnet overlay. The overlay is a one-way
+  # path: replies come back over the same tunnel, not as a modeled reverse
+  # relation, so the return behavior is not symmetric here. `shortName` is the
+  # id form (`mgmt`, not `neon-mgmt`): relation ids drop the site prefix.
+  allowTenantToGarnet = { tenant, shortName, priority }: {
+    id = "allow-${shortName}-to-garnet";
+    inherit priority;
+    from = tenantRef tenant;
+    to = garnetRef;
+    trafficType = "any";
+    action = "allow";
+    returnBehavior = "one-way";
+  };
+
+  garnetRef = {
+    kind = "external";
+    name = "garnet";
+  };
+
+  # The garnet underlay's own path to the WAN.
+  allowGarnetUnderlayToCore = priority: {
+    id = "allow-garnet-underlay-to-core";
+    inherit priority;
+    from = garnetRef;
+    to = coreScope;
+    trafficType = "nebula-garnet";
+    action = "allow";
+    returnBehavior = "one-way";
+  };
+
+  # A resolver entry in recursiveDnsIntent. Every one of them is the same
+  # contract: forward to a named upstream resolver on a named uplink and never
+  # open a direct public fallback.
+  recursiveDnsBinding = resolver: upstream: node: uplink: {
+    requesterScope = serviceRef resolver;
+    advertisedResolver = serviceRef resolver;
+    resolverSource = "local-recursive";
+    upstreamResolver = (serviceRef upstream) // { inherit node; };
+    egressSurface = {
+      kind = "external";
+      uplinks = [ uplink ];
+    };
+    returnBehavior = "symmetric";
+    allowedAddressFamilies = [
+      "ipv4"
+      "ipv6"
+    ];
+    directPublicFallback = false;
+  };
+
+  # The core resolver service declaration, shared by both sites.
+  coreDnsService = {
+    name = "core-dns";
+    providerNode = "core";
+    addressAuthority = "model-allocated-service-prefix";
+    trafficType = "dns";
   };
 
   runtimeIpv6Prefix = tenant: slot: {
@@ -264,6 +426,67 @@ let
     inherit slot;
     sourceFile = "/run/secrets/subnet-ipv6-${tenant}";
   };
+
+  # The `relation` a namespace-sharing grant carries: always a symmetric dns
+  # allow between two access resolvers (FS-540).
+  dnsSharingRelation = id: from: to: {
+    inherit id;
+    from = serviceRef from;
+    to = serviceRef to;
+    trafficType = "dns";
+    returnBehavior = "symmetric";
+  };
+
+  # The namespace authority answers only for its own records and refuses the
+  # rest, so a requester can never borrow its recursion (FS-560).
+  refuseNonLocalProvider = source: {
+    inherit source;
+    action = "refuse_non_local";
+  };
+
+  # A modeled service and the endpoint(s) that provide it. Most services are
+  # provided by the endpoint of the same name, so the provider list defaults to
+  # exactly that.
+  service = name: trafficType: providers: {
+    inherit name providers trafficType;
+  };
+
+  # A host endpoint in a tenant. Ollama's address is inventory (FS-181) rather
+  # than intent, so an endpoint may name only its IPv4 side and is then
+  # declared by `hostEndpointV4`.
+  hostEndpoint = name: tenant: ipv4: ipv6: {
+    kind = "host";
+    inherit name tenant ipv4;
+  }
+  // (if ipv6 == null then { } else { inherit ipv6; });
+
+  # An access node attached to exactly one tenant.
+  accessNode = { tenant, selects ? null }: {
+    role = "access";
+    attachments = [ (tenantRef tenant) ];
+  }
+  // (if selects == null then { } else { inherit selects; });
+
+  # Every listed tenant takes its IPv6 address by SLAAC; the intent only names
+  # which tenants are dual-stacked on the plane.
+  slaacTenants = tenants: builtins.listToAttrs (map
+    (name: {
+      inherit name;
+      value.mode = "slaac";
+    })
+    tenants);
+
+  # A tenant's owned prefixes. Tenants that hand a runtime IPv6 block down to
+  # the DHCPv6/RA path (the legacy vlan spaces) additionally list a
+  # `routedPrefixes` allocation; the plane lanes do not and only state their
+  # static prefixes.
+  tenantPrefix = { name, dnsDomain, ipv4, ipv6, routedSlot ? null }: {
+    kind = "tenant";
+    inherit name dnsDomain ipv4 ipv6;
+  }
+  // (if routedSlot == null then { } else {
+    routedPrefixes = [ (runtimeIpv6Prefix name routedSlot) ];
+  });
 in
 {
   esp0xdeadbeef.neon = {
@@ -294,204 +517,40 @@ in
 
     ownership = {
       prefixes = [
-        {
-          kind = "tenant";
-          name = "vlan2";
-          dnsDomain = "lan.";
-          ipv4 = "192.168.1.0/24";
-          ipv6 = "fd42:1::/64";
-          routedPrefixes = [
-            (runtimeIpv6Prefix "vlan2" 2)
-          ];
-        }
-        {
-          kind = "tenant";
-          name = "vlan3";
-          dnsDomain = "lan.";
-          ipv4 = "192.168.3.0/24";
-          ipv6 = "fd42:dead:beef:3::/64";
-          routedPrefixes = [
-            (runtimeIpv6Prefix "vlan3" 3)
-          ];
-        }
-        {
-          kind = "tenant";
-          name = "vlan7";
-          dnsDomain = "lan.";
-          ipv4 = "192.168.2.0/24";
-          ipv6 = "fd42:dead:beef:7::/64";
-          routedPrefixes = [
-            (runtimeIpv6Prefix "vlan7" 7)
-          ];
-        }
-        {
-          kind = "tenant";
-          name = "vlan8";
-          dnsDomain = "lan.";
-          ipv4 = "192.168.8.0/24";
-          ipv6 = "fd42:dead:beef:8::/64";
-          routedPrefixes = [
-            (runtimeIpv6Prefix "vlan8" 8)
-          ];
-        }
-        {
-          kind = "tenant";
-          name = "neon-mgmt";
-          dnsDomain = "mgmt.home.arpa.";
-          ipv4 = "10.3.10.0/24";
-          ipv6 = "fd42:dead:beef:310::/64";
-        }
-        {
-          kind = "tenant";
-          name = "neon-svc";
-          dnsDomain = "svc.home.arpa.";
-          ipv4 = "10.3.20.0/24";
-          ipv6 = "fd42:dead:beef:320::/64";
-        }
-        {
-          kind = "tenant";
-          name = "neon-clients";
-          dnsDomain = "clients.home.arpa.";
-          ipv4 = "10.3.30.0/24";
-          ipv6 = "fd42:dead:beef:330::/64";
-        }
-        {
-          kind = "tenant";
-          name = "neon-iot";
-          dnsDomain = "iot.home.arpa.";
-          ipv4 = "10.3.50.0/24";
-          ipv6 = "fd42:dead:beef:350::/64";
-        }
-        {
-          kind = "tenant";
-          name = "neon-iot-srv";
-          dnsDomain = "iot-srv.home.arpa.";
-          ipv4 = "10.3.51.0/24";
-          ipv6 = "fd42:dead:beef:351::/64";
-        }
-        {
-          kind = "tenant";
-          name = "neon-dmz";
-          dnsDomain = "dmz.home.arpa.";
-          ipv4 = "10.3.60.0/24";
-          ipv6 = "fd42:dead:beef:360::/64";
-        }
-        {
-          kind = "tenant";
-          name = "neon-unlock";
-          dnsDomain = "unlock.home.arpa.";
-          ipv4 = "10.3.90.0/24";
-          ipv6 = "fd42:dead:beef:390::/64";
-        }
+        (tenantPrefix { name = "vlan2"; dnsDomain = "lan."; ipv4 = "192.168.1.0/24"; ipv6 = "fd42:1::/64"; routedSlot = 2; })
+        (tenantPrefix { name = "vlan3"; dnsDomain = "lan."; ipv4 = "192.168.3.0/24"; ipv6 = "fd42:dead:beef:3::/64"; routedSlot = 3; })
+        (tenantPrefix { name = "vlan7"; dnsDomain = "lan."; ipv4 = "192.168.2.0/24"; ipv6 = "fd42:dead:beef:7::/64"; routedSlot = 7; })
+        (tenantPrefix { name = "vlan8"; dnsDomain = "lan."; ipv4 = "192.168.8.0/24"; ipv6 = "fd42:dead:beef:8::/64"; routedSlot = 8; })
+        (tenantPrefix { name = "neon-mgmt"; dnsDomain = "mgmt.home.arpa."; ipv4 = "10.3.10.0/24"; ipv6 = "fd42:dead:beef:310::/64"; })
+        (tenantPrefix { name = "neon-svc"; dnsDomain = "svc.home.arpa."; ipv4 = "10.3.20.0/24"; ipv6 = "fd42:dead:beef:320::/64"; })
+        (tenantPrefix { name = "neon-clients"; dnsDomain = "clients.home.arpa."; ipv4 = "10.3.30.0/24"; ipv6 = "fd42:dead:beef:330::/64"; })
+        (tenantPrefix { name = "neon-iot"; dnsDomain = "iot.home.arpa."; ipv4 = "10.3.50.0/24"; ipv6 = "fd42:dead:beef:350::/64"; })
+        (tenantPrefix { name = "neon-iot-srv"; dnsDomain = "iot-srv.home.arpa."; ipv4 = "10.3.51.0/24"; ipv6 = "fd42:dead:beef:351::/64"; })
+        (tenantPrefix { name = "neon-dmz"; dnsDomain = "dmz.home.arpa."; ipv4 = "10.3.60.0/24"; ipv6 = "fd42:dead:beef:360::/64"; })
+        (tenantPrefix { name = "neon-unlock"; dnsDomain = "unlock.home.arpa."; ipv4 = "10.3.90.0/24"; ipv6 = "fd42:dead:beef:390::/64"; })
       ];
 
       endpoints = [
-        {
-          kind = "host";
-          name = "vlan2-dns";
-          tenant = "vlan2";
-          ipv4 = [ "192.168.1.1" ];
-          ipv6 = [ "fd42:1::1" ];
-        }
-        {
-          kind = "host";
-          name = "vlan3-dns";
-          tenant = "vlan3";
-          ipv4 = [ "192.168.3.1" ];
-          ipv6 = [ "fd42:dead:beef:3::1" ];
-        }
-        {
-          kind = "host";
-          name = "s-nebula-container";
-          tenant = "vlan3";
-          ipv4 = [ "192.168.3.10" ];
-          ipv6 = [ "fd42:dead:beef:3::1337:dead:beef" ];
-        }
-        {
-          kind = "host";
-          name = "s-nebula-garnet";
-          tenant = "vlan3";
-          ipv4 = [ "192.168.3.12" ];
-          ipv6 = [ "fd42:dead:beef:3::1337:e1ee:fbeb" ];
-        }
+        (hostEndpoint "vlan2-dns" "vlan2" [ "192.168.1.1" ] [ "fd42:1::1" ])
+        (hostEndpoint "vlan3-dns" "vlan3" [ "192.168.3.1" ] [ "fd42:dead:beef:3::1" ])
+        (hostEndpoint "s-nebula-container" "vlan3" [ "192.168.3.10" ] [ "fd42:dead:beef:3::1337:dead:beef" ])
+        (hostEndpoint "s-nebula-garnet" "vlan3" [ "192.168.3.12" ] [ "fd42:dead:beef:3::1337:e1ee:fbeb" ])
         # Ollama inference endpoint.  Intent names the host in its tenant;
         # the concrete 192.168.3.11 address is inventory (FS-181).  The
         # name must match the inventory endpoint key
         # (`s-llm-inference-container`) so the provider endpoint resolves.
-        {
-          kind = "host";
-          name = "s-llm-inference-container";
-          tenant = "vlan3";
-          ipv4 = [ "192.168.3.11" ];
-        }
-        {
-          kind = "host";
-          name = "vlan7-dns";
-          tenant = "vlan7";
-          ipv4 = [ "192.168.2.1" ];
-          ipv6 = [ "fd42:dead:beef:7::1" ];
-        }
-        {
-          kind = "host";
-          name = "vlan8-dns";
-          tenant = "vlan8";
-          ipv4 = [ "192.168.8.1" ];
-          ipv6 = [ "fd42:dead:beef:8::1" ];
-        }
-        {
-          kind = "host";
-          name = "neon-mgmt-dns";
-          tenant = "neon-mgmt";
-          ipv4 = [ "10.3.10.1" ];
-        }
-        {
-          kind = "host";
-          name = "neon-svc-dns";
-          tenant = "neon-svc";
-          ipv4 = [ "10.3.20.1" ];
-        }
-        {
-          kind = "host";
-          name = "neon-clients-dns";
-          tenant = "neon-clients";
-          ipv4 = [ "10.3.30.1" ];
-        }
-        {
-          kind = "host";
-          name = "neon-iot-dns";
-          tenant = "neon-iot";
-          ipv4 = [ "10.3.50.1" ];
-        }
-        {
-          kind = "host";
-          name = "neon-iot-srv-dns";
-          tenant = "neon-iot-srv";
-          ipv4 = [ "10.3.51.1" ];
-        }
-        {
-          kind = "host";
-          name = "neon-dmz-dns";
-          tenant = "neon-dmz";
-          ipv4 = [ "10.3.60.1" ];
-        }
-        {
-          kind = "host";
-          name = "s-gameserver";
-          tenant = "neon-dmz";
-          ipv4 = [ "10.3.60.10" ];
-        }
-        {
-          kind = "host";
-          name = "neon-unlock-dns";
-          tenant = "neon-unlock";
-          ipv4 = [ "10.3.90.1" ];
-        }
-        {
-          kind = "host";
-          name = "neon-tang";
-          tenant = "neon-unlock";
-          ipv4 = [ "10.3.90.10" ];
-        }
+        (hostEndpoint "s-llm-inference-container" "vlan3" [ "192.168.3.11" ] null)
+        (hostEndpoint "vlan7-dns" "vlan7" [ "192.168.2.1" ] [ "fd42:dead:beef:7::1" ])
+        (hostEndpoint "vlan8-dns" "vlan8" [ "192.168.8.1" ] [ "fd42:dead:beef:8::1" ])
+        (hostEndpoint "neon-mgmt-dns" "neon-mgmt" [ "10.3.10.1" ] null)
+        (hostEndpoint "neon-svc-dns" "neon-svc" [ "10.3.20.1" ] null)
+        (hostEndpoint "neon-clients-dns" "neon-clients" [ "10.3.30.1" ] null)
+        (hostEndpoint "neon-iot-dns" "neon-iot" [ "10.3.50.1" ] null)
+        (hostEndpoint "neon-iot-srv-dns" "neon-iot-srv" [ "10.3.51.1" ] null)
+        (hostEndpoint "neon-dmz-dns" "neon-dmz" [ "10.3.60.1" ] null)
+        (hostEndpoint "s-gameserver" "neon-dmz" [ "10.3.60.10" ] null)
+        (hostEndpoint "neon-unlock-dns" "neon-unlock" [ "10.3.90.1" ] null)
+        (hostEndpoint "neon-tang" "neon-unlock" [ "10.3.90.10" ] null)
       ];
     };
 
@@ -504,41 +563,13 @@ in
     communicationContract = {
       inherit trafficTypes;
       services = [
-        {
-          name = "vlan2-dns";
-          providers = [ "vlan2-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "vlan3-dns";
-          providers = [ "vlan3-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "vlan7-dns";
-          providers = [ "vlan7-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "vlan8-dns";
-          providers = [ "vlan8-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "s-nebula-container";
-          providers = [ "s-nebula-container" ];
-          trafficType = "nebula";
-        }
-        {
-          name = "s-nebula-container-icmp";
-          providers = [ "s-nebula-container" ];
-          trafficType = "icmp";
-        }
-        {
-          name = "s-nebula-garnet";
-          providers = [ "s-nebula-garnet" ];
-          trafficType = "nebula-garnet";
-        }
+        (service "vlan2-dns" "dns" [ "vlan2-dns" ])
+        (service "vlan3-dns" "dns" [ "vlan3-dns" ])
+        (service "vlan7-dns" "dns" [ "vlan7-dns" ])
+        (service "vlan8-dns" "dns" [ "vlan8-dns" ])
+        (service "s-nebula-container" "nebula" [ "s-nebula-container" ])
+        (service "s-nebula-container-icmp" "icmp" [ "s-nebula-container" ])
+        (service "s-nebula-garnet" "nebula-garnet" [ "s-nebula-garnet" ])
         # FS-190/FS-200: Ollama is a cross-site shared service in the vlan3
         # access space.  The service carries its own port via the `ollama`
         # traffic type; the relation only states who may reach it.  It is
@@ -584,51 +615,15 @@ in
             cloudDependency = "none";
           };
         }
-        {
-          name = "vlan2-gateway-icmp";
-          providers = [ "vlan2-dns" ];
-          trafficType = "icmp";
-        }
-        {
-          name = "mgmt-dns";
-          providers = [ "neon-mgmt-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "svc-dns";
-          providers = [ "neon-svc-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "clients-dns";
-          providers = [ "neon-clients-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "iot-dns";
-          providers = [ "neon-iot-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "iot-srv-dns";
-          providers = [ "neon-iot-srv-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "dmz-dns";
-          providers = [ "neon-dmz-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "unlock-dns";
-          providers = [ "neon-unlock-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "tang";
-          providers = [ "neon-tang" ];
-          trafficType = "tang";
-        }
+        (service "vlan2-gateway-icmp" "icmp" [ "vlan2-dns" ])
+        (service "mgmt-dns" "dns" [ "neon-mgmt-dns" ])
+        (service "svc-dns" "dns" [ "neon-svc-dns" ])
+        (service "clients-dns" "dns" [ "neon-clients-dns" ])
+        (service "iot-dns" "dns" [ "neon-iot-dns" ])
+        (service "iot-srv-dns" "dns" [ "neon-iot-srv-dns" ])
+        (service "dmz-dns" "dns" [ "neon-dmz-dns" ])
+        (service "unlock-dns" "dns" [ "neon-unlock-dns" ])
+        (service "tang" "tang" [ "neon-tang" ])
         # FS-190/FS-200: publicly-exposed game servers in the dmz access space.
         # The service carries its own ports via the `game-server` traffic type;
         # the public-ingress relations below bind who may reach it.  The
@@ -681,67 +676,11 @@ in
           };
         }
       ];
-      relations = [
-        {
-          id = "allow-vlan2-to-vlan2-dns";
-          priority = 80;
-          from = {
-            kind = "tenant";
-            name = "vlan2";
-          };
-          to = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan7-to-vlan7-dns";
-          priority = 81;
-          from = {
-            kind = "tenant";
-            name = "vlan7";
-          };
-          to = {
-            kind = "service";
-            name = "vlan7-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan3-to-vlan3-dns";
-          priority = 82;
-          from = {
-            kind = "tenant";
-            name = "vlan3";
-          };
-          to = {
-            kind = "service";
-            name = "vlan3-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan8-to-vlan8-dns";
-          priority = 86;
-          from = {
-            kind = "tenant";
-            name = "vlan8";
-          };
-          to = {
-            kind = "service";
-            name = "vlan8-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
+      relations = builtins.concatMap (r: if builtins.isList r then r else [ r ]) [
+        (allowTenantToService "vlan2" "vlan2-dns" 80)
+        (allowTenantToService "vlan7" "vlan7-dns" 81)
+        (allowTenantToService "vlan3" "vlan3-dns" 82)
+        (allowTenantToService "vlan8" "vlan8-dns" 86)
         {
           # VLAN 2's resolver may query only VLAN 3's DNS service for the
           # shared lan. namespace. The resolver runtime narrows this further to
@@ -764,136 +703,45 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
-        {
-          id = "allow-vlan2-to-s-nebula-container-icmp";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "vlan2";
-          };
-          to = {
-            kind = "service";
-            name = "s-nebula-container-icmp";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan2-to-vlan2-gateway-icmp";
-          priority = 82;
-          from = {
-            kind = "tenant";
-            name = "vlan2";
-          };
-          to = {
-            kind = "service";
-            name = "vlan2-gateway-icmp";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "deny-vlan3-to-vlan2";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "vlan3";
-          };
-          to = {
-            kind = "tenant";
-            name = "vlan2";
-          };
-          trafficType = "any";
-          action = "deny";
-        }
-        {
-          id = "allow-vlan2-to-vlan3";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "vlan2";
-          };
-          to = {
-            kind = "tenant";
-            name = "vlan3";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
+        (allowFromTo "allow-vlan2-to-s-nebula-container-icmp" 83 (tenantRef "vlan2") (serviceRef "s-nebula-container-icmp") "icmp")
+        (allowFromTo "allow-vlan2-to-vlan2-gateway-icmp" 82 (tenantRef "vlan2") (serviceRef "vlan2-gateway-icmp") "icmp")
+        (denyFromTo "deny-vlan3-to-vlan2" 84 (tenantRef "vlan3") (tenantRef "vlan2") "any")
+        (allowFromTo "allow-vlan2-to-vlan3" 85 (tenantRef "vlan2") (tenantRef "vlan3") "any")
+        (publicIngress {
           id = "allow-wan-to-s-nebula-container";
           priority = 95;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-nebula-container";
-          };
+          service = "s-nebula-container";
           trafficType = "nebula";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-nebula-container";
-            targetEndpoint = "s-nebula-container";
-            targetPort = 4242;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 4242;
-              }
-              {
-                protocol = "tcp";
-                publicPort = 4242;
-              }
-            ];
-          };
-        }
-        {
+          targetPort = 4242;
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 4242;
+            }
+            {
+              protocol = "tcp";
+              publicPort = 4242;
+            }
+          ];
+        })
+        (publicIngress {
           id = "allow-wan-to-s-nebula-container-ipv6";
           priority = 95;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-nebula-container";
-          };
+          service = "s-nebula-container";
           trafficType = "nebula";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-nebula-container";
-            targetEndpoint = "s-nebula-container";
-            targetPort = 4242;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "preserve-source";
-            translationMode = "none";
-            family = "ipv6";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 4242;
-              }
-              {
-                protocol = "tcp";
-                publicPort = 4242;
-              }
-            ];
-          };
-        }
+          targetPort = 4242;
+          family = "ipv6";
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 4242;
+            }
+            {
+              protocol = "tcp";
+              publicPort = 4242;
+            }
+          ];
+        })
         # FS-210/FS-230: public ingress for the neon dmz game servers.  The
         # IPv4 path is NAPT (the site has one public IPv4 surface).  FS-220
         # uniqueness holds because no other binding claims these ports on the
@@ -911,776 +759,158 @@ in
         # none (only vlan2/3/7/8 do), so the traffic type is declared ipv4 and
         # no IPv6 ingress authority is claimed (FS-310
         # PUBLIC_INGRESS_IPV6_AUTHORITY_MISSING).
-        {
+        (publicIngress {
           id = "allow-wan-to-s-gameserver-mc-prod";
           priority = 90;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-gameserver";
-          };
+          service = "s-gameserver";
           trafficType = "game-server";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-gameserver";
-            targetEndpoint = "s-gameserver";
-            targetPort = 25565;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "tcp";
-                publicPort = 25565;
-                targetPort = 25565;
-              }
-            ];
-          };
-        }
-        {
+          targetPort = 25565;
+          tuples = [
+            {
+              protocol = "tcp";
+              publicPort = 25565;
+              targetPort = 25565;
+            }
+          ];
+        })
+        (publicIngress {
           id = "allow-wan-to-s-gameserver-mc-test";
           priority = 91;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-gameserver";
-          };
+          service = "s-gameserver";
           trafficType = "game-server";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-gameserver";
-            targetEndpoint = "s-gameserver";
-            targetPort = 25566;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "tcp";
-                publicPort = 25566;
-                targetPort = 25566;
-              }
-            ];
-          };
-        }
+          targetPort = 25566;
+          tuples = [
+            {
+              protocol = "tcp";
+              publicPort = 25566;
+              targetPort = 25566;
+            }
+          ];
+        })
         # Valheim: 2456 is the connect port; 2457/2458 are the query/steam
         # ports the server also binds.  Each needs its own relation for the
         # same single-targetPort reason as above.
-        {
+        (publicIngress {
           id = "allow-wan-to-s-gameserver-valheim";
           priority = 92;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-gameserver";
-          };
+          service = "s-gameserver";
           trafficType = "game-server";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-gameserver";
-            targetEndpoint = "s-gameserver";
-            targetPort = 2456;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 2456;
-                targetPort = 2456;
-              }
-            ];
-          };
-        }
-        {
+          targetPort = 2456;
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 2456;
+              targetPort = 2456;
+            }
+          ];
+        })
+        (publicIngress {
           id = "allow-wan-to-s-gameserver-valheim-query";
           priority = 93;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-gameserver";
-          };
+          service = "s-gameserver";
           trafficType = "game-server";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-gameserver";
-            targetEndpoint = "s-gameserver";
-            targetPort = 2457;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 2457;
-                targetPort = 2457;
-              }
-            ];
-          };
-        }
-        {
+          targetPort = 2457;
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 2457;
+              targetPort = 2457;
+            }
+          ];
+        })
+        (publicIngress {
           id = "allow-wan-to-s-gameserver-valheim-steam";
           priority = 94;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-gameserver";
-          };
+          service = "s-gameserver";
           trafficType = "game-server";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-gameserver";
-            targetEndpoint = "s-gameserver";
-            targetPort = 2458;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 2458;
-                targetPort = 2458;
-              }
-            ];
-          };
-        }
-        {
+          targetPort = 2458;
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 2458;
+              targetPort = 2458;
+            }
+          ];
+        })
+        (publicIngress {
           id = "allow-wan-to-s-nebula-garnet";
           priority = 96;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-nebula-garnet";
-          };
+          service = "s-nebula-garnet";
           trafficType = "nebula-garnet";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-nebula-garnet";
-            targetEndpoint = "s-nebula-garnet";
-            targetPort = 4243;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 4243;
-              }
-              {
-                protocol = "tcp";
-                publicPort = 4243;
-              }
-            ];
-          };
-        }
-        {
+          targetPort = 4243;
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 4243;
+            }
+            {
+              protocol = "tcp";
+              publicPort = 4243;
+            }
+          ];
+        })
+        (publicIngress {
           id = "allow-wan-to-s-nebula-garnet-ipv6";
           priority = 96;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-nebula-garnet";
-          };
+          service = "s-nebula-garnet";
           trafficType = "nebula-garnet";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-nebula-garnet";
-            targetEndpoint = "s-nebula-garnet";
-            targetPort = 4243;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "preserve-source";
-            translationMode = "none";
-            family = "ipv6";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 4243;
-              }
-              {
-                protocol = "tcp";
-                publicPort = 4243;
-              }
-            ];
-          };
-        }
+          targetPort = 4243;
+          family = "ipv6";
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 4243;
+            }
+            {
+              protocol = "tcp";
+              publicPort = 4243;
+            }
+          ];
+        })
         (allowTenantToWan "vlan2" 100)
         (allowTenantToWan "vlan7" 110)
         (allowTenantToWan "vlan8" 120)
-        {
-          id = "allow-clients-dns-to-dmz-dns";
-          priority = 78;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-dns-to-clients-dns";
-          priority = 79;
-          from = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          to = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-dns-to-unlock-dns";
-          priority = 81;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "unlock-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-clients-dns";
-          priority = 80;
-          from = {
-            kind = "tenant";
-            name = "neon-clients";
-          };
-          to = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-svc-dns";
-          priority = 81;
-          from = {
-            kind = "tenant";
-            name = "neon-svc";
-          };
-          to = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-dmz-dns";
-          priority = 82;
-          from = {
-            kind = "tenant";
-            name = "neon-dmz";
-          };
-          to = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "deny-dmz-to-clients";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "neon-dmz";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-clients";
-          };
-          trafficType = "any";
-          action = "deny";
-        }
-        {
-          id = "allow-clients-to-dmz";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-clients";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-dmz";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-to-iot-dns";
-          priority = 86;
-          from = {
-            kind = "tenant";
-            name = "neon-iot";
-          };
-          to = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-iot-srv-dns";
-          priority = 87;
-          from = {
-            kind = "tenant";
-            name = "neon-iot-srv";
-          };
-          to = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-unlock-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          to = {
-            kind = "service";
-            name = "tang";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-clients";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-svc";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-iot";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-iot-srv";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-dmz";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "neon-mgmt";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "neon-clients";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "neon-svc";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "neon-iot";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "neon-iot-srv";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "neon-dmz";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "neon-mgmt";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "neon-clients";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "neon-svc";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "neon-iot";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "neon-iot-srv";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "neon-dmz";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "neon-mgmt";
-          };
-          to = {
-            kind = "tenant";
-            name = "neon-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-mgmt-dns";
-          priority = 88;
-          from = {
-            kind = "tenant";
-            name = "neon-mgmt";
-          };
-          to = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
+        (allowResolverToResolver "clients-dns" "dmz-dns" 78)
+        (allowResolverToResolver "dmz-dns" "clients-dns" 79)
+        (allowResolverToResolver "clients-dns" "unlock-dns" 81)
+        (allowFromTo "allow-clients-to-clients-dns" 80 (tenantRef "neon-clients") (serviceRef "clients-dns") "dns")
+        (allowFromTo "allow-svc-to-svc-dns" 81 (tenantRef "neon-svc") (serviceRef "svc-dns") "dns")
+        (allowFromTo "allow-dmz-to-dmz-dns" 82 (tenantRef "neon-dmz") (serviceRef "dmz-dns") "dns")
+        (denyFromTo "deny-dmz-to-clients" 84 (tenantRef "neon-dmz") (tenantRef "neon-clients") "any")
+        (allowFromTo "allow-clients-to-dmz" 85 (tenantRef "neon-clients") (tenantRef "neon-dmz") "any")
+        (allowFromTo "allow-iot-to-iot-dns" 86 (tenantRef "neon-iot") (serviceRef "iot-dns") "dns")
+        (allowFromTo "allow-iot-srv-to-iot-srv-dns" 87 (tenantRef "neon-iot-srv") (serviceRef "iot-srv-dns") "dns")
+        # The unlock tenant reaches the Tang service it hosts directly.
+        (allowFromTo "allow-unlock-to-tang" 85 (tenantRef "neon-unlock") (serviceRef "tang") "tang")
+
+        # Tang: every access tenant of this site reaches the Tang box over the
+        # plain, icmp and traceroute classes.
+        (allowTenantsToTang {
+          site = "neon";
+          tenants = [ "neon-clients" "neon-svc" "neon-iot" "neon-iot-srv" "neon-dmz" "neon-mgmt" ];
+          unlock = "neon-unlock";
+        })
+
+        (allowFromTo "allow-mgmt-to-mgmt-dns" 88 (tenantRef "neon-mgmt") (serviceRef "mgmt-dns") "dns")
         (allowTenantToWan "neon-clients" 100)
         (allowTenantToWan "neon-svc" 110)
         (allowTenantToWan "neon-iot" 120)
         (allowTenantToWan "neon-iot-srv" 130)
         (allowTenantToWan "neon-mgmt" 140)
-        {
-          id = "allow-mgmt-to-garnet";
-          priority = 150;
-          from = {
-            kind = "tenant";
-            name = "neon-mgmt";
-          };
-          to = {
-            kind = "external";
-            name = "garnet";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
-        {
-          id = "allow-svc-to-garnet";
-          priority = 151;
-          from = {
-            kind = "tenant";
-            name = "neon-svc";
-          };
-          to = {
-            kind = "external";
-            name = "garnet";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
-        {
-          id = "allow-dmz-to-garnet";
-          priority = 152;
-          from = {
-            kind = "tenant";
-            name = "neon-dmz";
-          };
-          to = {
-            kind = "external";
-            name = "garnet";
-          };
-          trafficType = "any";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
+        (allowTenantToGarnet { tenant = "neon-mgmt"; shortName = "mgmt"; priority = 150; })
+        (allowTenantToGarnet { tenant = "neon-svc"; shortName = "svc"; priority = 151; })
+        (allowTenantToGarnet { tenant = "neon-dmz"; shortName = "dmz"; priority = 152; })
+        # The garnet underlay tenant reaches the ISP itself, not just `wan`.
         {
           id = "allow-iot-srv-nebula-garnet-underlay-to-isp";
           priority = 153;
-          from = {
-            kind = "tenant";
-            name = "neon-iot-srv";
-          };
-          to = {
-            kind = "external";
-          };
+          from = tenantRef "neon-iot-srv";
+          to = { kind = "external"; };
           trafficType = "nebula-garnet";
           action = "allow";
           returnBehavior = "one-way";
         }
-        {
-          id = "allow-garnet-underlay-to-core";
-          priority = 154;
-          from = {
-            kind = "external";
-            name = "garnet";
-          };
-          to = {
-            kind = "external";
-            scope = "core";
-          };
-          trafficType = "nebula-garnet";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
+        (allowGarnetUnderlayToCore 154)
         # FS-460: cobalt-svc reaches the vlan3 Ollama service over the garnet
         # overlay.  The remote side of the path is the overlay ingress facing
         # the s-llm-inference service; the payload port lives on the service
@@ -1712,452 +942,40 @@ in
     # normalize that dual path (it renders a self-referential policy-container
     # config). The inventory pins each access Unbound resolver to core-dns.
     recursiveDnsIntent = {
-      services = [
-        {
-          name = "core-dns";
-          providerNode = "core";
-          addressAuthority = "model-allocated-service-prefix";
-          trafficType = "dns";
-        }
-      ];
+      services = [ coreDnsService ];
 
       relations = [
-        {
-          id = "allow-core-dns-to-wan";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "core-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          # VLAN 2 clients may query the internal core resolver directly. This
-          # is a normal supported path: core remains bound only to its
-          # upstream-selector-facing service surface, and VLAN 3 deliberately
-          # has no equivalent relation.
-          id = "allow-vlan2-to-core-dns";
-          priority = 87;
-          from = {
-            kind = "tenant";
-            name = "vlan2";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan2-dns-to-core-dns";
-          priority = 88;
-          from = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-vlan7-dns-to-core-dns";
-          priority = 89;
-          from = {
-            kind = "service";
-            name = "vlan7-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "deny-vlan2-dns-to-wan";
-          priority = 92;
-          from = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "deny";
-        }
-        {
-          id = "deny-vlan7-dns-to-wan";
-          priority = 93;
-          from = {
-            kind = "service";
-            name = "vlan7-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "deny";
-        }
-        {
-          id = "allow-vlan8-dns-to-core-dns";
-          priority = 94;
-          from = {
-            kind = "service";
-            name = "vlan8-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-core-dns";
-          priority = 87;
-          from = {
-            kind = "tenant";
-            name = "neon-clients";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-dns-to-core-dns";
-          priority = 88;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-core-dns";
-          priority = 89;
-          from = {
-            kind = "tenant";
-            name = "neon-mgmt";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-dns-to-core-dns";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-dns-to-core-dns";
-          priority = 89;
-          from = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "deny-clients-dns-to-wan";
-          priority = 92;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "deny";
-        }
-        {
-          id = "deny-svc-dns-to-wan";
-          priority = 93;
-          from = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "deny";
-        }
-        {
-          id = "allow-iot-dns-to-core-dns";
-          priority = 94;
-          from = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-dns-to-core-dns";
-          priority = 95;
-          from = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
+        (allowFromTo "allow-core-dns-to-wan" 90 (serviceRef "core-dns") coreScope "dns")
+        # VLAN 2 clients may query the internal core resolver directly. This
+        # is a normal supported path: core remains bound only to its
+        # upstream-selector-facing service surface, and VLAN 3 deliberately
+        # has no equivalent relation.
+        (allowFromTo "allow-vlan2-to-core-dns" 87 (tenantRef "vlan2") (serviceRef "core-dns") "dns")
+        (allowResolverToCoreDns "vlan2-dns" 88)
+        (allowResolverToCoreDns "vlan7-dns" 89)
+        (denyFromTo "deny-vlan2-dns-to-wan" 92 (serviceRef "vlan2-dns") coreScope "dns")
+        (denyFromTo "deny-vlan7-dns-to-wan" 93 (serviceRef "vlan7-dns") coreScope "dns")
+        (allowResolverToCoreDns "vlan8-dns" 94)
+        (allowFromTo "allow-clients-to-core-dns" 87 (tenantRef "neon-clients") (serviceRef "core-dns") "dns")
+        (allowResolverToCoreDns "clients-dns" 88)
+        (allowFromTo "allow-mgmt-to-core-dns" 89 (tenantRef "neon-mgmt") (serviceRef "core-dns") "dns")
+        (allowResolverToCoreDns "mgmt-dns" 90)
+        (allowResolverToCoreDns "svc-dns" 89)
+        (denyFromTo "deny-clients-dns-to-wan" 92 (serviceRef "clients-dns") coreScope "dns")
+        (denyFromTo "deny-svc-dns-to-wan" 93 (serviceRef "svc-dns") coreScope "dns")
+        (allowResolverToCoreDns "iot-dns" 94)
+        (allowResolverToCoreDns "iot-srv-dns" 95)
       ];
 
       bindings = [
-        {
-          requesterScope = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "vlan7-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "vlan7-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "vlan8-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "vlan8-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
+        (recursiveDnsBinding "vlan2-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "vlan7-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "vlan8-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "clients-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "svc-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "iot-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "iot-srv-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "mgmt-dns" "core-dns" "core" "wan")
       ];
     };
 
@@ -2187,23 +1005,8 @@ in
           recursion = false;
           publicFallback = false;
         };
-        relation = {
-          id = "allow-vlan2-dns-to-vlan3-dns";
-          from = {
-            kind = "service";
-            name = "vlan2-dns";
-          };
-          to = {
-            kind = "service";
-            name = "vlan3-dns";
-          };
-          trafficType = "dns";
-          returnBehavior = "symmetric";
-        };
-        providerPolicy = {
-          source = "vlan2-dns";
-          action = "refuse_non_local";
-        };
+        relation = dnsSharingRelation "allow-vlan2-dns-to-vlan3-dns" "vlan2-dns" "vlan3-dns";
+        providerPolicy = refuseNonLocalProvider "vlan2-dns";
         lateralPolicy = {
           source = "vlan3";
           target = "vlan2-dns";
@@ -2231,23 +1034,8 @@ in
           recursion = false;
           publicFallback = false;
         };
-        relation = {
-          id = "allow-dmz-dns-to-clients-dns";
-          from = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          to = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          trafficType = "dns";
-          returnBehavior = "symmetric";
-        };
-        providerPolicy = {
-          source = "dmz-dns";
-          action = "refuse_non_local";
-        };
+        relation = dnsSharingRelation "allow-dmz-dns-to-clients-dns" "dmz-dns" "clients-dns";
+        providerPolicy = refuseNonLocalProvider "dmz-dns";
         lateralPolicy = {
           source = "neon-clients";
           target = "dmz-dns";
@@ -2274,23 +1062,8 @@ in
           recursion = false;
           publicFallback = false;
         };
-        relation = {
-          id = "allow-clients-dns-to-unlock-dns";
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "unlock-dns";
-          };
-          trafficType = "dns";
-          returnBehavior = "symmetric";
-        };
-        providerPolicy = {
-          source = "clients-dns";
-          action = "refuse_non_local";
-        };
+        relation = dnsSharingRelation "allow-clients-dns-to-unlock-dns" "clients-dns" "unlock-dns";
+        providerPolicy = refuseNonLocalProvider "clients-dns";
         lateralPolicy = {
           source = "neon-unlock";
           target = "clients-dns";
@@ -2308,41 +1081,7 @@ in
         delegatedPrefixLength = 48;
         perTenantPrefixLength = 64;
       };
-      tenants = {
-        vlan2 = {
-          mode = "slaac";
-        };
-        vlan3 = {
-          mode = "slaac";
-        };
-        vlan7 = {
-          mode = "slaac";
-        };
-        vlan8 = {
-          mode = "slaac";
-        };
-        neon-mgmt = {
-          mode = "slaac";
-        };
-        neon-svc = {
-          mode = "slaac";
-        };
-        neon-clients = {
-          mode = "slaac";
-        };
-        neon-iot = {
-          mode = "slaac";
-        };
-        neon-iot-srv = {
-          mode = "slaac";
-        };
-        neon-dmz = {
-          mode = "slaac";
-        };
-        neon-unlock = {
-          mode = "slaac";
-        };
-      };
+      tenants = slaacTenants [ "vlan2" "vlan3" "vlan7" "vlan8" "neon-mgmt" "neon-svc" "neon-clients" "neon-iot" "neon-iot-srv" "neon-dmz" "neon-unlock" ];
     };
 
     topology = {
@@ -2389,18 +1128,7 @@ in
           role = "downstream-selector";
         };
 
-        access-vlan2 = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "vlan2";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
+        access-vlan2 = accessNode { tenant = "vlan2"; selects = [ "wan" ]; };
 
         access-vlan3 = {
           role = "access";
@@ -2419,172 +1147,34 @@ in
           ];
         };
 
-        access-vlan7 = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "vlan7";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
+        access-vlan7 = accessNode { tenant = "vlan7"; selects = [ "wan" ]; };
 
-        access-vlan8 = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "vlan8";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
-        access-mgmt = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "neon-mgmt";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
-        access-svc = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "neon-svc";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
-        access-clients = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "neon-clients";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
-        access-iot = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "neon-iot";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
-        access-iot-srv = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "neon-iot-srv";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
-        access-dmz = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "neon-dmz";
-            }
-          ];
-        };
-        access-unlock = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "neon-unlock";
-            }
-          ];
-        };
+        access-vlan8 = accessNode { tenant = "vlan8"; selects = [ "wan" ]; };
+        access-mgmt = accessNode { tenant = "neon-mgmt"; selects = [ "wan" ]; };
+        access-svc = accessNode { tenant = "neon-svc"; selects = [ "wan" ]; };
+        access-clients = accessNode { tenant = "neon-clients"; selects = [ "wan" ]; };
+        access-iot = accessNode { tenant = "neon-iot"; selects = [ "wan" ]; };
+        access-iot-srv = accessNode { tenant = "neon-iot-srv"; selects = [ "wan" ]; };
+        access-dmz = accessNode { tenant = "neon-dmz"; };
+        access-unlock = accessNode { tenant = "neon-unlock"; };
       };
 
       links = [
-        [
-          "core"
-          "upstream-selector"
-        ]
-        [
-          "core-vpn-garnet-neon"
-          "upstream-selector"
-        ]
-        [
-          "upstream-selector"
-          "policy"
-        ]
-        [
-          "policy"
-          "downstream-selector"
-        ]
-        [
-          "downstream-selector"
-          "access-vlan2"
-        ]
-        [
-          "downstream-selector"
-          "access-vlan3"
-        ]
-        [
-          "downstream-selector"
-          "access-vlan7"
-        ]
-        [
-          "downstream-selector"
-          "access-vlan8"
-        ]
-        [
-          "downstream-selector"
-          "access-mgmt"
-        ]
-        [
-          "downstream-selector"
-          "access-svc"
-        ]
-        [
-          "downstream-selector"
-          "access-clients"
-        ]
-        [
-          "downstream-selector"
-          "access-iot"
-        ]
-        [
-          "downstream-selector"
-          "access-iot-srv"
-        ]
-        [
-          "downstream-selector"
-          "access-dmz"
-        ]
-        [
-          "downstream-selector"
-          "access-unlock"
-        ]
+        [ "core" "upstream-selector" ]
+        [ "core-vpn-garnet-neon" "upstream-selector" ]
+        [ "upstream-selector" "policy" ]
+        [ "policy" "downstream-selector" ]
+        [ "downstream-selector" "access-vlan2" ]
+        [ "downstream-selector" "access-vlan3" ]
+        [ "downstream-selector" "access-vlan7" ]
+        [ "downstream-selector" "access-vlan8" ]
+        [ "downstream-selector" "access-mgmt" ]
+        [ "downstream-selector" "access-svc" ]
+        [ "downstream-selector" "access-clients" ]
+        [ "downstream-selector" "access-iot" ]
+        [ "downstream-selector" "access-iot-srv" ]
+        [ "downstream-selector" "access-dmz" ]
+        [ "downstream-selector" "access-unlock" ]
       ];
     };
 
@@ -2657,125 +1247,27 @@ in
 
     ownership = {
       prefixes = [
-        {
-          kind = "tenant";
-          name = "cobalt-svc";
-          dnsDomain = "svc.home.arpa.";
-          ipv4 = "10.2.20.0/24";
-          ipv6 = "fd42:dead:beef:220::/64";
-        }
-        {
-          kind = "tenant";
-          name = "cobalt-clients";
-          dnsDomain = "clients.home.arpa.";
-          ipv4 = "10.2.30.0/24";
-          ipv6 = "fd42:dead:beef:230::/64";
-        }
-        {
-          kind = "tenant";
-          name = "cobalt-iot";
-          dnsDomain = "iot.home.arpa.";
-          ipv4 = "10.2.50.0/24";
-          ipv6 = "fd42:dead:beef:250::/64";
-        }
-        {
-          kind = "tenant";
-          name = "cobalt-iot-srv";
-          dnsDomain = "iot-srv.home.arpa.";
-          ipv4 = "10.2.51.0/24";
-          ipv6 = "fd42:dead:beef:251::/64";
-        }
-        {
-          kind = "tenant";
-          name = "cobalt-dmz";
-          dnsDomain = "dmz.home.arpa.";
-          ipv4 = "10.2.60.0/24";
-          ipv6 = "fd42:dead:beef:260::/64";
-        }
-        {
-          kind = "tenant";
-          name = "cobalt-clients-vpn";
-          dnsDomain = "clients-vpn.home.arpa.";
-          ipv4 = "10.2.31.0/24";
-          ipv6 = "fd42:dead:beef:231::/64";
-        }
-        {
-          kind = "tenant";
-          name = "cobalt-unlock";
-          dnsDomain = "unlock.home.arpa.";
-          ipv4 = "10.2.90.0/24";
-          ipv6 = "fd42:dead:beef:290::/64";
-        }
-        {
-          kind = "tenant";
-          name = "cobalt-mgmt";
-          dnsDomain = "mgmt.home.arpa.";
-          ipv4 = "10.2.10.0/24";
-          ipv6 = "fd42:dead:beef:210::/64";
-        }
+        (tenantPrefix { name = "cobalt-svc"; dnsDomain = "svc.home.arpa."; ipv4 = "10.2.20.0/24"; ipv6 = "fd42:dead:beef:220::/64"; })
+        (tenantPrefix { name = "cobalt-clients"; dnsDomain = "clients.home.arpa."; ipv4 = "10.2.30.0/24"; ipv6 = "fd42:dead:beef:230::/64"; })
+        (tenantPrefix { name = "cobalt-iot"; dnsDomain = "iot.home.arpa."; ipv4 = "10.2.50.0/24"; ipv6 = "fd42:dead:beef:250::/64"; })
+        (tenantPrefix { name = "cobalt-iot-srv"; dnsDomain = "iot-srv.home.arpa."; ipv4 = "10.2.51.0/24"; ipv6 = "fd42:dead:beef:251::/64"; })
+        (tenantPrefix { name = "cobalt-dmz"; dnsDomain = "dmz.home.arpa."; ipv4 = "10.2.60.0/24"; ipv6 = "fd42:dead:beef:260::/64"; })
+        (tenantPrefix { name = "cobalt-clients-vpn"; dnsDomain = "clients-vpn.home.arpa."; ipv4 = "10.2.31.0/24"; ipv6 = "fd42:dead:beef:231::/64"; })
+        (tenantPrefix { name = "cobalt-unlock"; dnsDomain = "unlock.home.arpa."; ipv4 = "10.2.90.0/24"; ipv6 = "fd42:dead:beef:290::/64"; })
+        (tenantPrefix { name = "cobalt-mgmt"; dnsDomain = "mgmt.home.arpa."; ipv4 = "10.2.10.0/24"; ipv6 = "fd42:dead:beef:210::/64"; })
       ];
 
       endpoints = [
-        {
-          kind = "host";
-          name = "cobalt-svc-dns";
-          tenant = "cobalt-svc";
-          ipv4 = [ "10.2.20.1" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-clients-dns";
-          tenant = "cobalt-clients";
-          ipv4 = [ "10.2.30.1" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-iot-dns";
-          tenant = "cobalt-iot";
-          ipv4 = [ "10.2.50.1" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-iot-srv-dns";
-          tenant = "cobalt-iot-srv";
-          ipv4 = [ "10.2.51.1" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-dmz-dns";
-          tenant = "cobalt-dmz";
-          ipv4 = [ "10.2.60.1" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-clients-vpn-dns";
-          tenant = "cobalt-clients-vpn";
-          ipv4 = [ "10.2.31.1" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-tang";
-          tenant = "cobalt-unlock";
-          ipv4 = [ "10.2.90.10" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-mgmt-dns";
-          tenant = "cobalt-mgmt";
-          ipv4 = [ "10.2.10.1" ];
-        }
-        {
-          kind = "host";
-          name = "cobalt-unlock-dns";
-          tenant = "cobalt-unlock";
-          ipv4 = [ "10.2.90.1" ];
-        }
-        {
-          kind = "host";
-          name = "s-nebula-cobalt-lighthouse";
-          tenant = "cobalt-svc";
-          ipv4 = [ "10.2.20.2" ];
-        }
+        (hostEndpoint "cobalt-svc-dns" "cobalt-svc" [ "10.2.20.1" ] null)
+        (hostEndpoint "cobalt-clients-dns" "cobalt-clients" [ "10.2.30.1" ] null)
+        (hostEndpoint "cobalt-iot-dns" "cobalt-iot" [ "10.2.50.1" ] null)
+        (hostEndpoint "cobalt-iot-srv-dns" "cobalt-iot-srv" [ "10.2.51.1" ] null)
+        (hostEndpoint "cobalt-dmz-dns" "cobalt-dmz" [ "10.2.60.1" ] null)
+        (hostEndpoint "cobalt-clients-vpn-dns" "cobalt-clients-vpn" [ "10.2.31.1" ] null)
+        (hostEndpoint "cobalt-tang" "cobalt-unlock" [ "10.2.90.10" ] null)
+        (hostEndpoint "cobalt-mgmt-dns" "cobalt-mgmt" [ "10.2.10.1" ] null)
+        (hostEndpoint "cobalt-unlock-dns" "cobalt-unlock" [ "10.2.90.1" ] null)
+        (hostEndpoint "s-nebula-cobalt-lighthouse" "cobalt-svc" [ "10.2.20.2" ] null)
       ];
     };
 
@@ -2806,149 +1298,25 @@ in
           }
         ];
       services = [
-        {
-          name = "svc-dns";
-          providers = [ "cobalt-svc-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "clients-dns";
-          providers = [ "cobalt-clients-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "iot-dns";
-          providers = [ "cobalt-iot-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "iot-srv-dns";
-          providers = [ "cobalt-iot-srv-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "dmz-dns";
-          providers = [ "cobalt-dmz-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "clients-vpn-dns";
-          providers = [ "cobalt-clients-vpn-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "tang";
-          providers = [ "cobalt-tang" ];
-          trafficType = "tang";
-        }
-        {
-          name = "unlock-dns";
-          providers = [ "cobalt-unlock-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "mgmt-dns";
-          providers = [ "cobalt-mgmt-dns" ];
-          trafficType = "dns";
-        }
-        {
-          name = "s-nebula-cobalt-lighthouse";
-          providers = [ "s-nebula-cobalt-lighthouse" ];
-          trafficType = "nebula-ipv4";
-        }
+        (service "svc-dns" "dns" [ "cobalt-svc-dns" ])
+        (service "clients-dns" "dns" [ "cobalt-clients-dns" ])
+        (service "iot-dns" "dns" [ "cobalt-iot-dns" ])
+        (service "iot-srv-dns" "dns" [ "cobalt-iot-srv-dns" ])
+        (service "dmz-dns" "dns" [ "cobalt-dmz-dns" ])
+        (service "clients-vpn-dns" "dns" [ "cobalt-clients-vpn-dns" ])
+        (service "tang" "tang" [ "cobalt-tang" ])
+        (service "unlock-dns" "dns" [ "cobalt-unlock-dns" ])
+        (service "mgmt-dns" "dns" [ "cobalt-mgmt-dns" ])
+        (service "s-nebula-cobalt-lighthouse" "nebula-ipv4" [ "s-nebula-cobalt-lighthouse" ])
       ];
 
-      relations = [
-        {
-          id = "allow-clients-dns-to-dmz-dns";
-          priority = 78;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-dns-to-clients-dns";
-          priority = 79;
-          from = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          to = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-dns-to-unlock-dns";
-          priority = 81;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "unlock-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-clients-dns";
-          priority = 80;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients";
-          };
-          to = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-svc-dns";
-          priority = 81;
-          from = {
-            kind = "tenant";
-            name = "cobalt-svc";
-          };
-          to = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-dmz-dns";
-          priority = 82;
-          from = {
-            kind = "tenant";
-            name = "cobalt-dmz";
-          };
-          to = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
+      relations = builtins.concatMap (r: if builtins.isList r then r else [ r ]) [
+        (allowResolverToResolver "clients-dns" "dmz-dns" 78)
+        (allowResolverToResolver "dmz-dns" "clients-dns" 79)
+        (allowResolverToResolver "clients-dns" "unlock-dns" 81)
+        (allowFromTo "allow-clients-to-clients-dns" 80 (tenantRef "cobalt-clients") (serviceRef "clients-dns") "dns")
+        (allowFromTo "allow-svc-to-svc-dns" 81 (tenantRef "cobalt-svc") (serviceRef "svc-dns") "dns")
+        (allowFromTo "allow-dmz-to-dmz-dns" 82 (tenantRef "cobalt-dmz") (serviceRef "dmz-dns") "dns")
         {
           id = "deny-dmz-to-clients";
           priority = 84;
@@ -2978,492 +1346,42 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
-        {
-          id = "allow-iot-to-iot-dns";
-          priority = 86;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot";
-          };
-          to = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-iot-srv-dns";
-          priority = 87;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot-srv";
-          };
-          to = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-vpn-to-clients-vpn-dns";
-          priority = 87;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients-vpn";
-          };
-          to = {
-            kind = "service";
-            name = "clients-vpn-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-unlock-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          to = {
-            kind = "service";
-            name = "tang";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-svc";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot-srv";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-dmz";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-vpn-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients-vpn";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-tang";
-          priority = 85;
-          from = {
-            kind = "tenant";
-            name = "cobalt-mgmt";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "tang";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "cobalt-svc";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot-srv";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "cobalt-dmz";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-vpn-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients-vpn";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-tang-icmp";
-          priority = 84;
-          from = {
-            kind = "tenant";
-            name = "cobalt-mgmt";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "icmp";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "cobalt-svc";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "cobalt-iot-srv";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-dmz-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "cobalt-dmz";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-vpn-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients-vpn";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-tang-traceroute";
-          priority = 83;
-          from = {
-            kind = "tenant";
-            name = "cobalt-mgmt";
-          };
-          to = {
-            kind = "tenant";
-            name = "cobalt-unlock";
-          };
-          trafficType = "traceroute";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-mgmt-dns";
-          priority = 88;
-          from = {
-            kind = "tenant";
-            name = "cobalt-mgmt";
-          };
-          to = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-dns-to-wan";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-dns-to-wan";
-          priority = 91;
-          from = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
+        (allowFromTo "allow-iot-to-iot-dns" 86 (tenantRef "cobalt-iot") (serviceRef "iot-dns") "dns")
+        (allowFromTo "allow-iot-srv-to-iot-srv-dns" 87 (tenantRef "cobalt-iot-srv") (serviceRef "iot-srv-dns") "dns")
+        (allowFromTo "allow-clients-vpn-to-clients-vpn-dns" 87 (tenantRef "cobalt-clients-vpn") (serviceRef "clients-vpn-dns") "dns")
+        # The unlock tenant reaches the Tang service it hosts directly.
+        (allowFromTo "allow-unlock-to-tang" 85 (tenantRef "cobalt-unlock") (serviceRef "tang") "tang")
+
+        # Tang: every access tenant of this site reaches the Tang box over the
+        # plain, icmp and traceroute classes.
+        (allowTenantsToTang {
+          site = "cobalt";
+          tenants = [ "cobalt-clients" "cobalt-svc" "cobalt-iot" "cobalt-iot-srv" "cobalt-dmz" "cobalt-clients-vpn" "cobalt-mgmt" ];
+          unlock = "cobalt-unlock";
+        })
+        (allowFromTo "allow-mgmt-to-mgmt-dns" 88 (tenantRef "cobalt-mgmt") (serviceRef "mgmt-dns") "dns")
+        (allowFromTo "allow-clients-dns-to-wan" 90 (serviceRef "clients-dns") coreScope "dns")
+        (allowFromTo "allow-svc-dns-to-wan" 91 (serviceRef "svc-dns") coreScope "dns")
+        (publicIngress {
           id = "allow-wan-to-s-nebula-cobalt-lighthouse";
           priority = 95;
-          from = {
-            kind = "external";
-            scope = "core";
-          };
-          to = {
-            kind = "service";
-            name = "s-nebula-cobalt-lighthouse";
-          };
+          service = "s-nebula-cobalt-lighthouse";
           trafficType = "nebula-ipv4";
-          action = "allow";
-          publicIngressTupleAuthority = {
-            sourceScope = "internet";
-            publicSurface = "wan";
-            targetService = "s-nebula-cobalt-lighthouse";
-            targetEndpoint = "s-nebula-cobalt-lighthouse";
-            targetPort = 4242;
-            returnBehavior = "stateful-return";
-            sourcePreservation = "rewritten";
-            translationMode = "napt";
-            hairpin = "not-modeled";
-            asymmetricRouting = "not-allowed";
-            tuples = [
-              {
-                protocol = "udp";
-                publicPort = 4242;
-              }
-              {
-                protocol = "tcp";
-                publicPort = 4242;
-              }
-            ];
-          };
-        }
-        {
-          id = "allow-iot-dns-to-wan";
-          priority = 93;
-          from = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-dns-to-wan";
-          priority = 94;
-          from = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-dns-to-wan";
-          priority = 95;
-          from = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
+          targetPort = 4242;
+          tuples = [
+            {
+              protocol = "udp";
+              publicPort = 4242;
+            }
+            {
+              protocol = "tcp";
+              publicPort = 4242;
+            }
+          ];
+        })
+        (allowFromTo "allow-iot-dns-to-wan" 93 (serviceRef "iot-dns") coreScope "dns")
+        (allowFromTo "allow-iot-srv-dns-to-wan" 94 (serviceRef "iot-srv-dns") coreScope "dns")
+        (allowFromTo "allow-mgmt-dns-to-wan" 95 (serviceRef "mgmt-dns") coreScope "dns")
         (allowTenantToWan "cobalt-clients" 100)
         (allowTenantToWan "cobalt-svc" 110)
         (allowTenantToWan "cobalt-iot" 120)
@@ -3505,21 +1423,7 @@ in
           action = "allow";
           returnBehavior = "symmetric";
         }
-        {
-          id = "allow-garnet-underlay-to-core";
-          priority = 154;
-          from = {
-            kind = "external";
-            name = "garnet";
-          };
-          to = {
-            kind = "external";
-            scope = "core";
-          };
-          trafficType = "nebula-garnet";
-          action = "allow";
-          returnBehavior = "one-way";
-        }
+        (allowGarnetUnderlayToCore 154)
         {
           id = "allow-clients-vpn-to-vpn-uplinks";
           priority = 85;
@@ -3560,12 +1464,7 @@ in
 
     recursiveDnsIntent = {
       services = [
-        {
-          name = "core-dns";
-          providerNode = "core";
-          addressAuthority = "model-allocated-service-prefix";
-          trafficType = "dns";
-        }
+        coreDnsService
         {
           name = "onyx-dns";
           providerNode = "core-vpn-onyx";
@@ -3581,414 +1480,32 @@ in
       ];
 
       relations = [
-        {
-          id = "allow-clients-vpn-to-onyx-dns";
-          priority = 86;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients-vpn";
-          };
-          to = {
-            kind = "service";
-            name = "onyx-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-onyx-dns-to-onyx";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "onyx-dns";
-          };
-          to = { kind = "external"; scope = "core-vpn-onyx"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-vpn-to-opal-dns";
-          priority = 86;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients-vpn";
-          };
-          to = {
-            kind = "service";
-            name = "opal-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-opal-dns-to-opal";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "opal-dns";
-          };
-          to = { kind = "external"; scope = "core-vpn-opal"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-to-core-dns";
-          priority = 87;
-          from = {
-            kind = "tenant";
-            name = "cobalt-clients";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-dns-to-core-dns";
-          priority = 88;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-to-core-dns";
-          priority = 89;
-          from = {
-            kind = "tenant";
-            name = "cobalt-mgmt";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-mgmt-dns-to-core-dns";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-svc-dns-to-core-dns";
-          priority = 89;
-          from = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-core-dns-to-wan";
-          priority = 90;
-          from = {
-            kind = "service";
-            name = "core-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "deny-clients-dns-to-wan";
-          priority = 92;
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "deny";
-        }
-        {
-          id = "deny-svc-dns-to-wan";
-          priority = 93;
-          from = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          to = { kind = "external"; scope = "core"; };
-          trafficType = "dns";
-          action = "deny";
-        }
-        {
-          id = "allow-iot-dns-to-core-dns";
-          priority = 94;
-          from = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-iot-srv-dns-to-core-dns";
-          priority = 95;
-          from = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          to = {
-            kind = "service";
-            name = "core-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-vpn-dns-to-onyx-dns";
-          priority = 96;
-          from = {
-            kind = "service";
-            name = "clients-vpn-dns";
-          };
-          to = {
-            kind = "service";
-            name = "onyx-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
-        {
-          id = "allow-clients-vpn-dns-to-opal-dns";
-          priority = 96;
-          from = {
-            kind = "service";
-            name = "clients-vpn-dns";
-          };
-          to = {
-            kind = "service";
-            name = "opal-dns";
-          };
-          trafficType = "dns";
-          action = "allow";
-          returnBehavior = "symmetric";
-        }
+        (allowFromTo "allow-clients-vpn-to-onyx-dns" 86 (tenantRef "cobalt-clients-vpn") (serviceRef "onyx-dns") "dns")
+        (allowFromTo "allow-onyx-dns-to-onyx" 90 (serviceRef "onyx-dns") { kind = "external"; scope = "core-vpn-onyx"; } "dns")
+        (allowFromTo "allow-clients-vpn-to-opal-dns" 86 (tenantRef "cobalt-clients-vpn") (serviceRef "opal-dns") "dns")
+        (allowFromTo "allow-opal-dns-to-opal" 90 (serviceRef "opal-dns") { kind = "external"; scope = "core-vpn-opal"; } "dns")
+        (allowFromTo "allow-clients-to-core-dns" 87 (tenantRef "cobalt-clients") (serviceRef "core-dns") "dns")
+        (allowResolverToCoreDns "clients-dns" 88)
+        (allowFromTo "allow-mgmt-to-core-dns" 89 (tenantRef "cobalt-mgmt") (serviceRef "core-dns") "dns")
+        (allowResolverToCoreDns "mgmt-dns" 90)
+        (allowResolverToCoreDns "svc-dns" 89)
+        (allowFromTo "allow-core-dns-to-wan" 90 (serviceRef "core-dns") coreScope "dns")
+        (denyFromTo "deny-clients-dns-to-wan" 92 (serviceRef "clients-dns") coreScope "dns")
+        (denyFromTo "deny-svc-dns-to-wan" 93 (serviceRef "svc-dns") coreScope "dns")
+        (allowResolverToCoreDns "iot-dns" 94)
+        (allowResolverToCoreDns "iot-srv-dns" 95)
+        (allowResolverToResolver "clients-vpn-dns" "onyx-dns" 96)
+        (allowResolverToResolver "clients-vpn-dns" "opal-dns" 96)
       ];
 
       bindings = [
-        {
-          requesterScope = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "svc-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "iot-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "iot-srv-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "mgmt-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "core-dns";
-            node = "core";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "wan" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "clients-vpn-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "clients-vpn-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "onyx-dns";
-            node = "core-vpn-onyx";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "onyx" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
-        {
-          requesterScope = {
-            kind = "service";
-            name = "clients-vpn-dns";
-          };
-          advertisedResolver = {
-            kind = "service";
-            name = "clients-vpn-dns";
-          };
-          resolverSource = "local-recursive";
-          upstreamResolver = {
-            kind = "service";
-            name = "opal-dns";
-            node = "core-vpn-opal";
-          };
-          egressSurface = {
-            kind = "external";
-            uplinks = [ "opal" ];
-          };
-          returnBehavior = "symmetric";
-          allowedAddressFamilies = [
-            "ipv4"
-            "ipv6"
-          ];
-          directPublicFallback = false;
-        }
+        (recursiveDnsBinding "clients-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "svc-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "iot-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "iot-srv-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "mgmt-dns" "core-dns" "core" "wan")
+        (recursiveDnsBinding "clients-vpn-dns" "onyx-dns" "core-vpn-onyx" "onyx")
+        (recursiveDnsBinding "clients-vpn-dns" "opal-dns" "core-vpn-opal" "opal")
       ];
     };
 
@@ -4011,23 +1528,8 @@ in
           recursion = false;
           publicFallback = false;
         };
-        relation = {
-          id = "allow-dmz-dns-to-clients-dns";
-          from = {
-            kind = "service";
-            name = "dmz-dns";
-          };
-          to = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          trafficType = "dns";
-          returnBehavior = "symmetric";
-        };
-        providerPolicy = {
-          source = "dmz-dns";
-          action = "refuse_non_local";
-        };
+        relation = dnsSharingRelation "allow-dmz-dns-to-clients-dns" "dmz-dns" "clients-dns";
+        providerPolicy = refuseNonLocalProvider "dmz-dns";
         lateralPolicy = {
           source = "cobalt-clients";
           target = "dmz-dns";
@@ -4054,23 +1556,8 @@ in
           recursion = false;
           publicFallback = false;
         };
-        relation = {
-          id = "allow-clients-dns-to-unlock-dns";
-          from = {
-            kind = "service";
-            name = "clients-dns";
-          };
-          to = {
-            kind = "service";
-            name = "unlock-dns";
-          };
-          trafficType = "dns";
-          returnBehavior = "symmetric";
-        };
-        providerPolicy = {
-          source = "clients-dns";
-          action = "refuse_non_local";
-        };
+        relation = dnsSharingRelation "allow-clients-dns-to-unlock-dns" "clients-dns" "unlock-dns";
+        providerPolicy = refuseNonLocalProvider "clients-dns";
         lateralPolicy = {
           source = "cobalt-unlock";
           target = "clients-dns";
@@ -4167,67 +1654,15 @@ in
           role = "downstream-selector";
         };
 
-        access-svc = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "cobalt-svc";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
+        access-svc = accessNode { tenant = "cobalt-svc"; selects = [ "wan" ]; };
 
-        access-clients = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "cobalt-clients";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
+        access-clients = accessNode { tenant = "cobalt-clients"; selects = [ "wan" ]; };
 
-        access-iot = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "cobalt-iot";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
+        access-iot = accessNode { tenant = "cobalt-iot"; selects = [ "wan" ]; };
 
-        access-iot-srv = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "cobalt-iot-srv";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
+        access-iot-srv = accessNode { tenant = "cobalt-iot-srv"; selects = [ "wan" ]; };
 
-        access-dmz = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "cobalt-dmz";
-            }
-          ];
-        };
+        access-dmz = accessNode { tenant = "cobalt-dmz"; };
 
         access-clients-vpn = {
 
@@ -4260,87 +1695,26 @@ in
           ];
         };
 
-        access-unlock = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "cobalt-unlock";
-            }
-          ];
-        };
+        access-unlock = accessNode { tenant = "cobalt-unlock"; };
 
-        access-mgmt = {
-          role = "access";
-          attachments = [
-            {
-              kind = "tenant";
-              name = "cobalt-mgmt";
-            }
-          ];
-          selects = [
-            "wan"
-          ];
-        };
+        access-mgmt = accessNode { tenant = "cobalt-mgmt"; selects = [ "wan" ]; };
       };
 
       links = [
-        [
-          "core"
-          "upstream-selector"
-        ]
-        [
-          "core-vpn-onyx"
-          "upstream-selector"
-        ]
-        [
-          "core-vpn-opal"
-          "upstream-selector"
-        ]
-        [
-          "core-vpn-garnet-cobalt"
-          "upstream-selector"
-        ]
-        [
-          "upstream-selector"
-          "policy"
-        ]
-        [
-          "policy"
-          "downstream-selector"
-        ]
-        [
-          "downstream-selector"
-          "access-svc"
-        ]
-        [
-          "downstream-selector"
-          "access-clients"
-        ]
-        [
-          "downstream-selector"
-          "access-dmz"
-        ]
-        [
-          "downstream-selector"
-          "access-iot-srv"
-        ]
-        [
-          "downstream-selector"
-          "access-iot"
-        ]
-        [
-          "downstream-selector"
-          "access-clients-vpn"
-        ]
-        [
-          "downstream-selector"
-          "access-unlock"
-        ]
-        [
-          "downstream-selector"
-          "access-mgmt"
-        ]
+        [ "core" "upstream-selector" ]
+        [ "core-vpn-onyx" "upstream-selector" ]
+        [ "core-vpn-opal" "upstream-selector" ]
+        [ "core-vpn-garnet-cobalt" "upstream-selector" ]
+        [ "upstream-selector" "policy" ]
+        [ "policy" "downstream-selector" ]
+        [ "downstream-selector" "access-svc" ]
+        [ "downstream-selector" "access-clients" ]
+        [ "downstream-selector" "access-dmz" ]
+        [ "downstream-selector" "access-iot-srv" ]
+        [ "downstream-selector" "access-iot" ]
+        [ "downstream-selector" "access-clients-vpn" ]
+        [ "downstream-selector" "access-unlock" ]
+        [ "downstream-selector" "access-mgmt" ]
       ];
     };
 
