@@ -384,6 +384,15 @@ def parse_updates() -> list[tuple[str, str, str, str]]:
 
 
 def main() -> int:
+    # Protected production pins first: if flake.lock moves a *-prod or
+    # *-legacy-prod input without a matching approved snapshot, the push stops
+    # here rather than after the (slow) privacy scan.
+    pin_guard = Path(__file__).resolve().parent.parent / "scripts" / "check-prod-pins.sh"
+    if pin_guard.is_file():
+        guard = subprocess.run([str(pin_guard)], check=False)
+        if guard.returncode != 0:
+            return guard.returncode
+
     try:
         for command in ("curl", "git", "sops"):
             require_command(command)

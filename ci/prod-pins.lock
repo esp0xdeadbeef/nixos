@@ -1,0 +1,97 @@
+{
+  "network-compiler-legacy-prod": {
+    "lastModified": 1788259011,
+    "narHash": "sha256-Z1YdZCQG8I05PG18E1jBTr7AzbfZkEDZC0sTFs3klZ0=",
+    "rev": "f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5"
+  },
+  "network-compiler-prod": {
+    "lastModified": 1790212166,
+    "narHash": "sha256-BBvGtumoRzCsuYCf7gffJDpBOvqFv/1DfS1oniHZVZQ=",
+    "rev": "e9907209a790fe87a9fbe447c158f60e08ac175d"
+  },
+  "network-control-plane-model-legacy-prod": {
+    "lastModified": 1789253100,
+    "narHash": "sha256-EKJQTAmv/pwjamM7ubjeCK1yDHIHOw2RORXFPHqnOIQ=",
+    "rev": "5f32cfe04b25e1619a12cd24365ac9165a648c8c"
+  },
+  "network-control-plane-model-prod": {
+    "lastModified": 1790212173,
+    "narHash": "sha256-THoZAOpRgysg5Za1bVLMYyNsy9ejWidZxfxp7fnB8r8=",
+    "rev": "b29d872e724660c42dec5b98a38dc5b658777b5f"
+  },
+  "network-forwarding-model-legacy-prod": {
+    "lastModified": 1789250734,
+    "narHash": "sha256-2+Dj6qv3ReH+EBLZmrw8tYGGDKkook8F8EEmD5jN1cQ=",
+    "rev": "5f6a6cd12a68650fc9fb920981ecf0d2f5dd8f73"
+  },
+  "network-forwarding-model-prod": {
+    "lastModified": 1790205900,
+    "narHash": "sha256-CJzhBGtgOenVw5KbBv+bU555MYu4n585NcJPqq8o/ow=",
+    "rev": "a86b4f60815e3488786d0bbb3e103698ef9f431c"
+  },
+  "network-labs-legacy-prod": {
+    "lastModified": 1789250741,
+    "narHash": "sha256-KkgwBcQYutGwzo0MSBPKEI8+kpK5ooIrtzEqwB16Ckk=",
+    "rev": "11ac8629278d255dcc0c353858a75bf59e918bd3"
+  },
+  "network-labs-prod": {
+    "lastModified": 1789682714,
+    "narHash": "sha256-dsmlDIp6vX36q59hb6EO60JQiYtSLGjxwSsiE2wlRh0=",
+    "rev": "376614f36eecb976bb59081f5fe1610babf2b5c1"
+  },
+  "network-labs-prod-renderer": {
+    "lastModified": 1789682714,
+    "narHash": "sha256-dsmlDIp6vX36q59hb6EO60JQiYtSLGjxwSsiE2wlRh0=",
+    "rev": "376614f36eecb976bb59081f5fe1610babf2b5c1"
+  },
+  "network-realization-model-legacy-prod": {
+    "lastModified": 1787189221,
+    "narHash": "sha256-ZOMlYGRjUwYghg+znFsLkWd7iEm7+qauvK0rubMnrxs=",
+    "rev": "a97b1a0b81796537133d3086ae77fef3084db863"
+  },
+  "network-realization-model-prod": {
+    "lastModified": 1787189221,
+    "narHash": "sha256-ZOMlYGRjUwYghg+znFsLkWd7iEm7+qauvK0rubMnrxs=",
+    "rev": "a97b1a0b81796537133d3086ae77fef3084db863"
+  },
+  "network-realization-schema-legacy-prod": {
+    "lastModified": 1787189221,
+    "narHash": "sha256-2lbUyd5UgdXLEwGcvjkivDlDe5MR8T2pITnHS+TSX8A=",
+    "rev": "782509c1c35c6319b0fd5a39d6658fe27a91aba3"
+  },
+  "network-realization-schema-prod": {
+    "lastModified": 1787189221,
+    "narHash": "sha256-2lbUyd5UgdXLEwGcvjkivDlDe5MR8T2pITnHS+TSX8A=",
+    "rev": "782509c1c35c6319b0fd5a39d6658fe27a91aba3"
+  },
+  "network-renderer-nebula-prod": {
+    "lastModified": 1791853175,
+    "narHash": "sha256-yAxdV1VQY0opOBQkmxYDzoeO073QVTW4NXH0fJ1vgyU=",
+    "rev": "4013bc1573773377e07e69961d3078c3d9dd7e98"
+  },
+  "network-renderer-nixos-legacy-prod": {
+    "lastModified": 1789253265,
+    "narHash": "sha256-GS1tSo1Vkh9I2fG2BG0wiE+8S1gRN33+hbG5QtiTpC4=",
+    "rev": "d78c529e95127bef2b19f990c1dd6faadc22f3e5"
+  },
+  "network-renderer-nixos-prod": {
+    "lastModified": 1790203226,
+    "narHash": "sha256-0vra9UOqXL2jLMzcX3052rtf7zHwL/ItrlFxp020/vI=",
+    "rev": "c8556986b2f7add2153dffda1e5f5119303286f5"
+  },
+  "network-renderer-wireguard-prod": {
+    "lastModified": 1788273198,
+    "narHash": "sha256-3B0KKvVLeeou3gp1oH2P+IZ+sgz19zyKCAD4jssbiho=",
+    "rev": "6b583f554598d7d1567fc7776e13184eccb51ea2"
+  },
+  "nixos-network-compiler-legacy-prod": {
+    "lastModified": 1788259011,
+    "narHash": "sha256-Z1YdZCQG8I05PG18E1jBTr7AzbfZkEDZC0sTFs3klZ0=",
+    "rev": "f4c7cbb1b0dd0ae68baf52958e9b0d1266ee52e5"
+  },
+  "nixos-network-compiler-prod": {
+    "lastModified": 1790212166,
+    "narHash": "sha256-BBvGtumoRzCsuYCf7gffJDpBOvqFv/1DfS1oniHZVZQ=",
+    "rev": "e9907209a790fe87a9fbe447c158f60e08ac175d"
+  }
+}
