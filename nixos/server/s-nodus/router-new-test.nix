@@ -58,7 +58,22 @@ let
   # per-VM QGA socket itself (`vm-exec VM COMMAND [ARG ...]`). Using the tracked
   # bin keeps this script in step with the manager's own QGA handling instead of
   # duplicating the socket path and socat plumbing here.
-  vmExec = "${config.system.build.nixosShellVmManagerOperatorCommands}/bin/vm-exec";
+  # Egress is probed from inside the `core` container, not through QGA:
+  # there is no VM any more, so `vm-exec` has no socket to talk to. Pinging
+  # from core exercises the router's own forwarding/NAT, which is the thing
+  # the deadline is supposed to be conditional on.
+  nixosContainer = lib.getExe' pkgs.nixos-container "nixos-container";
+  corePing = [
+    nixosContainer
+    "run"
+    "core"
+    "--"
+    "/run/current-system/sw/bin/ping"
+    "-c1"
+    "-W5"
+    "-n"
+    "1.1.1.1"
+  ];
 
   # Shared body for the state dump: the hypervisor-side facts that a
   # guest-side pcap cannot show.
@@ -72,12 +87,18 @@ let
       echo "=== $(date -Is) egress-window=${toString cfg.windowSeconds}s healthy-window=${toString cfg.egressOkWindowSeconds}s"
       echo "--- system"
       uptime
-      echo "--- vm units"
-      for u in ${newInstance}-vm ${prodInstance}-vm; do
-        printf '%s: %s\n' "$u" "$(systemctl is-active "$u" 2>/dev/null || true)"
+      echo "--- router containers"
+      for c in core downstream-selector upstream-selector policy; do
+        printf 'container@%s: %s\n' "$c" "$(systemctl is-active "container@$c.service" 2>/dev/null || true)"
       done
-      echo "--- vm unit journal"
-      journalctl -b --no-pager -o short-iso -u ${newInstance}-vm 2>/dev/null | tail -40 || true
+      echo "--- router container journal"
+      for c in core downstream-selector upstream-selector policy; do
+        echo "## $c"
+        journalctl -b --no-pager -o short-iso -u "container@$c.service" 2>/dev/null | tail -15 || true
+      done
+      echo "--- capture volumes"
+      du -sh /var/log/net-capture/* 2>/dev/null || echo "no captures"
+      ls -la /var/log/net-capture/*/*.pcap* 2>/dev/null | tail -10 || true
       echo "--- bridges"
       for b in br-cobalt-lan br-cobalt-wan; do
         echo "## $b"
@@ -155,9 +176,11 @@ in
       # No QEMU envelope for this trial: the candidate is realized as NixOS
       # containers on this host. Drop both VM instances so nothing starts a
       # guest, and empty the carrier watcher so it cannot start one either.
-      services.nixosShellVmManager.instances.${newInstance}.enable = lib.mkForce false;
-      services.nixosShellVmManager.instances.${prodInstance}.enable = lib.mkForce false;
-      services.nixosShellVmManager.carrierControls.wan-router-vms.instances = lib.mkForce [ ];
+      # Turn the VM manager off outright. Emptying the instance lists is not
+      # enough: the module asserts that at least one instance is enabled and
+      # that every carrier control references one, so "no VMs" has to mean the
+      # manager itself is not configured.
+      services.nixosShellVmManager.enable = lib.mkForce false;
 
       # Realize the candidate's containers directly on this host by importing
       # the same rendered model the VM used, but WITHOUT vmNics: with an empty
@@ -166,6 +189,12 @@ in
       # image. The deployment host in prod-network/testing/inventory-cobalt.nix
       # supplies this host's real ports (mxl_lan0 trunk, eth1 WAN).
       imports = [
+        # The dumper now runs on THIS host, because the router's containers do.
+        # It used to be enabled inside the s-router-cobalt-new guest, which no
+        # longer boots; without this the trial would run with no pcaps at all.
+        # The module watches the host-side container veths (ve-<name>).
+        (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network/router-capture.nix")
+
         (import ../../virtual-machine/nixos-shell-vm/s-router-cobalt-new/renderers.nix {
           inherit inputs lib relativeRepo;
           controlPlaneModelInput = inputs.network-control-plane-model;
@@ -189,6 +218,8 @@ in
           inventoryFileName = "inventory-cobalt.nix";
         })
       ];
+
+      local.routerCapture.enable = true;
 
       _module.args.sRouterProdProfile = {
         modelSource = relativeRepo.sourceModule "prod-network/testing";
@@ -241,6 +272,7 @@ in
         path = [
           pkgs.coreutils
           pkgs.gnugrep
+          pkgs.nixos-container
           pkgs.systemd
         ];
         serviceConfig = {
@@ -257,8 +289,7 @@ in
             printf 'failed: %s\n' "$(systemctl is-failed ${newInstance}-vm 2>/dev/null || true)"
             systemctl show ${newInstance}-vm.service \
               -p NRestarts -p ActiveEnterTimestamp -p SubState 2>/dev/null || true
-            printf 'egress: %s\n' "$(timeout 60 ${vmExec} ${newInstance} \
-              /run/current-system/sw/bin/ping -c1 -W5 -n 1.1.1.1 >/dev/null 2>&1 && echo ok || echo broken)"
+            printf 'egress: %s\n' "$(timeout 90 ${lib.escapeShellArgs corePing} >/dev/null 2>&1 && echo ok || echo broken)"
           } >>${logFile} 2>&1
         '';
       };
@@ -281,6 +312,7 @@ in
         path = [
           pkgs.coreutils
           pkgs.gnugrep
+          pkgs.nixos-container
           pkgs.systemd
         ];
         serviceConfig = {
@@ -306,8 +338,7 @@ in
           now=$(date +%s)
           elapsed=$(( now - start ))
 
-          if timeout 60 ${vmExec} ${newInstance} \
-            /run/current-system/sw/bin/ping -c1 -W5 -n 1.1.1.1 >/dev/null 2>&1; then
+          if timeout 90 ${lib.escapeShellArgs corePing} >/dev/null 2>&1; then
             egress=ok
             deadline=${toString cfg.egressOkWindowSeconds}
           else
