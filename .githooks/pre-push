@@ -426,9 +426,21 @@ PUBLIC_LITERAL_ALLOWLIST = {
     "1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9", "149.112.112.112",
     "8.26.56.26", "64.6.64.6", "208.67.222.222", "208.67.220.220",
     "::1",
+    # Dell DSU payload versions that are shaped exactly like an address and are
+    # quoted in dell-system-update commit messages. These are package versions
+    # (2.2.0.1 -> 2.3.0.0), not routable hosts; listed explicitly so the rule
+    # stays auditable instead of guessing from octet magnitude.
+    "2.2.0.1",
 }
 
-IPV4_LITERAL = re.compile(r"(?<![\d.])(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?![\d.])")
+# A dotted quad only counts as an address when it stands alone. Version and
+# package strings put the quad inside a larger token -- "2.3.0.1-26.08.00",
+# "dell-system-update-2.3.0.1", "v2.3.0.1" -- and those are not site identity.
+# The old lookaround allowed a trailing "-", so a Dell RPM version was reported
+# as a leaked public address and blocked pushes.
+IPV4_LITERAL = re.compile(
+    r"(?<![\w.-])(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?![\w.-])"
+)
 
 
 def scan_global_ip_literals(text: str, label: str) -> set[tuple[str, int, str]]:
@@ -449,6 +461,10 @@ def scan_global_ip_literals(text: str, label: str) -> set[tuple[str, int, str]]:
             except ValueError:
                 continue
             if not addr.is_global or addr.is_multicast or addr.is_reserved:
+                continue
+            # A quad ending in .0 is a network address, never a host; in this
+            # repository's history those are releases ("2.3.0.0"), not sites.
+            if int(raw.split(".")[-1]) == 0:
                 continue
             findings.add((label, lineno, "<global ipv4 literal>"))
     return findings
