@@ -231,26 +231,15 @@ in
       systemd.network.networks."10-mxl_lan0".networkConfig.Bridge = lib.mkForce "br-lan-trunk";
       systemd.network.networks."10-eth1".networkConfig.Bridge = lib.mkForce "br-wan";
 
-      # Loud, non-fatal warning: nixos/server/s-nodus/cobalt-bridges.nix still
-      # enslaves the LAN trunk port into br-cobalt-lan, while the rendered
-      # container target matches the SAME NIC into br-lan-trunk (20-mxl_lan0).
-      # networkd would apply both .network files, and the host's own management
-      # address lives on br-cobalt-lan.30, so booting this entry without
-      # resolving that loses the host's management path. Kept as a warning, not
-      # an assertion, so it can never abort a production build.
-      warnings =
-        let
-          nets = config.systemd.network.networks;
-          legacyTrunkClaim =
-            builtins.hasAttr "10-mxl_lan0" nets
-            && (nets."10-mxl_lan0".networkConfig.Bridge or null) == "br-cobalt-lan";
-        in
-        lib.optional legacyTrunkClaim ''
-          router-new-test: the LAN trunk port (mxl_lan0) is still claimed by
-          cobalt-bridges.nix for br-cobalt-lan, while this boot entry's rendered
-          container target claims it for br-lan-trunk. Resolve the host L2
-          realization and move the host management address off
-          br-cobalt-lan.30 before booting router-new-test.'';
+      # Host management moves off the prod-era trunk bridge onto the rendered
+      # management plane. The rendered target already DHCPs the host on the
+      # `mgmt` bridge (50-mgmt: VLAN 10 over br-lan-trunk), so the legacy
+      # DHCP on `vlan30` -- fed by cobalt-lan.30 off br-cobalt-lan -- would be a
+      # second, dead management path now that mxl_lan0 is enslaved to
+      # br-lan-trunk. Make the legacy access bridge unaddressed; it stays a
+      # plain L2 pass-through for the bench jacks on mxl_lan3.
+      systemd.network.networks."20-vlan30".networkConfig.DHCP = lib.mkForce "no";
+      systemd.network.networks."20-vlan30".networkConfig.LinkLocalAddressing = lib.mkForce "no";
 
       _module.args.sRouterProdProfile = {
         modelSource = relativeRepo.sourceModule "prod-network/testing";
