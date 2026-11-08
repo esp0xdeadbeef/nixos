@@ -221,6 +221,16 @@ in
 
       local.routerCapture.enable = true;
 
+      # Resolve the L2 collision instead of warning about it. The rendered
+      # container target enslaves the two physical ports to br-lan-trunk and
+      # br-wan; cobalt-bridges.nix (written for the QEMU envelope) enslaved the
+      # same ports to br-cobalt-lan / br-cobalt-wan. Two .network files
+      # matching one NIC means networkd applies whichever it likes, so instead
+      # of warning, point the legacy units at the SAME bridges the rendered
+      # target uses. One owner per port, no ambiguity.
+      systemd.network.networks."10-mxl_lan0".networkConfig.Bridge = lib.mkForce "br-lan-trunk";
+      systemd.network.networks."10-eth1".networkConfig.Bridge = lib.mkForce "br-wan";
+
       # Loud, non-fatal warning: nixos/server/s-nodus/cobalt-bridges.nix still
       # enslaves the LAN trunk port into br-cobalt-lan, while the rendered
       # container target matches the SAME NIC into br-lan-trunk (20-mxl_lan0).
