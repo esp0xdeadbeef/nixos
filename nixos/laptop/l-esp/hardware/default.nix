@@ -13,6 +13,7 @@
     ./steam.nix
     ./suspend-to-disk.nix
     ./tmpfs.nix
+    ./usb-serial-console.nix
   ];
 
   boot.kernelModules = [ "iwlwifi" ];

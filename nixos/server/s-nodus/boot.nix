@@ -92,6 +92,24 @@ in
       "pd_ignore_unused"
     ];
 
+    # The serial console must ALWAYS exist: it is the only way onto this board
+    # when the network is down, which happens regularly.
+    #
+    # `serial-getty@ttyS0` is normally instantiated by systemd-getty-generator
+    # only when `console=ttyS0` appears on the KERNEL COMMAND LINE.  On this
+    # board that command line comes from the FIT's /chosen bootargs (U-Boot),
+    # not from NixOS's boot.kernelParams -- so if a FIT is flashed from a
+    # generation whose bootargs lack the console argument, no serial getty is
+    # ever spawned and the board becomes unreachable exactly when the console
+    # matters most.
+    #
+    # Pulling the instance in through getty.target makes it independent of the
+    # bootargs: it starts whether or not `console=ttyS0` made it into the FIT.
+    # `services.getty.autologinUser = "root"` (set below) then gives root on
+    # that console, because NixOS's serial-getty@ template builds its ExecStart
+    # from the same autologin setting.
+    systemd.targets.getty.wants = [ "serial-getty@ttyS0.service" ];
+
     # --- bootloader -----------------------------------------------------
     # NixOS does not own the bootloader: the board's vendor U-Boot loads the
     # raw FIT from the `production` partition (see ./fit.nix and
