@@ -134,6 +134,27 @@ def is_expected_sops_file(path: str) -> bool:
     )
 
 
+def is_secret_bearing_path(path: str) -> bool:
+    """Every tracked file under secrets/ is secret-bearing unless it is
+    explicitly one of the known non-secret helper paths.
+
+    is_expected_sops_file() keys off a fixed suffix allowlist, so a secret
+    committed with any other suffix (e.g. a .garnet sidecar holding a Nebula
+    host key) was skipped entirely -- neither encryption-checked nor scanned.
+    Classifying by directory keeps that from silently passing again.
+    """
+    candidate = Path(path)
+    if candidate.parts[:1] != ("secrets",):
+        return False
+    if candidate.name in {".sops.yaml", "README.md"}:
+        return False
+    if candidate.name.endswith((".example", ".pub")):
+        return False
+    if candidate.suffix.lower() in {".sh", ".nix"}:
+        return False
+    return True
+
+
 def is_privacy_source(path: str) -> bool:
     name = Path(path).name
     return is_expected_sops_file(path) and (
@@ -180,7 +201,23 @@ def derive_private_denylist(
     tracked = git(repo, "ls-files", "-z", "--", "secrets").decode(
         "utf-8", errors="surrogateescape"
     )
-    sops_files = sorted(path for path in tracked.split("\0") if path and is_expected_sops_file(path))
+    tracked_files = [path for path in tracked.split("\0") if path]
+
+    # Fail closed on any secret-bearing file that is not an encrypted SOPS
+    # document. This covers suffixes outside SOPS_SUFFIXES, which would
+    # otherwise be invisible to both the encryption check and the scan below.
+    for path in tracked_files:
+        if not is_secret_bearing_path(path):
+            continue
+        status = run(["sops", "filestatus", path], cwd=repo)
+        try:
+            encrypted = status.returncode == 0 and json.loads(status.stdout).get("encrypted") is True
+        except (json.JSONDecodeError, AttributeError):
+            encrypted = False
+        if not encrypted:
+            raise PrivacyCheckError(f"tracked secret file is not SOPS-encrypted: {path}")
+
+    sops_files = sorted(path for path in tracked_files if is_expected_sops_file(path))
     if not sops_files:
         raise PrivacyCheckError("no tracked SOPS files were found")
 
