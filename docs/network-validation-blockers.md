@@ -51,3 +51,32 @@ input and of brave. network-realization-schema: wrapped-CPM validation.
 Neither blocker is "pre-existing and therefore ignorable": both are documented
 with the owning spec item and the concrete next step in
 `network-renderer-nixos/docs/blockers.md`.
+
+## Full validation sweep (realization + renderer)
+
+Executed locally with the same entrypoints CI uses:
+
+- network-realization-model: `nix flake check -L` → all checks passed.
+- network-realization-schema: `nix flake check -L` → all checks passed.
+- network-renderer-access-endpoint-nixos: 16 passed, 0 failed.
+- network-renderer-wireguard: 3 PASS, 0 FAIL (includes `nix flake check`).
+- network-renderer-containerlab-linux-backend: 57 tests PASS.
+- network-renderer-nebula: 15 PASS, 0 FAIL.
+- network-renderer-nixos: 24 PASS, 2 FAIL (the two blocked cases above).
+- network-labs: 42 PASS, 0 FAIL, 1 skipped.
+- network-control-plane-model: 242 PASS, 0 FAIL.
+- network-compiler, network-forwarding-model: CI success (forwarding model
+  82/82).
+
+Hygiene sweep across every network-* repository (including network-site-esp):
+
+- machine-local paths (`/home/<user>`, `~/…`, `/Users/…`): 0 in every tracked
+  tree.
+- private key material (`BEGIN … PRIVATE KEY`, `AGE-SECRET-KEY-1`): 0.
+- network-labs SOPS payloads stay encrypted; `.sops.yaml` carries only public
+  age recipients and no test decrypts them.
+- Operator infrastructure literals replaced with documentation ranges
+  (TEST-NET IPv4, 2001:db8::/32) in the renderer fixtures/cases, the CPM
+  hostile-DNS case, the labs SMT p2p pools and the forwarding-model WireGuard
+  boundary case. `network-codex-agent` is out of scope per instruction (private,
+  no CI).
