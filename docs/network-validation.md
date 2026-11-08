@@ -51,3 +51,39 @@ site-esp: success.
 - Operator infrastructure literals replaced with documentation ranges
   (TEST-NET IPv4, `2001:db8::/32`); the remaining public literals are
   well-known resolvers/example addresses used as DNS fixtures.
+
+## realization-model / realization-schema: audit and fixes
+
+The two repos were load-bearing but two of their schema guarantees were only
+exercised by fixtures:
+
+- `NR_SCHEMA_SHAPE_INVALID` rejected unknown *platform-binding* fields but no
+  unknown *bundle* fields. FS-161-HDS-010-SDS-010-SMS-010 requires the schema to
+  reject unknown extensions; a bundle could carry an extra top-level field
+  (including a second platform-binding sidecar) and still validate. The schema
+  now allows exactly the declared envelope (required + optional + the release
+  `validation` record) and fails at `/` otherwise
+  (`network-realization-schema` 675205d).
+- `protectedReferences` was validated by the schema but no producer populated
+  it, so every real bundle shipped `[]` and the protected-material checks were
+  fixture-only. `network-realization-model` (864693c) now projects every
+  `/run/secrets/` leaf the canonical content names into opaque
+  `{ reference, classification = "protected" }` records, unions explicitly
+  declared references, and rejects a platform binding that references a
+  protected path the bundle does not declare
+  (`NR_PLATFORM_BINDING_REFERENCE_MISSING`). Completeness is by construction:
+  a producer cannot release a bundle that omits a protected reference its own
+  content carries.
+
+Verified: both repos' `nix flake check -L` passes; a real CPM output realizes
+to a bundle with 5 derived protected references, all `/run/secrets/`, opaque,
+and `validateRendererInput` accepts it; `network-labs` pinned to the new
+model/schema (63c1740) runs 42 PASS / 0 FAIL, which exercises the full
+bundle -> platform binding -> renderer flow.
+
+Observed layering (no change required): the schema validates the bundle and
+binding shapes; renderer-consumption and rendered-output coverage manifests are
+validated in `network-labs` (FS-168 trace) where they are produced. Platform
+bindings are built with all five categories by the labs harness, while the NixOS
+host profile realizes the `deployment` category (VM NICs). The other categories
+are carried and schema-validated, not yet consumed by a renderer.
