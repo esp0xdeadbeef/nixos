@@ -51,11 +51,17 @@ in
       # /persist is mounted. Without it the probe for /persist always fails and
       # the outage counter silently falls back to /run, losing the counter on
       # every reboot and breaking the "window survives a reboot" contract.
+      #
+      # systemd is required for the final `systemctl reboot`. It currently
+      # resolves only because NixOS appends the implicit default service path;
+      # declaring it keeps the one action that matters (rebooting a wedged
+      # headless box) working if that default ever changes.
       path = with pkgs; [
         coreutils
         gnugrep
         iputils
         util-linux
+        systemd
       ];
       serviceConfig = {
         Type = "oneshot";
@@ -136,6 +142,12 @@ in
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
+      # This unit shells out to `systemctl start`; declare the dependency
+      # instead of relying on the implicit default service path.
+      path = [
+        pkgs.coreutils
+        pkgs.systemd
+      ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
