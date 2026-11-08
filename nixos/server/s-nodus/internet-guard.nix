@@ -47,10 +47,15 @@ in
   config = lib.mkIf cfg.enable {
     systemd.services.internet-guard = {
       description = "Reboot when every internet probe target stays unreachable";
+      # util-linux is required: the script uses `mountpoint` to decide whether
+      # /persist is mounted. Without it the probe for /persist always fails and
+      # the outage counter silently falls back to /run, losing the counter on
+      # every reboot and breaking the "window survives a reboot" contract.
       path = with pkgs; [
         coreutils
         gnugrep
         iputils
+        util-linux
       ];
       serviceConfig = {
         Type = "oneshot";
@@ -60,7 +65,15 @@ in
         set -u
 
         dir=/persist/var/lib/internet-guard
-        if ! mountpoint -q /persist; then
+        # `command -v` keeps the dependency explicit: if util-linux ever drops
+        # out of `path` again this is reported instead of silently counting in
+        # /run and losing the window on the next reboot. The guard still runs:
+        # on a headless box this reboot is the only recovery path, so degrading
+        # to a volatile counter beats refusing to guard at all.
+        if ! command -v mountpoint >/dev/null 2>&1; then
+          say "mountpoint (util-linux) missing from PATH; outage counter will not survive a reboot"
+        fi
+        if ! mountpoint -q /persist 2>/dev/null; then
           dir=/run/internet-guard
         fi
         file=$dir/since
