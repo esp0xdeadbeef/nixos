@@ -5107,11 +5107,11 @@
     "pin-refresh-source": {
       "flake": false,
       "locked": {
-        "lastModified": 1794107652,
-        "narHash": "sha256-L3T8sAYgvDpJuLOU4THrvrqLMr8NMdr+EQFduwNYYnM=",
+        "lastModified": 1794150217,
+        "narHash": "sha256-gwW1lkSNriG2otlPp1wNnhWMO50NZ/mWowFX2TEfeew=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos",
-        "rev": "0ac1774f4381cfe5374af65d9f1dbbe15e1476f5",
+        "rev": "657ae969f3290fbdb17117b33065264caf4cb4b8",
         "type": "github"
       },
       "original": {
