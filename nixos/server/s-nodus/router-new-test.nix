@@ -221,6 +221,27 @@ in
 
       local.routerCapture.enable = true;
 
+      # Loud, non-fatal warning: nixos/server/s-nodus/cobalt-bridges.nix still
+      # enslaves the LAN trunk port into br-cobalt-lan, while the rendered
+      # container target matches the SAME NIC into br-lan-trunk (20-mxl_lan0).
+      # networkd would apply both .network files, and the host's own management
+      # address lives on br-cobalt-lan.30, so booting this entry without
+      # resolving that loses the host's management path. Kept as a warning, not
+      # an assertion, so it can never abort a production build.
+      warnings =
+        let
+          nets = config.systemd.network.networks;
+          legacyTrunkClaim =
+            builtins.hasAttr "10-mxl_lan0" nets
+            && (nets."10-mxl_lan0".networkConfig.Bridge or null) == "br-cobalt-lan";
+        in
+        lib.optional legacyTrunkClaim ''
+          router-new-test: the LAN trunk port (mxl_lan0) is still claimed by
+          cobalt-bridges.nix for br-cobalt-lan, while this boot entry's rendered
+          container target claims it for br-lan-trunk. Resolve the host L2
+          realization and move the host management address off
+          br-cobalt-lan.30 before booting router-new-test.'';
+
       _module.args.sRouterProdProfile = {
         modelSource = relativeRepo.sourceModule "prod-network/testing";
         labSelector = null;
