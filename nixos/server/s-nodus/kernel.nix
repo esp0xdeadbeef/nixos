@@ -48,6 +48,23 @@ in
           name = "pcs-mtk-usxgmii-no-reset";
           patch = ./patches/977-pcs-mtk-usxgmii-no-reset-after-linkup.patch;
         }
+        # Netdev-watchdog recovery: a queue stalled WITHOUT an FE error must
+        # recover that netdev alone (stop/start) instead of either doing
+        # nothing (the old early return left the port dead until cold boot) or
+        # resetting the whole FE and bouncing every MAC (WAN included).
+        {
+          name = "mtk-eth-tx-timeout-single-dev-recovery";
+          patch = ./patches/981-mtk-eth-do-not-reset-all-macs-on-tx-timeout.patch;
+        }
+        # Warm-reset poll fix for MT7988: the FE clears RSTCTRL_FE
+        # asynchronously, so polling for the asserted bit times out on every
+        # recovery attempt and the cold-reset fallback leaves the MACs down
+        # ("warm reset failed", total outage until reboot).  Poll for the
+        # deasserted state instead (OpenWrt mtk_eth_soc form).
+        {
+          name = "mtk-eth-warm-reset-poll-fix";
+          patch = ./patches/982-mtk-eth-warm-reset-fix.patch;
+        }
       ];
       structuredExtraConfig = (prev.structuredExtraConfig or { }) // (with lib.kernel; {
         # --- board networking drivers (the delta provides the code) ---
