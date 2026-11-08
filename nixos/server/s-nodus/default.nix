@@ -90,6 +90,10 @@ in
     # database lives on /persist (not SOPS) so rotation is a file operation.
     ./tang.nix
 
+    # Trial boot entry: runs the candidate cobalt router in place of production
+    # and reboots back to the default entry when the window ends.
+    ./router-new-test.nix
+
     # Reboot the board when BOTH internet probes stay unreachable for the whole
     # window; one reachable target means a DNS/CDN problem, not a dead uplink.
     ./internet-guard.nix

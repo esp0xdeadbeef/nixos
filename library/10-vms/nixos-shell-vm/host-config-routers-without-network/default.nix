@@ -14,6 +14,7 @@
     ./impermanence.nix
     ./persist-state-disk.nix
     ./router-diagnostics.nix
+    ./router-capture.nix
   ];
 
 

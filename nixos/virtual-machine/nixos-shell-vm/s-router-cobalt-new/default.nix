@@ -135,6 +135,16 @@ in
   local.routerDiagnostics.selftest = true;
   local.routerDiagnostics.ensureDnsForwarders = true;
 
+  # Per-hop packet capture and state logging for the forwarding chain
+  # (access-* -> downstream-selector -> core -> upstream-selector, plus the
+  # policy-* containers). Written under /var/log/net-capture, which this guest
+  # persists on the state disk, so a trial that loses connectivity can still be
+  # diagnosed by mounting state.qcow2 instead of needing a reachable guest.
+  #
+  # Candidate-only: the production shape keeps the default (disabled), so this
+  # cannot change what the deployed router does.
+  local.routerCapture.enable = true;
+
   networking.hostName = lib.mkForce hostName;
 
   # No per-VM secrets/<host>.yaml: this VM reuses the cobalt site's existing

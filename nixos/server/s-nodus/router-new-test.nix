@@ -1,0 +1,309 @@
+# Non-default boot specialization that trials the candidate cobalt router.
+#
+# The default boot entry runs `s-router-cobalt-prod` (see vm-host.nix). This
+# specialization exists to A/B that by running `s-router-cobalt-new` in its
+# place on the real trunk, with the production image left untouched on disk.
+#
+# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
+# reboot always returns to the production shape. That is what makes the trial
+# self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
+# the host cannot even reach -- the reboot restores production without anyone
+# touching the site.
+#
+# The deadline is ADAPTIVE, because the two failure modes want opposite things:
+#
+#   egress broken -> get off the candidate quickly (default 10 min), since
+#                    every extra minute is a site outage and there is nothing
+#                    to watch on a dead box.
+#   egress works  -> stay on the candidate much longer (default 2 h) so the
+#                    live state can actually be inspected by hand: routes,
+#                    conntrack, container state, tcpdump while it is flowing.
+#
+# "Egress" is the candidate's own connectivity, probed through the manager's
+# tracked `vm-exec` bin (from the nixos-shell-vm-manager input) so it does not
+# depend on the host's own path. The verdict and the
+# deadline in force are logged on every poll, so a post-mortem can tell whether
+# the box was ever healthy and which window applied.
+#
+# Everything the trial learns is written to /persist (not /run), because the
+# point is to read it after the host has already rebooted back.
+#
+# Safety properties, in order of importance:
+#
+#   1. It is NOT the default entry. Nothing here can be reached by a plain
+#      reboot of the production system.
+#   2. The two router images conflict on the shared trunk ports (vm-host.nix
+#      sets Conflicts=), so prod cannot start while the candidate runs. This
+#      specialization also stops the carrier watcher from driving prod, which
+#      would otherwise keep trying to start it and fight the candidate.
+#   3. A reboot-loop guard: if the marker written just before the reboot is
+#      still present, the host came back INTO the specialization, so it refuses
+#      to reboot again and says so instead of looping.
+{ config, lib, pkgs, ... }:
+
+let
+  cfg = config.local.routerNewTest;
+
+  stateDir = "/persist/router-new-test";
+  logFile = "${stateDir}/host-state.log";
+  rebootMarker = "${stateDir}/rebooted-at";
+  startedAt = "${stateDir}/started-at";
+
+  prodInstance = "s-router-cobalt-prod";
+  newInstance = "s-router-cobalt-new";
+
+  # Guest exec comes from the nixos-shell-vm-manager flake input, not from a
+  # privately built helper: the module already exports its operator commands
+  # (vm-exec, vm-status, vm-logs, ...) as system.build, and vm-exec resolves the
+  # per-VM QGA socket itself (`vm-exec VM COMMAND [ARG ...]`). Using the tracked
+  # bin keeps this script in step with the manager's own QGA handling instead of
+  # duplicating the socket path and socat plumbing here.
+  vmExec = "${config.system.build.nixosShellVmManagerOperatorCommands}/bin/vm-exec";
+
+  # Shared body for the state dump: the hypervisor-side facts that a
+  # guest-side pcap cannot show.
+  dumpState = ''
+    set -u
+    dir=${stateDir}
+    mkdir -p "$dir"
+    log=${logFile}
+
+    {
+      echo "=== $(date -Is) egress-window=${toString cfg.windowSeconds}s healthy-window=${toString cfg.egressOkWindowSeconds}s"
+      echo "--- system"
+      uptime
+      echo "--- vm units"
+      for u in ${newInstance}-vm ${prodInstance}-vm; do
+        printf '%s: %s\n' "$u" "$(systemctl is-active "$u" 2>/dev/null || true)"
+      done
+      echo "--- vm unit journal"
+      journalctl -b --no-pager -o short-iso -u ${newInstance}-vm 2>/dev/null | tail -40 || true
+      echo "--- bridges"
+      for b in br-cobalt-lan br-cobalt-wan; do
+        echo "## $b"
+        ip -br link show master "$b" 2>/dev/null || echo "no members"
+        bridge fdb show br "$b" 2>/dev/null | head -40 || true
+      done
+      echo "--- taps"
+      ip -br link 2>/dev/null | grep -E 'tap-(lan-trunk|wan)' || echo none
+      echo "--- wan carrier"
+      cat /sys/class/net/wan-carrier/carrier 2>/dev/null || echo unknown
+    } >>"$log" 2>&1
+  '';
+in
+{
+  options.local.routerNewTest = {
+    windowSeconds = lib.mkOption {
+      type = lib.types.int;
+      default = 10 * 60;
+      description = ''
+        Deadline for the candidate while its egress is BROKEN. Short on
+        purpose: the site is down for as long as the candidate is booted, and
+        a dead box is not worth watching.
+      '';
+    };
+
+    egressOkWindowSeconds = lib.mkOption {
+      type = lib.types.int;
+      default = 2 * 60 * 60;
+      description = ''
+        Deadline for the candidate while its egress WORKS. Deliberately long so
+        the live router can be inspected by hand (routes, conntrack, tcpdump
+        while traffic flows). Still finite: a forgotten trial must return the
+        site to the production image eventually.
+      '';
+    };
+
+    probeIntervalSeconds = lib.mkOption {
+      type = lib.types.int;
+      default = 60;
+      description = "How often egress is probed and the deadline re-evaluated.";
+    };
+
+    verifyIntervalSeconds = lib.mkOption {
+      type = lib.types.int;
+      default = 120;
+      description = "How often the candidate's health is recorded during the trial.";
+    };
+  };
+
+  config = {
+    # Production boots clear the loop-guard marker. Without this the marker
+    # written before a trial's reboot would survive forever and permanently
+    # disarm the deadline for every later trial.
+    systemd.services.router-new-test-clear-marker = {
+      description = "Clear the router-new-test reboot guard after a production boot";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "${prodInstance}-vm.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = false;
+      };
+      script = ''
+        set -u
+        marker=${rebootMarker}
+        if [ -e "$marker" ]; then
+          echo "clearing router-new-test reboot marker from $(cat "$marker" 2>/dev/null || echo unknown)"
+          rm -f "$marker"
+        fi
+      '';
+    };
+
+    specialisation.router-new-test.configuration = {
+      system.nixos.tags = [ "router-new-test" ];
+
+      # Hand the candidate to the carrier watcher instead of starting it here.
+      # The manager asserts that a carrier-controlled instance never also sets
+      # activation.startOnBoot, and that is the right division: the watcher
+      # starts the candidate when the WAN transceiver is present and stops it
+      # when the module is pulled, which is exactly the production behaviour we
+      # want to reproduce while testing.
+      #
+      # Production is dropped from the watcher's instance list in the same
+      # statement, so it is neither started by the watcher nor on boot (its
+      # startOnBoot is already false in the base configuration). The shared
+      # trunk ports are protected by the Conflicts= the manager sets between the
+      # two images, so starting the candidate stops prod.
+      services.nixosShellVmManager.carrierControls.wan-router-vms.instances =
+        lib.mkForce [ newInstance ];
+
+      systemd.services.router-new-test-banner = {
+        description = "Announce the router-new-test trial";
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = false;
+        };
+        script = ''
+          set -u
+          mkdir -p ${stateDir}
+          date +%s >${startedAt}
+          {
+            echo "=== trial start $(date -Is)"
+            echo "candidate:  ${newInstance}"
+            echo "production: ${prodInstance} (stopped for this boot)"
+            echo "deadline:   ${toString cfg.windowSeconds}s if egress is broken,"
+            echo "            ${toString cfg.egressOkWindowSeconds}s if egress works"
+            echo "captures:   in the candidate guest, /var/log/net-capture (on its state disk)"
+            echo "generation: $(readlink -f /nix/var/nix/profiles/system 2>/dev/null || echo unknown)"
+          } >>${logFile} 2>&1
+        '';
+      };
+
+      # Record whether the candidate ever came up. A trial that produced no
+      # traffic is only diagnosable if the log says whether the guest was ever
+      # healthy, so this is sampled rather than only logged at the end.
+      systemd.services.router-new-test-verify = {
+        description = "Record candidate router health during the trial";
+        path = [
+          pkgs.coreutils
+          pkgs.gnugrep
+          pkgs.systemd
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = false;
+          TimeoutStartSec = "60s";
+        };
+        script = ''
+          set -u
+          ${dumpState}
+          {
+            echo "--- candidate health"
+            printf 'active: %s\n' "$(systemctl is-active ${newInstance}-vm 2>/dev/null || true)"
+            printf 'failed: %s\n' "$(systemctl is-failed ${newInstance}-vm 2>/dev/null || true)"
+            systemctl show ${newInstance}-vm.service \
+              -p NRestarts -p ActiveEnterTimestamp -p SubState 2>/dev/null || true
+            printf 'egress: %s\n' "$(timeout 60 ${vmExec} ${newInstance} \
+              /run/current-system/sw/bin/ping -c1 -W5 -n 1.1.1.1 >/dev/null 2>&1 && echo ok || echo broken)"
+          } >>${logFile} 2>&1
+        '';
+      };
+
+      systemd.timers.router-new-test-verify = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "3min";
+          OnUnitActiveSec = "${toString cfg.verifyIntervalSeconds}s";
+          Unit = "router-new-test-verify.service";
+          Persistent = false;
+        };
+      };
+
+      # The self-healing part. Polls instead of using a fixed deadline so the
+      # window can follow the candidate's actual state: short while egress is
+      # broken, long while it works.
+      systemd.services.router-new-test-reboot = {
+        description = "End the router-new-test trial and reboot into production";
+        path = [
+          pkgs.coreutils
+          pkgs.gnugrep
+          pkgs.systemd
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = false;
+          TimeoutStartSec = "180s";
+        };
+        script = ''
+          set -u
+          marker=${rebootMarker}
+          if [ -e "$marker" ]; then
+            echo "router-new-test: marker present since $(cat "$marker" 2>/dev/null || echo unknown);" \
+              "the host booted back into the specialization, refusing to reboot again" >>${logFile}
+            exit 0
+          fi
+
+          start=$(cat ${startedAt} 2>/dev/null || true)
+          if [ -z "$start" ]; then
+            # The banner may not have run yet; fall back to boot time so a
+            # candidate that never reaches multi-user still gets a deadline.
+            start=$(( $(date +%s) - $(cut -d. -f1 /proc/uptime) ))
+          fi
+          now=$(date +%s)
+          elapsed=$(( now - start ))
+
+          if timeout 60 ${vmExec} ${newInstance} \
+            /run/current-system/sw/bin/ping -c1 -W5 -n 1.1.1.1 >/dev/null 2>&1; then
+            egress=ok
+            deadline=${toString cfg.egressOkWindowSeconds}
+          else
+            egress=broken
+            deadline=${toString cfg.windowSeconds}
+          fi
+
+          printf '%s router-new-test egress=%s elapsed=%ss deadline=%ss\n' \
+            "$(date -Is)" "$egress" "$elapsed" "$deadline" >>${logFile}
+
+          if [ "$elapsed" -lt "$deadline" ]; then
+            exit 0
+          fi
+
+          ${dumpState}
+          date +%s >"$marker"
+          {
+            echo "--- trial end"
+            echo "egress at end: $egress (deadline ''${deadline}s, elapsed ''${elapsed}s)"
+            echo "rebooting to the default boot entry (production)"
+            echo "reboot requested at $(date -Is)"
+          } >>${logFile} 2>&1
+
+          echo "router-new-test: egress=$egress, ''${elapsed}s elapsed >= ''${deadline}s; rebooting to the default entry"
+          systemctl reboot
+        '';
+      };
+
+      systemd.timers.router-new-test-reboot = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          # Poll from early boot: a candidate that never boots must still return
+          # the site to production once the broken-egress window expires.
+          OnBootSec = "60s";
+          OnUnitActiveSec = "${toString cfg.probeIntervalSeconds}s";
+          Unit = "router-new-test-reboot.service";
+          Persistent = false;
+        };
+      };
+    };
+  };
+}
