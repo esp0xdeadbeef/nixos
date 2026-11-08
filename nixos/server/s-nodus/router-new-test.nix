@@ -231,15 +231,10 @@ in
       systemd.network.networks."10-mxl_lan0".networkConfig.Bridge = lib.mkForce "br-lan-trunk";
       systemd.network.networks."10-eth1".networkConfig.Bridge = lib.mkForce "br-wan";
 
-      # Host management moves off the prod-era trunk bridge onto the rendered
-      # management plane. The rendered target already DHCPs the host on the
-      # `mgmt` bridge (50-mgmt: VLAN 10 over br-lan-trunk), so the legacy
-      # DHCP on `vlan30` -- fed by cobalt-lan.30 off br-cobalt-lan -- would be a
-      # second, dead management path now that mxl_lan0 is enslaved to
-      # br-lan-trunk. Make the legacy access bridge unaddressed; it stays a
-      # plain L2 pass-through for the bench jacks on mxl_lan3.
-      systemd.network.networks."20-vlan30".networkConfig.DHCP = lib.mkForce "no";
-      systemd.network.networks."20-vlan30".networkConfig.LinkLocalAddressing = lib.mkForce "no";
+      # Host management stays on vlan30. It is the host's own underlay
+      # address (10.2.30.100) and the path nebula/ssh use, and vlan30 is fed by
+      # the access jack on mxl_lan3 as well as cobalt-lan.30 -- so it keeps
+      # working and must NOT be taken away as part of this trial.
 
       _module.args.sRouterProdProfile = {
         modelSource = relativeRepo.sourceModule "prod-network/testing";
