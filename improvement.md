@@ -193,6 +193,268 @@ while ad hoc `inputs.nixpkgs-unstable` reaches across `overlays/unstable-package
 `library/01-general/packages/pentesting/packages.nix`. Normalize before the
 `01-general` split hardens the current access pattern into a profile.
 
+### Memory reclaim policy is absent, and it costs wifi (l-esp case study)
+
+There is **no** `vm.*` sysctl configuration anywhere in the repo (`grep -rn
+'"vm\.' --include=*.nix` returns nothing), and swap/zram policy is duplicated
+per host with three different values:
+
+| Host | zram | swapfile | `vm.*` tuning |
+|---|---|---|---|
+| `l-esp` | `memoryPercent = 50` (`hardware/btrfs-scrub.nix`) | 45 GiB (`hardware/suspend-to-disk.nix`) | none |
+| `s-nodus` | `memoryPercent = 100` (`default.nix`) | 64 GiB | none |
+| `l-envil` / `l-portal` | none | none | none |
+
+`/tmp` is a bare tmpfs on every laptop, inheriting half of RAM with no size cap.
+
+#### Symptom
+
+`l-esp` (30 GiB, i7-12850HX) reported 329 `wlp0s20f3` wifi auth/deauth events and
+**313 `page allocation failure`** plus **458 `Tx queue alloc failed`** across one
+7.5-day boot. All 35 recorded failures were order-6 (256 KiB contiguous) in
+`iwl_pcie_txq_alloc`, driven by `iwl_mvm_add_new_dqa_stream_wk` — i.e. every new
+station/stream. When `iwl_mvm` cannot get its TXQ, the STA stream is never set
+up, traffic stalls, and the connection tears down. It surfaces as "wifi
+flapping" and gets misattributed to router rebuilds.
+
+#### Actual cause (measured, not inferred)
+
+Not memory exhaustion and not an out-of-tree driver:
+
+- `MemAvailable` was 13-16 GiB throughout; PSI memory `full avg300 = 0.01`; no
+  OOM kills. `iwlwifi`/`iwlmvm` are **in-tree**
+  (`/run/booted-system/kernel-modules/.../iwlwifi.ko.xz`). Kernel taint is
+  `4097` = `P|O`, contributed **only** by `nvidia`, `nvidia_drm`,
+  `nvidia_modeset`, `nvidia_uvm` — unrelated to wifi.
+- It is **fragmentation**. At failure time `Node 0 Normal` had ~1.0 GiB free
+  while the buddy allocator showed **zero blocks above order-3**:
+  `441073 238919 55988 7580 0 0 0 0 0 0 0`.
+- Compaction is not idle — `compact_daemon_wake 516206`, 1.25e9 pages scanned,
+  against `compact_success 468` / `compact_fail 1271` and
+  `allocstall_movable 1155047`. Forcing `compact_memory` made it *worse*
+  (441k → 18k free pages) and still produced no order-4+ block.
+- The blocker is **reclaimable slab**. `SReclaimable` was 4.3 GiB (dentry/inode),
+  `vfs_cache_pressure` at its default 100. `drop_caches` immediately restored
+  order-4/-5/-6 (166 order-6 blocks) — and slab was back at 4.2 GiB within
+  seconds, re-fragmenting the zone. Combined with 13.1 GiB of compressed anon
+  held in zsmalloc (unmovable, in-zone) and 2.5 GiB of tmpfs `shmem` in `/tmp`,
+  the high-order pool never survives long enough for `iwlwifi` to use it.
+
+So the config is "decent" in the sense that nothing is on fire, but it has no
+memory-reclaim policy at all, and the default swappiness=60 pushes anon into
+zsmalloc instead of reclaiming the slab that actually blocks the allocation.
+
+#### Gaps to fix
+
+1. **No shared memory profile.** Create `profiles/nixos/hardware/memory.nix`
+   (and route `intel-workstation`, `l-envil`, `l-portal`, `s-nodus` through it)
+   that owns zram, swapfile, tmpfs caps, and the `vm.*` sysctls in one place.
+   Three hosts currently pick three different zram values for no documented
+   reason.
+2. **zram sizing.** `memoryPercent = 50` on a 30 GiB host yields a 15.5 GiB
+   device that is currently 79% occupied. Cap zram by *actual* memory used, not
+   device size, and drop to ~25% so compressed anon stays a fraction of RAM.
+3. **No high-order reserve.** `min_free_kbytes = 67584` is order-0 scaled;
+   nothing keeps a contiguous pool available. Raise it and widen the kswapd
+   window (`watermark_scale_factor`).
+4. **`watermark_boost_factor = 15000` is counterproductive here** — it fires
+   (`boost:193272kB` observed) and still cannot satisfy order-6, burning reclaim
+   cycles. Set to 0 on hosts running `iwlwifi`.
+5. **`swappiness = 60`** lets anon fill zsmalloc while 10.8 GiB of reclaimable
+   pagecache sits idle. Lower it.
+6. **`vfs_cache_pressure = 100`** does not push dentry/inode slab out under
+   this workload; the 4.3 GiB slab is what blocks compaction. Consider raising
+   it (and/or bounding slab) so reclaimable slab does not monopolize the zone.
+7. **`/tmp` is an uncapped tmpfs** (`fileSystems."/tmp".device = "tmpfs"` in
+   three host files, no `size=`). 2.1-2.5 GiB of `shmem` was resident and is
+   unmovable. Add a size cap and a `nr_inodes` cap.
+8. **`systemd-oomd` is enabled with an empty config** (default
+   `oomd.conf` = `[OOM]` only), so its default thresholds can never fire on this
+   workload. Either configure thresholds against the measured PSI numbers or
+   drop it in favour of a policy that matches the failure mode.
+9. **`journalctl --disk-usage` was 3.9 GiB** with `Storage=persistent` and no
+   `SystemMaxUse`; combined with unbounded slab this is more reclaimable
+   pressure than the high-order pool tolerates.
+
+#### Verification recipe
+
+These are the checks that produced the diagnosis; use them to prove a fix:
+
+```sh
+# 1. Is it fragmentation? high-order blocks vs. free pages
+tr -s ' ' < /proc/buddyinfo | grep Normal   # zeros above order-3 => fragmented
+# 2. Is compaction even trying?
+grep -E 'compact_|allocstall' /proc/vmstat  # high daemon_wake + low success
+# 3. Is reclaimable slab the blocker?
+grep -E 'SReclaimable|SUnreclaim' /proc/meminfo
+sync; echo 1 > /proc/sys/vm/drop_caches       # order-6 reappears => slab
+# 4. Confirm the consumer is iwlwifi and not a bad driver
+dmesg | grep -c 'Tx queue alloc failed'
+for m in /sys/module/*; do [ -s $m/taint ] && echo "$m: $(cat $m/taint)"; done
+```
+
+Do **not** treat `iwl_pcie_txq_alloc` failures as a hardware/`iwlwifi` bug until
+`/proc/buddyinfo` shows order-6 availability. The driver is the victim.
+
+### s-nodus (100.64.0.18): stale build, unpinned TSO guard, oversized zram
+
+Same measurement pass, different host and a different failure profile. Board:
+Banana Pi BPI-R4 Pro 4E, MediaTek MT7988A, **4 cores / 3.8 GiB**, kernel 6.18.60,
+uptime at capture 25 min, hosting `s-router-cobalt-prod-vm.service` (QEMU,
+`-m 2048`, `-smp 4`). The MT7996 wifi is out of scope (not mainline), so the
+l-esp `iwlwifi` failure mode cannot occur here.
+
+`vm.*` is **entirely default** here too, identical to l-esp:
+
+```
+vm.swappiness = 60          vm.min_free_kbytes = 45056
+vm.watermark_boost_factor = 15000   vm.watermark_scale_factor = 10
+vm.vfs_cache_pressure = 100 vm.compaction_proactiveness = 20
+vm.overcommit_memory = 0    vm.panic_on_oom = 0
+```
+
+Unlike l-esp there is **no** fragmentation and no allocation failure
+(`page allocation failure` count 0, taint 0, `allocstall_*` all 0, `pgsteal_*`
+all 0). The cost here is **CPU**, not memory:
+
+- PSI CPU `some avg300 = 33.24`, `avg60 = 47.33`.
+- `vmstat` shows `gu` (guest) at **20-31%** and `sy` at **12-27%** on 4 cores.
+- `qemu-system-aa` at ~301% CPU for a 2048 MiB VM, with `CPUAffinity=` empty
+  and `Nice=0` — the VM competes with everything else on all 4 cores.
+
+#### Findings
+
+1. **The running system is a month stale and the TSO/GSO guard is not active.**
+   `network.nix` defines `systemd.services.mtk-eth-tso-off`, and it is present
+   in current flake HEAD:
+
+   ```sh
+   nix eval .#nixosConfigurations.s-nodus.config.systemd.services \
+     --apply builtins.attrNames | grep mtk   # -> "mtk-eth-tso-off"
+   ```
+
+   But on the host that unit **does not exist**:
+
+   ```sh
+   systemctl status mtk-eth-tso-off   # Unit mtk-eth-tso-off.service could not be found
+   sudo ls /run/current-system/etc/systemd/system/ | grep -i mtk   # (nothing)
+   ```
+
+   and the offloads it is supposed to disable are **on** on every port:
+
+   ```
+   eth1/eth2/end0: tx-tcp-segmentation: on, generic-segmentation-offload: on
+   ```
+
+   Current system: `nixos-system-s-nodus-sd-card-26.05.20261105.c56a87d`
+   (generation 72, 2026-11-08 02:02). `network.nix` was written 2026-10-07 in
+   `e4156dc6`. So the guard is deployed in git but **not on the board**. This is
+   silent drift, not a code bug — and it matters because the comment in
+   `network.nix` declares the MT7988 TXD-ring corruption (0x77777777 poison, TX
+   timeout) is only *avoided* by this guard. The board is currently running
+   without its documented mitigation.
+
+   **The kernel patches 981/982 are themselves correct — verified, not assumed.**
+   They apply cleanly to the 6.18.60 source the config actually builds:
+
+   ```sh
+   # base is 6.18.60, patches claim a 6.18.55 rebase
+   nix eval --raw .#nixosConfigurations.s-nodus.pkgs.linux_6_18.version  # 6.18.60
+   patch -p1 --dry-run < .../981-...tx-timeout.patch   # all hunks OK, offset -263
+   patch -p1 --dry-run < .../982-...warm-reset-fix.patch # hunk OK, offset -386
+   ```
+
+   and both are wired into the build:
+
+   ```sh
+   nix eval --json .#nixosConfigurations.s-nodus.config.boot.kernelPackages \
+     .kernel.kernelPatches --apply 'ps: map (p: p.name) ps'
+   # -> [..., "mtk-eth-tx-timeout-single-dev-recovery", "mtk-eth-warm-reset-poll-fix"]
+   ```
+
+   The running module is provably the *unpatched* 6.18.60: decompiling it shows
+   the old `"transmit timed out"` and `"warm reset failed"` strings and **not**
+   981's `"stalled with no FE error"` or 982's deasserted-poll path. Unpatched
+   6.18.60 has those strings at `mtk_eth_soc.c:3366` and `:3995`; the 981 hunks
+   land exactly there. So: **patches good, build config good, deployment stale.**
+   Nothing to fix in the patch set — only the generation on the board.
+2. **zram is sized at 100% of RAM with no cap.** `zram-generator.conf` is
+   `zram-size=100 / 100 * ram`, from `zramSwap.memoryPercent = 100` in
+   `nixos/server/s-nodus/default.nix`. On a 3.8 GiB board that is a 3.8 GiB
+   device. `/sys/block/zram0/mem_limit` is **not exposed** by this kernel build
+   (`ENOENT`), so there is no hard ceiling on zsmalloc growth — on a board whose
+   entire job is to host a 2 GiB VM, compressed anon competes directly with it.
+   Contrast `l-esp` (`memoryPercent = 50`, priority 100): three hosts, three
+   different zram policies, none documented.
+3. **zram priority 5 is below the swapfile (-2).** Kernel swaps to the
+   *higher* priority first, so zram wins here, which is the intent — but the
+   pair `(100, prio 5)` and `(50, prio 100)` across two hosts means the
+   documented intent differs per host with no written rationale.
+4. **Swap is completely unused** (0 B of 67 GiB) while 1.58 GiB `AnonPages`
+   sits resident on a 3.8 GiB board. Not wrong today, but it means the zram
+   sizing has never been exercised — the first time it is, it will be under VM
+   pressure, which is the worst moment to discover the bound is absent.
+5. **`systemd-oomd` enabled, config empty** (`/etc/systemd/oomd.conf` =
+   `[OOM]` only), same as l-esp. With `ManagedOOMMemoryPressure=auto` and no
+   PSI pressure observed, it will never act; if zram does fill, it fires late
+   and picks a victim by cgroup rather than by the VM's importance.
+6. **No CPU isolation for the router VM.** `CPUAffinity=` empty, `Nice=0`,
+   `IOSchedulingClass=2`. A 4-core/4-vCPU VM with no reservation will starve the
+   host's own netdev/softirq path under load — which is the one path the board
+   exists to serve. This is the actual explanation for `some avg60 = 47%` PSI CPU
+   on a machine with no page failures.
+7. **Journal is unbounded** (`Storage=persistent`, no `SystemMaxUse`):
+   724 MiB here, 3.9 GiB on l-esp. Smaller absolute impact on this board but the
+   same missing policy.
+
+#### Gaps to fix
+
+1. **Rebuild and re-activate s-nodus first.** Until generation 72 is replaced,
+   everything in `network.nix` is `improvement.md` fiction, not deployed state —
+   including the now-fixed TSO guard assertion and the already-correct kernel
+   patches 981/982. This is also the cleanest test of whether the `aarch64`
+   builder path from l-esp still works (it did during this investigation: the
+   unit built on `s-sigma-builder`). Confirm with
+   `systemctl status mtk-eth-tso-off` **and**
+   `ethtool -k eth1 | grep tcp-segmentation-offload`, plus
+   `xzcat .../mtk_eth.ko.xz | strings | grep 'no FE error'` to prove 981 landed.
+2. Merge s-nodus into the shared `profiles/nixos/hardware/memory.nix`
+   (step 14 above). It is the host most exposed to the zram decision, because
+   the VM's working set is a large fraction of RAM.
+3. Size zram against RAM *minus* the VM reservation, not total RAM. With a
+   fixed 2048 MiB guest, `memoryPercent` should be a small fraction, not 100%.
+4. Add CPU allocation for the VM: either pin the vCPUs and leave core 0 for
+   host netdev/softirq, or set `Nice`/`CPUWeight` on the VM slice. Measure with
+   `vmstat 1` `gu`/`sy` and `/proc/pressure/cpu` before and after.
+5. Bind journald like l-esp (`SystemMaxUse`).
+6. **Verify the TSO guard actually applies.** — **DONE (code fix applied).**
+   `nixos/server/s-nodus/network.nix` now asserts the result instead of ending
+   every call in `|| true`. The unit reads back
+   `tcp-segmentation-offload` and `generic-segmentation-offload` per interface
+   and exits non-zero if either is not `off`, and it `partOf`
+   `systemd-networkd.service` so a networkd restart (which is what a netdev
+   stop/start does, including patch 981's per-netdev recovery) re-applies it.
+   Verified: the readback expression returns `on` against today's host (i.e. it
+   would have caught the drift) and `off` immediately after
+   `ethtool -K eth1 tso off gso off`. Still outstanding: nothing in CI/SAT
+   detects a *missing* unit, only a failing one — a rebuild that drops
+   `mtk-eth-tso-off` entirely is still silent. Consider a SAT row for it.
+
+#### Verification recipe (s-nodus)
+
+```sh
+# stale-build detection: config in HEAD but not on the host
+systemctl status mtk-eth-tso-off --no-pager | head -3
+sudo ethtool -k eth1 | grep -E 'tcp-segmentation-offload|generic-segmentation'
+# CPU cost of the router VM (the failure mode here)
+vmstat 1 5                      # gu / sy columns
+cat /proc/pressure/cpu
+systemctl show s-router-cobalt-prod-vm.service -p CPUAffinity -p Nice
+# zram exposure (no mem_limit on this kernel => no ceiling)
+zramctl; cat /sys/block/zram0/mm_stat
+ls /sys/block/zram0/mem_limit   # ENOENT => unbounded
+```
+
 ### Protected paths
 
 - `prod-network/{prod,testing,current}/` are near-duplicate large trees
@@ -658,6 +920,25 @@ is explicitly gated.
     mirror (`nix store copy`) plus fallback builder, and order substituters
     local-first on every host. See "Multi-site build coordination" above.
 
+14. One `profiles/nixos/hardware/memory.nix` for zram, swap, tmpfs and `vm.*`.
+    Start with `l-esp` (it has measured evidence), then route `l-envil`,
+    `l-portal` and `s-nodus` through it. Preserve the btrfs swapfile/scrub
+    interaction in `l-esp/hardware/btrfs-scrub.nix` — it must stay out of
+    whatever `services.btrfs.autoScrub.fileSystems` enumerates. Cap `/tmp`
+    tmpfs explicitly while moving it, so the documented size lives with the
+    rest of the memory policy rather than being implicit. zram sizing must be a
+    per-host input, not a shared constant: `l-esp` runs 50%, `s-nodus` runs
+    100% on a board that also gives 2048 MiB to a fixed guest. See "Memory
+    reclaim policy is absent" and "s-nodus (100.64.0.18)" above.
+
+15. Re-activate `s-nodus` from current HEAD and confirm the TSO guard lands.
+    Generation 72 (`26.05.20261105.c56a87d`) predates the unit, so the board is
+    running without its documented MT7988 TXD-ring mitigation. This is also the
+    cheapest check that the aarch64 builder path still works. Gate on
+    `nixos/server/s-nodus/network.nix`: make the offload unit assert the
+    post-change `ethtool -k` state instead of ending every call in `|| true`, so
+    a future rebuild that drops it fails loudly.
+
 ## Validation Strategy
 
 For every cleanup step:
@@ -674,6 +955,29 @@ nix eval .#nixosConfigurations.s-sigma.config.system.build.toplevel.drvPath
 - For package changes, build the affected package directly.
 - For Home Manager-only moves, eval the affected user config before rebuilding
   the host.
+
+For the memory profile (step 14), the config eval proves nothing. Validate on
+the host after activation:
+
+```sh
+# order-6 blocks must be non-zero after a day of normal use
+tr -s ' ' < /proc/buddyinfo | grep Normal
+dmesg | grep -c 'Tx queue alloc failed'          # expect 0, was 458
+journalctl -b -k | grep -c 'page allocation failure'   # expect 0, was 313
+grep -E 'SReclaimable|SUnreclaim' /proc/meminfo
+grep -E 'compact_|allocstall' /proc/vmstat
+```
+
+For s-nodus (step 15), the config eval is not enough either — the whole finding
+was that HEAD and the running system disagreed:
+
+```sh
+systemctl status mtk-eth-tso-off --no-pager | head -3   # must be active
+sudo ethtool -k eth1 | grep -E 'tcp-segmentation-offload'  # must be off
+readlink /run/current-system                             # must be the new drv
+vmstat 1 5                                               # gu/sy after CPU policy
+cat /proc/pressure/cpu
+```
 
 Concurrent `nix eval` runs contend on one eval cache and may emit an occasional
 SQLite "database is busy" warning; that is benign.
@@ -695,6 +999,21 @@ SQLite "database is busy" warning; that is benign.
 - Do not leave a mixed commit that "also adds" or "also removes" a probe host
   stub alongside unrelated fixes; that pattern has silently undone deliberate
   removals twice.
+- Do not "fix" wifi `Tx queue alloc failed` by changing `iwlwifi` module
+  parameters before checking `/proc/buddyinfo`. The failure is memory
+  fragmentation (see "Memory reclaim policy is absent" above); touching the
+  driver hides the symptom and leaves the real leak in place.
+- Do not set `vm.watermark_boost_factor` upward on hosts with `iwlwifi`. It
+  already fires and fails there.
+- Do not trust a comment in a host file as evidence a mitigation is active.
+  `s-nodus/network.nix` declares the MT7988 TSO/GSO guard and it was absent from
+  the running system for a month (`systemctl status mtk-eth-tso-off` -> not
+  found, `ethtool -k eth1` -> `tx-tcp-segmentation: on`). Verify against
+  `/run/current-system`, not against git.
+- Do not size `zramSwap.memoryPercent` as a fraction of *total* RAM on a host
+  that also hosts a fixed-size VM. s-nodus runs a 2048 MiB guest on 3.8 GiB and
+  sizes zram at 100%; `/sys/block/zram0/mem_limit` does not exist on that
+  kernel, so there is no ceiling.
 
 ## Desired End State
 
