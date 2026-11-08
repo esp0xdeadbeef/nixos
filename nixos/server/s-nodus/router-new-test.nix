@@ -39,7 +39,7 @@
 #   3. A reboot-loop guard: if the marker written just before the reboot is
 #      still present, the host came back INTO the specialization, so it refuses
 #      to reboot again and says so instead of looping.
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, inputs, relativeRepo, ... }:
 
 let
   cfg = config.local.routerNewTest;
@@ -152,6 +152,50 @@ in
     specialisation.router-new-test.configuration = {
       system.nixos.tags = [ "router-new-test" ];
 
+      # No QEMU envelope for this trial: the candidate is realized as NixOS
+      # containers on this host. Drop both VM instances so nothing starts a
+      # guest, and empty the carrier watcher so it cannot start one either.
+      services.nixosShellVmManager.instances.${newInstance}.enable = lib.mkForce false;
+      services.nixosShellVmManager.instances.${prodInstance}.enable = lib.mkForce false;
+      services.nixosShellVmManager.carrierControls.wan-router-vms.instances = lib.mkForce [ ];
+
+      # Realize the candidate's containers directly on this host by importing
+      # the same rendered model the VM used, but WITHOUT vmNics: with an empty
+      # NIC list vmNicsPlatformBinding returns null, so the renderer emits no
+      # VM NIC binding and the module applies as host config instead of an
+      # image. The deployment host in prod-network/testing/inventory-cobalt.nix
+      # supplies this host's real ports (mxl_lan0 trunk, eth1 WAN).
+      imports = [
+        (import ../../virtual-machine/nixos-shell-vm/s-router-cobalt-new/renderers.nix {
+          inherit inputs lib relativeRepo;
+          controlPlaneModelInput = inputs.network-control-plane-model;
+          networkRealizationModelInput = inputs.network-realization-model;
+          nixosRendererInput = inputs.network-renderer-nixos;
+          nebulaRendererInput = inputs.network-renderer-nebula;
+          wireguardRendererInput = inputs.network-renderer-wireguard;
+          system = "aarch64-linux";
+          vmNics = [ ];
+          # The realization target is the HOST. These containers run here, so
+          # the inventory deployment host and every node's `host` must be
+          # s-nodus -- not s-router-cobalt-new, which only named the QEMU
+          # envelope. Keying it to the VM name would emit a deployment host
+          # for a machine that no longer exists.
+          hostName = "s-nodus";
+          modelSource = relativeRepo.sourceModule "prod-network/testing";
+          selectorFile = "nixos/virtual-machine/nixos-shell-vm/s-router-cobalt-new/default.nix";
+          # Same model the VM used: cobalt site, testing (latest network-*)
+          # inputs. Cobalt-specific filenames, not the s-router-prod defaults.
+          intentFileName = "intent-cobalt.nix";
+          inventoryFileName = "inventory-cobalt.nix";
+        })
+      ];
+
+      _module.args.sRouterProdProfile = {
+        modelSource = relativeRepo.sourceModule "prod-network/testing";
+        labSelector = null;
+        productionSelector = "s-nodus";
+      };
+
       # Hand the candidate to the carrier watcher instead of starting it here.
       # The manager asserts that a carrier-controlled instance never also sets
       # activation.startOnBoot, and that is the right division: the watcher
@@ -164,8 +208,7 @@ in
       # startOnBoot is already false in the base configuration). The shared
       # trunk ports are protected by the Conflicts= the manager sets between the
       # two images, so starting the candidate stops prod.
-      services.nixosShellVmManager.carrierControls.wan-router-vms.instances =
-        lib.mkForce [ newInstance ];
+
 
       systemd.services.router-new-test-banner = {
         description = "Announce the router-new-test trial";

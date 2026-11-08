@@ -1134,7 +1134,12 @@ in
           };
 
           trunk = {
-            parent = "eth0";
+            # Container target: the LAN trunk is the MT7988 DSA trunk port
+            # itself (mxl_lan0), not the eth0 virtio NIC that only exists
+            # inside the QEMU envelope. The renderer builds br-lan-trunk and
+            # the transit VLANs on this parent, so the host must NOT also
+            # enslave it into br-cobalt-lan (see s-nodus cobalt-bridges.nix).
+            parent = "mxl_lan0";
             bridge = "br-lan-trunk";
             mode = "trunk";
           };
