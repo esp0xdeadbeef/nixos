@@ -179,6 +179,19 @@ let
     || (config.virtualisation.podman.enable or false)
     || (config.virtualisation.docker.enable or false);
 
+  # Steam's default install location is ~/.local/share/Steam (ArchWiki, Steam
+  # § Directory structure); ~/.steam/root is only a symlink tree into it, so
+  # persisting the real directory keeps games, steamapps/*.acf manifests,
+  # Proton compatdata (saves for non-Cloud titles) and shadercache, while
+  # letting Steam recreate the .steam symlinks on first launch.
+  hasSteam =
+    (config.programs.steam.enable or false)
+    || hasPackage [
+      "steam"
+      "steam-original"
+      "steam-run-full"
+    ];
+
   desktopAppDirs =
     lib.optionals
       (hasPackage [
@@ -344,7 +357,12 @@ let
     ++ (lib.optionals hasDiscordClient discordClientDirs)
     ++ containerStateDirs
     ++ desktopAppDirs
+    ++ steamUserDirs
   );
+
+  steamUserDirs = lib.optionals hasSteam [
+    ".local/share/Steam"
+  ];
 
   spotifyPlayerFiles = lib.optionals (hasPackage [ "spotify-player" ]) [
     ".cache/spotify-player/credentials.json"
@@ -439,6 +457,7 @@ let
   ++ containerStateDirs
   ++ lib.optionals isWorkstationHost workstationUserDirs
   ++ desktopAppDirs
+  ++ steamUserDirs
   ++ llmAgentDirs
   ++ lib.optionals hasDiscordClient discordClientDirs
   ++ secureUserDirs
