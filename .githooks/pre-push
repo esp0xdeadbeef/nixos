@@ -491,9 +491,38 @@ def main() -> int:
     # push approval. Runs before the privacy scan so a refusal is fast.
     path_guard = Path(__file__).resolve().parent.parent / "scripts" / "check-prod-paths.sh"
     if path_guard.is_file():
-        pushed = sorted({local for (_, _, local, _) in updates if local and set(local) != {"0"}})
-        if pushed:
-            guard = subprocess.run([str(path_guard), "--revs", *pushed], check=False)
+        # pre-push stdin lines are: <local ref> <local sha> <remote ref> <remote sha>.
+        # Guarding only the tip is not enough -- the protected edit may sit in an
+        # earlier commit of the range being pushed -- so expand each update to
+        # the commits it actually publishes.
+        protected_revs: list[str] = []
+        for _local_ref, local_sha, _remote_ref, remote_sha in updates:
+            if not local_sha or set(local_sha) == {"0"}:
+                # Branch deletion: nothing is published.
+                continue
+            excluded = remote_sha if remote_sha and set(remote_sha) != {"0"} else None
+            try:
+                rev_range = (
+                    f"{excluded}..{local_sha}" if excluded else local_sha
+                )
+                log = subprocess.run(
+                    ["git", "rev-list", rev_range],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    cwd=str(Path(__file__).resolve().parent.parent),
+                )
+            except OSError:
+                log = None
+            if log is not None and log.returncode == 0:
+                protected_revs.extend(log.stdout.decode("utf-8").split())
+            else:
+                # Cannot compute the range (unknown remote sha); guard the tip.
+                protected_revs.append(local_sha)
+        if protected_revs:
+            guard = subprocess.run(
+                [str(path_guard), "--revs", *sorted(set(protected_revs))], check=False
+            )
             if guard.returncode != 0:
                 return guard.returncode
 
