@@ -4,29 +4,27 @@
 # specialization exists to A/B that by running `s-router-cobalt-new` in its
 # place on the real trunk, with the production image left untouched on disk.
 #
-# BLOCKED (SAT, 2026-11-09): the cobalt SAT cannot run yet, but NOT for the
-# reason recorded earlier here. Corrected measurement: the trial IS enterable.
-# `system-88-link` is the trial closure and boot -2 shows 83 `container@core`
-# lines, i.e. the box did boot the specialization; what looked like "the profile
-# is reset to production" was the recovery guard doing its job: at the 600 s
-# deadline it created `system-89-link` from the recorded base generation and
-# rebooted to production.
+# BLOCKED (SAT, 2026-11-09, latest measurement): the specialisation is not being
+# rebuilt from the overridden renderer input, so the container host-bridge fix
+# never reaches the rendered containers.
 #
-# The real blocker is egress inside the trial, and its cause is now measured and
-# fixed in the renderer: the container's host veth was never attached to a host
-# bridge. `core.conf` in the trial closure has zero HOST_BRIDGE lines, so the
-# container WAN kept only a link-local address and every SAT probe (they all run
-# from/through the container site) has no path. The renderer bound the bridge to
-# the bare interface name ("wan") instead of the model's host-side veth key
-# ("cor-wan-eca"), so nothing was ever applied.
-#
-# Fixed: network-renderer-nixos 70271f2 keys the binding by veth name; verified
-# with
-#   ... .applyAll { core = { extraVeths."cor-wan-eca" = {}; }; }
-#     .core.extraVeths."cor-wan-eca".hostBridge  ->  "br-wan"
-# Remaining work before SAT: rebuild with that renderer rev, re-enter the trial,
-# confirm a HOST_BRIDGE line in core.conf and an IPv4 lease on the container's
-# wan, then probe the SAT rows live and record evidence per row.
+# Evidence: `nix build --override-input network-renderer-nixos
+# path:/home/deadbeef/renderer-build ...#nixosConfigurations.s-nodus.config.system.build.toplevel`
+# produced a NEW host toplevel (dadr9jm0...) but
+#   readlink -f dadr9jm0.../specialisation/router-new-test
+#   -> /nix/store/5c4ydask...   (byte-identical to the previous build)
+# and that closure still has
+#   grep -c HOST_BRIDGE .../etc/nixos-containers/core.conf  ->  0
+# while the source of the rule really did change (renderer 70271f2 + the bridge
+# name resolver fix; verified in isolation:
+#   renderedBridges -> "40-br-wan,br-wan"
+#   out.core.extraVeths."cor-wan-eca".hostBridge -> "br-wan").
+# So the container rendering inside `specialisation.router-new-test` is not a
+# function of the network-renderer-nixos input that the override replaces --
+# something pins it (a follows/override on the specialization's own input set,
+# or the pipeline evaluating the renderer without validatedPlatformBinding).
+# Until that is resolved the trial keeps starting containers with no host
+# bridge, has no egress, and every SAT probe has no path.
 #
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
