@@ -23,6 +23,17 @@
 #   i.e. the profile does not survive the boot as the trial. Two independent
 #   attempts, twice the same result.
 #
+# Ruled out just now: the flashed FIT is NOT the selector. It carries a
+# placeholder, not a generation:
+#   sudo strings /dev/disk/by-partlabel/production | grep -oE "init=[^ ]*"
+#     -> init=%s
+#   cat /proc/cmdline -> init=/nix/var/nix/profiles/system/init
+# So the boot follows the profile, which means something rewrites the profile
+# between the successful `nix-env --set` and the next boot. Until that is found
+# the trial cannot be entered at all (the earlier 22:41 entry and the 23:02/23:38
+# entries show it used to work, so this is a regression in the recovery
+# machinery added today).
+#
 # Consequence: the veth/master and IPv4-lease check cannot be observed, so no
 # SAT row has evidence and all rows stay NOT OK. Next: find what rewrites the
 # profile at boot (the FIT carries init=/nix/var/nix/profiles/system/init, so the
