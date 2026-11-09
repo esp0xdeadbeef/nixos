@@ -34,7 +34,13 @@ in
   services.udev.extraRules = ''
     # Holtek USB TO UART BRIDGE: bind the generic usb-serial driver, both when
     # it is present at boot and when it is plugged in later.
-    ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="${holtekVendor}", ATTR{idProduct}=="${holtekProduct}", \
+    # Scope the bind to interface 0: the console tty lives there (the by-id
+    # name ends in -if00). A device-level match without ATTR{bInterfaceNumber}
+    # let udev pick whichever interface it processed first -- on 2026-11-09 it
+    # bound usbserial_generic to 1.2 and the kernel refused it:
+    #   usbserial_generic 1-5:1.2: device has no bulk endpoints
+    # so no /dev/ttyUSB* appeared and the only way back was a cold boot.
+    ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="${holtekVendor}", ATTR{idProduct}=="${holtekProduct}", ATTR{bInterfaceNumber}=="00", \
       RUN+="${pkgs.kmod}/bin/modprobe usbserial", \
       RUN+="${pkgs.bash}/bin/sh -c 'echo ${holtekVendor} ${holtekProduct} > /sys/bus/usb-serial/drivers/generic/new_id 2>/dev/null || true'"
 
