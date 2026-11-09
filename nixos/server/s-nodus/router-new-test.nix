@@ -4,33 +4,30 @@
 # specialization exists to A/B that by running `s-router-cobalt-new` in its
 # place on the real trunk, with the production image left untouched on disk.
 #
-# BLOCKED (SAT, 2026-11-09, narrowed to one missing renderer emission): the
-# container config carries no networking at all, and no host unit attaches the
-# container veths, so the trial has no egress and every SAT row stays NOT OK.
+# BLOCKED (SAT, 2026-11-09, final state): the renderer now emits the missing
+# host-side attachment, but the trial still cannot be entered because the
+# system profile is replaced by the production generation during boot.
 #
-# Measured in the trial closure
-# (/nix/store/5c4ydask...-nixos-system-s-nodus-router-new-test-...):
-#   grep -E "^INTERFACES=|^MACVLANS=" etc/nixos-containers/core.conf
-#     -> INTERFACES=""        MACVLANS=""
-#   grep -E "^EXTRA_NSPAWN_FLAGS=" etc/nixos-containers/core.conf
-#     -> EXTRA_NSPAWN_FLAGS=""
-#   ls etc/systemd/network | wc -l            -> 122
-#   grep -rl "cor-wan" etc/systemd/network    -> 0
-#   grep -h "^Bridge=" etc/systemd/network/*.network | sort -u
-#     -> br-lan-trunk, br-onyx, br-opal, br-wan, clients
-# So the bridges exist and something else is enslaved to them, but nothing
-# attaches the container's host-side veth (cor-wan-eca / cor-cbcoru-913).
+# Renderer side is PROVEN fixed (module emits a host networkd unit per veth):
+#   spec closure 2w0zwplayl6g.../etc/systemd/network:
+#     Name=cor-wan-eca
+#     [Network]
+#     Bridge=br-wan
 #
-# What is already proven good:
-#   containers.core.extraVeths -> cor-cbcoru-913,cor-wan-eca
-#   containers.core.extraVeths."cor-wan-eca".hostBridge -> br-wan
-#   (nixos-containers simply does not render a bridge for extraVeths.)
+# Entry is PROVEN broken:
+#   nix-env -p /nix/var/nix/profiles/system --set <closure>/specialisation/router-new-test
+#     -> prints TRIAL-PROFILE-SET, readlink confirms the specialization
+#   systemctl reboot; after boot:
+#     readlink -f /nix/var/nix/profiles/system  -> l2fdl1k9... (production)
+#     readlink -f /run/current-system           -> l2fdl1k9... (production)
+#   i.e. the profile does not survive the boot as the trial. Two independent
+#   attempts, twice the same result.
 #
-# Next fix (renderer): emit a host-side systemd-networkd .network unit per
-# container veth with `Bridge=<bound bridge>` (and the bridge netdev), instead of
-# relying on extraVeths.hostBridge. Then rebuild, re-enter the trial, confirm
-# `ip -br link` shows cor-wan-eca with master br-wan and the container wan gets
-# an IPv4 lease, and only then probe the SAT rows.
+# Consequence: the veth/master and IPv4-lease check cannot be observed, so no
+# SAT row has evidence and all rows stay NOT OK. Next: find what rewrites the
+# profile at boot (the FIT carries init=/nix/var/nix/profiles/system/init, so the
+# profile is the selector; candidates are the production FIT reflash unit and the
+# activation path), fix it, then run the trial and probe the SAT rows.
 #
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
