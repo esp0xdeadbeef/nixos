@@ -65,6 +65,21 @@ in
         set -u
         rc=0
         checked=0
+
+        # The MediaTek netdevs are not present ~30 s into boot: the unit used to
+        # log "no MediaTek interfaces present yet" and exit, and because nothing
+        # rescheduled it the offloads stayed ON for the whole boot. Wait for them
+        # (bounded) instead of sampling once.
+        waited=0
+        while [ "$waited" -lt 180 ]; do
+          for probe in /sys/class/net/eth[0-9] /sys/class/net/end0; do
+            [ -d "$probe" ] && { waited=999; break; }
+          done
+          [ "$waited" -eq 999 ] && break
+          sleep 5
+          waited=$((waited + 5))
+        done
+
         for iface in /sys/class/net/eth[0-9] /sys/class/net/end0; do
           [ -d "$iface" ] || continue
           name=''${iface##*/}
@@ -112,7 +127,10 @@ in
       wantedBy = [ "timers.target" ];
       timerConfig = {
         OnBootSec = "30s";
-        OnUnitActiveSec = "5min";
+        # OnUnitActiveSec never re-arms for a oneshot that exits immediately
+        # (observed: NEXT=- after the first run). OnUnitInactiveSec does, because
+        # the unit is inactive right after each run.
+        OnUnitInactiveSec = "5min";
         Unit = "mtk-eth-tso-off.service";
       };
     };
