@@ -24,6 +24,21 @@ in
       RUN+="${pkgs.kmod}/bin/modprobe usbserial", \
       RUN+="${pkgs.bash}/bin/sh -c 'echo ${vendor} ${product} > /sys/bus/usb-serial/drivers/generic/new_id 2>/dev/null || true'"
 
-    SUBSYSTEM=="tty", KERNEL=="ttyUSB*", SYMLINK+="tty-serial-console", TAG+="systemd"
+    # Bring a getty up on the USB-serial tty the moment it appears, so plugging
+    # the adapter in yields a login instead of a dead device node. %k expands to
+    # the kernel name (ttyUSB0, ...), so it works for any port number.
+    SUBSYSTEM=="tty", KERNEL=="ttyUSB*", SYMLINK+="tty-serial-console", TAG+="systemd", ENV{SYSTEMD_WANTS}="serial-getty@%k.service"
   '';
+
+  # Belt and braces: also pull the getty in via getty.target for the common
+  # first port, in case the udev tag races the device add. Restart keeps it
+  # retrying until the adapter is present.
+  systemd.services."serial-getty@ttyUSB0" = {
+    wantedBy = [ "getty.target" ];
+    serviceConfig = {
+      Restart = "always";
+      RestartSec = "5s";
+    };
+    restartIfChanged = false;
+  };
 }
