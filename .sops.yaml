@@ -410,6 +410,13 @@ creation_rules:
           - *s-router-cobalt
           - *s-router-cobalt-new
           - *s-router-cobalt-prod
+          # The host decrypts the router's PKI and hands it to the containers
+          # (specialisation router-new-test). Without this the host's
+          # sops-install-secrets fails on s-router-cobalt-garnet.yaml with
+          # "0 successful groups required, got 0", which then takes EVERY
+          # secret down with it -- including cobalt-wan-mac, so the candidate
+          # router comes up with no WAN MAC, no networkd and no internet.
+          - *s-nodus
   - path_regex: '^(secrets/)*s-router-cobalt-vpn-.*\.conf$'
     input_type: binary
     output_type: binary
