@@ -4,35 +4,31 @@
 # specialization exists to A/B that by running `s-router-cobalt-new` in its
 # place on the real trunk, with the production image left untouched on disk.
 #
-# BLOCKED (SAT, 2026-11-09): the specialisation's container shape is INVARIANT
-# under the network-renderer-nixos input, so the host-bridge fix cannot be
-# delivered by building from .16 and every SAT probe stays unrunnable.
+# BLOCKED (SAT, 2026-11-09, current state): the platform binding now reaches the
+# containers, but the container runtime ignores the per-veth bridge, so the host
+# side of the container WAN is still unattached and the trial has no egress.
 #
-# Measured, twice, with two different renderer trees:
-#   nix eval --override-input network-renderer-nixos path:/home/deadbeef/renderer-build \
-#     (builtins.getFlake "path:/home/deadbeef/nixos-build")
-#       .nixosConfigurations.s-nodus.config.specialisation."router-new-test"
-#       .configuration.system.build.toplevel.outPath
-#   -> /nix/store/5c4ydask...-nixos-system-s-nodus-router-new-test-...
-# i.e. the same store path the pre-fix build produced. `grep -c HOST_BRIDGE`
-# in that closure's etc/nixos-containers/core.conf is 0.
+# Proven working (the earlier "invariant under the renderer input" note was an
+# artifact of `builtins.getFlake`, which ignores --override-input; the same
+# check with the installable form fails when the module is deleted, which proves
+# the module is on the evaluated path):
+#   nix eval --override-input network-renderer-nixos path:... #     "path:...#nixosConfigurations.s-nodus.config.specialisation.
+#      \"router-new-test\".configuration.containers.core.extraVeths"
+#   -> cor-cbcoru-913,cor-wan-eca
+#   ...extraVeths.\"cor-wan-eca\".hostBridge
+#   -> br-wan
 #
-# Meanwhile the renderer module itself is correct and proven in isolation:
-#   renderedBridges -> "40-br-wan,br-wan"
-#   out.core.extraVeths."cor-wan-eca".hostBridge -> "br-wan"
-# (network-renderer-nixos 70271f2 plus the bridge-name resolver fix).
+# Still broken: the generated container config does not carry it.
+#   grep -c HOST_BRIDGE <spec>/etc/nixos-containers/core.conf  ->  0
+# `nixos-containers` renders HOST_BRIDGE only for the primary `hostBridge`
+# (`--network-bridge`); a bridge named on an `extraVeths` entry is dropped, so
+# the model's host-side veth (cor-wan-eca) still comes up with no master and the
+# container WAN keeps only a link-local address.
 #
-# Ruled out: s-nodus pinning the prod renderer -- only s-router-neon-prod,
-# s-router-cobalt-prod and s-router-prod set nixosRendererInput =
-# inputs.network-renderer-nixos-prod. The specialisation does pass
-# nixosRendererInput = inputs.network-renderer-nixos, hostName = "s-nodus" and
-# vmNics = [ ] into renderers.nix, so the break is inside the render/selector
-# path (selectorFile resolves the host module to the VM default.nix; the
-# container emission may be evaluated from that module rather than from the
-# rendered hostModule).
-#
-# Consequence: the trial cannot reach egress, all SAT rows remain NOT OK, and
-# no honest evidence exists to flip any of them.
+# Consequence: no egress in the trial, every SAT row stays NOT OK, and no honest
+# evidence exists to flip any of them. Next fix belongs in the renderer: emit the
+# host-side attachment itself (the veth as a bridge slave in the host's
+# systemd-networkd config), not an extraVeths.hostBridge the runtime discards.
 #
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
