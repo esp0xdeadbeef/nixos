@@ -48,6 +48,9 @@ let
   logFile = "${stateDir}/host-state.log";
   rebootMarker = "${stateDir}/rebooted-at";
   startedAt = "${stateDir}/started-at";
+  # Production generation recorded on every production boot; the trial guard
+  # restores it before rebooting so a finished trial cannot boot itself again.
+  baseGeneration = "${stateDir}/base-generation";
 
   prodInstance = "s-router-cobalt-prod";
   newInstance = "s-router-cobalt-new";
@@ -162,6 +165,11 @@ in
       };
       script = ''
         set -u
+        # Remember the production generation so the trial guard can put the
+        # host back on it before rebooting. Without this the guard rebooted
+        # into the specialization again (the profile still pointed at it) and
+        # a trial could never end on its own.
+        echo "$(readlink -f /run/current-system)" >${baseGeneration}
         marker=${rebootMarker}
         if [ -e "$marker" ]; then
           echo "clearing router-new-test reboot marker from $(cat "$marker" 2>/dev/null || echo unknown)"
@@ -181,6 +189,22 @@ in
       # that every carrier control references one, so "no VMs" has to mean the
       # manager itself is not configured.
       services.nixosShellVmManager.enable = lib.mkForce false;
+
+      # The rendered container configuration bind-mounts /run/secrets/devices
+      # into every container. sops-nix only creates the directories it has
+      # secrets for, so on a host that never had that tree the mount source did
+      # not exist and systemd-nspawn refused to start EVERY container:
+      #
+      #   systemd-nspawn: Failed to clone /run/secrets/devices/: No such file
+      #   or directory
+      #
+      # Measured on the 2026-11-09 trial: 14 containers failed, then all came
+      # up once the directory existed. It is a mount point the platform must
+      # provide, so it is declared here rather than left to sops' side effects.
+      systemd.tmpfiles.rules = [
+        "d /run/secrets 0750 root root -"
+        "d /run/secrets/devices 0750 root root -"
+      ];
 
       # Realize the candidate's containers directly on this host by importing
       # the same rendered model the VM used, but WITHOUT vmNics: with an empty
@@ -346,6 +370,7 @@ in
         path = [
           pkgs.coreutils
           pkgs.gnugrep
+          pkgs.nix
           pkgs.nixos-container
           pkgs.systemd
         ];
@@ -395,6 +420,14 @@ in
             echo "rebooting to the default boot entry (production)"
             echo "reboot requested at $(date -Is)"
           } >>${logFile} 2>&1
+
+          base=$(cat ${baseGeneration} 2>/dev/null || true)
+          if [ -n "$base" ] && [ -d "$base" ]; then
+            echo "restoring production generation $base before rebooting"
+            nix-env -p /nix/var/nix/profiles/system --set "$base" || echo "WARNING: could not restore $base"
+          else
+            echo "WARNING: no recorded production generation; reboot would stay on the specialization"
+          fi
 
           echo "router-new-test: egress=$egress, ''${elapsed}s elapsed >= ''${deadline}s; rebooting to the default entry"
           systemctl reboot
