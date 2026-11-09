@@ -86,6 +86,20 @@ in
     #
     # NOTE: these go into the FIT's /chosen bootargs (fit.nix), because the
     # stock U-Boot uses the FIT's bootargs, not NixOS's boot.kernelParams.
+    # Post-mortem access. Two defects measured on 2026-11-09:
+    #
+    # 1. `kernel.dmesg_restrict = 1` meant an ordinary operator account got
+    #    ZERO lines from dmesg (only root could read the ring buffer), which is
+    #    exactly backwards for a board that is diagnosed over ssh.
+    # 2. The panic on 2026-11-09 was lost: dmesg showed
+    #    "pstore: backend (ramoops) writing error (-28)" (ENOSPC). The DT
+    #    reserves only 64 KiB at 0x42ff0000 and the pstore CONSOLE backend
+    #    fills it with ordinary console output, leaving no room for the oops
+    #    record itself. Dropping the console backend keeps the zone for
+    #    dmesg/oops records, which is the part that cannot be reconstructed.
+    boot.kernel.sysctl."kernel.dmesg_restrict" = 0;
+    boot.extraModprobeConfig = "options ramoops console_size=0";
+
     boot.kernelParams = lib.mkBefore [
       "console=ttyS0,115200n1"
       "clk_ignore_unused"
