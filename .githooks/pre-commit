@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Protected production pins are a commit-time gate, not a CI one: the prod and
-# legacy-prod network shapes are what a live site runs on, and the whole point is
-# that a bump cannot leave this workstation without someone approving it. The
-# snapshot in ci/prod-pins.lock makes the change an explicit diff in the commit.
+# Protected production surfaces are a commit-time gate, not a CI one. Two
+# distinct guards, both commit-time:
+#
+#  * check-prod-paths.sh: the CONTENT of the protected paths (prod-network/prod/,
+#    prod-network/current/, the *-prod / *-legacy-prod host configs and secrets)
+#    is read-only without explicit per-session permission naming the exact
+#    files. AGENTS.md states this rule; before this guard existed nothing
+#    enforced it, so a content edit under prod-network/prod/ landed silently.
+#
+#  * check-prod-pins.sh: the *flake.lock pins* of the prod and legacy-prod
+#    network shapes cannot move without an approved snapshot diff.
+scripts/check-prod-paths.sh --staged
+
 if git diff --cached --name-only -- flake.lock | grep -qx flake.lock; then
   scripts/check-prod-pins.sh
 fi

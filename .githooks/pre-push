@@ -480,6 +480,23 @@ def main() -> int:
         if guard.returncode != 0:
             return guard.returncode
 
+    # Read the ref updates now (stdin is consumed once) so the protected-path
+    # guard below can name the commits actually being pushed.
+    updates = parse_updates()
+
+    # Protected production surfaces: AGENTS.md makes prod-network/prod/,
+    # prod-network/current/, the *-prod / *-legacy-prod host configs and secrets
+    # read-only without explicit per-session permission naming the exact files.
+    # Pushing them needs its own, separate approval -- an edit approval is not a
+    # push approval. Runs before the privacy scan so a refusal is fast.
+    path_guard = Path(__file__).resolve().parent.parent / "scripts" / "check-prod-paths.sh"
+    if path_guard.is_file():
+        pushed = sorted({local for (_, _, local, _) in updates if local and set(local) != {"0"}})
+        if pushed:
+            guard = subprocess.run([str(path_guard), "--revs", *pushed], check=False)
+            if guard.returncode != 0:
+                return guard.returncode
+
     try:
         for command in ("curl", "git", "sops"):
             require_command(command)
@@ -494,7 +511,8 @@ def main() -> int:
             raise PrivacyCheckError("cannot locate the Git repository")
         repo = Path(repo_result.stdout.decode("utf-8").strip())
 
-        updates = parse_updates()
+        # Already read once above for the protected-path guard; stdin is a
+        # one-shot stream, so reuse it rather than re-parsing.
         public_ipv4 = discover_public_address(repo, 4)
         try:
             public_ipv6 = discover_public_address(repo, 6)
