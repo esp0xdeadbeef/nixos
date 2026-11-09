@@ -98,6 +98,10 @@ in
     # driver bind; without it no /dev/ttyUSB* is created.
     ./usb-serial-console.nix
 
+    # The board publishes its own ttyS0 over TCP so the console is always
+    # reachable, independent of the operator laptop's USB-serial adapter.
+    ./serial-console-tcp.nix
+
     # Reboot the board when BOTH internet probes stay unreachable for the whole
     # window; one reachable target means a DNS/CDN problem, not a dead uplink.
     ./internet-guard.nix
