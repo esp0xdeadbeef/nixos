@@ -87,10 +87,30 @@ in
         done
 
         if [ "$checked" -eq 0 ]; then
-          echo "mtk-eth-tso-off: no MediaTek interfaces present yet; unit will re-run on link events" >&2
+          echo "mtk-eth-tso-off: no MediaTek interfaces present yet; the timer will retry" >&2
         fi
         exit "$rc"
       '';
+    };
+
+    # The unit above runs early, and on this board the MTK netdevs (eth1/eth2)
+    # are NOT up yet at that point: the unit logs "no MediaTek interfaces
+    # present yet" and, until now, nothing ever re-ran it -- the comment claimed
+    # "re-run on link events" but no such trigger existed. Result: TSO/GSO
+    # stayed ON for the whole boot and the MACs kept emitting frames with
+    # garbage L2 headers (ethertype 0x4d54, HTTP text as MAC addresses).
+    #
+    # Drive it from a timer instead of hoping for link events: cheap (a handful
+    # of ethtool calls), idempotent, and it self-heals after a networkd restart
+    # or a driver re-probe.
+    systemd.timers.mtk-eth-tso-off = {
+      description = "Re-apply TSO/GSO off on the MediaTek MACs";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "30s";
+        OnUnitActiveSec = "5min";
+        Unit = "mtk-eth-tso-off.service";
+      };
     };
   };
 }
