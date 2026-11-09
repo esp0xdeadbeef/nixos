@@ -219,6 +219,25 @@ in
         })
       ];
 
+      # The renderer emits the cobalt Nebula overlay for the core container,
+      # which needs the overlay PKI. In the VM these secrets came from the
+      # s-router-cobalt-new host module; this boot entry imports the renderer
+      # without that host module, so without this the profile service fails
+      # with "cannot stat /run/secrets/nebula-profile-core-vpn-garnet-cobalt-*"
+      # and switch-to-configuration aborts the whole activation.
+      sops.secrets =
+        lib.genAttrs
+          [
+            "nebula-profile-core-vpn-garnet-cobalt-ca-crt"
+            "nebula-profile-core-vpn-garnet-cobalt-crt"
+            "nebula-profile-core-vpn-garnet-cobalt-key"
+            "garnet-lighthouse-endpoint4"
+          ]
+          (_: {
+            sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-garnet.yaml";
+            format = "yaml";
+          });
+
       local.routerCapture.enable = true;
 
       # Resolve the L2 collision instead of warning about it. The rendered

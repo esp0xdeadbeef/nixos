@@ -53,6 +53,9 @@ in
         config.systemd.package
         pkgs.ethtool
         pkgs.gnugrep
+        # The readback assertion uses awk; without gawk here the unit dies with
+        # "awk: command not found" (status 127) and TSO silently stays on.
+        pkgs.gawk
       ];
       script = ''
         set -u
