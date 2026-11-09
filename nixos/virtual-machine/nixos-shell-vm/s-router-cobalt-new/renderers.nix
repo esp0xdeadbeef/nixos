@@ -70,20 +70,6 @@ let
     bundle = canonicalBundle;
   };
 
-  # FS-770-HDS-010: a container-hosted target needs the same host attachment a
-  # VM NIC gets. With vmNics empty there is no VM binding, so supply the host
-  # bridge per interface name instead (inventory fact: eth1 is the WAN uplink on
-  # br-wan, the LAN side is the trunk bridge). The renderer applies this to every
-  # rendered container and fails closed on a bridge the host does not render.
-  containerBinding = {
-    categories.deployment.containerTargets.${hostName} = {
-      interfaceBridges = {
-        wan = "br-wan";
-        ens3 = "br-lan-trunk";
-      };
-    };
-  };
-
   render-nixos =
     nixosRendererInput.libBySystem.${system}.renderer.canonical.hostModule (
       rendererInput
@@ -92,9 +78,6 @@ let
       }
       // lib.optionalAttrs (platformBinding != null) {
         inherit platformBinding;
-      }
-      // lib.optionalAttrs (platformBinding == null) {
-        platformBinding = containerBinding;
       }
     );
 
