@@ -252,20 +252,6 @@ let
     // {
       services = {
         dns = {
-          # FS-540-HDS-010-SDS-010-SMS-025/035: the core's static upstream is a
-          # REGISTERED upstream -- a runtime source file the renderer
-          # materializes into unbound (`forward-zone` + `forward-addr`) and
-          # allow-lists in the DNS egress nftables set. Bare `forwarders` are
-          # only ever rendered as a projection of a modelled named-core
-          # resolver, so they fail closed (DNS_RENDERER_CONTRACT_DIVERGENCE).
-          # The file is a host sops secret and holds the upstream addresses;
-          # they are never written in this repo in plaintext.
-          registeredUpstreams = [
-            {
-              sourceFile = "/run/secrets/cobalt-dns-upstreams";
-              family = "ipv4";
-            }
-          ];
           allowFrom = [
             dnsRuntime.requesters.access-clients.clientIpv4
             dnsRuntime.requesters.access-clients.clientIpv6
@@ -1090,13 +1076,9 @@ in
               # sends a client-id, so use udhcpc (-C) instead.
               dhcpClient = "udhcpc";
               sendHostname = false;
-              # Do NOT request the DNS option (6) from the provider. The core
-              # resolver's upstream is pinned by a registered upstream on the
-              # core-dns service (addresses in SOPS); learning the ISP's
-              # resolvers would add a second, unselected follow-source that
-              # flaps whenever the provider's resolver path changes
-              # (FS-525, FS-540, FS-550).
-              dhcpOptions = [ ];
+              # Request the DNS option (6) from the provider so the resolver
+              # can bootstrap its root trust anchor off the provider DNS.
+              dhcpOptions = [ "dns" ];
               # Clone the CPE's WAN MAC so the lease stays keyed on the same
               # hardware address as the original router. The MAC lives in SOPS,
               # not the public inventory.
