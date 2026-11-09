@@ -4,41 +4,29 @@
 # specialization exists to A/B that by running `s-router-cobalt-new` in its
 # place on the real trunk, with the production image left untouched on disk.
 #
-# BLOCKED (SAT, 2026-11-09, final state): the renderer now emits the missing
-# host-side attachment, but the trial still cannot be entered because the
-# system profile is replaced by the production generation during boot.
+# BLOCKED (SAT, 2026-11-10, corrected state): the trial DOES boot; the guard ends
+# it because egress is still broken even with the new host-veth attachment unit.
 #
-# Renderer side is PROVEN fixed (module emits a host networkd unit per veth):
-#   spec closure 2w0zwplayl6g.../etc/systemd/network:
-#     Name=cor-wan-eca
-#     [Network]
-#     Bridge=br-wan
+# Correcting two wrong notes above: the profile is not rewritten at boot and the
+# trial is not unreachable. `host-state.log` shows a normal trial run on the
+# 2026-11-09 00:39-00:45 boot:
+#   egress=broken elapsed=342s deadline=600s
+#   ...
+#   egress=broken elapsed=645s deadline=600s  -> restore production + reboot
+# i.e. the guard restored prod exactly as designed, which is what earlier looked
+# like "the profile was reset".
 #
-# Entry is PROVEN broken:
-#   nix-env -p /nix/var/nix/profiles/system --set <closure>/specialisation/router-new-test
-#     -> prints TRIAL-PROFILE-SET, readlink confirms the specialization
-#   systemctl reboot; after boot:
-#     readlink -f /nix/var/nix/profiles/system  -> l2fdl1k9... (production)
-#     readlink -f /run/current-system           -> l2fdl1k9... (production)
-#   i.e. the profile does not survive the boot as the trial. Two independent
-#   attempts, twice the same result.
+# The renderer attachment is present in that boot's /etc:
+#   journalctl -b -1 -o cat | grep 40-cor-wan
+#     -> removing obsolete symlink '/etc/systemd/network/40-cor-wan-eca.network'
+# (so the unit from spec 2w0zwplayl6g was installed), yet egress stayed broken,
+# so the veth is either not enslaved or the container WAN still gets no lease.
 #
-# Ruled out just now: the flashed FIT is NOT the selector. It carries a
-# placeholder, not a generation:
-#   sudo strings /dev/disk/by-partlabel/production | grep -oE "init=[^ ]*"
-#     -> init=%s
-#   cat /proc/cmdline -> init=/nix/var/nix/profiles/system/init
-# So the boot follows the profile, which means something rewrites the profile
-# between the successful `nix-env --set` and the next boot. Until that is found
-# the trial cannot be entered at all (the earlier 22:41 entry and the 23:02/23:38
-# entries show it used to work, so this is a regression in the recovery
-# machinery added today).
-#
-# Consequence: the veth/master and IPv4-lease check cannot be observed, so no
-# SAT row has evidence and all rows stay NOT OK. Next: find what rewrites the
-# profile at boot (the FIT carries init=/nix/var/nix/profiles/system/init, so the
-# profile is the selector; candidates are the production FIT reflash unit and the
-# activation path), fix it, then run the trial and probe the SAT rows.
+# Next concrete step: inside a trial boot capture
+#   ip -d link show cor-wan-eca   (expect "master br-wan")
+#   nixos-container run core -- ip -4 -br a show wan   (expect a DHCP lease)
+# plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
+# Only after that check can the SAT rows be probed honestly.
 #
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
