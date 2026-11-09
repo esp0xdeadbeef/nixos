@@ -2853,6 +2853,30 @@ in
           providerNode = "core";
           addressAuthority = "model-allocated-service-prefix";
           trafficType = "dns";
+          # FS-525 bullet 3: "A core node shall obtain its upstream DNS servers
+          # from its declared uplink or exit (DHCP, SLAAC, PPPoE, static).
+          # Hardcoded resolver addresses on a core shall produce a compiler
+          # warning but are permitted." FS-540-HDS-010-SDS-010-SMS-025 permits
+          # an explicitly static upstream attached to the selected core with
+          # the FS-525 hardcoded-upstream warning.
+          #
+          # Operating requirement: the core used to take its upstream from the
+          # ISP's WAN DHCP lease and ran as a pure iterator, so every provider
+          # resolver change made @127.0.0.1 SERVFAIL and took the site's DNS
+          # down. Pin a stable public provider pair instead, so the core's
+          # upstream no longer depends on what the ISP hands out. The addresses
+          # are secret material and live only in SOPS.
+          #
+          # A static upstream is forwarding by definition; without this the
+          # service keeps the compiler default ("iterative") while carrying an
+          # upstream source, which the NixOS renderer rejects as
+          # DNS_RECURSION_MODE_INVALID.
+          #
+          # The addresses themselves are delivered by the core's registered
+          # upstream source file (inventory services.dns.registeredUpstreams),
+          # which the renderer materializes into unbound and allow-lists in
+          # the DNS egress nftables set (SMS-025/SMS-035).
+          recursionMode = "forwarding";
         }
         {
           name = "onyx-dns";

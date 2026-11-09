@@ -187,6 +187,18 @@ in
         format = "yaml";
         path = "/run/secrets/cobalt-wan-mac";
       };
+
+      # FS-525 static core upstream (FS-540-HDS-010-SDS-010-SMS-025/035).
+      # The core resolver's registered upstream source file: one address per
+      # line, primary then failover. It lives only in SOPS; the renderer
+      # materializes it into unbound's forward-zone plus the DNS egress
+      # nftables allow-list, so no resolver address appears in this repo.
+      "cobalt-dns-upstreams" = {
+        sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-dns-upstreams.yaml";
+        key = "upstreams";
+        format = "yaml";
+        path = "/run/secrets/cobalt-dns-upstreams";
+      };
     }
     # garnet overlay PKI + lighthouse endpoint for the cobalt core node
     # (FS-460-HDS-010-SDS-010-SMS-010). The Nebula renderer bind-mounts these
@@ -229,6 +241,14 @@ in
       # bind mount.
       core.bindMounts."/run/secrets/cobalt-wan-mac" = {
         hostPath = config.sops.secrets."cobalt-wan-mac".path;
+        isReadOnly = true;
+      };
+
+      # The core resolver's static upstream list (FS-525). The renderer's
+      # dns-registered-upstream service reads it inside the container, so the
+      # host only delivers the decrypted SOPS file.
+      core.bindMounts."/run/secrets/cobalt-dns-upstreams" = {
+        hostPath = config.sops.secrets."cobalt-dns-upstreams".path;
         isReadOnly = true;
       };
     }
