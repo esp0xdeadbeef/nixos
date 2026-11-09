@@ -314,7 +314,36 @@ in
               })
               deviceIds
           ))
+          // (lib.listToAttrs (
+            builtins.concatMap
+              (name:
+                map
+                  (entry: {
+                    name = "cobalt-${name}-${entry.path}";
+                    value = {
+                      sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-vpn-${name}-fields.yaml";
+                      key = entry.field;
+                      path = "/run/secrets/${name}-${entry.path}";
+                    };
+                  })
+                  [
+                    { field = "privateKey"; path = "private-key"; }
+                    { field = "endpoint"; path = "endpoint"; }
+                    { field = "presharedKey"; path = "preshared-key"; }
+                    { field = "publicKey"; path = "public-key"; }
+                  ])
+              [ "onyx" "opal" ]
+          ))
           // {
+            # The AP units read this one, not the containers: without it every
+            # ap-conf-* unit dies with "open /run/secrets/cobalt-wifi: no such
+            # file" and the WiFi AP never comes up (measured 2026-11-09).
+            "cobalt-wifi" = {
+              sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wifi.yaml";
+              key = "";
+              path = "/run/secrets/cobalt-wifi";
+            };
+
             "cobalt-wan-mac" = {
               sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wan-mac.yaml";
               key = "mac";
