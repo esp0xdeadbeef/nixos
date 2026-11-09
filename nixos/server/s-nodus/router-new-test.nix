@@ -4,27 +4,35 @@
 # specialization exists to A/B that by running `s-router-cobalt-new` in its
 # place on the real trunk, with the production image left untouched on disk.
 #
-# BLOCKED (SAT, 2026-11-09, latest measurement): the specialisation is not being
-# rebuilt from the overridden renderer input, so the container host-bridge fix
-# never reaches the rendered containers.
+# BLOCKED (SAT, 2026-11-09): the specialisation's container shape is INVARIANT
+# under the network-renderer-nixos input, so the host-bridge fix cannot be
+# delivered by building from .16 and every SAT probe stays unrunnable.
 #
-# Evidence: `nix build --override-input network-renderer-nixos
-# path:/home/deadbeef/renderer-build ...#nixosConfigurations.s-nodus.config.system.build.toplevel`
-# produced a NEW host toplevel (dadr9jm0...) but
-#   readlink -f dadr9jm0.../specialisation/router-new-test
-#   -> /nix/store/5c4ydask...   (byte-identical to the previous build)
-# and that closure still has
-#   grep -c HOST_BRIDGE .../etc/nixos-containers/core.conf  ->  0
-# while the source of the rule really did change (renderer 70271f2 + the bridge
-# name resolver fix; verified in isolation:
+# Measured, twice, with two different renderer trees:
+#   nix eval --override-input network-renderer-nixos path:/home/deadbeef/renderer-build \
+#     (builtins.getFlake "path:/home/deadbeef/nixos-build")
+#       .nixosConfigurations.s-nodus.config.specialisation."router-new-test"
+#       .configuration.system.build.toplevel.outPath
+#   -> /nix/store/5c4ydask...-nixos-system-s-nodus-router-new-test-...
+# i.e. the same store path the pre-fix build produced. `grep -c HOST_BRIDGE`
+# in that closure's etc/nixos-containers/core.conf is 0.
+#
+# Meanwhile the renderer module itself is correct and proven in isolation:
 #   renderedBridges -> "40-br-wan,br-wan"
-#   out.core.extraVeths."cor-wan-eca".hostBridge -> "br-wan").
-# So the container rendering inside `specialisation.router-new-test` is not a
-# function of the network-renderer-nixos input that the override replaces --
-# something pins it (a follows/override on the specialization's own input set,
-# or the pipeline evaluating the renderer without validatedPlatformBinding).
-# Until that is resolved the trial keeps starting containers with no host
-# bridge, has no egress, and every SAT probe has no path.
+#   out.core.extraVeths."cor-wan-eca".hostBridge -> "br-wan"
+# (network-renderer-nixos 70271f2 plus the bridge-name resolver fix).
+#
+# Ruled out: s-nodus pinning the prod renderer -- only s-router-neon-prod,
+# s-router-cobalt-prod and s-router-prod set nixosRendererInput =
+# inputs.network-renderer-nixos-prod. The specialisation does pass
+# nixosRendererInput = inputs.network-renderer-nixos, hostName = "s-nodus" and
+# vmNics = [ ] into renderers.nix, so the break is inside the render/selector
+# path (selectorFile resolves the host module to the VM default.nix; the
+# container emission may be evaluated from that module rather than from the
+# rendered hostModule).
+#
+# Consequence: the trial cannot reach egress, all SAT rows remain NOT OK, and
+# no honest evidence exists to flip any of them.
 #
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
