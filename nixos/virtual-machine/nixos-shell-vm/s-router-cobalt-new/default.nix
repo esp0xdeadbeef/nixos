@@ -126,14 +126,19 @@ in
     productionSelector = hostName;
   };
 
-  # Diagnostics for the testing/rollback router only. `selftest` records
-  # DNS/WAN/TCP results on the persisted state disk; `ensureDnsForwarders`
-  # keeps a public-resolver forwarder in the core container's unbound because
-  # the modelled upstream (10.2.60.1) is unreachable and core otherwise runs as
-  # a pure iterator that SERVFAILs while warming a cold root anchor. Off for
-  # the production router: its intent does not model those resolvers.
+  # Diagnostics for the testing/rollback router only: `selftest` records
+  # DNS/WAN/TCP results on the persisted state disk so a failed boot is readable
+  # by mounting the qcow2.
+  #
+  # `ensureDnsForwarders` is deliberately NOT enabled. It existed on the theory
+  # that the core resolver SERVFAILed because the modelled upstream 10.2.60.1 is
+  # unreachable and unbound was iterating from a cold root anchor. That theory
+  # was wrong: the resolver answered fine as soon as the router itself stopped
+  # corrupting frames (TSO/GSO on the MediaTek MACs). Installing public
+  # resolvers papered over a router that was falling over, and it contradicts
+  # the intent, which does not model them. Kill the stopgap, keep the evidence.
   local.routerDiagnostics.selftest = true;
-  local.routerDiagnostics.ensureDnsForwarders = true;
+  local.routerDiagnostics.ensureDnsForwarders = false;
 
   # Per-hop packet capture and state logging for the forwarding chain
   # (access-* -> downstream-selector -> core -> upstream-selector, plus the
