@@ -47,7 +47,11 @@ in
       partOf = [ "systemd-networkd.service" ];
       serviceConfig = {
         Type = "oneshot";
-        RemainAfterExit = true;
+        # NOT RemainAfterExit: with it set, the unit stays "active" after the
+        # first run and every later `systemctl start` (which is all a timer can
+        # do) is a no-op. That is why the timer below never re-applied anything
+        # and TSO/GSO stayed on. With it unset each tick really runs the script.
+        RemainAfterExit = false;
       };
       path = [
         config.systemd.package
