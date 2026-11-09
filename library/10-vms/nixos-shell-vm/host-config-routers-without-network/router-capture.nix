@@ -88,11 +88,19 @@ let
             ${casePattern spec}) containers+=("$c") ;;
           esac
         done
+        # The renderer does not name container veths "ve-<container>"; on
+        # 2026-11-09 the live names were "cor-wan-eca" / "cor-cbcoru-913" (core)
+        # and "vb-tang", so the old patterns matched NOTHING: every capture
+        # service sat in its retry loop, stayed "active (running)" and left
+        # 0-byte directories behind -- a trial failed with no pcaps at all.
+        # Match the observed shapes too: a three-letter prefix of the container
+        # name, plus the "vb-" namespace devices.
         for c in "''${containers[@]-}"; do
+          prefix=$(printf '%s' "$c" | cut -c1-3)
           for p in /sys/class/net/*; do
             n=$(basename "$p")
             case "$n" in
-              "ve-$c" | "ve-$c"-*) ifaces+=("$n") ;;
+              "ve-$c" | "ve-$c"-* | "$prefix"-* | "vb-$c" | "vb-$c"-*) ifaces+=("$n") ;;
             esac
           done
         done
