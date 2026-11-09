@@ -4,31 +4,33 @@
 # specialization exists to A/B that by running `s-router-cobalt-new` in its
 # place on the real trunk, with the production image left untouched on disk.
 #
-# BLOCKED (SAT, 2026-11-09, current state): the platform binding now reaches the
-# containers, but the container runtime ignores the per-veth bridge, so the host
-# side of the container WAN is still unattached and the trial has no egress.
+# BLOCKED (SAT, 2026-11-09, narrowed to one missing renderer emission): the
+# container config carries no networking at all, and no host unit attaches the
+# container veths, so the trial has no egress and every SAT row stays NOT OK.
 #
-# Proven working (the earlier "invariant under the renderer input" note was an
-# artifact of `builtins.getFlake`, which ignores --override-input; the same
-# check with the installable form fails when the module is deleted, which proves
-# the module is on the evaluated path):
-#   nix eval --override-input network-renderer-nixos path:... #     "path:...#nixosConfigurations.s-nodus.config.specialisation.
-#      \"router-new-test\".configuration.containers.core.extraVeths"
-#   -> cor-cbcoru-913,cor-wan-eca
-#   ...extraVeths.\"cor-wan-eca\".hostBridge
-#   -> br-wan
+# Measured in the trial closure
+# (/nix/store/5c4ydask...-nixos-system-s-nodus-router-new-test-...):
+#   grep -E "^INTERFACES=|^MACVLANS=" etc/nixos-containers/core.conf
+#     -> INTERFACES=""        MACVLANS=""
+#   grep -E "^EXTRA_NSPAWN_FLAGS=" etc/nixos-containers/core.conf
+#     -> EXTRA_NSPAWN_FLAGS=""
+#   ls etc/systemd/network | wc -l            -> 122
+#   grep -rl "cor-wan" etc/systemd/network    -> 0
+#   grep -h "^Bridge=" etc/systemd/network/*.network | sort -u
+#     -> br-lan-trunk, br-onyx, br-opal, br-wan, clients
+# So the bridges exist and something else is enslaved to them, but nothing
+# attaches the container's host-side veth (cor-wan-eca / cor-cbcoru-913).
 #
-# Still broken: the generated container config does not carry it.
-#   grep -c HOST_BRIDGE <spec>/etc/nixos-containers/core.conf  ->  0
-# `nixos-containers` renders HOST_BRIDGE only for the primary `hostBridge`
-# (`--network-bridge`); a bridge named on an `extraVeths` entry is dropped, so
-# the model's host-side veth (cor-wan-eca) still comes up with no master and the
-# container WAN keeps only a link-local address.
+# What is already proven good:
+#   containers.core.extraVeths -> cor-cbcoru-913,cor-wan-eca
+#   containers.core.extraVeths."cor-wan-eca".hostBridge -> br-wan
+#   (nixos-containers simply does not render a bridge for extraVeths.)
 #
-# Consequence: no egress in the trial, every SAT row stays NOT OK, and no honest
-# evidence exists to flip any of them. Next fix belongs in the renderer: emit the
-# host-side attachment itself (the veth as a bridge slave in the host's
-# systemd-networkd config), not an extraVeths.hostBridge the runtime discards.
+# Next fix (renderer): emit a host-side systemd-networkd .network unit per
+# container veth with `Bridge=<bound bridge>` (and the bridge netdev), instead of
+# relying on extraVeths.hostBridge. Then rebuild, re-enter the trial, confirm
+# `ip -br link` shows cor-wan-eca with master br-wan and the container wan gets
+# an IPv4 lease, and only then probe the SAT rows.
 #
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
