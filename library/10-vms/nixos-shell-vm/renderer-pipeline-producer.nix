@@ -180,6 +180,38 @@ let
         };
       };
 
+  # Platform binding for a CONTAINER-hosted runtime target. The container set is
+  # the renderer's own output, so the binding cannot name containers; it names
+  # the host bridge per interface instead (inventory fact: which host bridge an
+  # interface name attaches to). Same validated envelope as the VM binding, so
+  # the renderer accepts it (FS-770-HDS-010).
+  containerPlatformBinding =
+    { hostName, bundle, interfaceBridges, target ? "nixos" }:
+    let
+      bindingBase = {
+        kind = "network-platform-binding-bundle";
+        schemaRevision = "network-platform-binding/v1";
+        bundleIdentity = bundle.bundleIdentity;
+        inherit target;
+        requestScope = bundle.requestScope;
+        categories.deployment.containerTargets.${hostName} = { inherit interfaceBridges; };
+        provenance = {
+          producer = "nixos/${hostName}";
+          producerRevision = "local-working-tree";
+        };
+      };
+      bindingIdentity = builtins.hashString "sha256" (builtins.toJSON bindingBase);
+    in
+    bindingBase
+    // {
+      inherit bindingIdentity;
+      validation = {
+        valid = true;
+        artifactIdentity = bindingIdentity;
+        schemaSetIdentity = bundle.validation.schemaSetIdentity;
+      };
+    };
+
 in
 {
   inherit
@@ -187,5 +219,6 @@ in
     realizeBundle
     realizeInventory
     vmNicsPlatformBinding
+    containerPlatformBinding
     ;
 }

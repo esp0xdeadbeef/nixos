@@ -169,7 +169,14 @@ in
         # host back on it before rebooting. Without this the guard rebooted
         # into the specialization again (the profile still pointed at it) and
         # a trial could never end on its own.
-        echo "$(readlink -f /run/current-system)" >${baseGeneration}
+        # Only a production boot may record the base generation: this unit also
+        # runs inside the trial, and on 2026-11-09 it wrote the *trial* path
+        # here, so the guard "restored" the trial and the box looped.
+        cur=$(readlink -f /run/current-system)
+        case "$cur" in
+          *router-new-test*) : ;;
+          *) echo "$cur" >${baseGeneration} ;;
+        esac
         marker=${rebootMarker}
         if [ -e "$marker" ]; then
           echo "clearing router-new-test reboot marker from $(cat "$marker" 2>/dev/null || echo unknown)"
@@ -476,7 +483,22 @@ in
             echo "reboot requested at $(date -Is)"
           } >>${logFile} 2>&1
 
-          base=$(cat ${baseGeneration} 2>/dev/null || true)
+          # Derive the production generation from the profile history instead
+          # of trusting one file: the newest system-*-link whose closure is not
+          # a router-new-test build. Self-healing even if a stale/incorrect
+          # base-generation file is present.
+          base=""
+          for link in $(ls -1dt /nix/var/nix/profiles/system-*-link 2>/dev/null); do
+            target=$(readlink -f "$link" 2>/dev/null || true)
+            case "$target" in
+              "" | *router-new-test*) continue ;;
+            esac
+            base=$target
+            break
+          done
+          if [ -z "$base" ]; then
+            base=$(cat ${baseGeneration} 2>/dev/null || true)
+          fi
           if [ -n "$base" ] && [ -d "$base" ]; then
             echo "restoring production generation $base before rebooting"
             nix-env -p /nix/var/nix/profiles/system --set "$base" || echo "WARNING: could not restore $base"
