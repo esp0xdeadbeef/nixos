@@ -206,6 +206,47 @@ in
       # systemd-tmpfiles-setup has run, so a `d` entry is hidden by the mount
       # and /run/secrets/devices is absent at boot. The directory has to be
       # created once sops is up and before any container starts.
+      # The rendered containers bind the SOPS-materialized secrets, exactly
+      # like the VM shape does in s-router-cobalt-new/default.nix. That module
+      # is the VM image, so the specialization cannot import it; without these
+      # declarations sops never creates /run/secrets/devices/<id> or
+      # /run/secrets/cobalt-wan-mac, and every container fails to start on the
+      # bind mount (measured 2026-11-09).
+      #
+      # Kept in the same shape as the VM module on purpose: same secret names,
+      # same paths, same files, so one host can run both shapes.
+      sops.secrets =
+        let
+          deviceDir = relativeRepo.sourceModule "prod-network/testing/secrets/devices";
+          deviceSopsDir = relativeRepo.sourcePath "prod-network/testing/secrets/devices";
+          deviceIds = map
+            (name: lib.removeSuffix ".sops.yaml" name)
+            (builtins.filter
+              (name: lib.hasSuffix ".sops.yaml" name)
+              (builtins.attrNames (builtins.readDir deviceDir)));
+        in
+        (lib.listToAttrs (
+          map
+            (id: {
+              name = "cobalt-device-${id}";
+              value = {
+                sopsFile = "${deviceSopsDir}/${id}.sops.yaml";
+                key = "mac";
+                format = "yaml";
+                path = "/run/secrets/devices/${id}";
+              };
+            })
+            deviceIds
+        ))
+        // {
+          "cobalt-wan-mac" = {
+            sopsFile = relativeRepo.sourcePath "secrets/s-router-cobalt-wan-mac.yaml";
+            key = "mac";
+            format = "yaml";
+            path = "/run/secrets/cobalt-wan-mac";
+          };
+        };
+
       systemd.services.s-nodus-secret-dirs = {
         description = "Provide the secret mount points the rendered containers bind";
         after = [ "sops-install-secrets.service" ];
