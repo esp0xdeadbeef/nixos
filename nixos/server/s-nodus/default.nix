@@ -101,6 +101,7 @@ in
     # The board serves its own kernel/console log over TCP so the console is
     # always reachable, independent of the operator laptop's USB adapter.
     ./kernel-log-tcp.nix
+    ./mxl862xx-tagging.nix
 
     # Reboot the board when BOTH internet probes stay unreachable for the whole
     # window; one reachable target means a DNS/CDN problem, not a dead uplink.
