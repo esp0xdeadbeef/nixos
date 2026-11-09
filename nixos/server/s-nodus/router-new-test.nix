@@ -4,6 +4,21 @@
 # specialization exists to A/B that by running `s-router-cobalt-new` in its
 # place on the real trunk, with the production image left untouched on disk.
 #
+# BLOCKED 2026-11-09: the trial cannot currently be ENTERED on this board.
+# Measured twice: `nix-env -p /nix/var/nix/profiles/system --set
+# <closure>/specialisation/router-new-test` succeeds (readlink confirms
+# /nix/store/5c4ydask...), `systemctl reboot` runs, and the booted system comes
+# back on the PRODUCTION generation (readlink -f /run/current-system =
+# /nix/store/zj4vil4..., `nixos-container list` = tang only). The kernel command
+# line is `init=/nix/var/nix/profiles/system/init`, so the profile is the only
+# selector and something rewrites it to production during boot (candidates:
+# s-nodus-fit-sync.service, which reflashes the production FIT, or the
+# activation script). Until that is understood and fixed, Site Acceptance
+# Testing of the cobalt site cannot run: every SAT row is a live probe against
+# the container-hosted router, which only exists in this specialization. The
+# earlier 22:41 entry into the trial worked, so this is a regression introduced
+# while adding the recovery/base-generation machinery.
+#
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
