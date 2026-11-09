@@ -201,10 +201,26 @@ in
       # Measured on the 2026-11-09 trial: 14 containers failed, then all came
       # up once the directory existed. It is a mount point the platform must
       # provide, so it is declared here rather than left to sops' side effects.
-      systemd.tmpfiles.rules = [
-        "d /run/secrets 0750 root root -"
-        "d /run/secrets/devices 0750 root root -"
-      ];
+      # NOTE: tmpfiles is the wrong mechanism here. Measured on 2026-11-09:
+      # `run-secrets.d.mount` (sops' tmpfs) is mounted AFTER
+      # systemd-tmpfiles-setup has run, so a `d` entry is hidden by the mount
+      # and /run/secrets/devices is absent at boot. The directory has to be
+      # created once sops is up and before any container starts.
+      systemd.services.s-nodus-secret-dirs = {
+        description = "Provide the secret mount points the rendered containers bind";
+        after = [ "sops-install-secrets.service" ];
+        before = [ "container@.service" ];
+        wants = [ "sops-install-secrets.service" ];
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          mkdir -p /run/secrets/devices
+          chmod 0750 /run/secrets/devices
+        '';
+      };
 
       # Realize the candidate's containers directly on this host by importing
       # the same rendered model the VM used, but WITHOUT vmNics: with an empty
