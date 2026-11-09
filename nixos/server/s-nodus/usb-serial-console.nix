@@ -17,6 +17,14 @@ in
 {
   boot.kernelModules = [ "usbserial" ];
 
+  # The adapter enumerates on a COLD boot but not on hotplug. That is the
+  # signature of USB runtime PM suspending the hub ports: a re-plug then never
+  # produces a uevent (observed: `udevadm monitor --kernel` stayed silent while
+  # the adapter was inserted, and lsusb showed only the hubs). Disable
+  # autosuspend globally and force every USB device's power/control to "on" as
+  # it is added.
+  boot.kernelParams = [ "usbcore.autosuspend=-1" ];
+
   services.udev.extraRules = ''
     # Holtek USB TO UART BRIDGE: bind the generic usb-serial driver on the
     # interface that actually has the bulk endpoints, both at boot and hotplug.
@@ -28,6 +36,9 @@ in
     # the adapter in yields a login instead of a dead device node. %k expands to
     # the kernel name (ttyUSB0, ...), so it works for any port number.
     SUBSYSTEM=="tty", KERNEL=="ttyUSB*", SYMLINK+="tty-serial-console", TAG+="systemd", ENV{SYSTEMD_WANTS}="serial-getty@%k.service"
+
+    # Keep hub ports powered: without this a replug can stay invisible.
+    ACTION=="add", SUBSYSTEM=="usb", ATTR{power/control}="on"
   '';
 
   # Belt and braces: also pull the getty in via getty.target for the common
