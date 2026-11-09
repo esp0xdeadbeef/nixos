@@ -94,6 +94,10 @@ in
     # and reboots back to the default entry when the window ends.
     ./router-new-test.nix
 
+    # The board's USB-serial console adapter (04d9:b534) needs an explicit
+    # driver bind; without it no /dev/ttyUSB* is created.
+    ./usb-serial-console.nix
+
     # Reboot the board when BOTH internet probes stay unreachable for the whole
     # window; one reachable target means a DNS/CDN problem, not a dead uplink.
     ./internet-guard.nix
