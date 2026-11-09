@@ -407,7 +407,12 @@ in
           # Poll from early boot: a candidate that never boots must still return
           # the site to production once the broken-egress window expires.
           OnBootSec = "60s";
-          OnUnitActiveSec = "${toString cfg.probeIntervalSeconds}s";
+          # OnUnitActiveSec does NOT re-arm for a Type=oneshot service that
+          # runs and exits: measured on 2026-11-09, the trial ran 8624s against
+          # a 600s deadline and only rebooted when an unrelated activation
+          # happened to start the unit again. OnUnitInactiveSec is relative to
+          # the previous run finishing, which is what a poll loop needs.
+          OnUnitInactiveSec = "${toString cfg.probeIntervalSeconds}s";
           Unit = "router-new-test-reboot.service";
           Persistent = false;
         };
