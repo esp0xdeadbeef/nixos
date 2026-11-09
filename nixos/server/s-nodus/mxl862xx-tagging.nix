@@ -32,7 +32,10 @@
       "systemd-networkd.service"
       "network-pre.target"
     ];
-    wantedBy = [ "network-pre.target" ];
+    # `network-pre.target` is a passive target: being wanted by it does not
+    # pull the unit in. multi-user is the active ordering point that brings it
+    # in, and `before` keeps it ahead of the first networkd run.
+    wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
