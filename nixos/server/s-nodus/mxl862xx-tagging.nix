@@ -84,4 +84,12 @@
     wants = [ "mxl862xx-8021q-tagging.service" ];
     after = [ "mxl862xx-8021q-tagging.service" ];
   };
+
+  # Delaying networkd delays the bridges it creates, so a container that joins a
+  # host bridge must wait for networkd instead of racing it (measured: tang
+  # failed to start with the ordering above and no other change).
+  systemd.services."container@" = {
+    wants = [ "systemd-networkd.service" ];
+    after = [ "systemd-networkd.service" ];
+  };
 }
