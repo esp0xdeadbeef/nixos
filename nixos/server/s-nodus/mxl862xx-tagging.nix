@@ -44,8 +44,19 @@
     script = ''
       conduit=/sys/class/net/eth2/dsa/tagging
 
-      # Nothing to do on hardware without the MaxLinear switch.
-      [ -w "$conduit" ] || exit 0
+      # The DSA tree is probed asynchronously, so the conduit may not exist yet
+      # when this unit is ordered. Wait for it instead of silently succeeding
+      # (that is how the first version of this unit became a no-op).
+      i=0
+      while [ ! -w "$conduit" ]; do
+        i=$((i + 1))
+        if [ "$i" -gt 30 ]; then
+          # No MaxLinear switch on this hardware: nothing to configure.
+          echo "mxl862xx-8021q-tagging: no $conduit after 30s, skipping"
+          exit 0
+        fi
+        sleep 1
+      done
 
       current="$(cat "$conduit")"
       if [ "$current" = "mxl862xx-8021q" ]; then
@@ -64,5 +75,13 @@
       fi
       echo "mxl862xx-8021q-tagging: DSA tagging is now $(cat "$conduit")"
     '';
+  };
+
+  # networkd is what brings the switch ports up, and DSA refuses the change
+  # while any user port is up. Making networkd wait for this unit removes the
+  # race completely: by the time networkd runs, the tag protocol is settled.
+  systemd.services.systemd-networkd = {
+    wants = [ "mxl862xx-8021q-tagging.service" ];
+    after = [ "mxl862xx-8021q-tagging.service" ];
   };
 }
