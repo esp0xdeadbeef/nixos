@@ -224,6 +224,18 @@ in
     script = ''
       set -euo pipefail
 
+      # NEVER flash a trial/boot-entry specialization into the FIT. The FIT
+      # carries an absolute init=, so flashing the candidate pins every later
+      # reboot to the candidate regardless of /nix/var/nix/profiles/system --
+      # that is what produced an endless reboot loop on 2026-11-10: the guard
+      # restored the production profile, but the FIT still booted the trial.
+      case "$(readlink -f /run/current-system)" in
+        *router-new-test*)
+          echo "current system is a router-new-test specialization: refusing to reflash the production FIT"
+          exit 0
+          ;;
+      esac
+
       fit=${config.system.build.bpiR4ProFit}
       part=/dev/disk/by-partlabel/production
 
