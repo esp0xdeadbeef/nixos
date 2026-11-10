@@ -258,15 +258,24 @@ in
         # runs inside the trial, and on 2026-11-09 it wrote the *trial* path
         # here, so the guard "restored" the trial and the box looped.
         cur=$(readlink -f /run/current-system)
-        case "$cur" in
-          *router-new-test*) : ;;
-          *) echo "$cur" >${baseGeneration} ;;
-        esac
         marker=${rebootMarker}
-        if [ -e "$marker" ]; then
-          echo "clearing router-new-test reboot marker from $(cat "$marker" 2>/dev/null || echo unknown)"
-          rm -f "$marker"
-        fi
+        case "$cur" in
+          *router-new-test*)
+            # Inside the trial this unit must do NOTHING: it used to delete the
+            # guard marker unconditionally, which un-froze the deadline and let
+            # the guard end a trial that was deliberately kept open for probing
+            # (measured 2026-11-10: marker removed at trial boot, guard reverted
+            # to production 600 s later).
+            :
+            ;;
+          *)
+            echo "$cur" >${baseGeneration}
+            if [ -e "$marker" ]; then
+              echo "clearing router-new-test reboot marker from $(cat "$marker" 2>/dev/null || echo unknown)"
+              rm -f "$marker"
+            fi
+            ;;
+        esac
       '';
     };
 
