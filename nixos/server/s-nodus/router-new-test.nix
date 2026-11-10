@@ -46,41 +46,41 @@
 # plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
 # Only after that check can the SAT rows be probed honestly.
 #
-# BLOCKED (SAT, 2026-11-10): the clients tenant has no egress in the trial, and
-# the GAMP FS says exactly which render this is.
+# BLOCKED (SAT, 2026-11-10): the trial's container model drops the modelled
+# default routes, and the exact code path is identified.
 #
-# Authorizing sentences (read from ~/github/network-codex-agent/GAMP):
-#   FS/README.md "Site Fabric Traffic Flow": fabric traffic leaving an access
-#     space reaches the policy point only as `access <-> down <-> pol`, so the
-#     downstream selector must carry the path toward the policy point.
-#   FS/README.md same section: "An access space owns the tenant prefixes it
-#     serves. Those prefixes ... shall never be routed through the downstream
-#     selector or the policy point. ... A rendered routing table that resolves
-#     an access space's own served prefix toward `down` is a defect."
-#   FS/README.md:1304: endpoint containers may receive default route/DNS "only
-#     from renderer output derived from the validated canonical realization
-#     bundle ... the host shall not supply it." (So adding routes by hand, as
-#     attempted live at 03:06, is forbidden by the FS and was wrong.)
+# FS authorization (read from ~/github/network-codex-agent/GAMP):
+#   FS "Site Fabric Traffic Flow": access traffic leaves only as
+#     `access <-> down <-> pol`; an access space's own served prefixes "shall
+#     never be routed through the downstream selector", and a rendered table
+#     that does so "is a defect".
+#   FS:1304: endpoint containers get default route/DNS only from renderer output
+#     derived from the validated realization bundle; "the host shall not supply
+#     it" -- so the live `ip route add` attempted at 03:06 was wrong, and nothing
+#     belongs in this host module.
 #
-# Measured defect in the trial render:
-#   containers.downstream-selector.config.systemd.network.networks."10-pdspaac".routes
-#     -> 248 routes, 0 with Destination 0.0.0.0/0
-#   live in the trial, table 1001 then contained the FS-forbidden entry:
-#     10.2.30.0/24 via 10.1.0.0 dev pacds       (served prefix routed to `down`)
-# Reference from the running production guest (same model, prod pins):
-#   /etc/systemd/network/10-pdspaac.network contains 6 x Destination=0.0.0.0/0,
-#   including "Gateway=10.1.0.23 ... Table=1001", and curl --interface 10.2.30.1
-#   ifconfig.me in access-clients returns the provider address.
-# The realization bundle does carry such routes on host attachTargets
-# (rendered-host.json contains 1407 x "0.0.0.0/0"), so the loss happens in the
-# container-runtime route mapping/emission, i.e. in network-renderer-nixos.
+# Where the loss happens (code, read not guessed):
+#   s88/ControlModule/mapping/container-runtime/interfaces/normalize.nix
+#     routes = routeListForInterface iface;   # only reads iface.routes
+#   Measured in the trial build:
+#     rendered.containers."downstream-selector".interfaces."pdspaac".routes
+#       -> 248 routes, 0 with Destination 0.0.0.0/0
+#     rendered.attachTargets[*].routes
+#       -> contains "dst = 0.0.0.0/0" (rendered-host.json has 1407 of them)
+#   Live in the trial that produced the FS defect:
+#     table 1001: 10.2.30.0/24 via 10.1.0.0 dev pacds  (served prefix toward down)
+#   Live production reference (host path, prod pins):
+#     /etc/systemd/network/10-pdspaac.network has 6 x Destination=0.0.0.0/0,
+#     incl. Gateway=10.1.0.23 Table=1001; curl --interface 10.2.30.1
+#     ifconfig.me returns the provider address.
 #
-# Next: fix the renderer container route emission (keep the modelled default
-# toward the policy point, drop routes that resolve the served tenant prefix
-# toward `down`), rebuild on .16, deploy, re-probe the SAT rows from the clients
-# /24. Nothing belongs in this host module.
+# Next: the container model must carry the attachTarget routes (the same route
+# set the host side already receives) so the container's networkd emits the
+# modelled default toward the policy point and drops the served-prefix route
+# toward `down`. That is a network-renderer-nixos change; then rebuild on .16,
+# deploy, and probe the SAT rows from the clients /24.
 #
-# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
+# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
 # the host cannot even reach -- the reboot restores production without anyone
