@@ -46,40 +46,44 @@
 # plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
 # Only after that check can the SAT rows be probed honestly.
 #
-# BLOCKED (SAT, 2026-11-10): the trial render cannot be produced at all, because
-# the CPM and the renderer disagree about where the relation-reachability route
-# lives. This is a spec-level mismatch, not a host-config problem.
+# BLOCKED (SAT, 2026-11-10): no trial render exists, because the FS-270
+# SMS-020 route-placement contract fails on the CONTAINER path while the host
+# path renders with the very same renderer pin.
 #
-# Build error (real, from .16):
+# Build error (.16, real):
 #   error: FS-270-HDS-010-SDS-010-SMS-020:
 #          route selector lacks its exact CPM policy-table reachability route
 # Guard: s88/ControlModule/render/container-networks/policy-routing/
-#        relation-selection-rules.nix:132 -- it requires, on the SELECTOR
-#        interface, a route with policyOnly=true, dst==destinationPrefix,
-#        relationId, intent.kind=="relation-policy-reachability",
-#        intent.direction, intent.policyStateOwner and via4/via6.
-# CPM output (network-artifacts/control-plane.json, 7.9 MB) carries exactly two
-# such routes and both sit on the POLICY runtime target:
-#   /control_plane_model/data/esp0xdeadbeef/cobalt/runtimeTargets/
-#     esp0xdeadbeef-cobalt-policy/effectiveRuntimeRealization/interfaces/
-#     p2p-downstream-selector-policy-...
-#     p2p-policy-upstream-selector-...
-# So the CPM puts them at the policy end and the renderer demands them at the
-# selector end. My earlier attempt to graft host attachTarget routes onto the
-# container interface (renderer aeadfe6) could never satisfy this guard because
-# those routes carry no intent.kind; it was reverted (23c9d4d).
+#        relation-selection-rules.nix:132 -- reads interfaces.<routeKey>.routes and
+#        requires policyOnly=true, dst==destinationPrefix, relationId,
+#        intent.kind=="relation-policy-reachability", direction, policyStateOwner
+#        and via4/via6.
+# CPM producer (~/github/network-control-plane-model,
+# src/cpm/ControlModule/runtime-targets/relation-policy-routing.nix):
+#   policyEntry = if role == "downstream-selector"
+#                   then (if forward then sourcePolicy else destinationPolicy)
+#                   else (if forward then destinationPolicy else sourcePolicy);
+#   the route is appended to interfaces.<policyEntry.name>.routes, and
+#   selector.routeInterface = routePolicyFor.name -- the same policy lane.
+#   Only two such routes exist in control-plane.json and both sit on
+#   runtimeTargets/esp0xdeadbeef-cobalt-policy/effectiveRuntimeRealization/
+#   interfaces/p2p-... .
+# Difference proven: the production host shape renders with this pin
+#   (generation bms1zp32rap builds and boots), the container shape does not.
 #
-# Related spec anchors: FS "Site Fabric Traffic Flow" (selectors realize the
-# modelled path choice and must not add/reroute a path) and
-# SMS/FS-310-HDS-010-SDS-010-SMS-130 (renderer may not invent routing table IDs,
-# metrics or priorities). Therefore the placement must be settled in the owning
-# HDS/SDS for FS-270-HDS-010-SDS-010-SMS-020 -- either the CPM emits the
-# reachability route on the selector interface, or the guard reads it from the
-# policy target -- before any code change. Nothing belongs in this host module.
+# Rejected by the specs, so not done here: grafting host attachTarget routes onto
+# the container interface (renderer aeadfe6, reverted as 23c9d4d) violates
+# SMS/FS-310-HDS-010-SDS-010-SMS-130 (no renderer-invented routing) and lacks
+# intent.kind so it cannot satisfy the guard anyway; and FS:1304 forbids the host
+# from supplying default routes to endpoint containers.
 #
-# Consequence: no valid trial render, so no SAT row can be probed.
+# Next (spec-first): settle in the owning HDS/SDS of
+# FS-270-HDS-010-SDS-010-SMS-020 whether the container image must carry the
+# selector-side reachability route, then make the container render preserve the
+# CPM interface routes (or the CPM emit them on the selector interface too),
+# rebuild on .16, deploy and only then probe the SAT rows.
 #
-# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
+# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
 # the host cannot even reach -- the reboot restores production without anyone
