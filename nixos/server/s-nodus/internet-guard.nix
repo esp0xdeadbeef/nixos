@@ -7,9 +7,9 @@
 # and must never trigger a reboot. Either target recovering resets the
 # counter.
 #
-# The outage start time is persisted under /persist (impermanence keeps it
-# across reboots); when /persist is not mounted it falls back to /run, which
-# still counts correctly within a boot.
+# The outage start time lives in /run (volatile). It must NOT be persisted:
+# a counter that survives a reboot makes the window already-exceeded on the
+# next boot, which turns the guard into a boot loop (measured 2026-11-10).
 { config, lib, pkgs, ... }:
 
 let
@@ -47,10 +47,9 @@ in
   config = lib.mkIf cfg.enable {
     systemd.services.internet-guard = {
       description = "Reboot when every internet probe target stays unreachable";
-      # util-linux is required: the script uses `mountpoint` to decide whether
-      # /persist is mounted. Without it the probe for /persist always fails and
-      # the outage counter silently falls back to /run, losing the counter on
-      # every reboot and breaking the "window survives a reboot" contract.
+      # util-linux is no longer needed for the outage counter (it is volatile
+      # in /run since 2026-11-10); it stays in PATH because operators use the
+      # same unit environment for mountpoint checks during recovery.
       #
       # systemd is required for the final `systemctl reboot`. It currently
       # resolves only because NixOS appends the implicit default service path;
@@ -70,18 +69,15 @@ in
       script = ''
         set -u
 
-        dir=/persist/var/lib/internet-guard
-        # `command -v` keeps the dependency explicit: if util-linux ever drops
-        # out of `path` again this is reported instead of silently counting in
-        # /run and losing the window on the next reboot. The guard still runs:
-        # on a headless box this reboot is the only recovery path, so degrading
-        # to a volatile counter beats refusing to guard at all.
-        if ! command -v mountpoint >/dev/null 2>&1; then
-          say "mountpoint (util-linux) missing from PATH; outage counter will not survive a reboot"
-        fi
-        if ! mountpoint -q /persist 2>/dev/null; then
-          dir=/run/internet-guard
-        fi
+        # The outage counter is VOLATILE on purpose (2026-11-10). It used to
+        # live under /persist, so a stale "outage started at T" survived every
+        # reboot. A box that came up with the probes still failing then had the
+        # window already exceeded and rebooted itself within a minute of every
+        # boot: a self-sustaining reboot loop that no operator can interrupt.
+        # Keeping it in /run means every boot starts with a full window, so the
+        # guard can only ever reboot a box that stayed broken for that whole
+        # window -- never one that is still coming up.
+        dir=/run/internet-guard
         file=$dir/since
         mkdir -p "$dir"
 
