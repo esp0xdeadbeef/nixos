@@ -395,6 +395,45 @@ in
           }
         );
 
+      # The containers must be able to READ these secrets, not just have sops
+      # materialize them on the host. The VM shape bound them in
+      # s-router-cobalt-new/default.nix; this boot entry does not import that
+      # module, so the binds are declared here explicitly:
+      #
+      #  - core: /run/secrets/cobalt-wan-mac (s88-link-init-wan applies the
+      #    provider MAC to `wan` before networkd; without the bind the unit
+      #    dies with "not readable" and the container never gets a lease).
+      #  - access-clients / access-iot: the per-device identity files under
+      #    /run/secrets/devices/<id> that gen-kea-cobalt-* joins into the DHCP
+      #    reservations (measured 2026-11-10: the trial emitted only the
+      #    directory of symlinks, so every handle was a broken link and the
+      #    kea generator failed, taking unbound and tenant DNS down).
+      containers = lib.mkMerge [
+        {
+          core.bindMounts."/run/secrets/cobalt-wan-mac" = {
+            hostPath = config.sops.secrets."cobalt-wan-mac".path;
+            isReadOnly = true;
+          };
+        }
+        (lib.genAttrs [ "access-clients" "access-iot" ] (name: {
+          bindMounts = lib.listToAttrs (
+            map
+              (id: {
+                name = "/run/secrets/devices/${id}";
+                value = {
+                  hostPath = config.sops.secrets."cobalt-device-${id}".path;
+                  isReadOnly = true;
+                };
+              })
+              (map
+                (fname: lib.removeSuffix ".sops.yaml" fname)
+                (builtins.filter
+                  (fname: lib.hasSuffix ".sops.yaml" fname)
+                  (builtins.attrNames (builtins.readDir (relativeRepo.sourceModule "prod-network/testing/secrets/devices")))))
+          );
+        }))
+      ];
+
       local.routerCapture.enable = true;
 
       # Resolve the L2 collision instead of warning about it. The rendered
