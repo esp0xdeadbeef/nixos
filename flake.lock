@@ -2747,7 +2747,6 @@
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
         "type": "github",
-        "ref": "main",
         "rev": "8b976744dee022c2b049910d55f4885cd84e94f9"
       }
     },
