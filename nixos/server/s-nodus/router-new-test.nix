@@ -65,6 +65,19 @@
 #   "these 19 derivations will be built" with 0 occurrences of the FS-270 error,
 #   where it previously failed at evaluation.
 #
+# RESOLVED (render side): with the CPM fix pinned (46cffa4) the cobalt trial
+# render EVALUATES. Proof on .16 and on .18: the derivation for the candidate is
+# produced instead of an FS-270 abort
+#   /nix/store/zigf1zb96n1727dmaraz4swfix1qjv67-nixos-system-s-nodus-router-new-test-...drv
+# where before the same command failed with
+#   error: FS-270-HDS-010-SDS-010-SMS-020: route selector lacks its exact CPM
+#          policy-table reachability route
+# The remaining work is building/deploying that derivation; because .16 cannot
+# obtain the non-substitutable linux-6.18.60 output, the build is being run on
+# the target itself (.18, aarch64 native, kernel already present) from
+# /home/deadbeef/nixos-src with the same flake.lock (cpm 46cffa4,
+# renderer 08219c7).
+#
 # Progress on that blocker: .16 cannot reach .18 over ssh ("Disconnected from
 # 100.64.0.18 port 22") and .16's store rejects unsigned paths ("cannot add path
 # ... because it lacks a signature by a trusted key", also with require-sigs
