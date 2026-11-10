@@ -46,41 +46,50 @@
 # plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
 # Only after that check can the SAT rows be probed honestly.
 #
-# BLOCKED (SAT, 2026-11-10): the trial's container model drops the modelled
-# default routes, and the exact code path is identified.
+# BLOCKED (SAT, 2026-11-10): the missing clients default route is a MODEL defect,
+# and the renderer must not fabricate it.
 #
-# FS authorization (read from ~/github/network-codex-agent/GAMP):
-#   FS "Site Fabric Traffic Flow": access traffic leaves only as
-#     `access <-> down <-> pol`; an access space's own served prefixes "shall
-#     never be routed through the downstream selector", and a rendered table
-#     that does so "is a defect".
+# Spec anchors read from ~/github/network-codex-agent/GAMP:
+#   SMS/FS-310-HDS-010-SDS-010-SMS-130 "Renderer No-Policy-Invention": a renderer
+#     may use at most one validated platform binding "and only for target
+#     mechanics", and must "reject renderer-invented: ... routing table IDs,
+#     route metrics, routing priorities ... when not traceable to canonical
+#     semantic authority".
+#   FS "Site Fabric Traffic Flow": an access space owns the prefixes it serves and
+#     those "shall never be routed through the downstream selector"; selectors
+#     "realize the modeled path choice. They do not grant permission and do not
+#     add, remove, or reroute a path."
 #   FS:1304: endpoint containers get default route/DNS only from renderer output
 #     derived from the validated realization bundle; "the host shall not supply
-#     it" -- so the live `ip route add` attempted at 03:06 was wrong, and nothing
-#     belongs in this host module.
+#     it".
 #
-# Where the loss happens (code, read not guessed):
-#   s88/ControlModule/mapping/container-runtime/interfaces/normalize.nix
-#     routes = routeListForInterface iface;   # only reads iface.routes
-#   Measured in the trial build:
-#     rendered.containers."downstream-selector".interfaces."pdspaac".routes
-#       -> 248 routes, 0 with Destination 0.0.0.0/0
-#     rendered.attachTargets[*].routes
-#       -> contains "dst = 0.0.0.0/0" (rendered-host.json has 1407 of them)
-#   Live in the trial that produced the FS defect:
-#     table 1001: 10.2.30.0/24 via 10.1.0.0 dev pacds  (served prefix toward down)
-#   Live production reference (host path, prod pins):
-#     /etc/systemd/network/10-pdspaac.network has 6 x Destination=0.0.0.0/0,
-#     incl. Gateway=10.1.0.23 Table=1001; curl --interface 10.2.30.1
-#     ifconfig.me returns the provider address.
+# Consequence: taking the host-side attachTarget routes and grafting them onto the
+# container interface is exactly the invention SMS-130 forbids. That experiment
+# was implemented (renderer aeadfe6) and REVERTED (renderer 23c9d4d); the
+# renderer test suite passes after the revert.
 #
-# Next: the container model must carry the attachTarget routes (the same route
-# set the host side already receives) so the container's networkd emits the
-# modelled default toward the policy point and drops the served-prefix route
-# toward `down`. That is a network-renderer-nixos change; then rebuild on .16,
-# deploy, and probe the SAT rows from the clients /24.
+# What is actually measured:
+#   rendered host arm:      attachTargets carry "dst = 0.0.0.0/0" (1407 in
+#                           rendered-host.json) and prod's 10-pdspaac.network has
+#                           6 default routes incl. Gateway=10.1.0.23 Table=1001,
+#                           so production's clients /24 egresses
+#                           (curl --interface 10.2.30.1 ifconfig.me works).
+#   rendered container arm: rendered.containers."downstream-selector" has no
+#                           `interfaces` key at all (keys: additionalCapabilities,
+#                           alarms, allowedDevices, autoStart, bindMounts,
+#                           extraVeths, firewall, privateNetwork, specialArgs,
+#                           warnings), and the trial's live table 1001 contained
+#                           the FS-forbidden "10.2.30.0/24 via 10.1.0.0 dev pacds".
+# So the canonical realization for the CONTAINER target does not carry the
+# modelled upward default for the clients leg, while the host arm does.
 #
-# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
+# Next (spec-first, per AGENTS.md): add the requirement to the owning HDS that a
+# container-realized selector carries the same modelled route set as the
+# host-realized selector for the same canonical bundle, then fix
+# network-realization-model (not the renderer, not this host module), rebuild on
+# .16, deploy and probe the SAT rows from the clients /24.
+#
+# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
 # the host cannot even reach -- the reboot restores production without anyone
