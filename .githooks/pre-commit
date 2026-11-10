@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Protected production surfaces are a commit-time gate, not a CI one. Two
-# distinct guards, both commit-time:
+# Commit-time guards for encrypted material and protected surfaces:
 #
-#  * check-prod-paths.sh: the CONTENT of the protected paths (prod-network/prod/,
-#    prod-network/current/, the *-prod / *-legacy-prod host configs and secrets)
-#    is read-only without explicit per-session permission naming the exact
-#    files. AGENTS.md states this rule; before this guard existed nothing
-#    enforced it, so a content edit under prod-network/prod/ landed silently.
-#
+#  * check-sops-encrypted.sh: a secrets file must actually be ciphertext. A
+#    plaintext value in the tree decrypts "fine" because there is nothing to
+#    decrypt, and the secret is already public.
+#  * check-sops-recipients.sh: a secrets file must be encrypted to the keys that
+#    are supposed to read it.
+#  * check-prod-paths.sh: the CONTENT of the protected paths
+#    (prod-network/prod/, prod-network/current/, the *-prod / *-legacy-prod
+#    host configs and secrets) is read-only without explicit per-session
+#    permission naming the exact files.
 #  * check-prod-pins.sh: the *flake.lock pins* of the prod and legacy-prod
 #    network shapes cannot move without an approved snapshot diff.
+scripts/check-sops-encrypted.sh --staged
+
 scripts/check-prod-paths.sh --staged
 scripts/check-sops-recipients.sh
 
