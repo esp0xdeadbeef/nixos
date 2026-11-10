@@ -22,6 +22,24 @@
 # (so the unit from spec 2w0zwplayl6g was installed), yet egress stayed broken,
 # so the veth is either not enslaved or the container WAN still gets no lease.
 #
+# ROOT CAUSES OF THE TWO USER-VISIBLE OUTAGES IN THE TRIAL (journal -b, trial
+# boot with 68 container@core lines):
+#   1. WiFi/APs down:
+#        ap-conf-wlp1s0.service: Main process exited, code=exited, status=1/FAILURE
+#        Error: open /run/secrets/cobalt-wifi: no such file or directory
+#      In production that secret exists and 18 ap-* units are active with 0
+#      failures, so this is trial-only: the trial's sops set did not materialize
+#      cobalt-wifi (declared now, still unverified in a trial boot).
+#   2. Overlay (.18) down:
+#        nebula-mesh: failed to load config: no config files found at
+#                     /run/secrets/rendered/nebula-mesh.json
+#        nebula-mesh.service: Scheduled restart job, restart counter is at 865
+#      In production /run/secrets/rendered/nebula-mesh.json exists and
+#      nebula-mesh is active. The trial renders the CONTAINER shape only and
+#      never renders the host nebula profile, so the host has no overlay for the
+#      whole trial window. Both must be declared/materialized by this boot entry
+#      before a trial can be left running.
+#
 # Next concrete step: inside a trial boot capture
 #   ip -d link show cor-wan-eca   (expect "master br-wan")
 #   nixos-container run core -- ip -4 -br a show wan   (expect a DHCP lease)
