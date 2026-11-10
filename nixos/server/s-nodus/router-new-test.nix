@@ -46,50 +46,40 @@
 # plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
 # Only after that check can the SAT rows be probed honestly.
 #
-# BLOCKED (SAT, 2026-11-10): the missing clients default route is a MODEL defect,
-# and the renderer must not fabricate it.
+# BLOCKED (SAT, 2026-11-10): the trial render cannot be produced at all, because
+# the CPM and the renderer disagree about where the relation-reachability route
+# lives. This is a spec-level mismatch, not a host-config problem.
 #
-# Spec anchors read from ~/github/network-codex-agent/GAMP:
-#   SMS/FS-310-HDS-010-SDS-010-SMS-130 "Renderer No-Policy-Invention": a renderer
-#     may use at most one validated platform binding "and only for target
-#     mechanics", and must "reject renderer-invented: ... routing table IDs,
-#     route metrics, routing priorities ... when not traceable to canonical
-#     semantic authority".
-#   FS "Site Fabric Traffic Flow": an access space owns the prefixes it serves and
-#     those "shall never be routed through the downstream selector"; selectors
-#     "realize the modeled path choice. They do not grant permission and do not
-#     add, remove, or reroute a path."
-#   FS:1304: endpoint containers get default route/DNS only from renderer output
-#     derived from the validated realization bundle; "the host shall not supply
-#     it".
+# Build error (real, from .16):
+#   error: FS-270-HDS-010-SDS-010-SMS-020:
+#          route selector lacks its exact CPM policy-table reachability route
+# Guard: s88/ControlModule/render/container-networks/policy-routing/
+#        relation-selection-rules.nix:132 -- it requires, on the SELECTOR
+#        interface, a route with policyOnly=true, dst==destinationPrefix,
+#        relationId, intent.kind=="relation-policy-reachability",
+#        intent.direction, intent.policyStateOwner and via4/via6.
+# CPM output (network-artifacts/control-plane.json, 7.9 MB) carries exactly two
+# such routes and both sit on the POLICY runtime target:
+#   /control_plane_model/data/esp0xdeadbeef/cobalt/runtimeTargets/
+#     esp0xdeadbeef-cobalt-policy/effectiveRuntimeRealization/interfaces/
+#     p2p-downstream-selector-policy-...
+#     p2p-policy-upstream-selector-...
+# So the CPM puts them at the policy end and the renderer demands them at the
+# selector end. My earlier attempt to graft host attachTarget routes onto the
+# container interface (renderer aeadfe6) could never satisfy this guard because
+# those routes carry no intent.kind; it was reverted (23c9d4d).
 #
-# Consequence: taking the host-side attachTarget routes and grafting them onto the
-# container interface is exactly the invention SMS-130 forbids. That experiment
-# was implemented (renderer aeadfe6) and REVERTED (renderer 23c9d4d); the
-# renderer test suite passes after the revert.
+# Related spec anchors: FS "Site Fabric Traffic Flow" (selectors realize the
+# modelled path choice and must not add/reroute a path) and
+# SMS/FS-310-HDS-010-SDS-010-SMS-130 (renderer may not invent routing table IDs,
+# metrics or priorities). Therefore the placement must be settled in the owning
+# HDS/SDS for FS-270-HDS-010-SDS-010-SMS-020 -- either the CPM emits the
+# reachability route on the selector interface, or the guard reads it from the
+# policy target -- before any code change. Nothing belongs in this host module.
 #
-# What is actually measured:
-#   rendered host arm:      attachTargets carry "dst = 0.0.0.0/0" (1407 in
-#                           rendered-host.json) and prod's 10-pdspaac.network has
-#                           6 default routes incl. Gateway=10.1.0.23 Table=1001,
-#                           so production's clients /24 egresses
-#                           (curl --interface 10.2.30.1 ifconfig.me works).
-#   rendered container arm: rendered.containers."downstream-selector" has no
-#                           `interfaces` key at all (keys: additionalCapabilities,
-#                           alarms, allowedDevices, autoStart, bindMounts,
-#                           extraVeths, firewall, privateNetwork, specialArgs,
-#                           warnings), and the trial's live table 1001 contained
-#                           the FS-forbidden "10.2.30.0/24 via 10.1.0.0 dev pacds".
-# So the canonical realization for the CONTAINER target does not carry the
-# modelled upward default for the clients leg, while the host arm does.
+# Consequence: no valid trial render, so no SAT row can be probed.
 #
-# Next (spec-first, per AGENTS.md): add the requirement to the owning HDS that a
-# container-realized selector carries the same modelled route set as the
-# host-realized selector for the same canonical bundle, then fix
-# network-realization-model (not the renderer, not this host module), rebuild on
-# .16, deploy and probe the SAT rows from the clients /24.
-#
-# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
+# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
 # the host cannot even reach -- the reboot restores production without anyone
@@ -463,7 +453,7 @@ in
       containers = lib.mkMerge [
         {
           core.bindMounts."/run/secrets/cobalt-wan-mac" = {
-            hostPath = config.sops.secrets."cobalt-wan-mac".path;
+            hostPath = config.specialisation.router-new-test.configuration.sops.secrets."cobalt-wan-mac".path;
             isReadOnly = true;
           };
         }
@@ -473,7 +463,7 @@ in
               (id: {
                 name = "/run/secrets/devices/${id}";
                 value = {
-                  hostPath = config.sops.secrets."cobalt-device-${id}".path;
+                  hostPath = config.specialisation.router-new-test.configuration.sops.secrets."cobalt-device-${id}".path;
                   isReadOnly = true;
                 };
               })
