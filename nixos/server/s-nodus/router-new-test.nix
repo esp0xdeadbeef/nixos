@@ -641,12 +641,30 @@ in
             exit 0
           fi
 
+          # A stale started-at (left over from an earlier trial) used to make
+          # `elapsed` instantly exceed the deadline, so the guard restored and
+          # rebooted within two minutes of every boot: a boot loop. Anchor the
+          # start to THIS boot whenever the recorded value predates it.
+          now_epoch=$(date +%s)
+          boot_epoch=$(( now_epoch - $(cut -d. -f1 /proc/uptime) ))
           start=$(cat ${startedAt} 2>/dev/null || true)
-          if [ -z "$start" ]; then
-            # The banner may not have run yet; fall back to boot time so a
-            # candidate that never reaches multi-user still gets a deadline.
-            start=$(( $(date +%s) - $(cut -d. -f1 /proc/uptime) ))
+          case "$start" in
+            "" | *[!0-9]*) start=$boot_epoch ;;
+          esac
+          if [ "$start" -lt $(( boot_epoch - 120 )) ]; then
+            start=$boot_epoch
           fi
+
+          # One recovery attempt per boot, ever. Without this a guard that
+          # restores a generation which still boots the candidate loops forever
+          # (observed 2026-11-10).
+          boot_id=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)
+          attempt=${stateDir}/attempted-$boot_id
+          if [ -e "$attempt" ]; then
+            echo "router-new-test: recovery already attempted on boot $boot_id; not rebooting again" >>${logFile}
+            exit 0
+          fi
+          : > "$attempt"
           now=$(date +%s)
           elapsed=$(( now - start ))
 
