@@ -46,6 +46,31 @@
 # plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
 # Only after that check can the SAT rows be probed honestly.
 #
+# BLOCKED (SAT, 2026-11-10): the clients tenant has no egress in the TRIAL
+# because downstream-selector's table 1001 has no default route, and the live
+# production router shows exactly which one is missing.
+#
+# Reference measured on the running s-router-cobalt-prod guest:
+#   downstream-selector interfaces:
+#     pdspaac@if108  10.1.0.22/31   (clients leg upward)
+#     pdspaau@if112  10.1.0.36/31   (mgmt leg upward)
+#   ip route show table 1001 in downstream-selector:
+#     default via 10.1.0.23 dev pdspaac proto static metric 50 onlink
+#   access-clients (10.2.30.0/24) then reaches the internet:
+#     curl --interface 10.2.30.1 ifconfig.me -> the provider address
+#
+# In the trial the same table 1001 carries only the tenant /31s; the default is
+# absent, so access-clients' `default via 10.1.0.1 dev access-clients`
+# (downstream-selector pacds) black-holes. A live attempt to add
+# "default via 10.1.0.39 dev pdspaau table 1001" failed because 10.1.0.39 is not
+# an address of any container: the mgmt-leg default belongs to tables 1008/1016,
+# not to 1001. The clients-leg default via pdspaau-adjacent 10.1.0.23 is what is
+# missing from the rendered downstream-selector config.
+#
+# Next: make the renderer emit the per-tenant upward default (clients -> 10.1.0.23
+# dev pdspaac, metric 50, onlink) into table 1001, rebuild, and re-probe the SAT
+# rows from the clients /24.
+#
 # Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
