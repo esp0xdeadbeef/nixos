@@ -65,6 +65,18 @@
 #   "these 19 derivations will be built" with 0 occurrences of the FS-270 error,
 #   where it previously failed at evaluation.
 #
+# Progress on that blocker: .16 cannot reach .18 over ssh ("Disconnected from
+# 100.64.0.18 port 22") and .16's store rejects unsigned paths ("cannot add path
+# ... because it lacks a signature by a trusted key", also with require-sigs
+# false and NIX_SSHOPTS), and nix-store --import of a 197 MB export silently
+# added nothing. The working channel is a local binary cache streamed through
+# the operator workstation:
+#   on .18: nix copy --to file:///tmp/k-cache /nix/store/h754icz...-linux-6.18.60
+#           tar -C /tmp -cf /tmp/k-cache.tar k-cache      (20 MB)
+#   pipe:   ssh .18 'sudo cat /tmp/k-cache.tar' | ssh .16 'sudo tar -C /tmp -xf -'
+#   on .16: sudo nix copy --option require-sigs false --from file:///tmp/k-cache #             /nix/store/h754icz...-linux-6.18.60
+# The final import is running (12 nix processes, log "copying 1 paths...").
+#
 # Remaining blocker (environment, not config): the 19 derivations include
 #   /nix/store/gil0hwqg761917lzbfk4fmw61blzh06d-linux-6.18.60.drv
 # whose outputs are missing on .16 and are not substitutable:
