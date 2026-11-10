@@ -2736,7 +2736,7 @@
         ]
       },
       "locked": {
-        "lastModified": 1794291000,
+        "lastModified": 1794269766,
         "narHash": "sha256-bUpcXZu9tfHcnXHFHNRgI3aeed28Ul0ptUlscu8lGcA=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
@@ -3587,10 +3587,10 @@
       "locked": {
         "lastModified": 1794258296,
         "narHash": "sha256-TVZKqXFH+XClrRJ14iXwlSY378k6tvaQRXGyX7/ilTg=",
-        "ref": "bananapi-bpi-r4-pro",
+        "owner": "esp0xdeadbeef",
+        "repo": "nixos-hardware",
         "rev": "bcd4db53bf4601f19e233ccb28312687639aafe4",
-        "revCount": 2915,
-        "type": "git"
+        "type": "github"
       },
       "original": {
         "type": "github",
