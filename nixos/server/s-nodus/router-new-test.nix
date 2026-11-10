@@ -65,6 +65,19 @@
 #   "these 19 derivations will be built" with 0 occurrences of the FS-270 error,
 #   where it previously failed at evaluation.
 #
+# DEPLOY BLOCKED BY AN EXTERNAL OPERATION (2026-11-10, measured): the target is
+# busy with a rebuild that this session did not start:
+#   ps: … nixos-rebuild-wrapped boot --accept-flake-config --impure
+#        --no-write-lock-file --refresh --flake github:esp0xdeadbeef/nixos#s-nodus
+#        --upgrade        (running 40+ minutes, cwd /)
+# It holds the nix lock, so the candidate build queued behind it makes no
+# progress (9 nix processes, no new lines in the build log), and it will replace
+# the boot generation with one built from GitHub main rather than from this tree.
+# Forcing either side would corrupt the other, so the sequence is: let that
+# rebuild finish, then build the candidate, set the profile to the trial
+# specialization WITH the guard marker present (the marker freeze was fixed in
+# 08e6e50f), boot, and probe the SAT rows.
+#
 # RESOLVED (render side): with the CPM fix pinned (46cffa4) the cobalt trial
 # render EVALUATES. Proof on .16 and on .18: the derivation for the candidate is
 # produced instead of an FS-270 abort
