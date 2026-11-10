@@ -2977,7 +2977,6 @@
       "original": {
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "08219c7363052109308428ea634361ca9b9026ec",
         "type": "github"
       }
     },
@@ -3593,10 +3592,10 @@
         "type": "github"
       },
       "original": {
-        "type": "github",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-hardware",
-        "rev": "bcd4db53bf4601f19e233ccb28312687639aafe4"
+        "rev": "bcd4db53bf4601f19e233ccb28312687639aafe4",
+        "type": "github"
       }
     },
     "nixos-mailserver": {
