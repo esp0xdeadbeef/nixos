@@ -13,6 +13,7 @@ set -euo pipefail
 #  * check-prod-pins.sh: the *flake.lock pins* of the prod and legacy-prod
 #    network shapes cannot move without an approved snapshot diff.
 scripts/check-prod-paths.sh --staged
+scripts/check-sops-recipients.sh
 
 if git diff --cached --name-only -- flake.lock | grep -qx flake.lock; then
   scripts/check-prod-pins.sh
