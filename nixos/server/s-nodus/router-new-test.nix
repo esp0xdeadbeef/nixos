@@ -46,32 +46,41 @@
 # plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
 # Only after that check can the SAT rows be probed honestly.
 #
-# BLOCKED (SAT, 2026-11-10): the clients tenant has no egress in the TRIAL
-# because downstream-selector's table 1001 has no default route, and the live
-# production router shows exactly which one is missing.
+# BLOCKED (SAT, 2026-11-10): the clients tenant has no egress in the trial, and
+# the GAMP FS says exactly which render this is.
 #
-# Reference measured on the running s-router-cobalt-prod guest:
-#   downstream-selector interfaces:
-#     pdspaac@if108  10.1.0.22/31   (clients leg upward)
-#     pdspaau@if112  10.1.0.36/31   (mgmt leg upward)
-#   ip route show table 1001 in downstream-selector:
-#     default via 10.1.0.23 dev pdspaac proto static metric 50 onlink
-#   access-clients (10.2.30.0/24) then reaches the internet:
-#     curl --interface 10.2.30.1 ifconfig.me -> the provider address
+# Authorizing sentences (read from ~/github/network-codex-agent/GAMP):
+#   FS/README.md "Site Fabric Traffic Flow": fabric traffic leaving an access
+#     space reaches the policy point only as `access <-> down <-> pol`, so the
+#     downstream selector must carry the path toward the policy point.
+#   FS/README.md same section: "An access space owns the tenant prefixes it
+#     serves. Those prefixes ... shall never be routed through the downstream
+#     selector or the policy point. ... A rendered routing table that resolves
+#     an access space's own served prefix toward `down` is a defect."
+#   FS/README.md:1304: endpoint containers may receive default route/DNS "only
+#     from renderer output derived from the validated canonical realization
+#     bundle ... the host shall not supply it." (So adding routes by hand, as
+#     attempted live at 03:06, is forbidden by the FS and was wrong.)
 #
-# In the trial the same table 1001 carries only the tenant /31s; the default is
-# absent, so access-clients' `default via 10.1.0.1 dev access-clients`
-# (downstream-selector pacds) black-holes. A live attempt to add
-# "default via 10.1.0.39 dev pdspaau table 1001" failed because 10.1.0.39 is not
-# an address of any container: the mgmt-leg default belongs to tables 1008/1016,
-# not to 1001. The clients-leg default via pdspaau-adjacent 10.1.0.23 is what is
-# missing from the rendered downstream-selector config.
+# Measured defect in the trial render:
+#   containers.downstream-selector.config.systemd.network.networks."10-pdspaac".routes
+#     -> 248 routes, 0 with Destination 0.0.0.0/0
+#   live in the trial, table 1001 then contained the FS-forbidden entry:
+#     10.2.30.0/24 via 10.1.0.0 dev pacds       (served prefix routed to `down`)
+# Reference from the running production guest (same model, prod pins):
+#   /etc/systemd/network/10-pdspaac.network contains 6 x Destination=0.0.0.0/0,
+#   including "Gateway=10.1.0.23 ... Table=1001", and curl --interface 10.2.30.1
+#   ifconfig.me in access-clients returns the provider address.
+# The realization bundle does carry such routes on host attachTargets
+# (rendered-host.json contains 1407 x "0.0.0.0/0"), so the loss happens in the
+# container-runtime route mapping/emission, i.e. in network-renderer-nixos.
 #
-# Next: make the renderer emit the per-tenant upward default (clients -> 10.1.0.23
-# dev pdspaac, metric 50, onlink) into table 1001, rebuild, and re-probe the SAT
-# rows from the clients /24.
+# Next: fix the renderer container route emission (keep the modelled default
+# toward the policy point, drop routes that resolve the served tenant prefix
+# toward `down`), rebuild on .16, deploy, re-probe the SAT rows from the clients
+# /24. Nothing belongs in this host module.
 #
-# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
+# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
 # the host cannot even reach -- the reboot restores production without anyone
