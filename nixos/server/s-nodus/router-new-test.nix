@@ -46,44 +46,41 @@
 # plus `networkctl status cor-wan-eca` to see whether networkd took the unit.
 # Only after that check can the SAT rows be probed honestly.
 #
-# BLOCKED (SAT, 2026-11-10): no trial render exists, because the FS-270
-# SMS-020 route-placement contract fails on the CONTAINER path while the host
-# path renders with the very same renderer pin.
+# BLOCKED (SAT, 2026-11-10): the render defect is FIXED and the trial render now
+# evaluates; deployment is blocked on a non-substitutable kernel output.
 #
-# Build error (.16, real):
-#   error: FS-270-HDS-010-SDS-010-SMS-020:
-#          route selector lacks its exact CPM policy-table reachability route
-# Guard: s88/ControlModule/render/container-networks/policy-routing/
-#        relation-selection-rules.nix:132 -- reads interfaces.<routeKey>.routes and
-#        requires policyOnly=true, dst==destinationPrefix, relationId,
-#        intent.kind=="relation-policy-reachability", direction, policyStateOwner
-#        and via4/via6.
-# CPM producer (~/github/network-control-plane-model,
-# src/cpm/ControlModule/runtime-targets/relation-policy-routing.nix):
-#   policyEntry = if role == "downstream-selector"
-#                   then (if forward then sourcePolicy else destinationPolicy)
-#                   else (if forward then destinationPolicy else sourcePolicy);
-#   the route is appended to interfaces.<policyEntry.name>.routes, and
-#   selector.routeInterface = routePolicyFor.name -- the same policy lane.
-#   Only two such routes exist in control-plane.json and both sit on
-#   runtimeTargets/esp0xdeadbeef-cobalt-policy/effectiveRuntimeRealization/
-#   interfaces/p2p-... .
-# Difference proven: the production host shape renders with this pin
-#   (generation bms1zp32rap builds and boots), the container shape does not.
+# Fixed (pushed, network-control-plane-model 46cffa4, 242/242 tests pass):
+#   relation-policy-routing.nix attached the relation policy-table reachability
+#   route only to the policy-side lane name, while addForTarget merges entries
+#   into the *selector target's own* interfaces. On a selector target that name
+#   does not exist, so the route was dropped and the renderer guard
+#   (FS-270-HDS-010-SDS-010-SMS-020, relation-selection-rules.nix:132) aborted
+#   every cobalt container render:
+#     error: FS-270-HDS-010-SDS-010-SMS-020: route selector lacks its exact CPM
+#            policy-table reachability route
+#   The route is now emitted for the selector lane as well (same canonical route
+#   content, both names are model fields; addForTarget only attaches to
+#   interfaces that exist). Evidence that it works: on .16 the build of
+#   nixosConfigurations.s-nodus.config.system.build.toplevel now reaches
+#   "these 19 derivations will be built" with 0 occurrences of the FS-270 error,
+#   where it previously failed at evaluation.
 #
-# Rejected by the specs, so not done here: grafting host attachTarget routes onto
-# the container interface (renderer aeadfe6, reverted as 23c9d4d) violates
-# SMS/FS-310-HDS-010-SDS-010-SMS-130 (no renderer-invented routing) and lacks
-# intent.kind so it cannot satisfy the guard anyway; and FS:1304 forbids the host
-# from supplying default routes to endpoint containers.
+# Remaining blocker (environment, not config): the 19 derivations include
+#   /nix/store/gil0hwqg761917lzbfk4fmw61blzh06d-linux-6.18.60.drv
+# whose outputs are missing on .16 and are not substitutable:
+#   nix-store -q --outputs ...  -> /nix/store/h754icz...-linux-6.18.60 (ONTBREEKT)
+#   /nix/store/s1ip027...-linux-6.18.60-dev (ONTBREEKT), sc5vmfvv...-modules
+#   nix copy from .18 -> "cannot add path ... because it lacks a signature by a
+#   trusted key"; nix-store --import of a 197 MB export did not materialize it.
+# The same kernel path exists on .18 because that is the running system, so the
+# bit-identical derivation is available there; importing it (or adding .16 as a
+# trusted key / signing) is what unblocks the deploy.
 #
-# Next (spec-first): settle in the owning HDS/SDS of
-# FS-270-HDS-010-SDS-010-SMS-020 whether the container image must carry the
-# selector-side reachability route, then make the container render preserve the
-# CPM interface routes (or the CPM emit them on the selector interface too),
-# rebuild on .16, deploy and only then probe the SAT rows.
+# Next: get that kernel closure onto .16 (trusted import), rebuild, deploy, boot
+# the trial with the guard marker set (the marker freeze was fixed in 08e6e50f),
+# then probe the SAT rows.
 #
-# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
+# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only# Selecting it happens at boot time only (GRUB -> "router-new-test"), so a
 # reboot always returns to the production shape. That is what makes the trial
 # self-healing: whatever goes wrong -- no forwarding, no lease, a wedged guest
 # the host cannot even reach -- the reboot restores production without anyone
