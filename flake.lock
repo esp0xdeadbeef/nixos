@@ -2740,14 +2740,14 @@
         "narHash": "sha256-Jg7XYem9eT0uygHQRngyr+SaOgyqucL2YWkGor/ar10=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "08219c7",
+        "rev": "08219c7363052109308428ea634361ca9b9026ec",
         "type": "github"
       },
       "original": {
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
         "type": "github",
-        "rev": "08219c7"
+        "rev": "08219c7363052109308428ea634361ca9b9026ec"
       }
     },
     "network-renderer-nixos-legacy-prod": {
