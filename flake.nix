@@ -291,8 +291,11 @@
     };
 
     # hardware:
+    # Fork of nixos-hardware carrying the Banana Pi BPI-R4 Pro support
+    # (bananapi/bpi-r4-pro) that the upstream tree does not have yet.
+    # Pinned by rev: builds must not depend on a moving branch.
     nixos-hardware = {
-      url = "github:nixos/nixos-hardware";
+      url = "github:esp0xdeadbeef/nixos-hardware/bcd4db53bf4601f19e233ccb28312687639aafe4";
     };
 
     impermanence = {
@@ -557,8 +560,11 @@
                 # which tap belongs to which bridge (vhost NICs are rendered as
                 # `-netdev tap,ifname=tap-<nicId>` and qemu does not bridge a
                 # bare tap). This is the single source of truth for those NICs.
+                # The host-local s-nodus carries these, and its
+                # s-nodus-nixos-hardware test copy does too (same board, same VMs),
+                # so neither loses its tap map.
                 vmNics =
-                  if name == "s-nodus" then
+                  if lib.elem name [ "s-nodus" "s-nodus-nixos-hardware" ] then
                     {
                       s-router-cobalt-new = [
                         {
@@ -608,7 +614,7 @@
                 # image. Until that exists, treat any host rebuild as capable of
                 # changing the production image, and verify with vm-status after.
                 vmImages =
-                  if name == "s-nodus" then
+                  if lib.elem name [ "s-nodus" "s-nodus-nixos-hardware" ] then
                     {
                       s-router-cobalt-new =
                         self.nixosConfigurations.s-router-cobalt-new.config.system.build.nixos-shell;

@@ -2736,17 +2736,19 @@
         ]
       },
       "locked": {
-        "lastModified": 1793785299,
-        "narHash": "sha256-TB2wBZH83HY026mL7DLLfl2JUf0ACPOtwBFTDrIn9FI=",
+        "lastModified": 1794291000,
+        "narHash": "sha256-bUpcXZu9tfHcnXHFHNRgI3aeed28Ul0ptUlscu8lGcA=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "877bbcc7150fd56ac4e4b48e78ae838494c2d2f6",
+        "rev": "8b976744dee022c2b049910d55f4885cd84e94f9",
         "type": "github"
       },
       "original": {
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "type": "github"
+        "type": "github",
+        "ref": "main",
+        "rev": "8b976744dee022c2b049910d55f4885cd84e94f9"
       }
     },
     "network-renderer-nixos-legacy-prod": {
@@ -3584,17 +3586,18 @@
         "nixpkgs": "nixpkgs_15"
       },
       "locked": {
-        "lastModified": 1794051415,
-        "narHash": "sha256-mJok3uMK0awq2MPKdSnvTxm3UD89KD3LclQzASgtY1s=",
-        "owner": "nixos",
-        "repo": "nixos-hardware",
-        "rev": "1a8ff4f57ffe1f732beaa1db842247a381ea471d",
-        "type": "github"
+        "lastModified": 1794258296,
+        "narHash": "sha256-TVZKqXFH+XClrRJ14iXwlSY378k6tvaQRXGyX7/ilTg=",
+        "ref": "bananapi-bpi-r4-pro",
+        "rev": "bcd4db53bf4601f19e233ccb28312687639aafe4",
+        "revCount": 2915,
+        "type": "git"
       },
       "original": {
-        "owner": "nixos",
+        "type": "github",
+        "owner": "esp0xdeadbeef",
         "repo": "nixos-hardware",
-        "type": "github"
+        "rev": "bcd4db53bf4601f19e233ccb28312687639aafe4"
       }
     },
     "nixos-mailserver": {
