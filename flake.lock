@@ -823,11 +823,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1794362348,
-        "narHash": "sha256-skpOTPKY27teeOfzj8ZmnJsJLG2b1qN6gZ7HgA7cQ88=",
+        "lastModified": 1794369124,
+        "narHash": "sha256-F5RZRCPZQoO539r7sMZCS3nhps9mEQEq5SZgIuSNWwI=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "41da9591c6c371d8ab4fca88b2fcd7a6aa754e27",
+        "rev": "f7099a817a0cbbcf00941e75531ca33c39fea26a",
         "type": "github"
       },
       "original": {
@@ -2344,11 +2344,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794341968,
-        "narHash": "sha256-UtC2zaHehoINEdYkQIBMxhM5tnk7eMlJ4774b8vGwBY=",
+        "lastModified": 1794368466,
+        "narHash": "sha256-jPerPnCqORIUBa2OZd1cVlhGOoPSAg6XoGhjboycMik=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-containerlab-linux-backend",
-        "rev": "f42fe3842b1fbc2fb439c80f56abdd39f083c087",
+        "rev": "ac065079de20f09a75a31cd0dc4bc533054b7832",
         "type": "github"
       },
       "original": {
@@ -2967,11 +2967,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794364254,
-        "narHash": "sha256-JLsk24DUQl/JNJh/Y6WHsHgIRsRT8AAzOkX/dHabAbA=",
+        "lastModified": 1794367385,
+        "narHash": "sha256-JsHKhwsgxd40V9qg5MnZfZM+jQA1ylmpgkrmmKhIB/Q=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "0789351ee0b4d1b0d8a25a4a0425af16d7bfbb8d",
+        "rev": "095c28fc69fff6e999b090b71cce7e38a058faaa",
         "type": "github"
       },
       "original": {
@@ -3462,11 +3462,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794341918,
-        "narHash": "sha256-hAcaihi30y0N3OMfwplXuj6PG/wdJNdbEdKTDhYbGYA=",
+        "lastModified": 1794368853,
+        "narHash": "sha256-4kf7I/LuQjPBdbd0afZ+/i2u9xeTocZvqg7KVe6JVoA=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-wireguard",
-        "rev": "786b04e4311a7e7733b9cbd21871f099fc8168d8",
+        "rev": "4d86236c5e088936b8ce06f0ecc4e686bf700688",
         "type": "github"
       },
       "original": {
