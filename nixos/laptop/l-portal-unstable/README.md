@@ -22,6 +22,24 @@ known-good `l-portal`, which stays the rollback target.
   `home-manager` tree (`local.homeManager.hostName`). Only the flake attribute
   name and the system hostname differ.
 
+## Deployment record
+
+Last deployed and booted generation:
+
+| | |
+| --- | --- |
+| flake attribute | `l-portal-unstable` |
+| system | `ywb1xrzwkg2k0l5yyxva9a2m0b7nbsqz-nixos-system-l-portal-unstable-26.05.20261105.c56a87d` |
+| kernel | 6.18.60 (patched, `radg7qx1fcadsb13a1xa6s0r5fdl47cb`) |
+| boot generation | 267, systemd-boot default |
+| rollback target | `0khmwhg65dvv8g8ngvwvh18kz3sf2xvv-nixos-system-l-portal-26.05.20261105.c56a87d` |
+
+To deploy: build the flake attribute, copy the closure to the machine, set the
+system profile and run `switch-to-configuration boot`, then reboot into the new
+generation. The closure must be imported with root (`sudo nix-store --import`)
+when the build happened elsewhere, because locally built paths carry no
+substituter signature.
+
 ## Verified on hardware
 
 Deployed and booted on the X13s (100.64.0.14), kernel 6.18.60 with the patched
