@@ -823,11 +823,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1794392309,
-        "narHash": "sha256-D6JiL2TmT4XlAnPKx90lJMoBf2eAPOdYZH5r6igESXQ=",
+        "lastModified": 1794419579,
+        "narHash": "sha256-x8f5KEQNY11gvWG337nv1PVTrgcHCm5VEcyKLjyixeo=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "ad52c990e5b5b0a9acabcddbadd8c59350b19432",
+        "rev": "31c345435fe52df2cac2b20af70081f76ab77ebd",
         "type": "github"
       },
       "original": {
