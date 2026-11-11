@@ -79,7 +79,7 @@ These are the things still worth changing. Each maps to a cleanup step below.
   rule. The README and AGENTS.md say to import by explicit intent, yet
   `library/imports.nix` still provides `enabledImports` /
   `enabledImportsRecursive` directory-scanning discovery, and it is still called
-  from `home-manager/l-esp/projects/default.nix` and
+  from `home-manager/l-esp/configs/default.nix` and
   `nixos/laptop/l-esp/optional/default.nix`. Either migrate those two call sites
   to explicit imports and retire the helper, or document the exception. Do not
   leave both conventions undocumented.
@@ -845,7 +845,7 @@ is explicitly gated.
 
 2. Decide the dynamic-import question.
    `library/imports.nix` still provides directory-scanning discovery called from
-   `home-manager/l-esp/projects/default.nix` and
+   `home-manager/l-esp/configs/default.nix` and
    `nixos/laptop/l-esp/optional/default.nix`. Migrate those two call sites to
    explicit imports and retire the helper, or document the exception.
 

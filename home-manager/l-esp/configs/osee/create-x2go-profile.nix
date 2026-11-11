@@ -1,10 +1,15 @@
 { config
 , pkgs
 , lib
+, systemHostName
 , ...
 }:
 
 let
+  # The container lives in the user's home-relative LXC path, not the system
+  # path; every lxc-* call must be told so with -P or it looks in /var/lib/lxc.
+  lxcHome = "/home/deadbeef/.local/share/lxc";
+  lxc = "${pkgs.lxc}/bin/lxc-attach -P ${lxcHome}";
   # Resolve lxc-osee's IPv4 address on eth0 and wait until sshd in the container
   # accepts connections.
   #
@@ -17,7 +22,7 @@ let
   waitForContainerIp = ''
     IP=""
     for _ in $(seq 1 60); do
-      IP="$(${pkgs.lxc}/bin/lxc-attach lxc-osee -- \
+      IP="$(${lxc} lxc-osee -- \
         ip -4 -o addr show dev eth0 2>/dev/null \
         | awk '{ split($4, a, "/"); print a[1]; exit }' || true)"
       [[ -n "$IP" ]] && break
@@ -47,7 +52,7 @@ let
     # The container may have an address before sshd is listening; x2go connects
     # over SSH, so wait for the port too. bash is required for /dev/tcp.
     for _ in $(seq 1 30); do
-      if ${pkgs.lxc}/bin/lxc-attach -n lxc-osee -- \
+      if ${lxc} -n lxc-osee -- \
         bash -c 'exec 3<>/dev/tcp/127.0.0.1/22' 2>/dev/null; then
         echo "lxc-osee eth0 is up with $IP and sshd is accepting connections"
         exit 0
@@ -180,7 +185,7 @@ let
     # known_hosts entry for this container: "<ip> <ssh host pubkey>".
     # Reuse the IP already resolved above instead of re-parsing eth0, so the two
     # can never disagree.
-    entry="$IP $(${pkgs.lxc}/bin/lxc-attach lxc-osee -- cat /etc/ssh/ssh_host_rsa_key.pub)"
+    entry="$IP $(${lxc} lxc-osee -- cat /etc/ssh/ssh_host_rsa_key.pub)"
 
     if ! grep -Fxq "$entry" "$HOME/.ssh/known_hosts"; then
         echo "$entry" >> "$HOME/.ssh/known_hosts"
@@ -192,70 +197,74 @@ let
   '';
 in
 {
-  # install the little updater script into your user PATH
-  home.packages = [ updateX2GoSession waitForContainerIpUnit pkgs.x2goclient pkgs.lxc ];
+  # Only on the machine that owns the container. Imported from
+  # home-manager/l-esp/home.nix, which every host shares, so an ungated copy
+  # would start these units on the router guests too.
+  config = lib.mkIf (systemHostName == "l-esp") {
+    # install the little updater script into your user PATH
+    home.packages = [ updateX2GoSession waitForContainerIpUnit pkgs.x2goclient pkgs.lxc ];
 
-  # Wait until the container's eth0 actually has an address. RemainAfterExit
-  # makes the "ready" result sticky for the rest of the graphical session.
-  systemd.user.services."waitForLxcOseeIp" = {
-    Unit = {
-      Description = "Wait for lxc-osee to obtain an IPv4 address on eth0";
-      After = [
-        "graphical-session.target"
-        "lxc-osee-start.service"
-      ];
-      # lxc-osee-start.service is Type=simple with `lxc-start -F`, so it reports
-      # started as soon as lxc-start forks, not when the container is reachable.
-      # This unit is the real readiness gate; it polls eth0 itself.
-      Wants = [ "lxc-osee-start.service" ];
-      PartOf = [ "graphical-session.target" ];
-      BindsTo = [ "graphical-session.target" ];
+    # Wait until the container's eth0 actually has an address. RemainAfterExit
+    # makes the "ready" result sticky for the rest of the graphical session.
+    systemd.user.services."waitForLxcOseeIp" = {
+      Unit = {
+        Description = "Wait for lxc-osee to obtain an IPv4 address on eth0";
+        After = [
+          "graphical-session.target"
+          "lxc-osee-start.service"
+        ];
+        # lxc-osee-start.service is Type=simple with `lxc-start -F`, so it reports
+        # started as soon as lxc-start forks, not when the container is reachable.
+        # This unit is the real readiness gate; it polls eth0 itself.
+        Wants = [ "lxc-osee-start.service" ];
+        PartOf = [ "graphical-session.target" ];
+        BindsTo = [ "graphical-session.target" ];
+      };
+
+      Service = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${waitForContainerIpUnit}/bin/wait-for-lxc-osee-ip";
+        # Bounded by the 60x2s poll loop inside the script.
+        TimeoutStartSec = "150s";
+        StandardOutput = "journal+console";
+        StandardError = "journal+console";
+      };
+
+      Install = {
+        WantedBy = [ "graphical-session.target" ];
+      };
     };
 
-    Service = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = "${waitForContainerIpUnit}/bin/wait-for-lxc-osee-ip";
-      # Bounded by the 60x2s poll loop inside the script.
-      TimeoutStartSec = "150s";
-      StandardOutput = "journal+console";
-      StandardError = "journal+console";
-    };
+    systemd.user.services."updateX2GOSession" = {
+      Unit = {
+        Description = "update the x2go session file";
+        After = [
+          "graphical-session.target"
+          "waitForLxcOseeIp.service"
+        ];
+        PartOf = [ "graphical-session.target" ];
+        BindsTo = [ "graphical-session.target" ];
+        # Do not start before the container's network is ready: without this a
+        # cold boot ran the session writer while eth0 still had no address.
+        Wants = [ "waitForLxcOseeIp.service" ];
+      };
 
-    Install = {
-      WantedBy = [ "graphical-session.target" ];
+      Service = {
+        Type = "simple";
+        ExecStart = "${updateX2GoSession}/bin/update-x2go-session";
+        Restart = "on-failure";
+        RestartSec = "10s";
+        # Must not undercut the script's own 120s wait-for-eth0 loop.
+        TimeoutStartSec = "150s";
+        KillMode = "control-group";
+        StandardOutput = "journal+console";
+        StandardError = "journal+console";
+      };
+
+      Install = {
+        WantedBy = [ "graphical-session.target" ];
+      };
     };
   };
-
-  systemd.user.services."updateX2GOSession" = {
-    Unit = {
-      Description = "update the x2go session file";
-      After = [
-        "graphical-session.target"
-        "waitForLxcOseeIp.service"
-      ];
-      PartOf = [ "graphical-session.target" ];
-      BindsTo = [ "graphical-session.target" ];
-      # Do not start before the container's network is ready: without this a
-      # cold boot ran the session writer while eth0 still had no address.
-      Wants = [ "waitForLxcOseeIp.service" ];
-    };
-
-    Service = {
-      Type = "simple";
-      ExecStart = "${updateX2GoSession}/bin/update-x2go-session";
-      Restart = "on-failure";
-      RestartSec = "10s";
-      # Must not undercut the script's own 120s wait-for-eth0 loop.
-      TimeoutStartSec = "150s";
-      KillMode = "control-group";
-      StandardOutput = "journal+console";
-      StandardError = "journal+console";
-    };
-
-    Install = {
-      WantedBy = [ "graphical-session.target" ];
-    };
-  };
-
 }

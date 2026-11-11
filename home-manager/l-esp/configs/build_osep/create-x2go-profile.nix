@@ -1,10 +1,15 @@
 { config
 , pkgs
 , lib
+, systemHostName
 , ...
 }:
 
 let
+  # The container lives in the user's home-relative LXC path, not the system
+  # path; every lxc-* call must be told so with -P or it looks in /var/lib/lxc.
+  lxcHome = "/home/deadbeef/.local/share/lxc";
+  lxc = "${pkgs.lxc}/bin/lxc-attach -P ${lxcHome}";
   updateX2GoSession = pkgs.writeShellScriptBin "update-x2go-session" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
@@ -25,7 +30,7 @@ let
     # picked up by accident.
     IP=""
     for _ in $(seq 1 60); do
-      IP="$(lxc-attach osep-lxc -- \
+      IP="$(${lxc} osep-lxc -- \
         ip -4 -o addr show dev eth0 2>/dev/null \
         | awk '{ split($4, a, "/"); print a[1]; exit }' || true)"
       [[ -n "$IP" ]] && break
@@ -122,7 +127,7 @@ let
     # known_hosts entry for this container: "<ip> <ssh host pubkey>".
     # Reuse the IP already resolved above instead of re-parsing eth0, so the two
     # can never disagree.
-    entry="$IP $(lxc-attach osep-lxc -- cat /etc/ssh/ssh_host_rsa_key.pub)"
+    entry="$IP $(${lxc} osep-lxc -- cat /etc/ssh/ssh_host_rsa_key.pub)"
 
     if ! grep -Fxq "$entry" "$HOME/.ssh/known_hosts"; then
         echo "$entry" >> "$HOME/.ssh/known_hosts"
@@ -134,38 +139,43 @@ let
   '';
 in
 {
-  # install the little updater script into your user PATH
-  home.packages = [ updateX2GoSession ];
+  # Only on the machine that owns the container: home-manager/l-esp/home.nix is
+  # shared by every host, so an ungated unit would start on the router guests.
+  config = lib.mkIf (systemHostName == "l-esp") {
+    # install the little updater script into your user PATH
+    home.packages = [ updateX2GoSession ];
 
-  systemd.user.services."updateX2GOSession" = {
-    Unit = {
-      Description = "update the x2go session file";
-      # After = [ "network-online.target" ];
-      # Wants = [ "network-online.target" ];
-      After = [ "graphical-session.target" ];
-      Wants = [
-        "graphical-session.target"
-        "network-online.target"
-      ];
-    };
-    Service = {
-      Type = "simple";
-      ExecStartPre = [
+    systemd.user.services."updateX2GOSession" = {
+      Unit = {
+        Description = "update the x2go session file";
+        # After = [ "network-online.target" ];
+        # Wants = [ "network-online.target" ];
+        After = [ "graphical-session.target" ];
+        Wants = [
+          "graphical-session.target"
+          "network-online.target"
+        ];
+      };
+      Service = {
+        Type = "simple";
+        ExecStartPre = [
 
-      ];
-      #       ExecStart = "${pkgs.writeShellScript "updateX2GOSession-callee" ''
-      # #!${pkgs.bash}/bin/bash --noprofile --norc
-      # ${updateX2GoSession}/bin/update-x2go-session
-      #       ''}";
-      ExecStart = "${updateX2GoSession}/bin/update-x2go-session";
-      Restart = "on-failure";
-      RestartSec = "10s"; # back off between retries
-      TimeoutStartSec = "75s";
-      StandardOutput = "journal+console";
-      StandardError = "journal+console";
-    };
-    Install = {
-      WantedBy = [ "default.target" ];
+        ];
+        #       ExecStart = "${pkgs.writeShellScript "updateX2GOSession-callee" ''
+        # #!${pkgs.bash}/bin/bash --noprofile --norc
+        # ${updateX2GoSession}/bin/update-x2go-session
+        #       ''}";
+        ExecStart = "${updateX2GoSession}/bin/update-x2go-session";
+        Restart = "on-failure";
+        RestartSec = "10s"; # back off between retries
+        TimeoutStartSec = "75s";
+        StandardOutput = "journal+console";
+        StandardError = "journal+console";
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
     };
   };
 }
+

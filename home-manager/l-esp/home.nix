@@ -19,7 +19,7 @@ in
     ./configs/git/config.nix
     ./configs/nixpkgs-allowunfree/packages.nix
     ./configs/tmuxp/packages.nix
-    ./projects
+    ./configs
     profiles.home-manager.desktop.legcord
     profiles.home-manager.desktop-i3
     profiles.home-manager.mail.aerc
