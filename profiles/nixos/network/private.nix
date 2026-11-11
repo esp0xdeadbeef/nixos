@@ -1,5 +1,6 @@
 { config
 , lib
+, options
 , pkgs
 , relativeRepo
 , ...
@@ -16,23 +17,32 @@ let
   # Preference order:
   #   1. `local.network.private.sopsFile`, when a host sets it explicitly (a
   #      host whose Wi-Fi secrets live outside its default SOPS file).
-  #   2. `config.sops.defaultSopsFile`, the authoritative host SOPS file. This
-  #      is what hosts set; deriving the path from `networking.hostName`
-  #      instead is wrong for a variant host that is the same machine under a
-  #      different flake attribute (l-portal-unstable): it derived a
+  #   2. `config.sops.defaultSopsFile`, the authoritative host SOPS file.
+  #      Deriving the path from `networking.hostName` instead (as this module
+  #      used to) is wrong for a variant host that is the same machine under a
+  #      different flake attribute: l-portal-unstable derived a
   #      `l-portal-unstable-default.yaml` that does not exist, yielding an
   #      empty key set and therefore no Wi-Fi profiles at all.
-  #   3. Nothing: hosts that do not use private Wi-Fi (e.g. s-nodus, which
-  #      declares its secrets with explicit per-secret `sopsFile` and never
-  #      sets `defaultSopsFile`). Here the key set is empty, which is correct
-  #      -- `hasWifiProfiles` is then false and this module stays inert.
+  #   3. Nothing: hosts that do not use private Wi-Fi (e.g. s-nodus). The key
+  #      set is then empty, which is correct -- `hasWifiProfiles` is false and
+  #      this module stays inert.
+  #
+  # `config.sops.defaultSopsFile` has NO default in sops-nix (it is declared as
+  # `mkOption { type = path; }`), so reading it on a host that never sets it
+  # throws "accessed but has no value defined" rather than yielding null.
+  # Hosts such as s-nodus declare their secrets with explicit per-secret
+  # `sopsFile` and never set `defaultSopsFile`; they must not be forced here.
+  #
+  # `config.sops ? defaultSopsFile` is not enough: the attribute exists as soon
+  # as the option is declared. Ask whether a *definition* exists instead, which
+  # is what `options.sops.defaultSopsFile.isDefined` reports.
+  defaultSopsFile =
+    if options.sops.defaultSopsFile.isDefined then config.sops.defaultSopsFile else null;
   sopsFilePath =
     if cfg.sopsFile != null then
       cfg.sopsFile
-    else if config.sops.defaultSopsFile != null then
-      config.sops.defaultSopsFile
     else
-      null;
+      defaultSopsFile;
   sopsFileExists =
     sopsFilePath != null && builtins.pathExists (toString sopsFilePath);
   # Human-readable form for assertion messages.
