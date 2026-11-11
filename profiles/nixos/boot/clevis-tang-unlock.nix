@@ -27,8 +27,29 @@ let
   jweName = i: "${cfg.deviceName}-${toString i}";
   jwePath = i: "/etc/clevis/${jweName i}.jwe";
 
+  # Each JWE must live in the Nix store as its own object, not be referenced as
+  # a raw path inside the repository checkout. `boot.initrd.secrets` values are
+  # baked into the initrd by `initrd-nixos-copy-secrets`, which runs at boot on
+  # the target machine -- so the value must already be a store path that is part
+  # of the system closure. Passing the repo path through verbatim works only
+  # when `nixos-rebuild` runs from a checkout on that same machine; building
+  # elsewhere (e.g. l-portal-unstable built on a remote builder) produced an
+  # initrd step that failed with
+  #   cp: cannot stat '...-source/nixos/laptop/<host>/hardware/root-cobalt-chain.jwe'
+  # and aborted bootloader installation. Copying to the store makes the closure
+  # self-contained and the build location irrelevant.
   stagedSecrets = lib.listToAttrs (
-    lib.imap0 (i: f: lib.nameValuePair (jwePath i) f) resolvedSecretFiles
+    lib.imap0
+      (
+        i: f:
+          lib.nameValuePair (jwePath i) (
+            builtins.path {
+              path = f;
+              name = "clevis-${jweName i}.jwe";
+            }
+          )
+      )
+      resolvedSecretFiles
   );
 
   # The paths the JWEs appear at *inside the initrd*, after
