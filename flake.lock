@@ -544,7 +544,7 @@
           "network-renderer-nixos",
           "network-labs"
         ],
-        "nixpkgs": "nixpkgs_16",
+        "nixpkgs": "nixpkgs_17",
         "nixpkgs-network": "nixpkgs-network_37"
       },
       "locked": {
@@ -596,7 +596,7 @@
           "network-renderer-nixos",
           "network-labs"
         ],
-        "nixpkgs": "nixpkgs_18",
+        "nixpkgs": "nixpkgs_19",
         "nixpkgs-network": "nixpkgs-network_43"
       },
       "locked": {
@@ -1472,7 +1472,7 @@
         "network-renderer-openconfig": "network-renderer-openconfig_5",
         "network-renderer-wireguard": "network-renderer-wireguard_6",
         "nixos-network-compiler": "nixos-network-compiler_6",
-        "nixpkgs": "nixpkgs_17"
+        "nixpkgs": "nixpkgs_18"
       },
       "locked": {
         "lastModified": 1794112790,
@@ -1502,7 +1502,7 @@
         "network-renderer-openconfig": "network-renderer-openconfig_6",
         "network-renderer-wireguard": "network-renderer-wireguard_7",
         "nixos-network-compiler": "nixos-network-compiler_7",
-        "nixpkgs": "nixpkgs_19"
+        "nixpkgs": "nixpkgs_20"
       },
       "locked": {
         "lastModified": 1794112790,
@@ -3598,6 +3598,25 @@
         "type": "github"
       }
     },
+    "nixos-hardware-x13s": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_16"
+      },
+      "locked": {
+        "lastModified": 1794348666,
+        "narHash": "sha256-n9d8DSZIfdt/XwmI8tTaCKtsvUFjS4oSQIUswRhr6aY=",
+        "owner": "esp0xdeadbeef",
+        "repo": "nixos-hardware",
+        "rev": "c6748c3cc176869587bfa714d8cfd53e837359be",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esp0xdeadbeef",
+        "repo": "nixos-hardware",
+        "rev": "c6748c3cc176869587bfa714d8cfd53e837359be",
+        "type": "github"
+      }
+    },
     "nixos-mailserver": {
       "inputs": {
         "blobs": "blobs",
@@ -3867,7 +3886,7 @@
     },
     "nixos-shell": {
       "inputs": {
-        "nixpkgs": "nixpkgs_20"
+        "nixpkgs": "nixpkgs_21"
       },
       "locked": {
         "lastModified": 1776988539,
@@ -4788,6 +4807,19 @@
     },
     "nixpkgs_16": {
       "locked": {
+        "lastModified": 1767892417,
+        "narHash": "sha256-8bW3q88CEg2u4hSP66Vf4lpbLonHz7hqDNBMcCY7E9U=",
+        "rev": "3497aa5c9457a9d88d71fa93a4a8368816fbeeba",
+        "type": "tarball",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.05pre924538.3497aa5c9457/nixexprs.tar.xz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz"
+      }
+    },
+    "nixpkgs_17": {
+      "locked": {
         "lastModified": 1771369470,
         "narHash": "sha256-0NBlEBKkN3lufyvFegY4TYv5mCNHbi5OmBDrzihbBMQ=",
         "owner": "NixOS",
@@ -4799,43 +4831,11 @@
         "owner": "NixOS",
         "repo": "nixpkgs",
         "rev": "0182a361324364ae3f436a63005877674cf45efb",
-        "type": "github"
-      }
-    },
-    "nixpkgs_17": {
-      "locked": {
-        "lastModified": 1793726008,
-        "narHash": "sha256-jQp1wKvbwWdLBASTXkSi/VYmDJ5AbBi1WvcMt9HWJC8=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "1d060086d60cb76a40cf37109f979d88a5bd6396",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
         "type": "github"
       }
     },
     "nixpkgs_18": {
       "locked": {
-        "lastModified": 1771369470,
-        "narHash": "sha256-0NBlEBKkN3lufyvFegY4TYv5mCNHbi5OmBDrzihbBMQ=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0182a361324364ae3f436a63005877674cf45efb",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0182a361324364ae3f436a63005877674cf45efb",
-        "type": "github"
-      }
-    },
-    "nixpkgs_19": {
-      "locked": {
         "lastModified": 1793726008,
         "narHash": "sha256-jQp1wKvbwWdLBASTXkSi/VYmDJ5AbBi1WvcMt9HWJC8=",
         "owner": "NixOS",
@@ -4847,6 +4847,22 @@
         "owner": "NixOS",
         "ref": "nixos-unstable",
         "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_19": {
+      "locked": {
+        "lastModified": 1771369470,
+        "narHash": "sha256-0NBlEBKkN3lufyvFegY4TYv5mCNHbi5OmBDrzihbBMQ=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "0182a361324364ae3f436a63005877674cf45efb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "0182a361324364ae3f436a63005877674cf45efb",
         "type": "github"
       }
     },
@@ -4868,6 +4884,22 @@
     },
     "nixpkgs_20": {
       "locked": {
+        "lastModified": 1793726008,
+        "narHash": "sha256-jQp1wKvbwWdLBASTXkSi/VYmDJ5AbBi1WvcMt9HWJC8=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "1d060086d60cb76a40cf37109f979d88a5bd6396",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_21": {
+      "locked": {
         "lastModified": 1776548001,
         "narHash": "sha256-ZSK0NL4a1BwVbbTBoSnWgbJy9HeZFXLYQizjb2DPF24=",
         "owner": "NixOS",
@@ -4881,7 +4913,7 @@
         "type": "indirect"
       }
     },
-    "nixpkgs_21": {
+    "nixpkgs_22": {
       "locked": {
         "lastModified": 1793865203,
         "narHash": "sha256-/cpdPHaySDIyCgZI6EWngiM6jK3YLUNzv1b7lTzy6Bk=",
@@ -5183,6 +5215,7 @@
         "nix-index-database": "nix-index-database",
         "nixos-aarch64-widevine": "nixos-aarch64-widevine",
         "nixos-hardware": "nixos-hardware",
+        "nixos-hardware-x13s": "nixos-hardware-x13s",
         "nixos-mailserver": "nixos-mailserver",
         "nixos-network-compiler-legacy-prod": "nixos-network-compiler-legacy-prod",
         "nixos-network-compiler-prod": "nixos-network-compiler-prod",
@@ -5190,7 +5223,7 @@
         "nixos-shell": "nixos-shell",
         "nixos-shell-vm-manager": "nixos-shell-vm-manager",
         "nixos-winddk": "nixos-winddk",
-        "nixpkgs": "nixpkgs_21",
+        "nixpkgs": "nixpkgs_22",
         "nixpkgs-25_11": "nixpkgs-25_11",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "pin-refresh-source": "pin-refresh-source",

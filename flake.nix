@@ -298,6 +298,18 @@
       url = "github:esp0xdeadbeef/nixos-hardware/bcd4db53bf4601f19e233ccb28312687639aafe4";
     };
 
+    # Same fork, but on the `x13s-pr1751-plus-bpi` branch: PR #1751's x13s
+    # rework (hardware.lenovo.x13s.* options, feature-keyed kernel patch series)
+    # stacked on top of the bpi-r4-pro commits above. Used ONLY by
+    # l-portal-unstable, so the pinned `nixos-hardware` input above stays the
+    # rollback target for every deployed host.
+    #
+    # The PR is still open upstream; when it merges, drop this input and point
+    # `nixos-hardware` at the upstream rev instead.
+    nixos-hardware-x13s = {
+      url = "github:esp0xdeadbeef/nixos-hardware/c6748c3cc176869587bfa714d8cfd53e837359be";
+    };
+
     impermanence = {
       url = "github:nix-community/impermanence";
       # inputs.nixpkgs.follows = "nixpkgs";
@@ -393,6 +405,9 @@
       # it as x86_64-linux is wrong.
       hostSystems = {
         l-portal = "aarch64-linux";
+        # Same physical X13s as l-portal, built against the PR #1751
+        # nixos-hardware branch (see the `nixos-hardware-x13s` input).
+        l-portal-unstable = "aarch64-linux";
         # s-nodus: Banana Pi BPI-R4 Pro 4E (MediaTek MT7988A).
         s-nodus = "aarch64-linux";
         # s-router-cobalt-new runs under KVM on s-nodus, so the guest must

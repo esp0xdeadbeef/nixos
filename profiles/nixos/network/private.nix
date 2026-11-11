@@ -7,9 +7,40 @@
 
 let
   cfg = config.local.network.private;
+  # `networking.hostName` is the machine's own name and is what this module's
+  # defaults key off. It is NOT necessarily the SOPS file name -- see
+  # sopsFilePath below.
   hostName = config.networking.hostName;
-  sopsFileRel = "secrets/${hostName}-default.yaml";
-  sopsFileExists = relativeRepo.exists sopsFileRel;
+  # Resolve the SOPS file holding this host's private Wi-Fi secrets.
+  #
+  # Preference order:
+  #   1. `local.network.private.sopsFile`, when a host sets it explicitly (a
+  #      host whose Wi-Fi secrets live outside its default SOPS file).
+  #   2. `config.sops.defaultSopsFile`, the authoritative host SOPS file. This
+  #      is what hosts set; deriving the path from `networking.hostName`
+  #      instead is wrong for a variant host that is the same machine under a
+  #      different flake attribute (l-portal-unstable): it derived a
+  #      `l-portal-unstable-default.yaml` that does not exist, yielding an
+  #      empty key set and therefore no Wi-Fi profiles at all.
+  #   3. Nothing: hosts that do not use private Wi-Fi (e.g. s-nodus, which
+  #      declares its secrets with explicit per-secret `sopsFile` and never
+  #      sets `defaultSopsFile`). Here the key set is empty, which is correct
+  #      -- `hasWifiProfiles` is then false and this module stays inert.
+  sopsFilePath =
+    if cfg.sopsFile != null then
+      cfg.sopsFile
+    else if config.sops.defaultSopsFile != null then
+      config.sops.defaultSopsFile
+    else
+      null;
+  sopsFileExists =
+    sopsFilePath != null && builtins.pathExists (toString sopsFilePath);
+  # Human-readable form for assertion messages.
+  sopsFileRel =
+    if sopsFilePath == null then
+      "no SOPS file"
+    else
+      "secrets/${builtins.baseNameOf (toString sopsFilePath)}";
   networkManagerEnabled = config.networking.networkmanager.enable;
   networkdEnabled = config.systemd.network.enable;
 
@@ -24,7 +55,7 @@ let
     if sopsFileExists then
       lib.filter (key: key != null)
         (
-          map keyFromLine (lib.splitString "\n" (builtins.readFile (relativeRepo.module sopsFileRel)))
+          map keyFromLine (lib.splitString "\n" (builtins.readFile sopsFilePath))
         )
     else
       [ ];
@@ -137,6 +168,16 @@ in
       default = hostName == "l-portal";
       description = "Apply the wifi-mac SOPS secret as NetworkManager's cloned Wi-Fi MAC address.";
     };
+
+    sopsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        SOPS file holding this host's private Wi-Fi secrets (the
+        `wifi-<name>-ssid` / `-password` / `-key-mgmt` keys and `wifi-mac`).
+        Defaults to `config.sops.defaultSopsFile`.
+      '';
+    };
   };
 
   config = lib.mkMerge [
@@ -163,7 +204,7 @@ in
 
     (lib.mkIf enableNetworkManagerProfiles {
       sops.secrets = lib.genAttrs wifiSecretNames (_: {
-        sopsFile = relativeRepo.sourcePath sopsFileRel;
+        sopsFile = sopsFilePath;
         owner = "root";
         group = "root";
         mode = "0400";
