@@ -1,3 +1,59 @@
+# l-portal-unstable
+
+Variant of `l-portal` (same physical ThinkPad X13s) built against the
+nixos-hardware x13s rework from [NixOS/nixos-hardware#1751], tracked as the
+dedicated, rev-pinned flake input `nixos-hardware-x13s`.
+
+It exists so the port can be built, booted and compared without touching the
+known-good `l-portal`, which stays the rollback target.
+
+## Differences from l-portal
+
+- Board support comes from the `x13s` module on the PR branch instead of the
+  pinned `nixos-hardware` input.
+- The four TPM patches are no longer carried locally in `hardware/tpm.nix`
+  (removed here); they are selected through the module's
+  `hardware.x13s.patches.tpm.enable`. Importing both would apply the series
+  twice and fail the patch phase.
+- `hardware.lenovo.x13s.wifiMAC = ""` keeps the SOPS-backed udev rule in
+  `default.nix` as the sole owner of the Wi-Fi address, instead of letting the
+  module generate a machine-id-derived MAC for the same device.
+- Machine identity stays `l-portal`: same SOPS files, same age/SSH keys, same
+  `home-manager` tree (`local.homeManager.hostName`). Only the flake attribute
+  name and the system hostname differ.
+
+## Verified on hardware
+
+Deployed and booted on the X13s (100.64.0.14), kernel 6.18.60 with the patched
+TPM driver built in:
+
+```
+qcom_qseecom qcom_qseecom: setting up client for qcom.tz.tpm
+tpm_qcom_qsee.tpm_qcom_qsee qcom_qseecom.tpm.0: using dTPM TPM backend
+```
+
+`/dev/tpm0` and `/dev/tpmrm0` appear, and root unlocks through the full chained
+binding (Tang **and** TPM2):
+
+```
+tpm2-startup: TPM2_Startup(CLEAR)
+clevis: trying /etc/clevis/root-0.jwe
+clevis: unlocked via /etc/clevis/root-0.jwe
+```
+
+The dTPM acceptance in the log comes from patch 0004, which is the X13s-specific
+one: the SC8280XP reports `QCOM_TPM_TYPE_DTPM`, not fTPM.
+
+## Rollback
+
+The machine boots one generation at a time; `l-portal` generations remain in the
+boot menu, so reverting is `nixos-rebuild boot --rollback` or selecting the
+previous entry at the systemd-boot menu.
+
+[NixOS/nixos-hardware#1751]: https://github.com/NixOS/nixos-hardware/pull/1751
+
+---
+
 # l-portal NixOS install
 
 The ThinkPad X13s is `aarch64-linux`. Build and install this host on the X13s
