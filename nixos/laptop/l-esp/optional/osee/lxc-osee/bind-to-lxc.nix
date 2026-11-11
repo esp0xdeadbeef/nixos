@@ -1,27 +1,17 @@
-{ config, pkgs, ... }:
-
 {
-  security.sudo = {
-    enable = true;
-
-    extraRules = [
-      {
-        users = [ "deadbeef" ];
-        commands = [
-          {
-            command = "/run/current-system/sw/bin/umount /home/deadbeef/.local/share/lxc/lxc-osee/rootfs/mnt";
-            options = [ "NOPASSWD" ];
-          }
-          {
-            command = "/run/current-system/sw/bin/bindfs --uid-offset=100000 --gid-offset=100900 /home/deadbeef/github/OSEE/shared /home/deadbeef/.local/share/lxc/lxc-osee/rootfs/mnt";
-            options = [ "NOPASSWD" ];
-          }
-          {
-            command = "/etc/nuke-lxc-from-orbit-on-shutdown.sh";
-            options = [ "NOPASSWD" ];
-          }
-        ];
-      }
-    ];
-  };
+  # The OSEE bindfs share, declared as data so that the sudoers NOPASSWD rule
+  # and the shutdown teardown are generated from it (see
+  # library/01-general/virtualization-as-host/lxc.nix).
+  #
+  # home-manager/l-esp/configs/osee/start-lxc.nix consumes this and refuses to
+  # build if the values disagree, so the argv sudo authorises and the argv the
+  # unit runs stay identical.
+  local.containerNetwork.bindMounts = [
+    {
+      source = "/home/deadbeef/github/OSEE/shared";
+      target = "/home/deadbeef/.local/share/lxc/lxc-osee/rootfs/mnt";
+      user = "deadbeef";
+      container = "lxc-osee";
+    }
+  ];
 }
