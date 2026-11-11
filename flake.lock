@@ -2623,11 +2623,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794341918,
-        "narHash": "sha256-Ix413QCjn31alHyu4VjPqMjUS2rSewlxzB4KGtoa4H8=",
+        "lastModified": 1794357769,
+        "narHash": "sha256-zKUGIJuQZSaZU0c7KZGWeZXud9vGqtK+q5SahRnufD4=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nebula",
-        "rev": "167a1801b1785a7d184108f992d82b9074f5fb2c",
+        "rev": "ac67fcacee0bbeb8f0f08012471a33b8bed56595",
         "type": "github"
       },
       "original": {
