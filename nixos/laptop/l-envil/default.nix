@@ -73,15 +73,11 @@ in
     class = "laptop";
   };
 
-  # Temporarily capped to a single build core: the FRITZ!SFP XGS-PON adapter in
-  # the Thunderbolt SFP+ cage draws enough current that saturating the i9-13900H
-  # trips the power supply. This is daemon-wide, so it limits both local builds
-  # and builds offloaded here by the other hosts' remote-builder clients. Raise
-  # back to max-jobs = 4 / cores = 4 once the power supply is fixed.
-  nix.settings = {
-    max-jobs = 2;
-    cores = 2;
-  };
+  # No nix.settings.max-jobs / cores override: the daemon runs at Nix's
+  # defaults (max-jobs = auto, cores = 0), so one job per hardware thread and
+  # each job free to use every core.  This host used to be capped to 2/2
+  # because the FRITZ!SFP XGS-PON adapter in the Thunderbolt cage drew enough
+  # current to trip the power supply; that adapter is gone.
 
   local.network.private.enable = false;
 

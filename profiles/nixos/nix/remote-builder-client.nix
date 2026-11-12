@@ -160,18 +160,17 @@ in
           class = "laptop";
           systems = [ "x86_64-linux" ];
           # i9-13900H: 14 cores / 20 threads, also used interactively and for
-          # local LLM workloads. Temporarily capped to a single job: the SFP+
-          # adapter currently in the Thunderbolt cage draws enough current to
-          # trip the power supply when builds saturate the box. Raise back to 4
-          # once the power supply is fixed.
-          maxJobs = 1;
+          # local LLM workloads. Kept class = laptop so a laptop client never
+          # offloads here and deadlocks with it. No maxJobs cap: the FRITZ!SFP
+          # adapter whose current draw tripped the power supply is gone, so
+          # builds dispatched here use the default job count again.
         };
         l-esp-builder = {
           address = "100.64.0.10";
           class = "laptop";
           systems = [ "x86_64-linux" ];
-          # i7-12850HX: 16 cores / 24 threads, interactive laptop. Same cap as
-          # l-envil.
+          # i7-12850HX: 16 cores / 24 threads, interactive laptop. Capped so
+          # locals and offloaded builds cannot fully throttle the machine.
           maxJobs = 4;
         };
         l-portal-builder = {
