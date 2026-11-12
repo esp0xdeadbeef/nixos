@@ -3,11 +3,16 @@
 #
 # TWO DEVICES
 # -----------
-#   1. microSD  -- the BOOT CHAIN only: bl2 / ubootenv / factory / fip /
-#      production (the raw FIT).  This is forced by the hardware: the MT7988
-#      BootROM loads BL2 from raw sector 34 of mmc 0, and BL2 then looks up the
-#      GPT partition *named* `fip` on the same device.  Neither can move to
-#      NVMe without reflashing SPI-NAND, which is never done.
+#   1. microSD  -- the BOOT CHAIN only: bl2 / ubootenv / factory / fip / ESP.
+#      This is forced by the hardware: the MT7988 BootROM loads BL2 from raw
+#      sector 34 of mmc 0, and BL2 then looks up the GPT partition *named*
+#      `fip` on the same device.  Neither can move to NVMe without reflashing
+#      SPI-NAND, which is never done.
+#
+#      BL2 and the FIP are built from source by nixos-hardware's
+#      bananapi/bpi-r4-pro atf.nix/fip.nix -- no vendor firmware image is
+#      needed.  U-Boot (inside the FIP) has CONFIG_EFI_LOADER, so it boots
+#      EFI/BOOT/BOOTAA64.EFI from the ESP, and systemd-boot takes over.
 #
 #   2. NVMe     -- the ROOT filesystem (btrfs: /root, /nix, /persist).  This is
 #      where space and throughput matter: the closure is ~7.3 GiB once the
@@ -23,7 +28,7 @@
 #        2  ubootenv        8192    1024  (512K) Linux
 #        3  factory         9216    4096  (2M)   Linux
 #        4  fip            13312    8192  (4M)   EFI
-#        5  production    327680  917504 (448M)  Linux   <- raw NixOS FIT
+#        5  ESP           102400  524288 (256M)  EFI   <- BOOTAA64.EFI + entries
 #   NVMe 1  nixos-root      2048   <fills>        Linux   <- btrfs
 #
 # USAGE
@@ -49,7 +54,9 @@ P1_S=34;       P1_N=8158               # bl2
 P2_S=8192;     P2_N=1024               # ubootenv
 P3_S=9216;     P3_N=4096               # factory
 P4_S=13312;    P4_N=8192               # fip
-P5_S=327680;   P5_N=917504             # production (raw FIT)
+# ESP: systemd-boot + the kernels/initrds for every retained generation.
+# 256 MiB holds BOOTAA64.EFI (a few hundred KiB) plus ~20 kernel+initrd pairs.
+P5_S=102400;   P5_N=524288             # ESP (FAT32)
 P6_S=1245184;  P6_GIB=24               # nixos-root (btrfs): rootfs + headroom
 #
 # The card does NOT hand 100% of its space to the root: the remainder stays
@@ -90,29 +97,26 @@ find_vendor_img() {
 
 # ---------------------------------------------------------------- build ----
 build() {
-  local VENDOR_IMG="${1:-}"
-  [ -n "$VENDOR_IMG" ] || VENDOR_IMG="$(find_vendor_img)"
-  [ -r "$VENDOR_IMG" ] || { echo "!! vendor image not found; pass it: $0 build <vendor.img>"; exit 1; }
+  # No vendor image is needed: BL2, BL31 and U-Boot are all built from source by
+  # nixos-hardware's bananapi/bpi-r4-pro (atf.nix, uboot.nix, fip.nix).  The
+  # argument is still accepted so existing invocations keep working.
   mkdir -p "$WORK"
-  echo ">> vendor donor: $VENDOR_IMG"
 
-  echo ">> building firmware blobs (firmware.nix)"
-  local FW
-  FW=$(nix-build --no-out-link -E "
-    let pkgs = import <nixpkgs> { system = builtins.currentSystem; };
-    in pkgs.callPackage $HERE/firmware.nix { vendorImagePath = $VENDOR_IMG; }")
-  echo "   firmware = $FW"
+  echo ">> building the board firmware from source (BL2 + FIP)"
+  local BL2 FIP
+  BL2=$(nix build --builders '' --print-out-paths --no-link \
+    "$REPO#nixosConfigurations.s-nodus.config.system.build.bpiR4ProBl2")
+  FIP=$(nix build --builders '' --print-out-paths --no-link \
+    "$REPO#nixosConfigurations.s-nodus.config.system.build.bpiR4ProFip")
+  echo "   bl2 = $BL2 ($(stat -c%s "$BL2") bytes)"
+  echo "   fip = $FIP ($(stat -c%s "$FIP") bytes)"
 
-  echo ">> building NixOS FIT for s-nodus"
-  local FIT
-  FIT=$(nix build --builders '' --print-out-paths --no-link \
-    "$REPO#nixosConfigurations.s-nodus.config.system.build.bpiR4ProFit")
-  echo "   FIT = $FIT ($(stat -c%s "$FIT") bytes)"
-
-  local fsz; fsz=$(stat -c%s "$FIT")
-  if [ "$fsz" -gt $(( P5_N * 512 )) ]; then
-    echo "!! FIT ($fsz B) exceeds production partition ($(( P5_N * 512 )) B)"; exit 1
-  fi
+  local bsz; bsz=$(stat -c%s "$BL2")
+  [ "$bsz" -le $(( P1_N * 512 )) ] \
+    || { echo "!! BL2 ($bsz B) exceeds its ${P1_N}-sector slot ($(( P1_N * 512 )) B)"; exit 1; }
+  local fsz; fsz=$(stat -c%s "$FIP")
+  [ "$fsz" -le $(( P4_N * 512 )) ] \
+    || { echo "!! FIP ($fsz B) exceeds the fip partition ($(( P4_N * 512 )) B)"; exit 1; }
 
   echo ">> building the SD root filesystem (btrfs image with the store closure)"
   local ROOTFS
@@ -153,33 +157,42 @@ build() {
   "$SGDISK" -a 1 -n 2:$P2_S:$(( P2_S+P2_N-1 )) -t 2:8300 -c 2:ubootenv   -u 2:$U2 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 3:$P3_S:$(( P3_S+P3_N-1 )) -t 3:8300 -c 3:factory    -u 3:$U3 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 4:$P4_S:$(( P4_S+P4_N-1 )) -t 4:ef00 -c 4:fip        -u 4:$U4 "$IMG" >/dev/null
-  "$SGDISK" -a 1 -n 5:$P5_S:$(( P5_S+P5_N-1 )) -t 5:8300 -c 5:production -u 5:$U5 "$IMG" >/dev/null
+  "$SGDISK" -a 1 -n 5:$P5_S:$(( P5_S+P5_N-1 )) -t 5:ef00 -c 5:ESP        -u 5:$U5 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 6:$P6_S:$p6End           -t 6:8300 -c 6:nixos-root -u 6:$U6 "$IMG" >/dev/null
   # Vendor GPT attribute flags (RequiredPartition / LegacyBIOSBootable).
   "$SGDISK" -A 1:set:0 -A 1:set:2 -A 2:set:0 -A 3:set:0 -A 4:set:0 "$IMG" >/dev/null
 
   echo ">> writing payloads"
-  dd if="$FW/bl2.bin"  of="$IMG" bs=512 seek=$P1_S conv=notrunc status=none
-  dd if="$FW/fip.bin"  of="$IMG" bs=512 seek=$P4_S conv=notrunc status=none
-  dd if="$FIT"         of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
+  dd if="$BL2"        of="$IMG" bs=512 seek=$P1_S conv=notrunc status=none
+  dd if="$FIP"        of="$IMG" bs=512 seek=$P4_S conv=notrunc status=none
+
+  # Partition 5 is the ESP.  It is formatted and populated below.
+  echo ">> formatting ESP (partition 5)"
+  local esp="$WORK/esp.img"
+  rm -f "$esp"
+  truncate -s $(( P5_N * 512 )) "$esp"
+  mkfs.vfat -F 32 -n ESP "$esp" >/dev/null
+  _populate_esp "$esp"
+  dd if="$esp" of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
 
   # Partition 6 is left EMPTY here on purpose.  It is created now only so the
   # GPT geometry is final; its btrfs filesystem (with the /root, /nix and
   # /persist subvolumes the config's fileSystems declare) is written by the
   # `populate` command against the flashed device.
   echo ">> partition 6 left for 'populate' (btrfs with subvolumes)"
-  # U-Boot environment: MANDATORY.  U-Boot's image_setup_libfdt() always
-  # overwrites /chosen/bootargs with env_get("bootargs"), so the FIT's bootargs
-  # are ignored and the vendor default (root=/dev/fit0) cannot boot NixOS.
+  # U-Boot environment.  It no longer carries the real bootargs (systemd-boot
+  # writes the per-generation command line into the ESP); it provides
+  # `bootcmd=bootflow scan -lb` plus a fallback cmdline for a manual boot from
+  # the U-Boot console.
   echo ">> writing U-Boot environment (ubootenv partition)"
   _write_uboot_env_in_image "$IMG"
 
   local got
+  got=$(dd if="$IMG" bs=512 skip=$P1_S count=1 status=none | head -c 11)
+  [ "$got" = "SDMMC_BOOT" ] || { echo "!! BL2 magic not at sector $P1_S (got '$got')"; exit 1; }
   got=$(dd if="$IMG" bs=512 skip=$P4_S count=1 status=none | od -An -tx1 | tr -d ' \n')
   [ "${got:0:8}" = "010064aa" ] || { echo "!! FIP header not at fip start"; exit 1; }
-  got=$(dd if="$IMG" bs=512 skip=$P5_S count=1 status=none | od -An -tx1 | tr -d ' \n')
-  [ "${got:0:8}" = "d00dfeed" ] || { echo "!! FIT magic not at production start"; exit 1; }
-  echo "   verified: fip header + production FIT magic"
+  echo "   verified: BL2 magic at sector $P1_S + FIP header at sector $P4_S"
 
   echo ">> built $IMG ($(du -h "$IMG" | cut -f1))"
   echo "   flash with:  $0 flash <sd-device>"
@@ -188,12 +201,59 @@ build() {
   echo "   stage 2 (move the root to the NVMe) is run FROM the booted system."
 }
 
+# Populate the ESP (a FAT image file) with systemd-boot and the current
+# generation's boot entry.
+#
+# This runs NixOS's own systemd-boot builder against the mounted ESP rather than
+# copying BOOTAA64.EFI and writing loader entries by hand: the builder knows the
+# EFI architecture, the entry format, and how `bootctl install` lays out
+# /EFI/BOOT and /EFI/systemd.  Reimplementing that is how these images end up
+# subtly unbootable.
+#
+# NIXOS_INSTALL_BOOTLOADER=1 makes it perform a full `bootctl install` (writing
+# the removable-media fallback BOOTAA64.EFI) instead of only refreshing the
+# existing installation, which is what a fresh image needs.
+_populate_esp() {
+  local ESPIMG="$1"
+  local mnt="$WORK/esp-mnt"
+  mkdir -p "$mnt"
+
+  local BUILDER
+  BUILDER=$(nix build --builders '' --print-out-paths --no-link \
+    "$REPO#nixosConfigurations.s-nodus.config.system.build.installBootLoader" ) \
+    || { echo "!! could not build installBootLoader"; exit 1; }
+
+  local TOPLEVEL
+  TOPLEVEL=$(nix build --builders '' --print-out-paths --no-link \
+    "$REPO#nixosConfigurations.s-nodus.config.system.build.toplevel")
+
+  # The builder writes to the ESP mount point compiled into it; bind it there
+  # via a throwaway mount namespace so the host's /boot is never touched.
+  sudo mount -o loop,uid=$(id -u),gid=$(id -g),umask=0077 "$ESPIMG" "$mnt"
+  trap 'sudo umount "$mnt" 2>/dev/null || true' RETURN
+
+  sudo env NIXOS_INSTALL_BOOTLOADER=1 \
+    "$BUILDER/bin/install-systemd-boot" "$TOPLEVEL"
+
+  sudo umount "$mnt"
+  trap - RETURN
+
+  # Assert the loader really landed: U-Boot only looks for the removable-media
+  # fallback path, so a missing BOOTAA64.EFI is an unbootable card.
+  if ! mdir -i "$ESPIMG" ::/EFI/BOOT 2>/dev/null | grep -qi 'BOOTAA64\.EFI'; then
+    echo "!! ESP is missing EFI/BOOT/BOOTAA64.EFI" >&2
+    mdir -i "$ESPIMG" ::/ >&2 2>/dev/null || true
+    exit 1
+  fi
+  echo "   ESP contains EFI/BOOT/BOOTAA64.EFI"
+}
+
 # Write the U-Boot environment into the ubootenv partition (p2) of an image.
 #
-# U-Boot's image_setup_libfdt() always overwrites /chosen/bootargs with
-# env_get("bootargs"), so the FIT's own bootargs are IGNORED and the vendor
-# default `root=/dev/fit0` wins -- which cannot boot NixOS.  The env is
-# therefore the only place the real cmdline can live.
+# This environment is now small: U-Boot's CONFIG_BOOTCOMMAND already scans for
+# the ESP (`bootflow scan -lb`), and each systemd-boot entry carries its own
+# kernel command line.  What remains here is the fallback: a `bootargs` that can
+# boot the system by hand from the U-Boot console if the ESP is damaged.
 #
 # Layout: CONFIG_ENV_SIZE=0x40000 with a redundant copy at offset 0x40000,
 # i.e. two 0x40000 images filling the 0x80000 (512 KiB) partition.

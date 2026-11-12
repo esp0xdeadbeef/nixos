@@ -413,8 +413,8 @@ in
   # The module defaults to make-ext4-fs.nix; we want btrfs, so point it at the
   # btrfs creator (its option description names this file).
   sdImage.rootFilesystemCreator = pkgs.path + "/nixos/lib/make-btrfs-fs.nix";
-  # No FAT firmware partition: the FIT (fit.nix) is the boot artifact, and the
-  # ESP/FAT path does not exist on this board's vendor U-Boot.
+  # No FAT firmware partition contents: the ESP is populated by systemd-boot's
+  # own builder (BOOTAA64.EFI + loader entries), not by a firmware blob.
   sdImage.populateFirmwareCommands = "";
 
   # No populateRootCommands: the system profile link is written by
@@ -441,9 +441,10 @@ in
   fileSystems."/".device = lib.mkForce "/dev/disk/by-partlabel/nixos-root";
   boot.initrd.supportedFilesystems = [ "btrfs" ];
 
-  # sd-image.nix always declares a FAT /boot/firmware partition; this board has
-  # none (the FIT is the boot artifact, there is no ESP).  The entry cannot be
-  # removed, so mark it nofail+noauto -- it is then never touched at boot.
+  # The FAT firmware partition IS the ESP now: U-Boot's EFI loader reads
+  # EFI/BOOT/BOOTAA64.EFI from it and systemd-boot takes over.  This reverses
+  # the old "no ESP" arrangement, which existed only because the vendor U-Boot
+  # had no bootefi path.  Mount point is set by efi.nix (efiSysMountPoint=/boot).
   fileSystems."/boot/firmware".options = lib.mkForce [ "nofail" "noauto" ];
 
   # sd-image force-enables enableAllHardware (a generic initrd module list for
