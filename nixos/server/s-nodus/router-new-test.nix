@@ -536,7 +536,7 @@ in
       # `cobalt-lan.30` off br-cobalt-lan, so in that shape the VLAN child -- and
       # every AP bridging onto the resulting vlan30 -- is NO-CARRIER, and each
       # cobalt-clients AP loops on its `state UP` preStart (measured 2026-11-11:
-      # `Mee Blomikie` units stuck activating/auto-restart, restart counter 17).
+      # the AP units stuck activating/auto-restart, restart counter 17).
       #
       # The AP module takes the trunk as data, so point it at the same bridge
       # the inventory gives the physical trunk (`uplinks.trunk.bridge` in
