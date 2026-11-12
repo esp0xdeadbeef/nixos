@@ -212,21 +212,35 @@ jacks join. The cobalt VM attaches its LAN NIC to `br-cobalt-lan` and its WAN
 NIC to `br-cobalt-wan`; it starts only while the WAN SFP is present
 (`./vm-host.nix`), but `mxl_lan0` stays wired regardless.
 
+Every 2.5G jack on this board is `mxl_lanN` (the mainline DSA port labels),
+not the bare `lanN` of the vendor DTS. All four jacks currently report
+`carrier=0` on the running host, i.e. **no cable is plugged into any of them**
+-- `NO-CARRIER`/`lowerlayerdown` on `mxl_lanN` is a physical fact, not a
+plumbing bug. Their bridge membership is what the map below sets, and it is
+correct whether or not a cable is present. Plug a device into `mxl_lan1`-`3`
+after wiring the trunk and it lands on the mapped plane.
+
 Because the VM terminates the VLANs itself, the access jacks reach the router
 only through the trunk: with `mxl_lan0` unplugged, `vlan50` has no uplink into
 the VM and its jacks see link but never get DHCP. Wire `mxl_lan0` to the cobalt
 router's switch trunk before expecting the access jacks to pass traffic.
 
+The clients plane is shared by three things -- this host's own
+management/underlay address, the `cobalt-clients` AP BSS, and the `mxl_lan3`
+access jack -- all on `vlan30`. That is why `mxl_lan1`/`mxl_lan2` are on
+`vlan50` (`cobalt-iot`, its own `10.2.50.0/24`) and not `vlan30`: a VLAN-30
+device would otherwise share L2 with the host and the AP clients.
+
 ### Verifying the trunk
 
-`lan1` is a **bridge member**. `tcpdump -i lan1` can miss frames the bridge
-forwards straight through to another port, so a blank capture there is not
-proof that nothing arrives. Capture on the bridge or the VLAN child instead,
-and confirm the link state first:
+`mxl_lan3` is a **bridge member** of `vlan30`. `tcpdump -i mxl_lan3` can miss
+frames the bridge forwards straight through to another port, so a blank
+capture there is not proof that nothing arrives. Capture on the bridge or the
+VLAN child instead, and confirm the link state first:
 
 ```sh
-ip -br link show lan1                 # must not be NO-CARRIER
-bridge link show                      # lan1 should be a member of br-cobalt-lan
+ip -br link show mxl_lan3              # must not be NO-CARRIER
+bridge link show                      # mxl_lan3 should be a member of vlan30
 ip -br link show master br-cobalt-lan # members (plus the VM tap when it runs)
 tcpdump -i br-cobalt-lan -n -e        # tagged VLAN 30 frames crossing the bridge
 tcpdump -i cobalt-lan.30 -n -e        # the same frames after tag termination
@@ -288,6 +302,20 @@ VAPs otherwise share the base MAC and the kernel refuses to bring up more than
 one (`Name not unique on network`), so each VAP gets a distinct
 locally-administered MAC. If `ap-conf-*` fails with an empty SSID, `/run/ap`
 was cleared — restart `ap-ssid-*` to regenerate `ssids.env`.
+
+`ap-planes.service` creates the `ap-mgmt` / `ap-clients-vpn` / `ap-unlock`
+bridges and their `cobalt-lan.{10,31,90}` children, and it waits for the trunk
+bridge (`br-cobalt-lan`) *inside* its script. It must not carry a
+`requires`/`after` on `sys-subsystem-net-devices-br-cobalt-lan.device`: that
+bridge is a runtime networkd netdev, so its device unit does not exist when
+systemd builds the boot transaction, and a `Requires=` on it fails the job at
+transaction time (observed as `Dependency failed for ap-planes.service` after
+the device had already plugged). When that job fails, the three extra plane
+bridges never appear, every BSS on them loops in `start-pre` waiting for
+`state UP`, and `ap-vap-extra` (which requires `ap-planes`) also fails — so
+5/6 GHz loses its `wlp1s-5`/`wlp1s-6` base interfaces too. If only the
+`cobalt-clients` BSS (on `vlan30`) is running, look at
+`systemctl status ap-planes ap-vap-extra` first.
 
 ## TODOs / hardening
 

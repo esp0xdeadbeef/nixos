@@ -168,22 +168,53 @@ in
     # trunk these VLAN children are created on follows `local.sNodusWifi.trunkBridge`
     # so a container-shaped host (trial) builds them on the bridge that actually
     # carries the physical trunk instead of the memberless `br-cobalt-lan`.
+    #
+    # The trunk is waited for INSIDE the script, not by a unit dependency.
+    # A `requires`/`after` on `sys-subsystem-net-devices-<trunk>.device` looks
+    # correct but is not: the bridge is a virtual netdev created by
+    # systemd-networkd at runtime, so its udev device unit does not exist yet
+    # when systemd builds the boot transaction.  systemd then records a
+    # not-found dependency and fails this job at transaction time -- even
+    # though the device unit goes `active (plugged)` 78s earlier on this host
+    # (boot 47f2b654: br-cobalt-lan plugged 06:05:07, "Dependency failed for
+    # ap-planes.service" 06:06:25).  The job never retries, so ap-mgmt /
+    # ap-clients-vpn / ap-unlock were never created, every BSS bridged onto
+    # them looped forever in start-pre waiting for `state UP`, and ap-vap-extra
+    # (requires=ap-planes) also failed -- taking 5/6 GHz down with it because
+    # wlp1s-5/wlp1s-6 were never made.  Polling the link is what ap-vap-extra
+    # already does for the base interfaces: deterministic and recoverable.
     systemd.services.ap-planes = {
       description = "Create the cobalt AP VLAN children and plane bridges";
       wantedBy = [ "multi-user.target" ];
       before = [ "ap-vap-extra.service" ];
+      # Order against the device unit when it exists, but do NOT require it: a
+      # missing-at-transaction-time device unit must not fail the job.
       after = [ "sys-subsystem-net-devices-${cfg.trunkBridge}.device" ];
-      requires = [ "sys-subsystem-net-devices-${cfg.trunkBridge}.device" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
       };
-      path = [ pkgs.iproute2 pkgs.gnugrep ];
+      path = [ pkgs.iproute2 pkgs.gnugrep pkgs.coreutils ];
       script = ''
         set -euo pipefail
         trunk=${cfg.trunkBridge}
-        # Locally-administered MACs so the bridges stay distinguishable.
-        # (vlan|bridge name, vlan id (0 = plain bridge), mac)
+
+        # Bounded wait for the trunk bridge networkd creates.  ~60s is well
+        # inside the boot budget and far longer than networkd needs to create
+        # a bridge from its .netdev; failing loudly beats silently starting the
+        # VLAN children on a link that does not exist (ip link add would then
+        # create link-less VLANs that never carry a frame).
+        for _ in $(seq 1 60); do
+          ip link show "$trunk" >/dev/null 2>&1 && break
+          sleep 1
+        done
+        if ! ip link show "$trunk" >/dev/null 2>&1; then
+          echo "ap-planes: trunk bridge $trunk never appeared" >&2
+          exit 1
+        fi
+        # (vlan child, vlan id, plane bridge) triples, matching the plane set
+        # in wifi-ssids.nix.  The clients plane is NOT here: it bridges onto
+        # the host's own vlan30 (see clientsBridge).
         for spec in \
           "cobalt-lan.10 10 ap-mgmt" \
           "cobalt-lan.31 31 ap-clients-vpn" \
