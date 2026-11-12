@@ -220,6 +220,22 @@ nix eval --impure --raw \
   .#nixosConfigurations.l-envil.config.system.build.toplevel.drvPath
 ```
 
+### Deployed state (2026-11-12)
+
+The removal is live, not just committed: generation **343**
+(`26.05.20261105.c56a87d`, kernel 6.18.60) replaced the router-era generation
+342, and the running system's derivation matches this tree's
+`config.system.build.toplevel` exactly. Post-boot checks: no `br-cobalt-*`,
+`vlan30` or `tap*` interfaces; zero failed units; internet, DNS and the nebula
+overlay all reachable; both sops age identities intact (`/persist/root/...`
+and `/persist/home/deadbeef/...`) so every secret still decrypts.
+
+`/persist/old_roots` was collected with `systemctl start
+pruneBtrfsRoots.service` rather than by hand — it keeps a retention window, so
+it went from 8 rollback roots / 7.2 GB to 5 / 1.8 GB. Never delete those
+subvolumes with `rm`: they are btrfs subvolumes and the rotation service is the
+supported pruner.
+
 ## Work apps
 
 Teams, Azure CLI, and Intune are disabled by default. Re-enable them in Home
