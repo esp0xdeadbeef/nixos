@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 # Cobalt Tang (NBDE) server, run as a NixOS container directly on s-nodus.
 #
@@ -123,6 +123,40 @@ in
         mode = "0700";
       }
     ];
+
+    # Reach Tang over the host's nebula address as well.
+    #
+    # `hostBridge = "ap-unlock"` puts the container on the unlock VLAN's L2
+    # segment (10.2.90.0/24) so existing Clevis bindings keep working; that is
+    # intentional. But `ap-unlock` is created from `cobalt-lan.90`, a VLAN child
+    # of the `cobalt-lan` SFP trunk, so with no transceiver the chain breaks:
+    # no cobalt-lan -> no cobalt-lan.90 -> no ap-unlock -> the container cannot
+    # start and a booting client has no Tang to fetch its share from.
+    #
+    # `nebula.mesh` is up independently of the trunk, so publishing Tang there
+    # adds a path that does not depend on SFP hardware. The container keeps
+    # 10.2.90.10, so `.jwe` files bound to that advertisement stay valid -- this
+    # only adds a second way in.
+    #
+    # Same mechanism as ./kernel-log-tcp.nix, which publishes the kernel log on
+    # 100.64.0.18:7001: a socat listener on the mesh address pointing at the
+    # container. socat rather than an nftables DNAT because the container sits
+    # behind a private bridge, which is exactly what may be missing.
+    systemd.services.tang-nebula = {
+      description = "Publish Tang on the nebula mesh address";
+      after = [
+        "container@tang.service"
+        "nebula-mesh.service"
+      ];
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        Restart = "always";
+        RestartSec = "5s";
+      };
+      script = ''
+        exec ${pkgs.socat}/bin/socat TCP-LISTEN:7500,bind=100.64.0.18,reuseaddr,fork TCP:10.2.90.10:7500
+      '';
+    };
 
     # Refuse to serve a keypair-less Tang.  `tangd` would happily generate a
     # FRESH keypair if the directory were empty, and every existing Clevis .jwe
