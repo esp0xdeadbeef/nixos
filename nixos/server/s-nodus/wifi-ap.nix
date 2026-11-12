@@ -122,15 +122,33 @@ in
     # phy from /sys/class/net/<base>/phy80211).  For 5/6 GHz the base interfaces
     # (wlp1s-5 / wlp1s-6) must be created on phy0 first.  ap-vap-extra runs before
     # ap-vap and the per-BSS hostapd units.
+    #
+    # It `wants` but does NOT `require` ap-planes.  This unit only creates
+    # interfaces on phy0 and touches no bridge, so the plane bridges are
+    # irrelevant to it -- and a hard `requires` here was the cascade that took
+    # 5 GHz and 6 GHz down together: every BSS `requires` ap-vap-<radio>,
+    # which `requires` ap-vap-extra, which `requires` ap-planes.  When
+    # ap-planes failed at boot, that failure propagated all the way up and
+    # wlp1s-5/wlp1s-6 were never created (measured on s-nodus: only wlp1s0
+    # existed, and all 5/6 GHz units were dead).  `wants` still pulls ap-planes
+    # in and keeps the ordering, but a bridge failure can no longer kill the
+    # per-band interfaces.
+    #
+    # Restart=on-failure: a oneshot that fails once (radio not yet probed, phy
+    # busy) now retries by itself instead of needing `systemctl start` by hand.
+    # Each pass recreates whatever is missing and leaves existing interfaces
+    # alone, so retrying is idempotent.
     systemd.services.ap-vap-extra = {
       description = "Create the MT7996 per-band AP base interfaces";
       wantedBy = [ "multi-user.target" ];
       after = [ "ap-planes.service" ];
-      requires = [ "ap-planes.service" ];
+      wants = [ "ap-planes.service" ];
       before = [ "ap-vap-wlp1s0.service" "ap-vap-wlp1s-5.service" "ap-vap-wlp1s-6.service" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+        Restart = "on-failure";
+        RestartSec = 10;
       };
       script = ''
         set -euo pipefail
@@ -150,6 +168,20 @@ in
           ${pkgs.iproute2}/bin/ip link set $iface down 2>/dev/null || true
           ${pkgs.iproute2}/bin/ip link set $iface address $(macAddr $iface) 2>/dev/null || true
         done
+
+        # Hard post-condition.  Without it this unit "succeeds" after silently
+        # failing to create the interface (the `|| true` in the loop swallows
+        # the error), and the first visible symptom is 5/6 GHz simply missing,
+        # with no failed unit to point at.  Failing here makes the cause
+        # explicit and lets Restart=on-failure retry once the phy is ready.
+        missing=""
+        for iface in wlp1s-5 wlp1s-6; do
+          [ -d /sys/class/net/$iface ] || missing="$missing $iface"
+        done
+        if [ -n "$missing" ]; then
+          echo "ap-vap-extra: could not create:$missing (phy0 not ready?)" >&2
+          exit 1
+        fi
       '';
     };
 
@@ -193,6 +225,11 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+        # Self-heal if the trunk bridge appears late (networkd slow, or the
+        # board boots before the cobalt VM taps br-cobalt-lan): retry instead of
+        # leaving the plane bridges missing until someone notices.
+        Restart = "on-failure";
+        RestartSec = 10;
       };
       path = [ pkgs.iproute2 pkgs.gnugrep pkgs.coreutils ];
       script = ''
