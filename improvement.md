@@ -714,26 +714,54 @@ the busy one builds and the idle one waits. Consequences for this plan:
 A real queue is therefore **files on shared storage**, with claim done by atomic
 rename. See the NAS constraint below.
 
-### The NAS cannot hold a store or a file:// cache
+### Storage for the store and the cache: CIFS is the blocker, not the NAS
 
 `/mnt/nas/private` is a **CIFS/SMB mount** from `192.168.1.75` (`vers=3.0`,
 `sec=ntlmssp`), 18 TiB total, 13 TiB free. Probed directly on `s-tau`: plain file
-create OK, hardlink OK, atomic `mv` OK, but `ln -s` returns
-**`Operation not supported`**.
+create OK, hardlink OK, atomic `mv` OK, but `ln -s` returns **`EPERM` /
+`Operation not supported`** — at the syscall level, and still failing with the
+`mapposix` mount option. It is not a mount-flag problem.
 
-A Nix store and a `file://` binary cache are both symlink-heavy, so:
+The remote end is a **QNAP Turbo NAS** (confirmed: `:8080` serves `<title>QNAP
+Turbo NAS</title>`). Its NFS service is simply **not enabled** — ports 111, 2049
+and 20048 are all closed, which is the QNAP default. Enabling it (*Control Panel
+→ Network & File Services → NFS Service*, then NFS host access on the share) is a
+toggle, and NFS supports symlinks natively. So the constraint below is a
+**current configuration, not an inherent property of the NAS**:
 
 | Use on `/mnt/nas/private` | Verdict |
 |---|---|
-| Nix store for a builder or cache host | **No** — needs symlinks |
-| `file://` binary cache store | **No** — same reason |
+| Nix store or `file://` cache, **over CIFS** | **No** — no symlinks |
+| Nix store or `file://` cache, **over NFS** | Technically yes — see the DB caveat |
 | Object storage for Attic (Garage/MinIO data dir) | **Yes** — plain files |
 | Queue spool `pending`/`running`/`done`/`failed` | **Yes** — atomic `mv` verified |
 | Build logs, `flake.lock` stamps, `last-built` markers | **Yes** |
 
-So the cache host keeps its *store* on local disk, or is Attic with an S3/Garage
-backend whose data dir happens to live on the NAS. It cannot sit directly on the
-CIFS mount. This constrains step 12.
+Two reasons to keep the *live* store off the NAS even after enabling NFS:
+
+- **A live store is a SQLite database.** `/nix/var/nix/db/db.sqlite` is exposed to
+  partial writes if the NAS or link drops mid-write. With `soft` mounts that is a
+  corruption risk; with `hard` it hangs instead. NFS is fine for artifacts, poor
+  for a live DB. Give the cache host a local virtio disk.
+- **The NAS is itself a VM on the same hypervisor.** Its NIC MAC (`24:5e:be:…`)
+  is a QEMU/KVM virtual interface, and `s-tau` is a Proxmox-style host
+  (`vmbr0/1/4`, `lxcbr0`). Mounting the QNAP from `s-tau` is not remote storage —
+  it is virtualised local storage reached through a network protocol stacked on
+  top, adding round-trips to media that is physically right there. `s-tau`'s own
+  `/nix` volume (3.7 TiB, 69% used) and `s-sigma`'s `/persist` (2.7 TiB free) are
+  both faster for this.
+
+What the NAS is genuinely good for is **durability and independence from the
+builders**: surviving a rebuild of `s-sigma`, and holding the `flake.lock` stamps
+so an on-demand builder knows what it already did. Those are small-file
+workloads with no symlinks, which is exactly its strength. This constrains step
+12, not step 13a.
+
+Related: a **shared block device** (iSCSI LUN) is the wrong fix for a *shared*
+store — a block device has no cluster coordination, so two hosts mounting the
+same filesystem corrupts it. It is fine as a single-mounter disk (e.g. the cache
+host's own virtio disk). `iscsi_tcp`/`libiscsi` modules are present on `s-tau`
+but no initiator is installed.
 
 ### Cache server choice: `nix-serve`, Attic or harmonia
 
@@ -1144,14 +1172,16 @@ is explicitly gated.
     (`nix-serve` vs Attic vs harmonia — see "Cache server choice" above) because
     it determines what the clients point at. Cap it to a slice of the host (12 of
     64 cores, 48 of 503 GiB, `CPUQuota=75%`, idle IO, `max-jobs = 4` inside) so it
-    warms gradually and never saturates the machine. Keep its store on local disk:
-    `/mnt/nas/private` is CIFS and **cannot create symlinks**, so it can hold the
-    queue spool and logs but never a store or a `file://` cache. Add a nightly
-    warm timer, pin the fleet closure against GC, and add the shared
+    warms gradually and never saturates the machine. Keep its store on a local
+    virtio disk, not on the NAS: `/mnt/nas/private` is CIFS and **cannot create
+    symlinks**, and even once the QNAP's NFS is enabled a live store is a SQLite
+    database that should not span a network filesystem. The NAS holds the queue
+    spool, logs and stamps only. Add a nightly warm timer, pin the fleet closure
+    against GC, and add the shared
     `profiles/nixos/nix/binary-cache.nix` profile to every host. Do this per site
     only after step 13 decides which site is the authority. See "Build
-    distribution and shared binary cache" and "The NAS cannot hold a store"
-    above.
+    distribution and shared binary cache" and "Storage for the store and the
+    cache" above.
 
 13. Single build authority across sites.
     Run the prebuild timer on exactly one R730; make the other site a pull
