@@ -85,17 +85,11 @@ in
 
   local.network.private.enable = false;
 
-  # mt7925u (Netgear A8000 AXE3000, 0846:9072) firmware reports a hw_path
-  # without the 5GHz bit even though the MT7925 silicon is tri-band, which
-  # leaves only 2.4GHz registered and makes 5GHz AP mode impossible. The
-  # patch keys the workaround on this specific USB device (set during probe)
-  # instead of forcing the band for every MT7925.
-  boot.kernelPatches = [
-    {
-      name = "mt7925-force-5ghz";
-      patch = ../../../patches/mt7925-force-5ghz.patch;
-    }
-  ];
+  # No boot.kernelPatches here on purpose. Any patch makes this host compile
+  # the whole kernel from source instead of substituting it from the binary
+  # cache, and the mt7925-force-5ghz patch that used to live here only applied
+  # to the Netgear A8000 (0846:9072) USB adapter, which l-envil no longer uses.
+  # That patch is still required by s-ap-nighthawk, so it stays in ./patches.
 
   warnings = [
     "l-envil: systemd-hibernate.service disables systemd's user.slice freezer because hibernate froze immediately after freezing user.slice; remove this once the upstream/systemd sleep-stack issue is fixed."
