@@ -17,7 +17,10 @@ in
     profiles.nixos.laptop.intel-workstation
     profiles.nixos.network.cobalt-wifi-client
     profiles.nixos.network.nebula-mesh
-    profiles.nixos.vm-host.nixos-shell
+    # No vm-host.nixos-shell / nixos-shell-servers: this host used to run the
+    # cobalt site stack (s-router-cobalt, s-nebula-cobalt, both AP VMs) next to
+    # the Thunderbolt-docked routers NICs.  The router moved to s-nodus (which
+    # terminates the cobalt trunk itself), so those VMs live there now.
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm.open-webui
     profiles.nixos.containers.firefox-vnc
@@ -36,7 +39,6 @@ in
     ./1-custom-packages/burp-fix.nix
     ./hardware/audio-and-bluetooth.nix
     ./hardware/bootloader.nix
-    ./hardware/cobalt-bridges.nix
     ./hardware/hardware-configuration.nix
     ./hardware/impermanence.nix
     ./hardware/nvidia.nix
@@ -45,7 +47,6 @@ in
     ./disko/build_disko.nix
     ./llms/ollama.nix
     ./lxc/bind-to-lxc.nix
-    ./nixos-shell-servers
   ];
 
   local.nix.remoteBuilderServer = {

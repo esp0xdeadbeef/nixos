@@ -87,6 +87,18 @@ in
     ];
 
     hostPlatform = "aarch64-linux";
+
+    # This host is instantiated from `inputs.nixpkgs-unstable` (see
+    # `nixpkgsFor` in flake.nix) while the flake's own `nixpkgs` input is the
+    # pinned nixos-26.05. nixpkgs hard-codes `nix.registry.nixpkgs` to
+    # `config.nixpkgs.pkgs.path` when `nixpkgs.flake.setFlakeRegistry` is on
+    # (the default for flake-built systems), and *also* derives it from the
+    # flake's nixpkgs -- two definitions that disagree here and abort eval with
+    # "conflicting definition values" for `nix.registry.nixpkgs.to.path`.
+    # This host is variant-only and never used as a `nixpkgs` registry source,
+    # so the pin is not needed.
+    flake.setFlakeRegistry = false;
+    flake.setNixPath = false;
   };
 
   networking.hostName = hostName;

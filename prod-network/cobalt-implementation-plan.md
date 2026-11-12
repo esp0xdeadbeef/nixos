@@ -19,7 +19,9 @@ ISP router (NAT) and later moves to a direct fiber connection.
   pinned CPM requires an IPv6 loopback. No public PD, no WAN IPv6.
 - **WAN:** DHCP behind the ISP router for now; later direct fiber (see §6)
 - **Client under test:** `l-portal`
-- **Temporary router host:** `l-envil`
+- **Router host:** `s-nodus` (BPI-R4 Pro 4E). `l-envil` was the temporary router
+  host during the NAT phase; its cobalt bridges and router/AP VMs were removed
+  once s-nodus took over, so `l-envil` no longer carries the cobalt trunk.
 
 ## 2. Locked decisions
 
@@ -118,8 +120,8 @@ behind the ISP router it is just DHCP on VLAN 300.
                          │
               Netgear GS108PEv3 port 4 (VLAN 300 untagged)
                          │
-   l-envil USB (port 1) ─┴─ VLAN 300 (tagged toward the cobalt WAN container)
-   l-envil dock (port 3) ─── LAN trunk: VLANs 2/3/7/8 tagged
+   s-nodus (port 1) ──────── VLAN 300 (tagged toward the cobalt WAN container)
+   s-nodus (port 3) ──────── LAN trunk: VLANs 2/3/7/8 tagged
    l-portal USB (port 2) ─── VLAN 8 untagged (IOT)
 ```
 
@@ -129,7 +131,7 @@ Verified port map (via `netgear-admin` disable probe):
 |---|---|---|
 | 1 | l-envil USB (`enp0s13f0u4u4u3`) | WAN (VLAN 300) |
 | 2 | l-portal USB (`enu1u1`) | portal (VLAN 8) |
-| 3 | l-envil dock (pinned `cobalt-lan0`) | LAN trunk (2/3/7/8) |
+| 3 | s-nodus (`mxl_lan0`) | LAN trunk (2/3/7/8) |
 | 4 | ISP router | WAN (VLAN 300 untagged) |
 | 5–8 | — | empty |
 
@@ -171,15 +173,15 @@ Admin password is a secret (set via `PROSAFE_VLAN_PASSWORD`).
 ### Reaching the switch (out-of-band management)
 
 The switch's trunk side rides the LAN/dock NIC that `br-cobalt-lan` carries
-(enslaved declaratively in `l-envil/hardware/cobalt-bridges.nix`). The switch
+(enslaved declaratively in `s-nodus/cobalt-bridges.nix`). The switch
 keeps its factory mgmt IP because nothing on this L2 runs a DHCP server for
 it, so reach it out-of-band by putting a transient `/24` helper address on
 `br-cobalt-lan` (it is the same L2 your management station shares with the
 switch):
 
 ```sh
-# l-envil host. The dock NIC that carries the switch (the LAN dock NIC, pinned
-# by permanent MAC to `cobalt-lan0`) is already enslaved into br-cobalt-lan;
+# The s-nodus host. Its dock trunk NIC (bound by permanent MAC to its
+# `mxl_lan0` role) is already enslaved into br-cobalt-lan;
 # add only the transient mgmt helper IP on the bridge, then ping the factory
 # mgmt IP. The /24 is dedicated to switch management and is not persisted.
 sudo ip addr add 192.168.0.2/24 dev br-cobalt-lan
@@ -246,7 +248,7 @@ Tooling (all in the flake):
 4. `inventory-cobalt.nix` — ✅ (WAN still needs `vlan = 300`)
 5. `inventory-all.nix` + renderers wiring — ✅
 6. `s-router-cobalt` VM — ✅ (QEMU bridges pending host setup)
-7. Register VM on l-envil + host bridges — pending
+7. Register VM on s-nodus + host bridges — ✅
 8. Switch VLAN provisioning — ✅ (applied + tcpdump-validated)
 9. Compile iteration (cobalt link names, WAN VLAN 300) — in progress
 10. Boot, attach l-portal, verify DHCP + internet — pending
@@ -260,7 +262,7 @@ Tooling (all in the flake):
   ```
 - Switch L2 validated with tcpdump:
   - l-portal untagged → trunk sees **VLAN 8** tagged ✅
-  - ISP untagged → l-envil USB sees **VLAN 300** tagged ✅
+  - ISP untagged → s-nodus trunk port sees **VLAN 300** tagged ✅
   - trunk shows **no VLAN 300** ✅
 - l-portal on VLAN 8 gets a DHCP lease and Internet (IOT lane, isolated from VLANs 2/3/7).
 

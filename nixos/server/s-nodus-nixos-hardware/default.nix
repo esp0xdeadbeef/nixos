@@ -48,12 +48,12 @@ in
 
     # Board support from the nixos-hardware fork: kernel (6.18 + OpenWrt MT7988
     # net delta), resolved BPI-R4 Pro DTS, serial console, bootargs, the
-    # kernel-driver build guard, and "NixOS does not own the bootloader".
+    # kernel-driver build guard, and the boot chain (BL2 + FIP + U-Boot built
+    # from source, then EFI -> systemd-boot).
     inputs.nixos-hardware.nixosModules.bananapi-bpi-r4-pro
-    # FIT image + U-Boot env: what the stock OpenWrt U-Boot actually boots.  The
-    # board module (imported above) is paired with these two; the FIT is exposed
-    # as system.build.bpiR4ProFit, which mk-sd-image.sh reads.
-    (inputs.nixos-hardware + "/bananapi/bpi-r4-pro/fit.nix")
+    # U-Boot environment: now only carries `bootcmd=bootflow scan -lb` plus a
+    # fallback command line, because the real per-generation kernel cmdline is
+    # written by systemd-boot into the ESP by `nixos-rebuild`.
     (inputs.nixos-hardware + "/bananapi/bpi-r4-pro/uboot-env.nix")
 
     # Headless board: take the useful base pieces but NOT the desktop/laptop
@@ -92,8 +92,9 @@ in
     ./cobalt-bridges.nix
     # Host-level Wi-Fi AP (MT7996), reusing the cobalt AP-VM implementation.
     ./wifi-ap.nix
-    # NOTE: no ./fit.nix here -- the FIT (system.build.bpiR4ProFit) and its sync
-    # unit come from inputs.nixos-hardware's bananapi/bpi-r4-pro/fit.nix.
+    # NOTE: no ./fit.nix here -- there is no FIT any more.  The boot chain is
+    # BL2 + FIP from inputs.nixos-hardware's bananapi/bpi-r4-pro (fip.nix) and
+    # systemd-boot on the ESP (efi.nix).
 
     # Optional machine-local overrides.  The board keeps its own copy at
     # /etc/nixos.local.nix (mirrored by the rsync deploy) so an on-board

@@ -222,6 +222,40 @@ in
 
   config =
     mkMerge [
+      # Scripted-initrd-only wiring.
+      #
+      # `boot.initrd.postMountCommands` and `boot.initrd.systemd.suppressedUnits`
+      # are part of the scripted initrd. nixos-unstable (>=26.11) replaced them
+      # with `mkRemovedOptionModule` stubs: the option objects still exist (so
+      # `options ? ...` is true) but *defining* them is an evaluation error.
+      # There is therefore no introspection-based gate; instead this block is
+      # emitted only when the consumer has not already been told the scripted
+      # initrd is gone, which `config.system.nixos.release` answers reliably.
+      (lib.optionalAttrs (lib.versionAtLeast lib.trivial.release "26.11") (
+        { }
+      ))
+      (lib.optionalAttrs (lib.versionOlder lib.trivial.release "26.11") (
+        let
+          neededForBootDirs = filter (dir: elem dir.dirPath pathsNeededForBoot) directories;
+          mkBindMount = { persistentStoragePath, dirPath, ... }:
+            let
+              target = concatPaths [ "/mnt-root" persistentStoragePath dirPath ];
+            in
+            ''
+              mkdir -p ${escapeShellArg target}
+              mountFS ${escapeShellArgs [ target dirPath ]} bind none
+            '';
+        in
+        {
+          boot.initrd.postMountCommands =
+            mkIf (!config.boot.initrd.systemd.enable)
+              (mkAfter (concatMapStrings mkBindMount neededForBootDirs));
+
+          boot.initrd.systemd.suppressedUnits = [
+            "systemd-machine-id-commit.service"
+          ];
+        }
+      ))
       (lib.optionalAttrs (options ? home-manager.sharedModules) {
         home-manager.sharedModules = [
           ./home-manager.nix
@@ -492,20 +526,6 @@ in
                 };
               };
 
-            boot.initrd.postMountCommands =
-              let
-                neededForBootDirs = filter (dir: elem dir.dirPath pathsNeededForBoot) directories;
-                mkBindMount = { persistentStoragePath, dirPath, ... }:
-                  let
-                    target = concatPaths [ "/mnt-root" persistentStoragePath dirPath ];
-                  in
-                  ''
-                    mkdir -p ${escapeShellArg target}
-                    mountFS ${escapeShellArgs [ target dirPath ]} bind none
-                  '';
-              in
-              mkIf (!config.boot.initrd.systemd.enable)
-                (mkAfter (concatMapStrings mkBindMount neededForBootDirs));
           }
 
           # Work around an issue with persisting /etc/machine-id where the
@@ -515,7 +535,6 @@ in
           # https://github.com/nix-community/impermanence/issues/229 and
           # https://github.com/nix-community/impermanence/pull/242
           (mkIf (any (f: f == "/etc/machine-id") (catAttrs "filePath" files)) {
-            boot.initrd.systemd.suppressedUnits = [ "systemd-machine-id-commit.service" ];
             systemd.services.systemd-machine-id-commit.unitConfig.ConditionFirstBoot = true;
           })
 

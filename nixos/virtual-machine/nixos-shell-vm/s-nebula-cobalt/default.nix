@@ -2,7 +2,7 @@
 
 # Cobalt nebula lighthouse VM.
 #
-# Mirrors the neon s-nebula lighthouse, but as a standalone VM on l-envil
+# Mirrors the neon s-nebula lighthouse, but as a standalone VM on s-nodus
 # rather than a container hosted on the site-a hypervisor. It joins the
 # cobalt service tenant (VLAN 20) where the router forwards nebula traffic,
 # plus the mgmt tenant (VLAN 10) for SSH.

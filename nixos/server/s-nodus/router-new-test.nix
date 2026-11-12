@@ -527,6 +527,23 @@ in
       systemd.network.networks."10-mxl_lan0".networkConfig.Bridge = lib.mkForce "br-lan-trunk";
       systemd.network.networks."10-eth1".networkConfig.Bridge = lib.mkForce "br-wan";
 
+      # Wi-Fi must ride the trunk that actually has a member in this shape.
+      #
+      # Moving mxl_lan0 to br-lan-trunk (above) leaves br-cobalt-lan with NO
+      # member: this trial disables the VM manager, so the router VM's vhost tap
+      # that normally keeps it up (vm-host.nix vhost-tap-attach) is never
+      # created. cobalt-bridges.nix still terminates clients VLAN 30 as
+      # `cobalt-lan.30` off br-cobalt-lan, so in that shape the VLAN child -- and
+      # every AP bridging onto the resulting vlan30 -- is NO-CARRIER, and each
+      # cobalt-clients AP loops on its `state UP` preStart (measured 2026-11-11:
+      # `Mee Blomikie` units stuck activating/auto-restart, restart counter 17).
+      #
+      # The AP module takes the trunk as data, so point it at the same bridge
+      # the inventory gives the physical trunk (`uplinks.trunk.bridge` in
+      # prod-network/testing/inventory-cobalt.nix). Prod keeps the default and
+      # is therefore completely unaffected by this override.
+      local.sNodusWifi.trunkBridge = lib.mkForce "br-lan-trunk";
+
       # Host management stays on vlan30. It is the host's own underlay
       # address (10.2.30.100) and the path nebula/ssh use, and vlan30 is fed by
       # the access jack on mxl_lan3 as well as cobalt-lan.30 -- so it keeps

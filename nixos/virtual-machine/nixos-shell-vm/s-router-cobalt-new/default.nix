@@ -15,8 +15,7 @@ let
   # -- `system` is threaded through as a parameter and every layer exposes
   # aarch64-linux in libBySystem -- so this is the only change required.
   # The architecture is NOT hardcoded here: it defaults to x86_64-linux and is
-  # overridden to aarch64-linux via `hostSystems` in flake.nix.  The x86_64
-  # build of an equivalent VM is `s-router-cobalt` on l-envil.
+  # overridden to aarch64-linux via `hostSystems` in flake.nix.
   system = vmSystem;
   modelSource = relativeRepo.sourceModule "prod-network/testing";
   # Eval-time directory listing (readDir): needs a real path (sourceModule).

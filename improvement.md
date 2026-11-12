@@ -150,6 +150,63 @@ moves the ambiguity.
   `imports` aggregators with no option. Decide whether the option convention
   applies to new modules only or retroactively, and write that down.
 
+### The dendritic pattern: not used here (evaluated, deliberately deferred)
+
+**Status: NOT in use.** Verified 2026-11-11 against the tree, not against
+memory or the word appearing anywhere:
+
+| Dendritic hallmark | This repo |
+| --- | --- |
+| `import-tree` (auto-import every `.nix` by path) | 0 occurrences |
+| `flake-parts`, `flake-file`, `easy-hosts` | 0 occurrences |
+| Modules self-describing via `flake-file` / `class = "nixos"` | absent |
+| Single-argument `{ inputs, ... }` modules; `flake.nix` as declarative index | no |
+| Feature modules discovered by directory walk | no — explicit `imports = [ ... ]` |
+| The word "dendritic" in comments or docs | 0 occurrences |
+
+The two markers that *do* appear are false positives and were checked
+individually: `_module.args` (23 hits) carries renderer/profile arguments
+down a module tree (`_module.args.sRouterProdProfile`, `mailboxSets`, …), which is
+ordinary NixOS module practice; `class =` (21 hits) is a `mkOption` on
+`profiles/nixos/nix/remote-builder-client.nix` and device-class strings in
+`prod-network/*/inventory-cobalt.nix`, not the dendritic `class`
+module-system attribute.
+
+What the repo actually is: **explicit imports + profiles**. Hosts are wired
+explicitly at `flake.nix:547` (`nixpkgs.lib.nixosSystem`), every feature dir has
+its own `default.nix` gating imports on an `enable` flag, and `library/` is
+reached through named profiles. That is the layout AGENTS.md describes, and it
+is internally consistent.
+
+Why not adopt it now, and why it is written down instead of done:
+
+- It is a **whole-tree restructuring**, not a migration of one directory. It
+  inverts the ownership model: every file becomes self-contained and
+  auto-imported, so `flake.nix` stops listing hosts and becomes an index. That
+  makes the diff unbounded and it touches the boot path of every machine.
+- It conflicts with two live, load-bearing properties of this tree: (1)
+  protected `prod-network/{prod,current}/` surfaces must not be reshuffled as a
+  side effect, and (2) `s-nodus` and the router VMs currently depend on
+  *ordered* imports and `mkForce`/`lib.mkAfter` overrides between
+  `cobalt-bridges.nix`, `vm-host.nix` and the renderers. `import-tree` makes
+  import order path-sorted, so an override that today wins by import order can
+  silently lose. That class of regression lands on a running site.
+- Its main win (no more hand-maintained `imports = [ … ]` lists) is **exactly
+  the problem this repo does not have**: the lists are already small and
+  profile-mediated, while the real friction documented above is convention
+  drift (`mkEnableOption` minority), a formatter gate that does not gate, and
+  duplicate bundles — none of which dendritic fixes.
+- It would also hide explicit module arguments (`inputs`, `relativeRepo`,
+  `profiles`, `name`) behind a single `{ inputs, ... }` signature, which is a
+  readability *loss* for a tree whose modules take nine named arguments on
+  purpose.
+
+Precondition before this is ever considered: finish the `library/01-general`
+split and the Staged Cleanup Plan, then re-evaluate. If it is adopted later, do
+it as a from-scratch rebuild of one leaf host (a disposable VM such as
+`nixos-shell-vm/`), measure whether import order actually changed any effective
+config, and only then touch anything with a site attached.
+
 ### Tooling
 
 - The formatter gate does not gate. The `formatter` in `flake.nix` runs
@@ -1010,6 +1067,13 @@ SQLite "database is busy" warning; that is benign.
   the running system for a month (`systemctl status mtk-eth-tso-off` -> not
   found, `ethtool -k eth1` -> `tx-tcp-segmentation: on`). Verify against
   `/run/current-system`, not against git.
+- Do not convert the tree to the dendritic pattern (see "The dendritic pattern:
+  not used here") as a cleanup step, and never alongside another fix. It
+  re-sorts import order, which is what the `mkForce`/`lib.mkAfter`
+  bridge-and-renderer overrides on `s-nodus` currently rely on; a wrong winner
+  there takes a site's client L2 (and its Wi-Fi) down. If it is ever wanted, it
+  is a from-scratch rebuild of one disposable host first, with the effective
+  config diffed before and after.
 - Do not size `zramSwap.memoryPercent` as a fraction of *total* RAM on a host
   that also hosts a fixed-size VM. s-nodus runs a 2048 MiB guest on 3.8 GiB and
   sizes zram at 100%; `/sys/block/zram0/mem_limit` does not exist on that

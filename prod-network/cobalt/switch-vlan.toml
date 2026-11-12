@@ -15,12 +15,13 @@
 #   VLAN 90   = unlock   (Tang-only unlock plane, no WAN/DNS)
 #
 # Physical port map (current wiring):
-#   1-2 -> LAN trunk (cobalt-lan0)        tagged planes (20/30/31/50/51/60/90)
+#   1-2 -> LAN trunk (s-nodus mxl_lan0)   tagged planes (20/30/31/50/51/60/90)
 #   4-5 -> untagged clients               access on VLAN 30
 #   3, 6-8 -> unwired / inert
 #
-# History: this map used to describe the original il NAT-phase topology
-# (1=l-envil WAN, 3=LAN trunk, 4=ISP router, 5=l-portal clients-vpn). Ports
+# History: this map used to describe the original NAT-phase topology
+# (1=l-envil WAN, 3=LAN trunk, 4=ISP router, 5=l-portal clients-vpn), back when
+# l-envil was the temporary router host. Ports
 # 1-2 are the tagged LAN trunk and 4-5 are untagged clients; the remaining
 # defaults are bare so an accidental patch cannot land a device on the wrong
 # plane.
@@ -46,7 +47,7 @@ address = "192.168.0.239"
 model = "gs108ev3"     # TODO: GS108PEv3 driver
 
 [switches.cobalt-switch.ports]
-# Ports 1-2 carry every plane as tagged frames; l-envil tags/untags per bridge.
+# Ports 1-2 carry every plane as tagged frames; s-nodus tags/untags per bridge.
 1 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T", "90T"] }
 2 = { pvid = 1, vlans = ["1U", "20T", "30T", "31T", "50T", "51T", "60T", "90T"] }
 # Ports 4-5 are untagged access on the clients plane, so those devices get a

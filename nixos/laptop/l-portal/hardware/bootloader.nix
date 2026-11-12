@@ -59,6 +59,14 @@ in
     '';
   };
 
+  # This host is on the pinned nixos-26.05, which still offers a scripted initrd.
+  # The Clevis/Tang + TPM2 chain needs the systemd one (`tpm2-startup`,
+  # `clevis-try-bindings-*`, initrd networking), and `clevis-tang-unlock` no
+  # longer sets this for us because the option is a removed-option stub on
+  # nixos-unstable. The unstable variant of this host does not need it:
+  # nixos-unstable always uses the systemd initrd.
+  boot.initrd.systemd.enable = true;
+
   hardware.deviceTree = {
     enable = true;
     filter = lib.mkDefault "sc8280xp-lenovo-thinkpad-x13s*.dtb";

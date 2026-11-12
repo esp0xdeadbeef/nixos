@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, options, pkgs, ... }:
 let
   cfg = config.local.boot.clevisTangUnlock;
 
@@ -245,8 +245,12 @@ in
       }
     ];
 
-    boot.initrd.systemd.enable = true;
-
+    # NOTE: `boot.initrd.systemd.enable` is deliberately not set here. This
+    # chain requires the systemd initrd, but nixos-unstable (>=26.11) turned it
+    # into a removed-option stub (`mkRemovedOptionModule`), so *defining* it
+    # there is an evaluation error -- and it cannot be detected with `options ?`
+    # because the stub is still present. Stable (26.05) hosts that import this
+    # module therefore request the systemd initrd themselves.
     # Whether a TPM2 keyslot may be used as an unlock fallback is a property of
     # the *host* (does it have a working TPM with an enrolled token?), not of the
     # Clevis binding. Setting it unconditionally here used to force

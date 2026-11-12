@@ -20,7 +20,20 @@ deployed; it is exercised with `nix build`/`nix eval` only.
 | `local.bpiR4Pro.enable` | board config owner | thin bridge in `./boot.nix` -> `hardware.bananapi.bpi-r4-pro.enable` |
 
 Everything else (`network.nix`, `cobalt-bridges.nix`, `wifi-ap.nix`,
-`vm-host.nix`, `tang.nix`, `disko.nix`, ...) is a straight copy, and
+`vm-host.nix`, `tang.nix`, `disko.nix`, ...) is **imported** from
+`../s-nodus/`, not copied: each same-named file here is a three-line
+`imports = [ ../s-nodus/<file>.nix ]` re-export. Only the board axis is local:
+`default.nix` (which board inputs are wired) and `boot.nix` (the
+`local.bpiR4Pro` -> `hardware.bananapi.bpi-r4-pro` bridge).
+
+This is deliberate. The copy used to duplicate every file, and the duplicates
+drifted: `internet-guard.nix` here still carried the *old* `/persist`-based
+outage counter that the canonical file fixed on 2026-11-10 because it caused a
+self-sustaining reboot loop, and `wifi-ap.nix` had drifted apart from the
+trunk-bridge fix. Sharing the source makes that class of divergence impossible
+and keeps the comparison honest -- the only thing that can differ between the
+two hosts is the board support, which is the entire point of the copy.
+
 `networking.hostName` is forced to `s-nodus` so the build is identity-equivalent
 (the nebula cert is issued for s-nodus / overlay 100.64.0.18 and the secrets are
 keyed under `secrets/s-nodus.yaml`).

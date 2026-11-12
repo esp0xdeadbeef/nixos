@@ -3,12 +3,17 @@
 # Cobalt host-side platform binding for the s-router-cobalt-new VM
 # (Banana Pi BPI-R4 Pro 4E).
 #
-# Role (mirrors nixos/laptop/l-envil/hardware/cobalt-bridges.nix):
+# Role:
 #   mxl_lan0 -> 802.1Q trunk into br-cobalt-lan (carries the cobalt LAN trunk)
 #   mxl_lan1 -> access port, untagged (VLAN 30)  (clients)
 #   mxl_lan2 -> access port, untagged (VLAN 50)  (cobalt-iot; lab/OSEE bench)
 #   lan5     -> management (DHCP, host uplink/nebula) -- NOT part of the bridges
 #   sfp1/sfp2 -> SFP+ cages; sfp2 is the WAN source for VM activation
+#
+# This host is the cobalt router's platform binding.  l-envil carried the same
+# role during the NAT phase through a Thunderbolt-docked NIC set
+# (nixos/laptop/l-envil/hardware/cobalt-bridges.nix); that file is gone, so the
+# rules below have no in-tree equivalent to mirror.
 #
 # VLAN 50 is `cobalt-iot`: one of the tenants the intent grants
 # `allowTenantToWan` (prio 120), so a device on mxl_lan2 gets DHCP from the

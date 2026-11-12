@@ -1,12 +1,10 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, options, pkgs, ... }:
 
 let
   cfg = config.local.impermanence;
 in
 
 lib.mkIf cfg.rotateBtrfsRoot.enable {
-
-  boot.initrd.systemd.enable = true;
 
   boot.initrd.systemd.initrdBin = with pkgs; [
     bash

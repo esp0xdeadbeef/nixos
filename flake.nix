@@ -308,6 +308,10 @@
     # `nixos-hardware` at the upstream rev instead.
     nixos-hardware-x13s = {
       url = "github:esp0xdeadbeef/nixos-hardware/c6748c3cc176869587bfa714d8cfd53e837359be";
+      # Follow the fleet's nixpkgs instead of the fork's own pin. The x13s
+      # module only contributes board support; pulling a second nixpkgs into the
+      # module system makes `nix.registry.nixpkgs` ambiguous.
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
     impermanence = {
@@ -541,10 +545,24 @@
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------
-      nixosConfigurations = lib.mapAttrs
+      # Hosts built against `nixpkgs-unstable` instead of the pinned `nixpkgs`
+      # (nixos-26.05). This is what makes a host genuinely unstable: its package
+      # set, kernel and module system all come from nixos-unstable.
+      #
+      # An explicit allowlist, so no host drifts off the release pin by accident.
+      # `l-portal-unstable` exists to run nixos-unstable on the X13s with board
+      # support from the PR #1751 nixos-hardware branch.
+      nixosConfigurations =
+        let
+          unstableNixpkgsHosts = [ "l-portal-unstable" ];
+          nixpkgsFor =
+            name:
+            if lib.elem name unstableNixpkgsHosts then inputs.nixpkgs-unstable else nixpkgs;
+        in
+        lib.mapAttrs
         (
           name: path:
-            nixpkgs.lib.nixosSystem {
+            (nixpkgsFor name).lib.nixosSystem {
               system = hostSystemFor name;
 
               specialArgs = {
