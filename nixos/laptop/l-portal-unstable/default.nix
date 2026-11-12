@@ -120,7 +120,22 @@ in
     # SOPS-backed rule below for the same KERNELS match. `""` keeps the
     # `services.udev.extraRules` in this file the sole owner of the address.
     wifiMAC = "";
+
+    # Left at the default (null) on purpose: that is PR #1751's
+    # machine-id-derived MAC path, and the whole point of this variant is to
+    # exercise the module rather than overwrite it. The module's
+    # `bluetooth-x13s-mac` service therefore owns the address; there is no
+    # SOPS-backed BT rule here competing for hci0. See the Bluetooth block
+    # below for why the enable flag is required at all.
+    # bluetoothMAC = null;
   };
+
+  # PR #1751 testing: the module's Bluetooth MAC block is gated on
+  # `hardware.bluetooth.enable`, so with Bluetooth off none of it runs and the
+  # `bluetooth-x13s-mac` oneshot (wait for hci0 firmware -> btmgmt pub
+  # public-addr) is never exercised. Enabling it here is what actually tests
+  # that code path on this hardware.
+  hardware.bluetooth.enable = true;
 
   # The TPM the Clevis chain depends on: the Qualcomm QSEECOM transport is not
   # mainline, so these patches are required. They are the same four patches
@@ -128,6 +143,14 @@ in
   # kernel baseline can be selected. See hardware/bootloader.nix for how the
   # TPM is used (Tang AND TPM2 `sss` chain for root).
   hardware.x13s.patches.tpm.enable = true;
+
+  # PR #1751 testing: the camera only captures *once* per boot on mainline;
+  # after one capture the CAMNOC AXI RCG is left pointing at camcc_pll0 and
+  # the next titan_top_gdsc collapse never reaches PWR_ON. This patch set marks
+  # the camnoc_axi/slow_ahb/fast_ahb RCGs shared so the domain powers up
+  # cleanly across repeated captures -- which is exactly what the acceptance
+  # test (read the same sheet of paper several times) exercises.
+  hardware.x13s.patches.camera.enable = true;
 
   local.nix.remoteBuilderServer = {
     enable = true;
