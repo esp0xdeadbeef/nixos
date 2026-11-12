@@ -662,6 +662,182 @@ Promoting the fallback to authority is a manual decision (or a healthcheck-gated
 timer); only a coordinator (Hydra) makes failover automatic without
 reintroducing a race window.
 
+### What the builders actually do today (measured 2026-11-12)
+
+Recorded because the design above depends on it and the current behaviour is not
+what the config suggests.
+
+| | `s-sigma` (`100.64.0.16`) | `s-tau` (`100.64.0.17`) |
+|---|---|---|
+| Cores | 64 | 64 |
+| Load at time of check | **76** (oversubscribed) | 3.1 (96% CPU idle, 482 GiB RAM free) |
+| `nix.settings.builders` | **empty** | **empty** |
+| `max-jobs` | 64 | 64 |
+| `extra-platforms` | `aarch64-linux i686-linux` | `aarch64-linux i686-linux` |
+| `nixbld` processes | 240 | ~3 |
+| Doing | aarch64 kernel via `qemu-user` binfmt | one straggler `u-boot` build |
+
+Two conclusions:
+
+1. **Neither host offloads to the other.** `builders` is empty on both, so every
+   build is local. The `nix-ssh` authorized key on `s-tau` commented
+   `root@s-sigma-remote-builder` is **not** evidence of a working offload — it is
+   a key label. `nix-ssh` is a trusted user on `s-tau`
+   (`trusted-users = root nix-ssh`, with that key in
+   `/etc/ssh/authorized_keys.d/nix-ssh`), and the frequent short
+   `nix-daemon --stdio` sessions under `nix-ssh` are `s-sigma` **probing `s-tau`
+   as a substituter**, not shipping derivations to it. The target side is wired
+   and simply never used for builds.
+2. **The idle capacity is real and large.** `s-sigma` is pinned at ~76 load
+   while `s-tau` sits ~96% idle with half a terabyte of RAM free. The immediate
+   win is not new hardware, it is pointing `s-sigma`'s builds at `s-tau`.
+
+There is also a dead artifact to clean up: `/etc/ssh/authorized_keys.d/` on
+`s-tau` holds `nix-ssh.bak-1791317302`, a stale copy of the trusted `nix-ssh`
+key. It authorises nothing today, but if anything regenerates
+`~nix-ssh/.ssh/authorized_keys` from that directory it would re-authorise a
+possibly-rotated key. Delete it.
+
+### `builders` is not a queue
+
+`builders` is parallel *dispatch*, not a persistent queue. If the target is down,
+busy beyond `maxJobs`, or lacks a feature, the client silently builds locally.
+That is the observed failure mode above: nothing coordinates the two R730s, so
+the busy one builds and the idle one waits. Consequences for this plan:
+
+- A builder that is **off** cannot be a `builders` target without clients
+  noticing a hang or timeout; it needs `fallback = true` client-side.
+- Two independent prebuild timers race (already covered above).
+- "Queue a build and walk away" is not expressible; submission must be a
+  durable artefact on shared storage.
+
+A real queue is therefore **files on shared storage**, with claim done by atomic
+rename. See the NAS constraint below.
+
+### The NAS cannot hold a store or a file:// cache
+
+`/mnt/nas/private` is a **CIFS/SMB mount** from `192.168.1.75` (`vers=3.0`,
+`sec=ntlmssp`), 18 TiB total, 13 TiB free. Probed directly on `s-tau`: plain file
+create OK, hardlink OK, atomic `mv` OK, but `ln -s` returns
+**`Operation not supported`**.
+
+A Nix store and a `file://` binary cache are both symlink-heavy, so:
+
+| Use on `/mnt/nas/private` | Verdict |
+|---|---|
+| Nix store for a builder or cache host | **No** — needs symlinks |
+| `file://` binary cache store | **No** — same reason |
+| Object storage for Attic (Garage/MinIO data dir) | **Yes** — plain files |
+| Queue spool `pending`/`running`/`done`/`failed` | **Yes** — atomic `mv` verified |
+| Build logs, `flake.lock` stamps, `last-built` markers | **Yes** |
+
+So the cache host keeps its *store* on local disk, or is Attic with an S3/Garage
+backend whose data dir happens to live on the NAS. It cannot sit directly on the
+CIFS mount. This constrains step 12.
+
+### Cache server choice: `nix-serve`, Attic or harmonia
+
+Step 12 currently specifies `services.nix-serve`. That is the smallest possible
+thing and is fine, but decide explicitly before implementing, because it changes
+what `profiles/nixos/nix/binary-cache.nix` points at:
+
+- **`services.nix-serve`** — no dedup, no GC policy, signing key on the building
+  host. Smallest moving part.
+- **Attic** (`zhaofengli/attic`) — S3-compatible backend, global dedup, LRU GC,
+  and **server-side signing**: "signing is done on-the-fly by the server when
+  store paths are fetched; the user pushing store paths does not have access to
+  the signing key." That property is the reason to prefer it here: an ephemeral
+  builder never holds the cache signing key, so a throwaway on-demand box cannot
+  leak what it does not have. Caveat: its README still says "Attic is an early
+  prototype."
+- **harmonia** (`nix-community/harmonia`) — Rust single binary serving a local
+  store directory over HTTP. Fewer parts than Attic, no dedup, no managed
+  signing, and needs a real local filesystem (not the CIFS mount).
+
+If near-identical `flake.lock` bumps are the common case, Attic's dedup pays for
+itself; if "boring and tiny" wins, keep `nix-serve`. **Whichever is chosen, the
+cache host is a cache and never a builder**: no `nix-eval-jobs`, no `builders`
+pointing anywhere, sized for RAM and disk rather than cores.
+
+### An on-demand builder that powers itself off (solar case)
+
+Goal: the box powers on, asks "is the fleet closure for the current `flake.lock`
+already cached?", works only if not, then powers off. `flake.lock`'s hash *is*
+the job identity, so the change question is one file compare and needs no
+database.
+
+```bash
+#!/usr/bin/env bash
+# /etc/nix/prebuild.sh — systemd oneshot, ordered before poweroff.target
+set -euo pipefail
+
+PROJ=${PROJ:-fleet}
+STATE=/mnt/nas/private/nix-ci
+LOCK_HASH=$(sha256sum flake.lock | cut -d' ' -f1)
+
+mkdir -p "$STATE/last-built" "$STATE/logs"
+
+# 1. Cheap early-out: nothing to do, free to shut down immediately.
+if [ "$(cat "$STATE/last-built/$PROJ" 2>/dev/null || true)" = "$LOCK_HASH" ]; then
+  echo "$PROJ already built for $LOCK_HASH"
+  exit 0
+fi
+
+# 2. Evaluate. GC roots keep the .drv files alive for the whole run.
+nix-eval-jobs --gc-roots-dir /tmp/gc --flake .#hydraJobs \
+  | jq -r 'select(.error == null) | .drvPath' > /tmp/jobs
+
+# 3. Build, tolerating individual failures, logging to the NAS.
+nix build --keep-going --no-link $(cat /tmp/jobs) \
+  2>&1 | tee "$STATE/logs/$PROJ-$(date -u +%Y%m%dT%H%M%SZ).log"
+
+# 4. Record success only if the build actually succeeded.
+printf '%s\n' "$LOCK_HASH" > "$STATE/last-built/$PROJ"
+```
+
+`nix-eval-jobs` (Hydra's evaluator, extracted: same JSON shape, parallel
+evaluation, per-attribute failure isolation, creates a GC root per `.drv`) is
+the right tool for step 2. It needs no daemon and no Postgres, so this does not
+contradict the "Hydra only as a coordinator" decision above.
+
+Points that are easy to get wrong:
+
+- **Exit before doing the expensive thing.** The early-out is the feature; it is
+  what makes "turn it on when the sun shines" cheap on days with no change.
+- **Do not power off from inside the build.** A separate unit with
+  `After=prebuild.service` decides, so a failed build leaves the box up for
+  inspection instead of vanishing.
+- **Push results as they complete**, not at the end, so a mid-run power loss does
+  not discard hours of work.
+
+### The post-build hook must not block the build loop
+
+Nix's own manual is explicit about the hazard:
+
+> "The post build hook program runs after each executed build, and **blocks the
+> build loop**. … A more advanced implementation might pass the store paths to a
+> user-supplied **daemon or queue** for processing the store paths outside of the
+> build loop."
+
+So the hook only spools, and a long-running uploader on the always-on cache host
+drains it:
+
+```sh
+#!/bin/sh
+# /etc/nix/queue-upload.sh — must return immediately
+set -eu; set -f; IFS=' '
+mkdir -p /mnt/nas/private/nix-ci/cache-queue/pending
+printf '%s\n%s\n' "$DRV_PATH" "$OUT_PATHS" \
+  > "$(mktemp /mnt/nas/private/nix-ci/cache-queue/pending/XXXXXX)"
+exec true
+```
+
+Because the hook touches only the NAS, a slow or absent cache can never stall
+builds — the exact failure the manual warns about, and the reason a naive inline
+`nix copy` upload hook is wrong here. With Attic this composes cleanly: the
+builder pushes unsigned, the cache signs on fetch, and the private key never
+leaves the always-on host.
+
 ## Target Layout (now largely realized)
 
 The goal is not to make every host list every tiny file, and not to import one
@@ -964,18 +1140,43 @@ is explicitly gated.
 12. Fleet binary cache via a dedicated build VM — **not implemented, design only.**
     Stand up `s-cache` as a supervised nixos-shell guest on s-sigma, with its own
     persisted store disk, a SOPS-held signing key installed at a stable path, and
-    `services.nix-serve` bound to its nebula address. Cap it to a slice of the
-    host (12 of 64 cores, 48 of 503 GiB, `CPUQuota=75%`, idle IO, `max-jobs = 4`
-    inside) so it warms gradually and never saturates the machine. Add a nightly
+    the cache server bound to its nebula address. **Decide the server first**
+    (`nix-serve` vs Attic vs harmonia — see "Cache server choice" above) because
+    it determines what the clients point at. Cap it to a slice of the host (12 of
+    64 cores, 48 of 503 GiB, `CPUQuota=75%`, idle IO, `max-jobs = 4` inside) so it
+    warms gradually and never saturates the machine. Keep its store on local disk:
+    `/mnt/nas/private` is CIFS and **cannot create symlinks**, so it can hold the
+    queue spool and logs but never a store or a `file://` cache. Add a nightly
     warm timer, pin the fleet closure against GC, and add the shared
     `profiles/nixos/nix/binary-cache.nix` profile to every host. Do this per site
     only after step 13 decides which site is the authority. See "Build
-    distribution and shared binary cache" above.
+    distribution and shared binary cache" and "The NAS cannot hold a store"
+    above.
 
 13. Single build authority across sites.
     Run the prebuild timer on exactly one R730; make the other site a pull
     mirror (`nix store copy`) plus fallback builder, and order substituters
     local-first on every host. See "Multi-site build coordination" above.
+
+13a. Stop the observed waste: point `s-sigma` at `s-tau`.
+    Both R730s have `builders` empty, so each builds locally — `s-sigma` was at
+    load 76 while `s-tau` sat 96% idle with 482 GiB free. Set
+    `nix.settings.buildMachines` with `protocol = "ssh-ng"`, `hostName =
+    "s-tau"`, `maxJobs = 64` and the same `supportedFeatures`, plus
+    `distributedBuilds = true`, on `s-sigma`. The `nix-ssh` user is already
+    trusted on `s-tau` and both hosts already advertise `aarch64-linux`, so
+    nothing else needs to change. This is independent of the cache work and is
+    worth doing first. While here, delete the stale
+    `/etc/ssh/authorized_keys.d/nix-ssh.bak-*` on `s-tau`.
+
+13b. Turn the prebuild timer into the hash-gated, spool-and-poweroff loop.
+    Replace the nightly warm timer with the `flake.lock`-hash gate, so a box that
+    is switched on with nothing to do exits immediately instead of idling, and
+    one that does have work records the stamp only on success. Add the
+    non-blocking `post-build-hook` (spool under `/mnt/nas/private/nix-ci/`, drain
+    from the cache host) — an inline `nix copy` in the hook blocks the build loop
+    and is the documented way to make Nix unusable on slow storage. See the two
+    script sections above.
 
 14. One `profiles/nixos/hardware/memory.nix` for zram, swap, tmpfs and `vm.*`.
     Start with `l-esp` (it has measured evidence), then route `l-envil`,
