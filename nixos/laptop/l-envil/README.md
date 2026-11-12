@@ -189,6 +189,22 @@ does not have; its sm_86-only build made Ollama silently fall back to CPU.
 The public NixOS CUDA cache is auto-enabled by the shared CUDA cache module
 when NVIDIA support is configured.
 
+## Host role
+
+l-envil is a **pentesting workstation**, not a router or VM host. It used to
+run the cobalt site stack (the `s-router-cobalt` VM, `s-nebula-cobalt`, both AP
+VMs and `s-tang`) next to two Thunderbolt-docked NICs that carried the cobalt
+LAN/WAN trunk. That whole arrangement moved to `s-nodus`
+(`nixos/server/s-nodus/`), which terminates the cobalt trunk itself and runs the
+router VMs, the MT7996 host APs and Tang as a host container.
+
+Consequently this host has **no** `cobalt-bridges.nix`, no `nixos-shell-servers`
+and no `profiles.nixos.vm-host.nixos-shell`: no `br-cobalt-*` bridges, no
+`vlan30`, no router taps. Networking is Wi-Fi (`wlp0s20f3`, NetworkManager,
+including the cobalt SSIDs from `profiles.nixos.network.cobalt-wifi-client`) plus
+the nebula overlay `100.64.0.13`. Re-adding any of that here would duplicate the
+s-nodus router, so add router work there instead.
+
 ## Work apps
 
 Teams, Azure CLI, and Intune are disabled by default. Re-enable them in Home
@@ -218,8 +234,11 @@ nmcli device status
 
 ## After first boot
 
+l-envil roams on Wi-Fi, so it has no stable LAN address; reach it over the
+nebula overlay (its identity is the nebula cert, not the Wi-Fi lease):
+
 ```bash
-ssh deadbeef@192.168.1.151
+ssh deadbeef@100.64.0.13
 nixos-rebuild switch --impure --flake path:/home/deadbeef/github/nixos#l-envil
 sbctl status
 systemd-cryptenroll /dev/nvme0n1p4
