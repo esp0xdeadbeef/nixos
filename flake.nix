@@ -246,6 +246,12 @@
       inputs.network-control-plane-model.follows = "network-control-plane-model-legacy-prod";
       inputs.network-forwarding-model.follows = "network-forwarding-model-legacy-prod";
       inputs.network-realization-model.follows = "network-realization-model-legacy-prod";
+      # The renderer has TWO compiler inputs (network-compiler and
+      # nixos-network-compiler); wiring only one left `network-compiler`
+      # resolving through the renderer's own `network-labs` to the testing
+      # branch, so the frozen legacy-prod render came out of a compiler from a
+      # later generation than the rest of the legacy-prod stack.
+      inputs.network-compiler.follows = "network-compiler-legacy-prod";
       inputs.nixos-network-compiler.follows = "nixos-network-compiler-legacy-prod";
       inputs.network-labs.follows = "network-labs-legacy-prod";
     };
