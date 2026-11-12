@@ -291,11 +291,30 @@
     };
 
     # hardware:
-    # Fork of nixos-hardware carrying the Banana Pi BPI-R4 Pro support
-    # (bananapi/bpi-r4-pro) that the upstream tree does not have yet.
-    # Pinned by rev: builds must not depend on a moving branch.
-    nixos-hardware = {
-      url = "github:esp0xdeadbeef/nixos-hardware/bcd4db53bf4601f19e233ccb28312687639aafe4";
+    # Upstream nixos-hardware, UNPINNED on purpose: flake.lock is the pin, so
+    # `nix flake update nixos-hardware` moves every host at once and nothing in
+    # this repo hardcodes a fork rev for hardware nobody forked.
+    #
+    # Two inputs below carry fork-only content and are pinned by rev; they are
+    # used ONLY by the hosts that need them (see each comment).
+    nixos-hardware.url = "github:NixOS/nixos-hardware";
+
+    # Fork carrying the Banana Pi BPI-R4 Pro support (bananapi/bpi-r4-pro),
+    # which upstream does not have yet (upstream bananapi/ has bpi-sm10 only).
+    #
+    # Used ONLY by s-nodus and s-nodus-nixos-hardware.  Everything else -- the
+    # laptops and the Dell servers -- uses the upstream `nixos-hardware` above,
+    # so board-specific work never lands on them.
+    #
+    # ddc90236 is the `bananapi-bpi-r4-pro-efi` branch: the board builds its own
+    # boot chain (BL2 + FIP carrying BL31 and U-Boot with CONFIG_EFI_LOADER) and
+    # boots an ESP through systemd-boot, instead of the signed vendor OpenWrt
+    # firmware and its raw FIT.
+    nixos-hardware-bpi-r4-pro = {
+      url = "github:esp0xdeadbeef/nixos-hardware/ddc90236d61ffc9ea8b991b320d0eba2b0ab9635";
+      # Share the fleet's nixpkgs rather than pulling the fork's own pin into
+      # the module system as a second nixpkgs.
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Same fork, but on the `x13s-pr1751-plus-bpi` branch: PR #1751's x13s

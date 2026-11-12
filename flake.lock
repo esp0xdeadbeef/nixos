@@ -3584,17 +3584,37 @@
         "nixpkgs": "nixpkgs_15"
       },
       "locked": {
-        "lastModified": 1794258296,
-        "narHash": "sha256-TVZKqXFH+XClrRJ14iXwlSY378k6tvaQRXGyX7/ilTg=",
+        "lastModified": 1794425805,
+        "narHash": "sha256-4s5CRvkYX4oAJVZ+zu2bBKFH2gG2GqN6OKHEWgJr1AY=",
+        "owner": "NixOS",
+        "repo": "nixos-hardware",
+        "rev": "b6ca87f78ec5bafc4b2aef7b29803dcf419266af",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixos-hardware",
+        "type": "github"
+      }
+    },
+    "nixos-hardware-bpi-r4-pro": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794498595,
+        "narHash": "sha256-aHvuPpKq9MHJh8V7rVF4QVRYgAkebuSOFcx9hrZuvXw=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-hardware",
-        "rev": "bcd4db53bf4601f19e233ccb28312687639aafe4",
+        "rev": "ddc90236d61ffc9ea8b991b320d0eba2b0ab9635",
         "type": "github"
       },
       "original": {
         "owner": "esp0xdeadbeef",
         "repo": "nixos-hardware",
-        "rev": "bcd4db53bf4601f19e233ccb28312687639aafe4",
+        "rev": "ddc90236d61ffc9ea8b991b320d0eba2b0ab9635",
         "type": "github"
       }
     },
@@ -5204,6 +5224,7 @@
         "nix-index-database": "nix-index-database",
         "nixos-aarch64-widevine": "nixos-aarch64-widevine",
         "nixos-hardware": "nixos-hardware",
+        "nixos-hardware-bpi-r4-pro": "nixos-hardware-bpi-r4-pro",
         "nixos-hardware-x13s": "nixos-hardware-x13s",
         "nixos-mailserver": "nixos-mailserver",
         "nixos-network-compiler-legacy-prod": "nixos-network-compiler-legacy-prod",

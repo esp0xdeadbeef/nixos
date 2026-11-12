@@ -67,11 +67,11 @@ in
     # kernel-driver build guard, and the boot chain (BL2 + FIP + U-Boot with EFI
     # -> systemd-boot on the ESP).  ./boot.nix is now only the local->module
     # option bridge.
-    inputs.nixos-hardware.nixosModules.bananapi-bpi-r4-pro
+    inputs.nixos-hardware-bpi-r4-pro.nixosModules.bananapi-bpi-r4-pro
     # The U-Boot environment: `bootcmd=bootflow scan -lb` plus a fallback
     # command line.  The real per-generation cmdline is written by
     # systemd-boot into the ESP.
-    (inputs.nixos-hardware + "/bananapi/bpi-r4-pro/uboot-env.nix")
+    (inputs.nixos-hardware-bpi-r4-pro + "/bananapi/bpi-r4-pro/uboot-env.nix")
     ./boot.nix
     ./network.nix
     ./cobalt-bridges.nix

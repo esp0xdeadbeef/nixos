@@ -20,7 +20,7 @@
 #
 # Differences from s-nodus, by design:
 #   * board hardware (kernel, DTB, console, no-NixOS-bootloader) comes from
-#     inputs.nixos-hardware.nixosModules.bananapi-bpi-r4-pro;
+#     inputs.nixos-hardware-bpi-r4-pro.nixosModules.bananapi-bpi-r4-pro;
 #   * the FIT + U-Boot env come from the same module's fit.nix/uboot-env.nix;
 #   * the vendor sd-image.nix import is dropped (that image cannot write the
 #     vendor BL2/FIP blobs; the nixos-hardware sd-image.nix lays out the GPT and
@@ -50,11 +50,11 @@ in
     # net delta), resolved BPI-R4 Pro DTS, serial console, bootargs, the
     # kernel-driver build guard, and the boot chain (BL2 + FIP + U-Boot built
     # from source, then EFI -> systemd-boot).
-    inputs.nixos-hardware.nixosModules.bananapi-bpi-r4-pro
+    inputs.nixos-hardware-bpi-r4-pro.nixosModules.bananapi-bpi-r4-pro
     # U-Boot environment: now only carries `bootcmd=bootflow scan -lb` plus a
     # fallback command line, because the real per-generation kernel cmdline is
     # written by systemd-boot into the ESP by `nixos-rebuild`.
-    (inputs.nixos-hardware + "/bananapi/bpi-r4-pro/uboot-env.nix")
+    (inputs.nixos-hardware-bpi-r4-pro + "/bananapi/bpi-r4-pro/uboot-env.nix")
 
     # Headless board: take the useful base pieces but NOT the desktop/laptop
     # shell profiles (fish/zsh prompt) which drag in shell/user assumptions
@@ -93,7 +93,7 @@ in
     # Host-level Wi-Fi AP (MT7996), reusing the cobalt AP-VM implementation.
     ./wifi-ap.nix
     # NOTE: no ./fit.nix here -- there is no FIT any more.  The boot chain is
-    # BL2 + FIP from inputs.nixos-hardware's bananapi/bpi-r4-pro (fip.nix) and
+    # BL2 + FIP from inputs.nixos-hardware-bpi-r4-pro's bananapi/bpi-r4-pro (fip.nix) and
     # systemd-boot on the ESP (efi.nix).
 
     # Optional machine-local overrides.  The board keeps its own copy at
