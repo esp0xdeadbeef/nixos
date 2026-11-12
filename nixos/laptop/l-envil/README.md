@@ -205,6 +205,21 @@ including the cobalt SSIDs from `profiles.nixos.network.cobalt-wifi-client`) plu
 the nebula overlay `100.64.0.13`. Re-adding any of that here would duplicate the
 s-nodus router, so add router work there instead.
 
+### Verifying the removal landed
+
+Run on the host; the first command must print nothing and the second must hold
+the derivation this tree evaluates to:
+
+```bash
+# No routed datapath interfaces: expect no br-cobalt-*, vlan30 or tapN.
+ip -brief link | grep -iE 'cobalt|vlan30|^tap'   # -> no output
+
+# The running system is the one this config evaluates to.
+nix-store -q --deriver /run/current-system
+nix eval --impure --raw \
+  .#nixosConfigurations.l-envil.config.system.build.toplevel.drvPath
+```
+
 ## Work apps
 
 Teams, Azure CLI, and Intune are disabled by default. Re-enable them in Home
