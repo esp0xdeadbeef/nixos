@@ -1353,6 +1353,14 @@ in
                   ra.enable = false;
                   healthCheck = {
                     enable = true;
+                    # FS-470-HDS-010-SDS-010-SMS-041: "an enabled probe likewise
+                    # requires services.healthCheck.interval". This contract
+                    # enabled the probe without one, so the renderer rejected the
+                    # whole overlay and the cobalt HAT stopped building:
+                    #   provider contract rejected: SMS-041: health check requires
+                    #   services.healthCheck.interval when enabled
+                    # 30s is the value the renderer's own contract tests use.
+                    interval = "30s";
                   };
                 };
               };
@@ -1435,6 +1443,14 @@ in
                   ra.enable = false;
                   healthCheck = {
                     enable = true;
+                    # FS-470-HDS-010-SDS-010-SMS-041: "an enabled probe likewise
+                    # requires services.healthCheck.interval". This contract
+                    # enabled the probe without one, so the renderer rejected the
+                    # whole overlay and the cobalt HAT stopped building:
+                    #   provider contract rejected: SMS-041: health check requires
+                    #   services.healthCheck.interval when enabled
+                    # 30s is the value the renderer's own contract tests use.
+                    interval = "30s";
                   };
                 };
               };
