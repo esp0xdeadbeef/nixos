@@ -332,7 +332,7 @@
     # The PR is still open upstream; when it merges, drop this input and point
     # `nixos-hardware` at the upstream rev instead.
     nixos-hardware-x13s = {
-      url = "github:esp0xdeadbeef/nixos-hardware/c6748c3cc176869587bfa714d8cfd53e837359be";
+      url = "github:esp0xdeadbeef/nixos-hardware/cb28461df42dfba83315032e0c50a366c2184ba6";
       # Follow the fleet's nixpkgs instead of the fork's own pin. The x13s
       # module only contributes board support; pulling a second nixpkgs into the
       # module system makes `nix.registry.nixpkgs` ambiguous.
