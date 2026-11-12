@@ -32,18 +32,21 @@
     # The tty appears as ttyACM<N> (CDC-ACM). Give it a stable name and start a
     # getty on it the moment it is added, so plugging the adapter in yields a
     # login instead of a dead device node.
+    #
+    # %k is the actual kernel name (ttyACM0, ttyACM1, ...), so this follows the
+    # adapter across re-enumeration. Do NOT also wire a static
+    # serial-getty@ttyACM0 into getty.target: that unit was observed on the
+    # board stuck in `activating (auto-restart)` for as long as the adapter was
+    # unplugged, and it cannot follow the device if it appears as ttyACM1.
     SUBSYSTEM=="tty", KERNEL=="ttyACM*", SYMLINK+="tty-serial-console", TAG+="systemd", ENV{SYSTEMD_WANTS}="serial-getty@%k.service"
   '';
 
-  # Belt and braces: also pull the getty in via getty.target, in case the udev
-  # tag races the device add. Restart keeps it retrying until the adapter is
-  # present.
-  systemd.services."serial-getty@ttyACM0" = {
-    wantedBy = [ "getty.target" ];
-    serviceConfig = {
-      Restart = "always";
-      RestartSec = "5s";
-    };
-    restartIfChanged = false;
+  # The console must come back on its own: if the getty exits for any reason
+  # (adapter yanked mid-session, USB glitch) a re-plug must yield a login again
+  # without operator action. Applied to the template so it covers ttyACM<N> for
+  # every N, not just ttyACM0.
+  systemd.services."serial-getty@".serviceConfig = {
+    Restart = "always";
+    RestartSec = "5s";
   };
 }
