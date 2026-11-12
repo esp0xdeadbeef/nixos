@@ -44,6 +44,44 @@ REPO="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || echo "$HERE/../.
 WORK=/tmp/bpi-r4/sdimg
 IMG="$WORK/s-nodus-boot.img"
 
+# Optional local nixos-hardware checkout to build the board firmware from
+# (BL2/BL31/U-Boot).  Unset, the flake's pinned nixos-hardware input is used.
+#
+#   NIXOS_HARDWARE=/path/to/nixos-hardware ./mk-sd-image.sh build
+#
+# This exists so a change to the board support can be tested on a real card
+# before it is pinned, instead of building a board that differs from the source
+# being edited.
+NH_ARGS=()
+if [ -n "${NIXOS_HARDWARE:-}" ]; then
+  [ -f "$NIXOS_HARDWARE/flake.nix" ] || { echo "!! NIXOS_HARDWARE=$NIXOS_HARDWARE is not a flake"; exit 1; }
+  NH_ARGS=(--override-input "nixos-hardware" "path:$NIXOS_HARDWARE")
+  echo ">> using nixos-hardware from $NIXOS_HARDWARE"
+fi
+
+# Every `nix build` in this script goes through nix_build, which applies the
+# NIXOS_HARDWARE override once so every artifact (BL2, FIP, rootfs, the ESP
+# builder, the toplevel) is taken from the same nixos-hardware revision.  A
+# mixed build would let the firmware and the system disagree, which on this
+# board means an unbootable card.
+#
+# Build speed: nixpkgs.buildPlatform defaults to aarch64-linux for this host, so
+# on an x86_64 machine every aarch64 binary runs through binfmt_misc
+# qemu-aarch64 (correct, but 10-50x slower -- it turned a ~30 minute image
+# build into a multi-hour one).  That is a property of the host config, not of
+# this script, so it is NOT papered over here; see the README for the
+# cross-build recipe (`nixpkgs.buildPlatform = "x86_64-linux"` in a machine-local
+# override, which mkDefault already allows).
+nix_build() {
+  local attr="$1"
+  local override=()
+  if [ -n "${NIXOS_HARDWARE:-}" ]; then
+    override=(--override-input "nixos-hardware" "path:$NIXOS_HARDWARE")
+  fi
+  nix build "${override[@]}" "$REPO#nixosConfigurations.s-nodus.config.$attr" \
+    --print-out-paths --no-link
+}
+
 # SD geometry (512-byte sectors); must match disko.nix.
 #
 # The card carries BOTH the boot chain and a complete root filesystem.  That is
@@ -104,10 +142,8 @@ build() {
 
   echo ">> building the board firmware from source (BL2 + FIP)"
   local BL2 FIP
-  BL2=$(nix build --builders '' --print-out-paths --no-link \
-    "$REPO#nixosConfigurations.s-nodus.config.system.build.bpiR4ProBl2")
-  FIP=$(nix build --builders '' --print-out-paths --no-link \
-    "$REPO#nixosConfigurations.s-nodus.config.system.build.bpiR4ProFip")
+  BL2=$(nix_build "system.build.bpiR4ProBl2")
+  FIP=$(nix_build "system.build.bpiR4ProFip")
   echo "   bl2 = $BL2 ($(stat -c%s "$BL2") bytes)"
   echo "   fip = $FIP ($(stat -c%s "$FIP") bytes)"
 
@@ -120,8 +156,7 @@ build() {
 
   echo ">> building the SD root filesystem (btrfs image with the store closure)"
   local ROOTFS
-  ROOTFS=$(nix build --print-out-paths --no-link \
-    "$REPO#nixosConfigurations.s-nodus.config.system.build.rootfsImage")
+  ROOTFS=$(nix_build "system.build.rootfsImage")
   echo "   rootfs = $ROOTFS ($(du -h --apparent-size "$ROOTFS" | cut -f1) apparent)"
 
   # Size the root partition to the rootfs image, then add slack so the first
@@ -219,13 +254,11 @@ _populate_esp() {
   mkdir -p "$mnt"
 
   local BUILDER
-  BUILDER=$(nix build --builders '' --print-out-paths --no-link \
-    "$REPO#nixosConfigurations.s-nodus.config.system.build.installBootLoader" ) \
+  BUILDER=$(nix_build "system.build.installBootLoader" ) \
     || { echo "!! could not build installBootLoader"; exit 1; }
 
   local TOPLEVEL
-  TOPLEVEL=$(nix build --builders '' --print-out-paths --no-link \
-    "$REPO#nixosConfigurations.s-nodus.config.system.build.toplevel")
+  TOPLEVEL=$(nix_build "system.build.toplevel")
 
   # The builder writes to the ESP mount point compiled into it; bind it there
   # via a throwaway mount namespace so the host's /boot is never touched.
@@ -321,8 +354,7 @@ root() {
     echo ">> building rootfs (flat btrfs image with the store closure)"
     echo "   NOTE: this evaluates the whole network pipeline; if the board OOMs,"
     echo "         build it elsewhere and pass the path as the second argument."
-    ROOT_IMAGE=$(nix build --builders '' --print-out-paths --no-link \
-      "$REPO#nixosConfigurations.s-nodus.config.system.build.rootfsImage")
+    ROOT_IMAGE=$(nix_build "system.build.rootfsImage")
   fi
   echo "   rootfs = $ROOT_IMAGE"
 
@@ -477,8 +509,7 @@ populate() {
 
   if [ -z "$ROOT_IMAGE" ]; then
     echo ">> building the root filesystem image"
-    ROOT_IMAGE=$(nix build --print-out-paths --no-link \
-      "$REPO#nixosConfigurations.s-nodus.config.system.build.rootfsImage")
+    ROOT_IMAGE=$(nix_build "system.build.rootfsImage")
   fi
   echo "   rootfs = $ROOT_IMAGE"
 

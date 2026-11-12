@@ -62,14 +62,21 @@ in
     profiles.nixos.sops.persist-root-ssh
     profiles.nixos.nix.remote-builder-client
 
+    # Board support from the nixos-hardware fork: kernel (6.18 + OpenWrt MT7988
+    # net delta), resolved BPI-R4 Pro DTS, serial console, bootargs, the
+    # kernel-driver build guard, and the boot chain (BL2 + FIP + U-Boot with EFI
+    # -> systemd-boot on the ESP).  ./boot.nix is now only the local->module
+    # option bridge.
+    inputs.nixos-hardware.nixosModules.bananapi-bpi-r4-pro
+    # The U-Boot environment: `bootcmd=bootflow scan -lb` plus a fallback
+    # command line.  The real per-generation cmdline is written by
+    # systemd-boot into the ESP.
+    (inputs.nixos-hardware + "/bananapi/bpi-r4-pro/uboot-env.nix")
     ./boot.nix
-    ./kernel.nix
-    ./dtb.nix
     ./network.nix
     ./cobalt-bridges.nix
     # Host-level Wi-Fi AP (MT7996), reusing the cobalt AP-VM implementation.
     ./wifi-ap.nix
-    ./fit.nix
 
     # Optional machine-local overrides.  The board keeps its own copy at
     # /etc/nixos.local.nix (mirrored by the rsync deploy) so an on-board
