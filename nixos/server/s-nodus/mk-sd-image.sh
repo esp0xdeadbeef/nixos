@@ -65,21 +65,44 @@ fi
 # mixed build would let the firmware and the system disagree, which on this
 # board means an unbootable card.
 #
-# Build speed: nixpkgs.buildPlatform defaults to aarch64-linux for this host, so
-# on an x86_64 machine every aarch64 binary runs through binfmt_misc
-# qemu-aarch64 (correct, but 10-50x slower -- it turned a ~30 minute image
-# build into a multi-hour one).  That is a property of the host config, not of
-# this script, so it is NOT papered over here; see the README for the
-# cross-build recipe (`nixpkgs.buildPlatform = "x86_64-linux"` in a machine-local
-# override, which mkDefault already allows).
+# Build speed is handled in nix_build below: on an x86_64 build machine it
+# cross-builds instead of running aarch64 builders under qemu-aarch64.
 nix_build() {
   local attr="$1"
   local override=()
   if [ -n "${NIXOS_HARDWARE:-}" ]; then
     override=(--override-input "nixos-hardware" "path:$NIXOS_HARDWARE")
   fi
-  nix build "${override[@]}" "$REPO#nixosConfigurations.s-nodus.config.$attr" \
-    --print-out-paths --no-link
+
+  # Cross-build on a non-aarch64 machine.
+  #
+  # nixpkgs.buildPlatform defaults to aarch64-linux for this host, so a plain
+  # `nix build .#...` produces derivations whose builders are aarch64 binaries.
+  # On an x86_64 build machine every one of those runs through binfmt_misc
+  # qemu-aarch64, which is 10-50x slower: the ~7 GiB closure (kernel + the QEMU
+  # cobalt VMs) did not finish in hours.
+  #
+  # extendModules adds the platform override to the FLAKE's configuration, so
+  # nixpkgs selects its x86_64 -> aarch64 cross toolchain and aarch64 objects
+  # are compiled by the NATIVE compiler.  The resulting image is identical; only
+  # the build machine's work changes.
+  #
+  # S_NODUS_NO_CROSS=1 forces the native (emulated) path, which is what a
+  # rebuild ON the board (an aarch64 host) uses anyway.
+  if [ -z "${S_NODUS_NO_CROSS:-}" ] && [ "$(uname -m)" != "aarch64" ]; then
+    nix build "${override[@]}" --impure --print-out-paths --no-link --expr "
+      let
+        f = builtins.getFlake \"$REPO\";
+        cfg = f.nixosConfigurations.s-nodus.extendModules {
+          modules = [ { nixpkgs.buildPlatform = \"$(uname -m)-linux\"; } ];
+        };
+      in
+      cfg.config.$attr" \
+      || return 1
+  else
+    nix build "${override[@]}" "$REPO#nixosConfigurations.s-nodus.config.$attr" \
+      --print-out-paths --no-link
+  fi
 }
 
 # SD geometry (512-byte sectors); must match disko.nix.
