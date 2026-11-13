@@ -145,6 +145,75 @@ produce a bootable card on its own: it cannot write the raw BL2/FIP blobs, it
 cannot write the U-Boot env, and disko has no "raw content in a partition"
 type. `mk-sd-image.sh` therefore does the assembly.
 
+## Reaching the NVMe root from another machine (NBD)
+
+The board's root lives on the NVMe, and the card only carries the boot chain
+(see [Storage](#storage-diskonix)). To partition or populate that root from a
+laptop — instead of pulling the drive or running everything on the 4 GiB
+board — export the partition over NBD from the board and mount it remotely.
+
+The board's serial console is the reliable way in: it runs the stock OpenWrt,
+which already ships `nbd-server` (`nbd-server - 3.25-r1` via `opkg`).
+
+**1. Export the partition from the board**, bound to the LAN address. The
+`[ip:]port file` form matters:
+
+```sh
+# on the board (serial console)
+nbd-server 192.168.1.1:10809 /dev/nvme0n1p1 >/tmp/nbd.log 2>&1 &
+netstat -lnt | grep 10809      # want: 192.168.1.1:10809  0.0.0.0:*  LISTEN
+```
+
+Always pass the `192.168.1.1:` prefix. Without it `nbd-server` listens on
+**every** interface (`:::10809`) — the board's WAN side included — and the
+ancient NBD export protocol has no authentication, so that would expose the
+root filesystem to the uplink. Kill a stray server with `killall nbd-server`
+(there is no `pkill` on OpenWrt).
+
+**2. Attach it from the laptop:**
+
+```sh
+modprobe nbd max_part=8                      # creates /dev/nbd0
+nix shell nixpkgs#nbd -c nbd-client 192.168.1.1 10809 /dev/nbd0
+blkid /dev/nbd0        # want LABEL="nixos-root" TYPE="btrfs"
+mount -t btrfs /dev/nbd0 /mnt/snodus
+btrfs subvolume list /mnt/snodus
+```
+
+Use `nbd-client`, not `qemu-nbd`. `qemu-nbd` is the fallback everyone reaches
+for because it is often the only NBD tool installed, but its client mode has no
+export-name option (`-N` is an `nbd-client` flag; `qemu-nbd` rejects it) and it
+does not survive the newstyle negotiation `nbd-server` 3.25 uses — it connects
+and immediately disconnects, leaving `/dev/nbd0` without a filesystem.
+`nix shell nixpkgs#nbd` provides `nbd-client` without installing anything, and
+that connects first time:
+
+```
+Negotiation: ..size = 976761MB
+Connected /dev/nbd0
+/dev/nbd0: LABEL="nixos-root" ... TYPE="btrfs"
+```
+
+Listing exports is refused by the server (`E: listing not allowed by server.`),
+which is fine — the default export is the device that was passed on the
+command line.
+
+Detach when done, otherwise the board's server keeps the device busy:
+
+```sh
+umount /mnt/snodus && nbd-client -d /dev/nbd0
+```
+
+**Network reality check.** The board has *no* route to the nebula builders
+(`ping 100.64.0.17` → 100% packet loss), but it is reachable on the LAN
+(`192.168.1.x`, ~1.3 ms). So a laptop that is on the LAN *and* on the mesh is
+the bridge: it can mount the board's NVMe and still reach s-tau/s-sigma for
+the closure.
+
+Do not try to `dd` the raw image over this link: the image is ~25 GiB because
+it declares a 24 GiB `nixos-root`, of which the card needs only the first
+~1 GiB (see `mk-sd-image.sh flash`, which copies just the boot chain).
+
 ## Two gotchas that cost real debugging time
 
 ### 1. U-Boot ignores the FIT's `/chosen/bootargs`
