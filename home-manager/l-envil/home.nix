@@ -22,6 +22,7 @@ in
     profiles.home-manager.desktop-i3
     profiles.home-manager.mail.aerc
     profiles.home-manager.mail.geary
+    profiles.home-manager.agents-all
     # profiles.home-manager.desktop-sway
     ./desktop.nix
     ./rclone-wrapper/rclone.nix

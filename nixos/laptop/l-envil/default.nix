@@ -23,6 +23,7 @@ in
     # terminates the cobalt trunk itself), so those VMs live there now.
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm.open-webui
+    profiles.nixos.llm-clients.agents-all
     profiles.nixos.containers.firefox-vnc
     profiles.nixos.ssh.password-login
     profiles.nixos.users.sudo-nopasswd

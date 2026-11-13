@@ -117,8 +117,17 @@ P3_S=9216;     P3_N=4096               # factory
 P4_S=13312;    P4_N=8192               # fip
 # ESP: systemd-boot + the kernels/initrds for every retained generation.
 # 256 MiB holds BOOTAA64.EFI (a few hundred KiB) plus ~20 kernel+initrd pairs.
-P5_S=102400;   P5_N=524288             # ESP (FAT32)
-P6_S=1245184;  P6_GIB=24               # nixos-root (btrfs): rootfs + headroom
+# ESP: FAT32 holding BOOTAA64.EFI plus a kernel+initrd PER RETAINED GENERATION.
+# One generation is ~70 MiB (kernel ~12 MiB + initrd ~55 MiB), and
+# systemd-boot.configurationLimit keeps 20, so 256 MiB overflowed on the second
+# generation with ENOSPC. 1 GiB leaves room for ~14, and the ESP is cheap next
+# to the root.
+P5_S=102400;   P5_N=2097152            # ESP (FAT32), 1 GiB
+# Root starts after the ESP. 102400 + 2097152 = 2199552 sectors, rounded up to
+# the next 2048 boundary.  Keeping this derived from P5 avoids the silent
+# overlap that a hand-maintained constant would reintroduce when the ESP grows.
+P6_S=$(( ((P5_S + P5_N) + 2047) / 2048 * 2048 ))
+P6_GIB=24                               # nixos-root (btrfs): rootfs + headroom
 #
 # The card does NOT hand 100% of its space to the root: the remainder stays
 # unallocated so it can be grown later without reflashing.  Space is not the
@@ -224,12 +233,13 @@ build() {
   dd if="$BL2"        of="$IMG" bs=512 seek=$P1_S conv=notrunc status=none
   dd if="$FIP"        of="$IMG" bs=512 seek=$P4_S conv=notrunc status=none
 
-  # Partition 5 is the ESP.  It is formatted and populated below.
-  echo ">> formatting ESP (partition 5)"
+  # Partition 5 is the ESP.  `_populate_esp` gives it a GPT with a single ESP
+  # partition and formats that (bootctl requires a PARTITIONED loop device, so
+  # the mkfs has to happen on the partition, not on the bare image).
+  echo ">> formatting + populating ESP (partition 5)"
   local esp="$WORK/esp.img"
   rm -f "$esp"
   truncate -s $(( P5_N * 512 )) "$esp"
-  mkfs.vfat -F 32 -n ESP "$esp" >/dev/null
   _populate_esp "$esp"
   dd if="$esp" of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
 
@@ -273,35 +283,73 @@ build() {
 # existing installation, which is what a fresh image needs.
 _populate_esp() {
   local ESPIMG="$1"
-  local mnt="$WORK/esp-mnt"
-  mkdir -p "$mnt"
 
+  # `system.build.installBootLoader` is the generated SCRIPT itself (a single
+  # file named install-systemd-boot.sh), not a package with bin/.  Calling
+  # "$BUILDER/bin/install-systemd-boot" fails with "Not a directory".
   local BUILDER
-  BUILDER=$(nix_build "system.build.installBootLoader" ) \
+  BUILDER=$(nix_build "system.build.installBootLoader") \
     || { echo "!! could not build installBootLoader"; exit 1; }
+  [ -f "$BUILDER" ] || { echo "!! installBootLoader is not a file: $BUILDER" >&2; exit 1; }
 
   local TOPLEVEL
   TOPLEVEL=$(nix_build "system.build.toplevel")
 
-  # The builder writes to the ESP mount point compiled into it; bind it there
-  # via a throwaway mount namespace so the host's /boot is never touched.
-  sudo mount -o loop,uid=$(id -u),gid=$(id -g),umask=0077 "$ESPIMG" "$mnt"
-  trap 'sudo umount "$mnt" 2>/dev/null || true' RETURN
+  # `bootctl install` refuses a loop device that is not a PARTITIONED block
+  # device ("File system /dev/loop1 is not located on a partitioned block
+  # device").  So give the ESP image a GPT with one ESP partition and attach it
+  # with `losetup -P`, which creates /dev/loopNp1.  `bootctl` then installs into
+  # that partition and writes the removable-media EFI/BOOT/BOOTAA64.EFI.
+  #
+  # The builder has its mount point COMPILED IN (efiSysMountPoint, /boot), and
+  # bootctl offers no flag we control from here, so the ESP partition is mounted
+  # over /boot inside a private mount namespace: the builder writes into the
+  # image and the build machine's real /boot is never touched.  (A plain
+  # `mount ... $mnt` is not enough -- the builder ignores $mnt and was observed
+  # writing loader/random-seed into the host's /boot.)
+  #
+  # The aarch64 bootctl runs through binfmt_misc/qemu-user, which is fine: it is
+  # one small tool, not the build.
+  sudo unshare -m --propagation private bash -eu -c '
+    img="$1"; builder="$2"; toplevel="$3"; tool="$4"
+    loopdev=""
+    cleanup() {
+      umount /boot 2>/dev/null || true
+      [ -n "$loopdev" ] && losetup -d "$loopdev" 2>/dev/null || true
+    }
+    trap cleanup EXIT
 
-  sudo env NIXOS_INSTALL_BOOTLOADER=1 \
-    "$BUILDER/bin/install-systemd-boot" "$TOPLEVEL"
+    # A single ESP partition filling the image.
+    "$tool" -Z "$img" >/dev/null 2>&1 || true
+    "$tool" -n 1:2048:0 -t 1:ef00 -c 1:ESP "$img" >/dev/null
 
-  sudo umount "$mnt"
-  trap - RETURN
+    loopdev=$(losetup -fP --show "$img")
+    part="${loopdev}p1"
+    [ -b "$part" ] || { echo "!! no partition device for $loopdev" >&2; exit 1; }
 
-  # Assert the loader really landed: U-Boot only looks for the removable-media
-  # fallback path, so a missing BOOTAA64.EFI is an unbootable card.
-  if ! mdir -i "$ESPIMG" ::/EFI/BOOT 2>/dev/null | grep -qi 'BOOTAA64\.EFI'; then
-    echo "!! ESP is missing EFI/BOOT/BOOTAA64.EFI" >&2
-    mdir -i "$ESPIMG" ::/ >&2 2>/dev/null || true
-    exit 1
-  fi
-  echo "   ESP contains EFI/BOOT/BOOTAA64.EFI"
+    # The filesystem goes on the PARTITION, not on the bare image: bootctl
+    # refuses a loop device that is not itself partitioned.
+    mkfs.vfat -F 32 -n ESP "$part" >/dev/null
+
+    mount -t tmpfs tmpfs /boot
+    mount "$part" /boot
+    NIXOS_INSTALL_BOOTLOADER=1 bash "$builder" "$toplevel"
+
+    # Verify INSIDE the namespace, against the mounted partition.  Checking the
+    # outer ESPIMG with `mdir -i` cannot work: the filesystem now lives on the
+    # partition, not at offset 0 of the image, so mdir sees the GPT instead.
+    # U-Boot only looks for the removable-media fallback path, so a missing
+    # EFI/BOOT/BOOTAA64.EFI is an unbootable card.
+    test -f /boot/EFI/BOOT/BOOTAA64.EFI || {
+      echo "!! ESP is missing EFI/BOOT/BOOTAA64.EFI" >&2
+      find /boot -maxdepth 3 >&2 || true
+      exit 1
+    }
+    echo "   ESP contains EFI/BOOT/BOOTAA64.EFI"
+
+    umount /boot
+    losetup -d "$loopdev"; loopdev=""
+  ' _ "$ESPIMG" "$BUILDER" "$TOPLEVEL" "$SGDISK"
 }
 
 # Write the U-Boot environment into the ubootenv partition (p2) of an image.
