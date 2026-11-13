@@ -275,6 +275,8 @@ build() {
   echo ">> formatting + populating ESP (partition 5)"
   local esp="$WORK/esp.img"
   local espPart="$WORK/esp-part.img"
+  rm -rf "$WORK/esp-profiles"
+  mkdir -p "$WORK/esp-profiles"
   rm -f "$esp" "$espPart"
   truncate -s $(( P5_N * 512 )) "$esp"
   _populate_esp "$esp"
@@ -369,6 +371,28 @@ _populate_esp() {
     # refuses a loop device that is not itself partitioned.
     mkfs.vfat -F 32 -n ESP "$part" >/dev/null
 
+    # The systemd-boot builder enumerates generations from the BUILD-HOST
+    # /nix/var/nix/profiles/system-*, not from $toplevel.  On a shared builder
+    # that is catastrophic: s-tau own 32 x86_64 generations ended up in this
+    # board ESP ("Linux kernel x86 boot executable, bzImage" next to a
+    # correct ARM64 BOOTAA64.EFI), which U-Boot then rejects with
+    # "Machine type 0x8664 is not supported".
+    #
+    # /nix is a read-only bind mount of the real store, so the profile
+    # directory cannot simply be written.  Instead bind a scratch directory
+    # that contains exactly ONE generation -- the target toplevel -- over
+    # /nix/var/nix/profiles for the duration of the install.  The builder then
+    # sees a single, aarch64 generation and nothing else.
+    mkdir -p "$4/profiles/var/nix"
+    ln -sfn "$toplevel" "$4/profiles/system"
+    ln -sfn "$toplevel" "$4/profiles/system-1-link"
+    mkdir -p /nix/var/nix/profiles 2>/dev/null || true
+    mount --bind "$4/profiles" /nix/var/nix/profiles 2>/dev/null || {
+      echo "!! cannot bind a private /nix/var/nix/profiles; the ESP would be" >&2
+      echo "!! populated from the BUILD-HOST generations (wrong arch)." >&2
+      exit 1
+    }
+
     mount -t tmpfs tmpfs /boot
     mount "$part" /boot
     NIXOS_INSTALL_BOOTLOADER=1 bash "$builder" "$toplevel"
@@ -392,7 +416,7 @@ _populate_esp() {
     # -> P5 -> nested GPT -> FAT) which nothing can mount.
     dd if="$part" of="$5" bs=8M status=none
     losetup -d "$loopdev"; loopdev=""
-  ' _ "$ESPIMG" "$BUILDER" "$TOPLEVEL" "$SGDISK" "$WORK/esp-part.img"
+  ' _ "$ESPIMG" "$BUILDER" "$TOPLEVEL" "$SGDISK" "$WORK/esp-part.img" "$WORK/esp-profiles"
 }
 
 # Write the U-Boot environment into the ubootenv partition (p2) of an image.
