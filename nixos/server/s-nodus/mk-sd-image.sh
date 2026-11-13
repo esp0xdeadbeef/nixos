@@ -233,15 +233,19 @@ build() {
   dd if="$BL2"        of="$IMG" bs=512 seek=$P1_S conv=notrunc status=none
   dd if="$FIP"        of="$IMG" bs=512 seek=$P4_S conv=notrunc status=none
 
-  # Partition 5 is the ESP.  `_populate_esp` gives it a GPT with a single ESP
-  # partition and formats that (bootctl requires a PARTITIONED loop device, so
-  # the mkfs has to happen on the partition, not on the bare image).
+  # Partition 5 is the ESP.  `_populate_esp` builds it on a throwaway
+  # one-partition GPT (bootctl refuses an unpartitioned loop device), then
+  # extracts just that partition to $WORK/esp-part.img.  The card P5 must hold
+  # the FAT filesystem DIRECTLY -- writing the throwaway image instead would
+  # nest a second GPT inside P5, which nothing can mount.
   echo ">> formatting + populating ESP (partition 5)"
   local esp="$WORK/esp.img"
-  rm -f "$esp"
+  local espPart="$WORK/esp-part.img"
+  rm -f "$esp" "$espPart"
   truncate -s $(( P5_N * 512 )) "$esp"
   _populate_esp "$esp"
-  dd if="$esp" of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
+  [ -f "$espPart" ] || { echo "!! ESP partition was not extracted" >&2; exit 1; }
+  dd if="$espPart" of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
 
   # Partition 6 is left EMPTY here on purpose.  It is created now only so the
   # GPT geometry is final; its btrfs filesystem (with the /root, /nix and
@@ -306,7 +310,7 @@ _populate_esp() {
   # over /boot inside a private mount namespace: the builder writes into the
   # image and the build machine's real /boot is never touched.  (A plain
   # `mount ... $mnt` is not enough -- the builder ignores $mnt and was observed
-  # writing loader/random-seed into the host's /boot.)
+  # writing loader/random-seed into the build machine's real /boot.)
   #
   # The aarch64 bootctl runs through binfmt_misc/qemu-user, which is fine: it is
   # one small tool, not the build.
@@ -348,8 +352,13 @@ _populate_esp() {
     echo "   ESP contains EFI/BOOT/BOOTAA64.EFI"
 
     umount /boot
+    # Copy just the PARTITION out to $5.  The image file carries a throwaway GPT
+    # only so bootctl accepts the loop device; the card P5 must hold the FAT
+    # filesystem directly, otherwise the ESP ends up two levels deep (card GPT
+    # -> P5 -> nested GPT -> FAT) which nothing can mount.
+    dd if="$part" of="$5" bs=8M status=none
     losetup -d "$loopdev"; loopdev=""
-  ' _ "$ESPIMG" "$BUILDER" "$TOPLEVEL" "$SGDISK"
+  ' _ "$ESPIMG" "$BUILDER" "$TOPLEVEL" "$SGDISK" "$WORK/esp-part.img"
 }
 
 # Write the U-Boot environment into the ubootenv partition (p2) of an image.
