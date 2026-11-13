@@ -70,6 +70,30 @@ fi
 nix_build() {
   local attr="$1"
   local override=()
+  # Extra nix flags; unset by default.
+  local extra=()
+  # S_NODUS_LOCAL_ONLY pins the build to THIS machine (benchmarking a host, or
+  # when the configured remote builders are busy/unreachable).
+  #
+  # `builders` is a SETTING, not a `nix build` flag: `--builders=` is rejected
+  # as an unrecognised flag, and a bare `--builders ""` splits into an option
+  # whose value becomes the next argv entry (observed: it kept offloading to
+  # s-sigma instead of failing).
+  if [ -n "${S_NODUS_LOCAL_ONLY:-}" ]; then
+    extra=(--option builders "")
+  fi
+  if [ -n "${NIX_BUILD_ARGS:-}" ]; then
+    # Split on spaces into separate argv entries.
+    #
+    # To pin the build to THIS machine, pass
+    #     NIX_BUILD_ARGS="--option builders ''"
+    # (`--builders` is a SETTING, not a `nix build` flag: `--builders=` is
+    # rejected as an unrecognised flag, and a bare `--builders ""` splits into
+    # an option whose value becomes the next argument. Both were observed to
+    # either fail or silently keep offloading to s-sigma.)
+    # shellcheck disable=SC2206
+    extra=($NIX_BUILD_ARGS)
+  fi
   if [ -n "${NIXOS_HARDWARE:-}" ]; then
     override=(--override-input "nixos-hardware" "path:$NIXOS_HARDWARE")
   fi
@@ -90,7 +114,7 @@ nix_build() {
   # S_NODUS_NO_CROSS=1 forces the native (emulated) path, which is what a
   # rebuild ON the board (an aarch64 host) uses anyway.
   if [ -z "${S_NODUS_NO_CROSS:-}" ] && [ "$(uname -m)" != "aarch64" ]; then
-    nix build "${override[@]}" --impure --print-out-paths --no-link --expr "
+    nix build "${override[@]}" "${extra[@]}" --impure --print-out-paths --no-link --expr "
       let
         f = builtins.getFlake \"$REPO\";
         cfg = f.nixosConfigurations.s-nodus.extendModules {
@@ -100,8 +124,8 @@ nix_build() {
       cfg.config.$attr" \
       || return 1
   else
-    nix build "${override[@]}" "$REPO#nixosConfigurations.s-nodus.config.$attr" \
-      --print-out-paths --no-link
+    nix build "${override[@]}" "${extra[@]}" \
+      "$REPO#nixosConfigurations.s-nodus.config.$attr" --print-out-paths --no-link
   fi
 }
 
