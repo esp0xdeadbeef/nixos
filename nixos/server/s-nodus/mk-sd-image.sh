@@ -80,7 +80,17 @@ nix_build() {
   # whose value becomes the next argv entry (observed: it kept offloading to
   # s-sigma instead of failing).
   if [ -n "${S_NODUS_LOCAL_ONLY:-}" ]; then
-    extra=(--option builders "")
+    # No remote builders, and accept aarch64 OUTPUTS on this machine.
+    #
+    # A cross build produces derivations whose `system` is aarch64-linux; nix
+    # refuses those with
+    #   Reason: platform mismatch
+    #   Required system: 'aarch64-linux'
+    #   Current system: 'x86_64-linux'
+    # unless the host advertises the platform.  The builders in this fleet have
+    # `extra-platforms = aarch64-linux` in /etc/nix/nix.conf; a plain laptop
+    # does not, and /etc/nix/nix.conf is read-only there, so pass it here.
+    extra=(--option builders "" --option extra-platforms "aarch64-linux")
   fi
   if [ -n "${NIX_BUILD_ARGS:-}" ]; then
     # Split on spaces into separate argv entries.
