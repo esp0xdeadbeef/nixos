@@ -1,23 +1,34 @@
 /**
  * Goal Extension - a simple recurring task, Codex-style /goal.
  *
- * A goal is a standing instruction. On every new turn the agent's message is
- * prefixed with the goal repeated VERBATIM (1:1, never rewritten or wrapped)
- * followed by a fixed "proof required" contract: the agent must justify, with
- * validated evidence, either that the next step is now proven done, or that it
- * is genuinely impossible.
+ * A goal is a standing instruction. It is injected as a SYSTEM PROMPT SECTION
+ * (verbatim, 1:1, never rewritten) together with a fixed "proof required"
+ * contract: the agent must justify, with validated evidence, either that the
+ * next step is now proven done, or that it is genuinely impossible.
+ *
+ * Why the system prompt and not a user message: a user-message wrapper lands in
+ * the transcript, so every copy is replayed on every request AND fed into the
+ * compaction summarization request as conversation. That is what made this
+ * extension blow up long sessions - a real one carried 61 copies (~111 KB) of
+ * the goal wrapper into context and into the compactor. A prompt section costs
+ * one copy in the leading system message, never enters the conversation, and is
+ * not summarized by compaction; after a compaction the section is still there
+ * because the prompt is rebuilt from the live goal on every request.
  *
  * A goal is plain text. Nothing in it is ever treated as a file unless the
  * user explicitly marks it with `@`: `@path/to/spec.md` (relative to the
- * project root) or `@~/x/spec.md`. Only `@` tokens are read from disk at the
- * start of every turn and injected verbatim under a `[Goal file]` block. An
+ * project root) or `@~/x/spec.md`. Only `@` tokens are read from disk for each
+ * request and injected verbatim into the prompt under a `[Goal file]` block. An
  * `@` file that cannot be read rejects the goal (or aborts the turn) instead
- * of running half-armed.
+ * of running half-armed. A file body is capped (MAX_FILE_CHARS per file, a
+ * MAX_TOTAL_FILE_CHARS total) and the cut is stated in the prompt, because a
+ * whole multi-hundred-KB file in the prompt on every request is exactly the
+ * kind of cost this extension has to stay away from.
  *
  * Usage:
  *   /goal              show the active goal
  *   /goal <text>       set (or replace) the active goal
- *   /goal <text> file  also inline that file every turn
+ *   /goal <text> file  also inline that file into the prompt
  *   /goal status       goal + which files are inlined + auto state
  *   /goal auto         arm self-continuation (already ON by default)
  *   /goal auto off     stop continuing automatically
@@ -26,7 +37,9 @@
  *
  * Self-continuation replaces the "nudge the pane with a dot every 10 seconds"
  * loop: with auto armed the extension requests the next turn itself and keeps
- * going up to 2000 turns / 24 h. It does not stop on a bare marker, and a hash
+ * going up to 200 auto-turns / 6 h, and stops early once context crosses a soft
+ * limit so pi never has to discover an overflow mid-run. It does not stop on a
+ * bare marker, and a hash
  * alone is not an escape: GOAL DONE and GOAL BLOCKED both require
  *   - spec: sha256 of all the goal's words (recomputed here), and
  *   - solution: a git commit created DURING THIS RUN in the goal repo; for
@@ -36,7 +49,8 @@
  *
  * The goal is stored in the session, so it follows the active branch and is
  * restored on resume / branch navigation. Only the raw goal text is stored;
- * the per-turn wrapper is generated fresh every turn and never persisted.
+ * the prompt section that carries it is rebuilt for each request and never
+ * persisted, so it cannot accumulate in the transcript.
  */
 
 import { execFileSync } from "node:child_process";
@@ -54,9 +68,27 @@ const FILE_MARKER = "[Goal file]";
 // Cap per file so one runaway path cannot eat the whole window. Past this the
 // file is inlined as far as the cap and the cut is stated explicitly, so the
 // agent knows it is reading a truncated document, never a silently partial one.
-const MAX_FILE_CHARS = 500_000;
-// A file we inline is re-read on every turn; warn (not fail) past this size.
-const HUGE_FILE_BYTES = 2_000_000;
+//
+// This used to be 500_000 chars (~125k tokens). Because the file body is
+// re-injected on every wrapped turn, one `@big.md` burned ~125k tokens per turn
+// and blew a 1M window in a handful of turns. The goal loop does not need the
+// whole file in context: it needs the goal, and the agent can `read` the file
+// itself when a step actually depends on it. So the inline budget is small and
+// the rest is a pointer.
+const MAX_FILE_CHARS = 16_000;
+// Total budget across ALL goal files, so ten files cannot each spend the per-
+// file cap. Files are inlined in listed order until this is exhausted.
+const MAX_TOTAL_FILE_CHARS = 32_000;
+// Files are re-read on every request; warn (not fail) past this size.
+const HUGE_FILE_BYTES = 256_000;
+
+// Auto-continue budget. 2000 turns / 24 h is not a real cap: long before then
+// the transcript alone overflows the window, and each turn also appends a
+// persisted custom_message that is replayed to the model forever. The caps here
+// are a runaway-stop, not the main protection -- the main protection is that the
+// goal lives in the system prompt and continuations are pruned to one.
+const AUTO_MAX_ITERATIONS = 400;
+const AUTO_MAX_WALL_CLOCK_MS = 12 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Self-continuation (/goal auto on|off)
@@ -65,9 +97,10 @@ const HUGE_FILE_BYTES = 2_000_000;
 // a human (or a tmux nudge bot) to press Enter. Guards:
 //   - ON by default: `/goal <text>` arms it and kicks the first turn; never
 //     persisted as "on", so a resumed session re-arms only when a goal is set;
-//   - re-sends only the SHORT continuation prompt, because the goal + full file
-//     are already in the transcript and re-inlining 60 KB per turn is waste;
-//   - stops on a hard iteration cap (2000 turns) and a wall-clock cap (24 h);
+//   - the goal + contract live in the system prompt, so a continuation message
+//     is a one-liner and never restates them;
+//   - stops on a hard iteration cap (200 turns), a wall-clock cap (6 h) and a
+//     context soft limit, because a runaway loop is the expensive failure;
 //   - stops when the goal is cleared or the session switches.
 //
 // Escape contract (GAMP-style: nothing is OK until evidenced, and the evidence
@@ -77,8 +110,6 @@ const HUGE_FILE_BYTES = 2_000_000;
 //     in a git repo, `solution: <commit>` = a commit that actually exists.
 //   - GOAL BLOCKED requires `spec: <sha256>` plus the blocker text.
 // A stop line without a verified proof is rejected and the loop continues.
-const AUTO_MAX_ITERATIONS = 2000;
-const AUTO_MAX_WALL_CLOCK_MS = 24 * 60 * 60 * 1000;
 const STOP_WORDS = ["GOAL DONE", "GOAL BLOCKED"];
 
 // Scratch path for goal bookkeeping (completion records, blocker notes). It is
@@ -90,27 +121,20 @@ const NO_REPO_GOAL_DIR =
 	`Do NOT create a .goal/ directory, .goal file, or any goal/completion note inside the repo — ` +
 	`those are throwaway scratch and belong at ${GOAL_NOTE_PATH} (write it there if you want a note; it is never committed).`;
 
-const AUTO_PROMPT =
-	"Continue the goal. Do the next concrete step now, using tools, and do not summarize or ask permission. " +
-	"You may only stop this loop by ending your turn with GOAL DONE or GOAL BLOCKED plus an escape proof. " +
-	"A stop line without a proof verified by the goal extension is rejected and the loop continues. " +
-	"Proof format (one per line, lowercase labels):\n" +
-	"  spec: <64-hex sha256 of all the words of the goal files, concatenated in the order listed in this message:\n" +
-	"        cat file1 file2 ... | sha256sum — or of the goal text itself when there are no files>\n" +
-	"  solution: <git commit hash created DURING THIS RUN, in the goal repo>  (required for both escapes)\n" +
-	"    GOAL DONE  — the commit implements the goal.\n" +
-	"    GOAL BLOCKED — the commit documents the blocker and its message contains the word BLOCKED;\n" +
-	"        there is no escape by hash alone, and an effort complaint is not a blocker.\n" +
-	`Write any goal bookkeeping note to ${GOAL_NOTE_PATH} (never into the repo: no .goal/ dir, no .goal file).\n` +
-	"Compute the spec hash yourself with the exact cat|sha256sum command; do not invent hex. " +
-	"Commit before claiming either escape; the extension verifies the commit exists, is new, and matches the escape.";
+// The escape contract lives in the system prompt (PROOF_CONTRACT below), so the
+// continuation messages only need to say "keep going" plus the exact hash
+// command for this goal. They are the only entries this extension puts in the
+// transcript, so they are deliberately one line each.
+const AUTO_CONTINUE = "Continue the goal: do the next concrete step now, using tools. Do not summarize or ask permission.";
 
 interface GoalState {
 	goal: string | null;
 }
 
-// Fixed per-turn contract. Generated fresh each turn, NEVER stored in `goal`
-// and never folded back into the persisted value.
+// Fixed per-turn contract, part of the system prompt. The escape proof format
+// lives here too: the prompt is rebuilt for every request and survives
+// compaction, so the agent always has the exact rules without the extension
+// re-writing them into the transcript.
 const PROOF_CONTRACT = [
 	"PROOF REQUIRED (answer this for every turn, before doing anything else):",
 	"1. Restate the exact next step you are about to complete.",
@@ -122,6 +146,16 @@ const PROOF_CONTRACT = [
 	"3. Only after that evidence, proceed. If you cannot supply evidence, say so",
 	"   explicitly instead of claiming progress.",
 	NO_REPO_GOAL_DIR,
+	"",
+	"ESCAPE (only when auto-continue is on): end your turn with GOAL DONE or GOAL BLOCKED",
+	"plus a proof. Format, one per line, lowercase labels:",
+	"  spec: <64-hex sha256 of the goal's words, or of its files concatenated — the exact",
+	"        command is given in each continuation message>",
+	"  solution: <git commit hash created DURING THIS RUN, in the goal repo>",
+	"    GOAL DONE — the commit implements the goal.",
+	"    GOAL BLOCKED — the commit documents the blocker and its message contains BLOCKED.",
+	"A stop line without a verified proof is rejected and the loop continues. An effort",
+	"complaint (\"too much work\", \"context too small\") is not a blocker.",
 ].join("\n");
 
 // ---------------------------------------------------------------------------
@@ -161,12 +195,33 @@ interface LoadedFile {
 	bytes: number;
 	text: string;
 	truncated: boolean;
+	// Chars left out of `text` because of the per-file or total budget.
+	omittedChars: number;
 }
 
-// Read every goal file in full. Throws on a file that cannot be read, so the
-// turn aborts instead of running with the goal half-inlined.
+// Per-turn file cache. `specHash()`, `repoDir()` and the input wrapper all need
+// the same files; before this cache each settle re-read every goal file from
+// disk up to three times.
+let fileCache: { key: string; files: LoadedFile[] } | null = null;
+
+function cacheKey(cwd: string, goal: string | null): string {
+	return `${cwd}\u0000${goal ?? ""}`;
+}
+
 function loadGoalFiles(cwd: string, goal: string | null): LoadedFile[] {
+	const key = cacheKey(cwd, goal);
+	if (fileCache && fileCache.key === key) return fileCache.files;
+	const files = readGoalFiles(cwd, goal);
+	fileCache = { key, files };
+	return files;
+}
+
+// Read every goal file. Throws on a file that cannot be read, so the turn
+// aborts instead of running with the goal half-inlined. Each file is cut at the
+// per-file cap and the whole set at the total cap; both cuts are reported.
+function readGoalFiles(cwd: string, goal: string | null): LoadedFile[] {
 	const files: LoadedFile[] = [];
+	let budget = MAX_TOTAL_FILE_CHARS;
 	for (const token of goalFileTokens(goal, cwd)) {
 		const abs = isAbsolute(token) ? token : resolve(cwd, token);
 		if (!existsSync(abs)) {
@@ -178,13 +233,17 @@ function loadGoalFiles(cwd: string, goal: string | null): LoadedFile[] {
 		if (!st.isFile()) {
 			throw new Error(`goal path is not a file: ${token} (resolved to ${abs}).`);
 		}
-		let text = readFileSync(abs, "utf8");
-		let truncated = false;
-		if (text.length > MAX_FILE_CHARS) {
-			text = text.slice(0, MAX_FILE_CHARS);
-			truncated = true;
-		}
-		files.push({ path: token, abs, bytes: st.size, text, truncated });
+		const full = readFileSync(abs, "utf8");
+		const take = Math.min(full.length, Math.max(0, Math.min(MAX_FILE_CHARS, budget)));
+		budget -= take;
+		files.push({
+			path: token,
+			abs,
+			bytes: st.size,
+			text: full.slice(0, take),
+			truncated: take < full.length,
+			omittedChars: full.length - take,
+		});
 	}
 	return files;
 }
@@ -192,12 +251,15 @@ function loadGoalFiles(cwd: string, goal: string | null): LoadedFile[] {
 function fileHeader(files: LoadedFile[]): string {
 	if (files.length === 0) return "";
 	const blocks = files.map((f) => {
-		const head = `${FILE_MARKER} ${f.path} (${f.abs}) — ${f.bytes} bytes${f.truncated ? `, TRUNCATED to the first ${MAX_FILE_CHARS} chars` : ""}, read in full now:`;
+		const cut = f.truncated
+			? ` — TRUNCATED: ${f.omittedChars} chars omitted here; use the read tool on this path for the rest`
+			: "";
+		const head = `${FILE_MARKER} ${f.path} (${f.abs}) — ${f.bytes} bytes${cut}`;
 		return `${head}\n<<<FILE ${f.path}\n${f.text}\nFILE ${f.path}>>>`;
 	});
 	return [
-		"This file is part of the goal. It is reprinted here in full on every turn, so it is already open:",
-		"read it here, apply it as written, and do not claim you cannot see it or need to re-read it.",
+		"These files are part of the goal. They are already open below; apply them as written.",
+		"Do not claim you cannot see them or need to re-read them unless a step needs text past a TRUNCATED cut.",
 		...blocks,
 	].join("\n\n");
 }
@@ -213,11 +275,18 @@ function fileHeader(files: LoadedFile[]): string {
 //   with goal files:  cat file1 file2 ... | sha256sum   (in the listed order)
 //   without files:    printf '%s' '<goal text>' | sha256sum
 // Recomputing from disk here means the agent cannot fake the hash.
+//
+// This must hash the FULL file bytes, exactly like `cat | sha256sum`, and never
+// the truncated inline copy: the file body is capped for context reasons, so
+// hashing the capped text would guarantee a mismatch for every large goal file.
 function specHash(cwd: string, goal: string | null): string {
 	const h = createHash("sha256");
-	const files = loadGoalFiles(cwd, goal);
-	if (files.length > 0) {
-		for (const f of files) h.update(f.text);
+	const tokens = goalFileTokens(goal, cwd);
+	if (tokens.length > 0) {
+		for (const token of tokens) {
+			const abs = isAbsolute(token) ? token : resolve(cwd, token);
+			h.update(readFileSync(abs));
+		}
 	} else if (goal) {
 		h.update(goal);
 	}
@@ -304,16 +373,17 @@ function parseEscape(text: string): EscapeProof | null {
 	};
 }
 
-// The short continuation prompt plus the live list of words to hash, so the
-// escape instructions always name the exact files. Used both for the settle
-// continuation and for the self-start kick when /goal auto is armed.
+// The continuation message plus the exact hash command for this goal. This is
+// the ONLY thing the extension writes into the transcript per auto-turn, so it
+// stays one short line; the goal, the contract and the file bodies live in the
+// system prompt instead (see before_agent_start).
 function autoPrompt(goal: string | null, _cwd: string): string {
 	const files = goalFileTokens(goal);
-	const hashTargets =
+	const hashCommand =
 		files.length > 0
-			? `\n\nWords to hash for the spec proof — run exactly:\n  cat ${files.join(" ")} | sha256sum`
-			: `\n\nWords to hash for the spec proof — run exactly:\n  printf '%s' '${goal}' | sha256sum`;
-	return `${AUTO_PROMPT}${hashTargets}`;
+			? `cat ${files.join(" ")} | sha256sum`
+			: `printf '%s' '${goal?.replace(/'/g, "'\\''") ?? ""}' | sha256sum`;
+	return `${AUTO_CONTINUE}\n\nspec hash: ${hashCommand}`;
 }
 
 export default function goalExtension(pi: ExtensionAPI) {
@@ -325,6 +395,83 @@ export default function goalExtension(pi: ExtensionAPI) {
 	let autoRun = true;
 	let autoIterations = 0;
 	let autoStartedAt = 0;
+	// Goal state is now carried by the system prompt section, so the old
+	// "already inlined this run" bookkeeping is gone.
+	// Context size seen at the last assistant message, for the soft cap.
+	let lastContextTokens = 0;
+
+	function elapsedNow(): number {
+		return autoStartedAt ? Date.now() - autoStartedAt : 0;
+	}
+
+	// Return the ids of every goal continuation prompt this run already appended.
+	// They are persisted custom_messages that the model replays on every request,
+	// so a long loop pays for all of them at once. We keep only the newest and
+	// omit the rest with context_edit (raw history and the UI keep everything).
+	function priorPromptEntryIds(ctx: ExtensionContext | null): string[] {
+		if (!ctx) return [];
+		const ids: string[] = [];
+		try {
+			for (const entry of ctx.sessionManager.getBranch()) {
+				const e = entry as { type?: string; customType?: string; id?: string };
+				if (e.type === "custom_message" && e.customType === ENTRY_TYPE && e.id) ids.push(e.id);
+			}
+		} catch {
+			return [];
+		}
+		return ids;
+	}
+
+	// Omit every previously appended continuation, because this handler is about to
+	// append a fresh one. `previousEntryIds` are ids that already exist in the
+	// branch; entries drafted in this same handler have no id yet and cannot be
+	// targeted, which is exactly why the caller passes the pre-existing list.
+	function pruneSuperseded(previousEntryIds: string[]): Array<{ type: "context_edit"; targetId: string; replacement: null }> {
+		return previousEntryIds.map((id) => ({ type: "context_edit" as const, targetId: id, replacement: null }));
+	}
+
+	// Central stop check: turn cap, wall clock, and a context guard. The context
+	// guard uses pi's own compaction threshold, not a fixed number, so the full
+	// model window stays usable: the loop stops only once pi is about to compact,
+	// rather than at some arbitrary smaller size.
+	function stopByCap(elapsed: number): boolean {
+		let why: string | null = null;
+		if (autoIterations > AUTO_MAX_ITERATIONS) {
+			why = `cap ${AUTO_MAX_ITERATIONS} turns`;
+		} else if (elapsed > AUTO_MAX_WALL_CLOCK_MS) {
+			why = `cap ${Math.round(AUTO_MAX_WALL_CLOCK_MS / 3600000)} h`;
+		} else if (lastContextTokens > 0 && lastContextTokens >= compactionThreshold()) {
+			why = `context ${lastContextTokens} tokens reached pi's compaction threshold`;
+		}
+		if (!why) return false;
+		autoRun = false;
+		autoStartedAt = 0;
+		if (lastCtx) {
+			updateStatus(lastCtx);
+			lastCtx.ui.notify(
+				`Auto-continue stopped by ${why} after ${autoIterations} turns. Re-arm with /goal auto; /goal clear drops the goal.`,
+				"warning",
+			);
+		}
+		return true;
+	}
+
+	// Pi compacts at contextWindow - reserveTokens. The window comes from pi; the
+	// reserve has no direct accessor, so assume the documented 20 %-style reserve
+	// is already reflected in the window being the *usable* one. The point is to
+	// stop before pi has to compact, never to shrink the window artificially.
+	function compactionThreshold(): number {
+		const anyCtx = lastCtx as unknown as {
+			getContextUsage?: () => { tokens?: number | null; contextWindow?: number | null; percent?: number | null } | null;
+		} | null;
+		try {
+			const usage = anyCtx?.getContextUsage?.();
+			if (usage?.contextWindow) return usage.contextWindow;
+		} catch {
+			// fall through
+		}
+		return Number.POSITIVE_INFINITY;
+	}
 	// The last assistant text seen this run, used to detect the stop words.
 	let lastAssistantText = "";
 	// The settle hook has no ctx argument; remember the latest one for status.
@@ -353,6 +500,8 @@ export default function goalExtension(pi: ExtensionAPI) {
 		autoRun = true;
 		autoIterations = 0;
 		autoStartedAt = 0;
+		lastContextTokens = 0;
+		fileCache = null;
 		const entries = ctx.sessionManager.getBranch();
 		for (let i = entries.length - 1; i >= 0; i--) {
 			const entry = entries[i] as { type?: string; customType?: string; data?: GoalState };
@@ -361,17 +510,6 @@ export default function goalExtension(pi: ExtensionAPI) {
 				break;
 			}
 		}
-	}
-
-	// The verbatim goal plus the fixed proof contract. Nothing here is ever
-	// written back into `goal`, so the stored text stays 1:1 with what you typed.
-	function goalHeader(_cwd: string): string {
-		const files = goalFileTokens(goal);
-		const note =
-			files.length > 0
-				? `\n\nThis goal names ${files.length} file(s): ${files.join(", ")}. Their full content is printed below the contract, reprinted fresh every turn.`
-				: "";
-		return `${INPUT_MARKER} GOAL (verbatim):\n${goal}${note}\n\n${PROOF_CONTRACT}`;
 	}
 
 	// Strip a wrapper if the user pastes a previously-wrapped turn as the goal.
@@ -428,7 +566,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 				updateStatus(ctx);
 				ctx.ui.notify(
 					on
-						? `Auto-continue armed (default ON; max ${AUTO_MAX_ITERATIONS} turns / 24 h). Stop it with /goal auto off. It stops only on "${STOP_WORDS[0]}" or "${STOP_WORDS[1]}" with a proof verified by the extension.`
+						? `Auto-continue armed (default ON; max ${AUTO_MAX_ITERATIONS} turns / ${Math.round(AUTO_MAX_WALL_CLOCK_MS / 3600000)} h, and it stops when context reaches the model window). Stop it with /goal auto off. It stops only on "${STOP_WORDS[0]}" or "${STOP_WORDS[1]}" with a proof verified by the extension.`
 						: "Auto-continue disarmed.",
 					"info",
 				);
@@ -451,8 +589,8 @@ export default function goalExtension(pi: ExtensionAPI) {
 				ctx.ui.notify(
 					[
 						`Goal: ${goal ?? "(none)"}`,
-						`Files inlined each turn: ${goalFileTokens(goal).join(", ") || "(none)"}`,
-						`Auto-continue: ${autoRun ? `on (default), ${autoIterations}/${AUTO_MAX_ITERATIONS} turns` : "off (/goal auto to re-arm)"}`,
+						`Files inlined once per run: ${goalFileTokens(goal).join(", ") || "(none)"}`,
+						`Auto-continue: ${autoRun ? `on (default), ${autoIterations}/${AUTO_MAX_ITERATIONS} turns, context ${lastContextTokens} tokens` : "off (/goal auto to re-arm)"}`,
 					].join("\n"),
 					"info",
 				);
@@ -467,6 +605,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 				goal = null;
 				autoRun = false;
 				autoIterations = 0;
+				fileCache = null;
 				persist();
 				updateStatus(ctx);
 				ctx.ui.notify("Goal cleared.", "info");
@@ -494,12 +633,16 @@ export default function goalExtension(pi: ExtensionAPI) {
 			persist();
 			updateStatus(ctx);
 			const fileLines = files.map(
-				(f) => `\n  ${f.path} (${f.abs}) — ${f.bytes} bytes, inlined every turn`,
+				(f) =>
+					`\n  ${f.path} (${f.abs}) — ${f.bytes} bytes` +
+					(f.truncated ? `, first ${f.text.length} chars inlined (${f.omittedChars} omitted — the agent reads the rest itself)` : ""),
 			);
 			const huge = files.filter((f) => f.bytes > HUGE_FILE_BYTES);
 			ctx.ui.notify(
-				`Goal set (auto-continue ON — /goal auto off to stop):\n${goal}${fileLines.length ? `\n\nInlined each turn:${fileLines.join("")}` : ""}` +
-					(huge.length ? `\n\nWarning: ${huge.length} file(s) over ${HUGE_FILE_BYTES} bytes — this will be expensive every turn.` : ""),
+				`Goal set (auto-continue ON — /goal auto off to stop):\n${goal}${fileLines.length ? `\n\nInlined once per run:${fileLines.join("")}` : ""}` +
+					(huge.length
+						? `\n\nWarning: ${huge.length} file(s) over ${HUGE_FILE_BYTES} bytes. They are capped at ${MAX_FILE_CHARS} chars (${MAX_TOTAL_FILE_CHARS} total), so the agent must read the rest with its own tools.`
+						: ""),
 				"info",
 			);
 			// Self-start when idle, so /goal <text> alone begins the loop with no
@@ -513,23 +656,57 @@ export default function goalExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	// Prepend the verbatim goal + proof contract + the full text of every goal
-	// file to every new user turn. Files are re-read from disk here, so an edit
-	// made between turns is picked up with no /goal re-issue.
+	// The user's own text passes through untouched. The goal is not injected
+	// here: it lives in the system prompt (see before_agent_start), so a user turn
+	// costs exactly what the user typed and the goal is never duplicated into the
+	// transcript or into the compaction input. This hook only validates the goal
+	// files, so a path deleted between turns fails now instead of on every turn.
 	pi.on("input", async (event, ctx) => {
 		lastCtx = ctx;
 		if (!goal) return;
 		// Skip only extension-injected input; interactive and rpc are real users.
 		if (event.source === "extension") return;
-		// Idempotency: never wrap a turn that already carries the wrapper.
-		if (event.text.includes(INPUT_MARKER)) return;
-		// Slash commands are handled by their own handler; do not wrap them.
+		// Slash commands are handled by their own handler; do not touch them.
 		if (event.text.trimStart().startsWith("/")) return;
 
-		// A broken goal file must not degrade into a silent no-op turn.
-		const files = loadGoalFiles(ctx.cwd, goal);
-		const body = files.length > 0 ? `\n\n${fileHeader(files)}` : "";
-		return { action: "transform", text: `${goalHeader(ctx.cwd)}${body}\n\n${event.text}` };
+		// The goal + proof contract live in the SYSTEM PROMPT (see the
+		// before_agent_start hook below), not in the user turn. Wrapping the text
+		// here would write another copy of the goal into the transcript on every
+		// message, and the transcript is exactly what compaction has to summarize.
+		// The only thing this hook still does is validate the goal files early, so
+		// a deleted file fails this turn instead of silently arming a broken goal.
+		// Validate the goal files now, then drop the cache so the request that follows
+		// re-reads them and picks up any edit made since the last turn.
+		loadGoalFiles(ctx.cwd, goal);
+		fileCache = null;
+	});
+
+	// The goal, its proof contract and its file bodies are injected as a SYSTEM
+	// PROMPT SECTION, not as a user message.
+	//
+	// This is the whole point of the design. A user-message wrapper is persisted
+	// in the transcript, which means every copy is (a) replayed to the model on
+	// every request, (b) fed into compaction's summarization request as
+	// "conversation", and (c) left behind in the compacted summary as duplicated
+	// goal prose. Measured on a real session: 61 copies of the wrapper, ~111 KB.
+	//
+	// A prompt section instead costs exactly one copy in the leading system
+	// message, is diffed by pi (so it is a cache hit once written), never enters
+	// the conversation, and is therefore never summarized by compaction. On
+	// compaction the section is still present, because the system prompt is
+	// rebuilt for every request from the live goal.
+	pi.on("before_agent_start", (event, ctx) => {
+		if (!goal) return;
+		// Keep the transcript clean: nothing this extension adds goes into it.
+		let section = `\n\nThe following is the user's standing goal, restated by the goal extension. It applies to every turn until it is cleared.\n\n${INPUT_MARKER} GOAL (verbatim):\n${goal}\n\n${PROOF_CONTRACT}`;
+		const files = goalFileTokens(goal);
+		if (files.length > 0) {
+			// Files are read fresh here, so an edit between turns is picked up with no
+			// /goal re-issue. A file that cannot be read fails the turn loudly.
+			const loaded = loadGoalFiles(ctx.cwd, goal);
+			section += `\n\n${fileHeader(loaded)}`;
+		}
+		event.systemPromptOptions.sections.goal = section;
 	});
 
 	// Track the assistant's own words so auto-continue can stop when the agent
@@ -537,6 +714,11 @@ export default function goalExtension(pi: ExtensionAPI) {
 	pi.on("message_end", (event) => {
 		const msg = event.message as { role?: string; content?: unknown } | undefined;
 		if (!msg || msg.role !== "assistant") return;
+		// Track context size for the soft cap in agent_before_settle.
+		const usage = (msg as { usage?: { input?: number; cacheRead?: number; cacheWrite?: number } }).usage;
+		if (usage) {
+			lastContextTokens = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
+		}
 		const content = msg.content;
 		const text = Array.isArray(content)
 			? content
@@ -553,8 +735,15 @@ export default function goalExtension(pi: ExtensionAPI) {
 	// would otherwise settle. Every exit path disarms, so nothing can loop.
 	// The only accepted escapes are the verified proof lines; a bare GOAL DONE /
 	// GOAL BLOCKED is rejected and the loop continues with the rejection reason.
-	pi.on("agent_before_settle", (_event) => {
+	pi.on("agent_before_settle", (event) => {
 		if (!autoRun || !goal) return;
+
+		// Every entry this extension appends is persisted and replayed to the model
+		// for the rest of the session. Keep only the newest continuation live and
+		// omit the older ones via context_edit, so N turns cost one instruction,
+		// not N. Drafts in event.entries have no id yet, so only already-persisted
+		// ids are targeted.
+		const prune = pruneSuperseded(priorPromptEntryIds(lastCtx));
 
 		const proof = parseEscape(lastAssistantText);
 		if (proof) {
@@ -610,45 +799,37 @@ export default function goalExtension(pi: ExtensionAPI) {
 			}
 			autoIterations += 1;
 			if (lastCtx) updateStatus(lastCtx);
+			if (stopByCap(elapsedNow())) return;
+			// The rejection is its own message; it must stay small. The goal and the
+			// escape contract are in the system prompt, so the rejection only names the
+			// reason plus the hash command, never a second copy of the instructions.
 			return {
 				continue: true,
 				entries: [
+					...prune,
 					{
 						type: "custom_message" as const,
 						customType: ENTRY_TYPE,
 						display: true,
 						content:
-							`Your escape was REJECTED by the goal extension: ${reasons.join("; ")}. ` +
-							`For GOAL BLOCKED the blocker must be real and committed: write the blocker analysis to ${GOAL_NOTE_PATH}, ` +
-							`commit the repo work (or a commit whose message contains BLOCKED), and give that commit as the solution line. ` +
-							`Never write a .goal/ dir or a goal note into the repo — only ${GOAL_NOTE_PATH}. ` +
-							`An effort complaint ("too much work", "context too small") is not a blocker. ` +
-							`For GOAL DONE the solution commit must implement the goal and be created during this run.\n\n` +
-							`${AUTO_PROMPT}`,
+							`Escape REJECTED: ${reasons.join("; ")}. ` +
+							`Commit real work (blocker commits must say BLOCKED in the message), then give spec: + solution:. ` +
+							`Never write .goal/ or a note into the repo — only ${GOAL_NOTE_PATH}. ` +
+							`An effort complaint is not a blocker.\n\n` +
+							autoPrompt(goal, cwd),
 					},
 				],
 			};
 		}
 
 		autoIterations += 1;
-		const elapsed = autoStartedAt ? Date.now() - autoStartedAt : 0;
-		if (autoIterations > AUTO_MAX_ITERATIONS || elapsed > AUTO_MAX_WALL_CLOCK_MS) {
-			autoRun = false;
-			autoStartedAt = 0;
-			if (lastCtx) {
-				updateStatus(lastCtx);
-				lastCtx.ui.notify(
-					`Auto-continue stopped by cap: ${autoIterations} turns / ${Math.round(elapsed / 3600000)} h. Re-arm with /goal auto.`,
-					"warning",
-				);
-			}
-			return;
-		}
 		if (lastCtx) updateStatus(lastCtx);
+		if (stopByCap(elapsedNow())) return;
 
 		return {
 			continue: true,
 			entries: [
+				...prune,
 				{
 					type: "custom_message" as const,
 					customType: ENTRY_TYPE,
