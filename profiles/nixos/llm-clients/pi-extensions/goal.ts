@@ -37,9 +37,7 @@
  *
  * Self-continuation replaces the "nudge the pane with a dot every 10 seconds"
  * loop: with auto armed the extension requests the next turn itself and keeps
- * going up to 200 auto-turns / 6 h, and stops early once context crosses a soft
- * limit so pi never has to discover an overflow mid-run. It does not stop on a
- * bare marker, and a hash
+ * going up to 2000 turns / 24 h. It does not stop on a bare marker, and a hash
  * alone is not an escape: GOAL DONE and GOAL BLOCKED both require
  *   - spec: sha256 of all the goal's words (recomputed here), and
  *   - solution: a git commit created DURING THIS RUN in the goal repo; for
@@ -82,13 +80,12 @@ const MAX_TOTAL_FILE_CHARS = 32_000;
 // Files are re-read on every request; warn (not fail) past this size.
 const HUGE_FILE_BYTES = 256_000;
 
-// Auto-continue budget. 2000 turns / 24 h is not a real cap: long before then
-// the transcript alone overflows the window, and each turn also appends a
-// persisted custom_message that is replayed to the model forever. The caps here
-// are a runaway-stop, not the main protection -- the main protection is that the
-// goal lives in the system prompt and continuations are pruned to one.
-const AUTO_MAX_ITERATIONS = 400;
-const AUTO_MAX_WALL_CLOCK_MS = 12 * 60 * 60 * 1000;
+// Auto-continue budget. These are the user's original caps and are deliberately
+// unrelated to the context fix: with the goal in the system prompt and
+// continuations pruned to one, a long loop no longer grows the transcript, so
+// there is no reason to shorten how long the user wants it to run.
+const AUTO_MAX_ITERATIONS = 2000;
+const AUTO_MAX_WALL_CLOCK_MS = 24 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Self-continuation (/goal auto on|off)
@@ -99,8 +96,7 @@ const AUTO_MAX_WALL_CLOCK_MS = 12 * 60 * 60 * 1000;
 //     persisted as "on", so a resumed session re-arms only when a goal is set;
 //   - the goal + contract live in the system prompt, so a continuation message
 //     is a one-liner and never restates them;
-//   - stops on a hard iteration cap (200 turns), a wall-clock cap (6 h) and a
-//     context soft limit, because a runaway loop is the expensive failure;
+//   - stops on a hard iteration cap (2000 turns) and a wall-clock cap (24 h);
 //   - stops when the goal is cleared or the session switches.
 //
 // Escape contract (GAMP-style: nothing is OK until evidenced, and the evidence
@@ -430,18 +426,14 @@ export default function goalExtension(pi: ExtensionAPI) {
 		return previousEntryIds.map((id) => ({ type: "context_edit" as const, targetId: id, replacement: null }));
 	}
 
-	// Central stop check: turn cap, wall clock, and a context guard. The context
-	// guard uses pi's own compaction threshold, not a fixed number, so the full
-	// model window stays usable: the loop stops only once pi is about to compact,
-	// rather than at some arbitrary smaller size.
+	// Central stop check: turn cap and wall clock. No context-based stop here: the
+	// user's caps are the only stopping policy this extension adds.
 	function stopByCap(elapsed: number): boolean {
 		let why: string | null = null;
 		if (autoIterations > AUTO_MAX_ITERATIONS) {
 			why = `cap ${AUTO_MAX_ITERATIONS} turns`;
 		} else if (elapsed > AUTO_MAX_WALL_CLOCK_MS) {
 			why = `cap ${Math.round(AUTO_MAX_WALL_CLOCK_MS / 3600000)} h`;
-		} else if (lastContextTokens > 0 && lastContextTokens >= compactionThreshold()) {
-			why = `context ${lastContextTokens} tokens reached pi's compaction threshold`;
 		}
 		if (!why) return false;
 		autoRun = false;
@@ -454,23 +446,6 @@ export default function goalExtension(pi: ExtensionAPI) {
 			);
 		}
 		return true;
-	}
-
-	// Pi compacts at contextWindow - reserveTokens. The window comes from pi; the
-	// reserve has no direct accessor, so assume the documented 20 %-style reserve
-	// is already reflected in the window being the *usable* one. The point is to
-	// stop before pi has to compact, never to shrink the window artificially.
-	function compactionThreshold(): number {
-		const anyCtx = lastCtx as unknown as {
-			getContextUsage?: () => { tokens?: number | null; contextWindow?: number | null; percent?: number | null } | null;
-		} | null;
-		try {
-			const usage = anyCtx?.getContextUsage?.();
-			if (usage?.contextWindow) return usage.contextWindow;
-		} catch {
-			// fall through
-		}
-		return Number.POSITIVE_INFINITY;
 	}
 	// The last assistant text seen this run, used to detect the stop words.
 	let lastAssistantText = "";
@@ -566,7 +541,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 				updateStatus(ctx);
 				ctx.ui.notify(
 					on
-						? `Auto-continue armed (default ON; max ${AUTO_MAX_ITERATIONS} turns / ${Math.round(AUTO_MAX_WALL_CLOCK_MS / 3600000)} h, and it stops when context reaches the model window). Stop it with /goal auto off. It stops only on "${STOP_WORDS[0]}" or "${STOP_WORDS[1]}" with a proof verified by the extension.`
+						? `Auto-continue armed (default ON; max ${AUTO_MAX_ITERATIONS} turns / ${Math.round(AUTO_MAX_WALL_CLOCK_MS / 3600000)} h). Stop it with /goal auto off. It stops only on "${STOP_WORDS[0]}" or "${STOP_WORDS[1]}" with a proof verified by the extension.`
 						: "Auto-continue disarmed.",
 					"info",
 				);
