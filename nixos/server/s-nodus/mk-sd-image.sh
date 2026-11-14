@@ -252,7 +252,12 @@ build() {
   "$SGDISK" -a 1 -n 3:$P3_S:$(( P3_S+P3_N-1 )) -t 3:8300 -c 3:factory    -u 3:$U3 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 4:$P4_S:$(( P4_S+P4_N-1 )) -t 4:ef00 -c 4:fip        -u 4:$U4 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 5:$P5_S:$(( P5_S+P5_N-1 )) -t 5:ef00 -c 5:ESP        -u 5:$U5 "$IMG" >/dev/null
-  "$SGDISK" -a 1 -n 6:$P6_S:$p6End           -t 6:8300 -c 6:nixos-root -u 6:$U6 "$IMG" >/dev/null
+  # NOT "nixos-root": the NVMe root carries that PARTLABEL, and two partitions
+  # with the same name make /dev/disk/by-partlabel/nixos-root resolve to
+  # whichever udev settles last -- the card's empty one, which drops stage 1 into
+  # emergency mode.  This bit the board twice; the partition is unused padding on
+  # the card, so the name is pure liability.
+  "$SGDISK" -a 1 -n 6:$P6_S:$p6End           -t 6:8300 -c 6:sd-old-root -u 6:$U6 "$IMG" >/dev/null
   # Vendor GPT attribute flags (RequiredPartition / LegacyBIOSBootable).
   "$SGDISK" -A 1:set:0 -A 1:set:2 -A 2:set:0 -A 3:set:0 -A 4:set:0 "$IMG" >/dev/null
 
@@ -274,6 +279,47 @@ build() {
   truncate -s $(( P5_N * 512 )) "$esp"
   _populate_esp "$esp"
   [ -f "$espPart" ] || { echo "!! ESP partition was not extracted" >&2; exit 1; }
+
+  # Add U-Boot's environment as a FILE on the ESP (uEnv.txt).
+  #
+  # The vendor/OpenWrt U-Boot ignores the raw `ubootenv` partition entirely: its
+  # built-in bootcmd is
+  #
+  #   setenv bootdelay 3; run loadenv; bootmenu;
+  #   loadenv     = if run checkenv; then run loadenvfile; fi
+  #   checkenv    = test -e (device) (partition) (bootenv)   -> mmc 0:5 uEnv.txt
+  #   loadenvfile = load ... (bootenv); env import -t ...
+  #
+  # so it imports uEnv.txt FROM THIS PARTITION.  Writing the env to the
+  # ubootenv partition therefore changes nothing on such firmware -- that
+  # mistake cost several failed boots.
+  #
+  # bootcmd alone is also not enough: it ends in `bootmenu`, which dispatches to
+  # entry (bootmenu_default)=2 -> bootmenu_2 -> `run newboot`, and newboot loads
+  # a FIT called bpi-r4.itb that no longer exists.  Overriding bootmenu_2 is
+  # what actually changes the command that runs.
+  #
+  # Written here, outside the unshare block, because that block is a single
+  # quoted string inside a Nix string and quoting there is a minefield.
+  local uenvtmp="$WORK/uEnv.txt"
+  {
+    echo "bootcmd=bootflow scan -lb"
+    echo "bootdelay=3"
+    echo "bootmenu_default=2"
+    echo "bootmenu_2=Boot from SD/EMMC.=bootflow scan -lb"
+  } > "$uenvtmp"
+  grep -q '^bootmenu_2=Boot from SD/EMMC.=bootflow scan -lb$' "$uenvtmp" \
+    || { echo "!! uEnv.txt lacks the bootmenu_2 override" >&2; exit 1; }
+
+  # Append the file to the extracted FAT partition with mcopy.  A plain append
+  # would corrupt the filesystem, so this needs mtools, not dd.  Like sgdisk,
+  # it is resolved through `nix shell` so the script does not depend on the
+  # caller's PATH.
+  nix shell nixpkgs#mtools -c mcopy -o -i "$espPart" "$uenvtmp" ::/uEnv.txt
+  nix shell nixpkgs#mtools -c mdir -i "$espPart" ::/uEnv.txt >/dev/null \
+    || { echo "!! uEnv.txt did not land on the ESP" >&2; exit 1; }
+  echo "   ESP contains uEnv.txt (bootmenu_2 -> bootflow scan -lb)"
+
   dd if="$espPart" of="$IMG" bs=512 seek=$P5_S conv=notrunc status=none
 
   # Partition 6 is left EMPTY here on purpose.  It is created now only so the

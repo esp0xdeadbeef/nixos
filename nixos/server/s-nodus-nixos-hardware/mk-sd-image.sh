@@ -154,7 +154,9 @@ build() {
   "$SGDISK" -a 1 -n 3:$P3_S:$(( P3_S+P3_N-1 )) -t 3:8300 -c 3:factory    -u 3:$U3 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 4:$P4_S:$(( P4_S+P4_N-1 )) -t 4:ef00 -c 4:fip        -u 4:$U4 "$IMG" >/dev/null
   "$SGDISK" -a 1 -n 5:$P5_S:$(( P5_S+P5_N-1 )) -t 5:8300 -c 5:production -u 5:$U5 "$IMG" >/dev/null
-  "$SGDISK" -a 1 -n 6:$P6_S:$p6End           -t 6:8300 -c 6:nixos-root -u 6:$U6 "$IMG" >/dev/null
+  # NOT "nixos-root": that PARTLABEL belongs to the NVMe root, and a duplicate
+  # makes /dev/disk/by-partlabel/nixos-root resolve to this empty partition.
+  "$SGDISK" -a 1 -n 6:$P6_S:$p6End           -t 6:8300 -c 6:sd-old-root -u 6:$U6 "$IMG" >/dev/null
   # Vendor GPT attribute flags (RequiredPartition / LegacyBIOSBootable).
   "$SGDISK" -A 1:set:0 -A 1:set:2 -A 2:set:0 -A 3:set:0 -A 4:set:0 "$IMG" >/dev/null
 
