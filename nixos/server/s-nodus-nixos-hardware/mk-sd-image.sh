@@ -199,16 +199,14 @@ build() {
 # i.e. two 0x40000 images filling the 0x80000 (512 KiB) partition.
 _write_uboot_env_in_image() {
   local IMG="$1"
-  local env="$WORK/uboot.env"
+  local env
 
-  # uboot-env.txt is used verbatim: its init= points at the stable
-  # /nix/var/nix/profiles/system symlink, so it does not need to track the
-  # current toplevel (and a rebuild that moves the profile is picked up on
-  # the next boot without rewriting this env).
-  #
-  # mkenvimage writes ONE copy of the given size; write it twice ourselves.
-  nix shell nixpkgs#ubootTools -c \
-    mkenvimage -s 0x40000 -r -o "$env" "$HERE/uboot-env.txt"
+  # The environment is the board module's build product (bananapi/bpi-r4-pro
+  # uboot-env.nix), not a second hand-maintained copy.  A local uboot-env.txt
+  # used to live here and drifted from the module; that is how a card ended up
+  # booting the vendor "run boot_sdmmc" env under our firmware.
+  env=$(nix_build "system.build.bpiR4ProUbootEnv") \
+    || { echo "!! could not build bpiR4ProUbootEnv"; exit 1; }
 
   [ "$(stat -c%s "$env")" -eq 262144 ] || { echo "!! unexpected env size"; exit 1; }
 

@@ -110,33 +110,26 @@ nix_build() {
 
   # Cross-build on a non-aarch64 machine.
   #
-  # nixpkgs.buildPlatform defaults to aarch64-linux for this host, so a plain
-  # `nix build .#...` produces derivations whose builders are aarch64 binaries.
-  # On an x86_64 build machine every one of those runs through binfmt_misc
-  # qemu-aarch64, which is 10-50x slower: the ~7 GiB closure (kernel + the QEMU
-  # cobalt VMs) did not finish in hours.
+  # `nixpkgs.buildPlatform` defaults to aarch64-linux for this host, so a plain
+  # `nix build .#...` yields aarch64 builders that run under qemu-aarch64
+  # (10-50x slower -- the ~7 GiB closure did not finish in hours).  The override
+  # lives in /etc/nixos.local.nix (imported by ./local-overrides.nix), NOT in a
+  # `--expr` here.
   #
-  # extendModules adds the platform override to the FLAKE's configuration, so
-  # nixpkgs selects its x86_64 -> aarch64 cross toolchain and aarch64 objects
-  # are compiled by the NATIVE compiler.  The resulting image is identical; only
-  # the build machine's work changes.
+  # It used to be `nix build --impure --expr "getFlake ... extendModules ..."`.
+  # That re-evaluated the whole flake on every call (`builtins.getFlake`
+  # bypasses the eval cache: ~5 minutes before a single compiler started), so
+  # the platform override now lives in /etc/nixos.local.nix instead.
   #
-  # S_NODUS_NO_CROSS=1 forces the native (emulated) path, which is what a
-  # rebuild ON the board (an aarch64 host) uses anyway.
-  if [ -z "${S_NODUS_NO_CROSS:-}" ] && [ "$(uname -m)" != "aarch64" ]; then
-    nix build "${override[@]}" "${extra[@]}" --impure --print-out-paths --no-link --expr "
-      let
-        f = builtins.getFlake \"$REPO\";
-        cfg = f.nixosConfigurations.s-nodus.extendModules {
-          modules = [ { nixpkgs.buildPlatform = \"$(uname -m)-linux\"; } ];
-        };
-      in
-      cfg.config.$attr" \
-      || return 1
-  else
-    nix build "${override[@]}" "${extra[@]}" \
-      "$REPO#nixosConfigurations.s-nodus.config.$attr" --print-out-paths --no-link
-  fi
+  # --impure is NOT optional: ./local-overrides.nix imports
+  # /etc/nixos.local.nix, an absolute path outside the flake.  A pure
+  # evaluation cannot see it, so `buildPlatform` stays aarch64-linux and the
+  # entire closure is built under qemu-aarch64 (measured: 2h21m on the VM
+  # images with no progress).  `nix eval .#...` vs `nix eval --impure .#...`
+  # gives aarch64-linux vs x86_64-linux -- that is the difference between an
+  # hours-long emulated build and a cross build.
+  nix build --impure "${override[@]}" "${extra[@]}" \
+    "$REPO#nixosConfigurations.s-nodus.config.$attr" --print-out-paths --no-link
 }
 
 # SD geometry (512-byte sectors); must match disko.nix.
@@ -351,7 +344,11 @@ _populate_esp() {
   # The aarch64 bootctl runs through binfmt_misc/qemu-user, which is fine: it is
   # one small tool, not the build.
   sudo unshare -m --propagation private bash -eu -c '
+    # Named explicitly: the block below uses six distinct paths and mixing them
+    # up is silent (an earlier version read the profiles dir from $4 and wrote
+    # into the sgdisk STORE PATH).
     img="$1"; builder="$2"; toplevel="$3"; tool="$4"
+    outpart="$5"; profdir="$6"
     loopdev=""
     cleanup() {
       umount /boot 2>/dev/null || true
@@ -383,11 +380,11 @@ _populate_esp() {
     # that contains exactly ONE generation -- the target toplevel -- over
     # /nix/var/nix/profiles for the duration of the install.  The builder then
     # sees a single, aarch64 generation and nothing else.
-    mkdir -p "$4/profiles/var/nix"
-    ln -sfn "$toplevel" "$4/profiles/system"
-    ln -sfn "$toplevel" "$4/profiles/system-1-link"
+    mkdir -p "$profdir/profiles"
+    ln -sfn "$toplevel" "$profdir/profiles/system"
+    ln -sfn "$toplevel" "$profdir/profiles/system-1-link"
     mkdir -p /nix/var/nix/profiles 2>/dev/null || true
-    mount --bind "$4/profiles" /nix/var/nix/profiles 2>/dev/null || {
+    mount --bind "$profdir/profiles" /nix/var/nix/profiles 2>/dev/null || {
       echo "!! cannot bind a private /nix/var/nix/profiles; the ESP would be" >&2
       echo "!! populated from the BUILD-HOST generations (wrong arch)." >&2
       exit 1
@@ -414,7 +411,7 @@ _populate_esp() {
     # only so bootctl accepts the loop device; the card P5 must hold the FAT
     # filesystem directly, otherwise the ESP ends up two levels deep (card GPT
     # -> P5 -> nested GPT -> FAT) which nothing can mount.
-    dd if="$part" of="$5" bs=8M status=none
+    dd if="$part" of="$outpart" bs=8M status=none
     losetup -d "$loopdev"; loopdev=""
   ' _ "$ESPIMG" "$BUILDER" "$TOPLEVEL" "$SGDISK" "$WORK/esp-part.img" "$WORK/esp-profiles"
 }
@@ -430,19 +427,25 @@ _populate_esp() {
 # i.e. two 0x40000 images filling the 0x80000 (512 KiB) partition.
 _write_uboot_env_in_image() {
   local IMG="$1"
-  local env="$WORK/uboot.env"
 
-  # uboot-env.txt is used verbatim: its init= points at the stable
-  # /nix/var/nix/profiles/system symlink, so it does not need to track the
-  # current toplevel (and a rebuild that moves the profile is picked up on
-  # the next boot without rewriting this env).
+  # The environment is the BOARD MODULE's build product, not something this
+  # script re-generates.
   #
-  # mkenvimage writes ONE copy of the given size; write it twice ourselves.
-  nix shell nixpkgs#ubootTools -c \
-    mkenvimage -s 0x40000 -r -o "$env" "$HERE/uboot-env.txt"
+  # It used to run mkenvimage over a hand-maintained $HERE/uboot-env.txt, a
+  # second copy of the same data that drifted from
+  # bananapi/bpi-r4-pro/uboot-env.nix.  That is how a card ended up with the
+  # VENDOR OpenWrt environment under our firmware: "bootcmd=run boot_sdmmc",
+  # looking for a FIT that no longer exists, dropping to BPI-R4P> on every
+  # boot.  One source of truth, and it is the module.
+  local env
+  env=$(nix_build "system.build.bpiR4ProUbootEnv") \
+    || { echo "!! could not build bpiR4ProUbootEnv"; exit 1; }
 
-  [ "$(stat -c%s "$env")" -eq 262144 ] || { echo "!! unexpected env size"; exit 1; }
+  [ "$(stat -c%s "$env")" -eq 262144 ] \
+    || { echo "!! unexpected env size: $(stat -c%s "$env")"; exit 1; }
 
+  # Two redundant 0x40000 copies, matching CONFIG_ENV_SIZE and what the
+  # `ubootenv` partition is sized for.
   dd if="$env" of="$IMG" bs=4096 seek=$(( P2_S / 8 ))      conv=notrunc status=none
   dd if="$env" of="$IMG" bs=4096 seek=$(( P2_S / 8 + 64 )) conv=notrunc status=none
 
@@ -451,7 +454,13 @@ _write_uboot_env_in_image() {
   a=$(dd if="$IMG" bs=4096 skip=$(( P2_S / 8 ))      count=64 status=none | sha256sum | cut -d' ' -f1)
   b=$(dd if="$IMG" bs=4096 skip=$(( P2_S / 8 + 64 )) count=64 status=none | sha256sum | cut -d' ' -f1)
   [ "$a" = "$e" ] && [ "$b" = "$e" ] || { echo "!! ubootenv write mismatch"; exit 1; }
-  echo "   env written (2 copies, sha $e)"
+
+  # Assert the thing that actually matters for a hands-free boot.
+  dd if="$IMG" bs=4096 skip=$(( P2_S / 8 )) count=64 status=none \
+    | strings | grep -q '^bootcmd=bootflow scan -lb$' \
+    || { echo "!! ubootenv does not set bootcmd=bootflow scan -lb" >&2; exit 1; }
+
+  echo "   env written (2 copies, sha $e, bootcmd=bootflow scan -lb)"
 }
 
 # ---------------------------------------------------------------- flash ----

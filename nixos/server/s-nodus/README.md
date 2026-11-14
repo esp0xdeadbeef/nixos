@@ -227,9 +227,16 @@ bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait
 ```
 
 and `root=/dev/fit0` is OpenWrt's device. So the real cmdline **must** live in
-the U-Boot environment (`./uboot-env.txt`, written into the `ubootenv`
-partition). Because writing an env replaces the built-in one entirely, that file
-reproduces every variable the SD boot path needs.
+the U-Boot environment, written into the `ubootenv` partition. Because writing an
+env replaces the built-in one entirely, it reproduces every variable the SD boot
+path needs.
+
+That environment is built by `bananapi/bpi-r4-pro/uboot-env.nix`
+(`system.build.bpiR4ProUbootEnv`), and `mk-sd-image.sh` writes **that** artifact.
+There used to be a second, hand-maintained `uboot-env.txt` in this directory;
+it drifted from the module and a card ended up with the vendor
+`bootcmd=run boot_sdmmc` under our firmware, dropping to `BPI-R4P>` on every
+boot. There is now exactly one source of truth.
 
 ### 2. `init=` is mandatory
 
