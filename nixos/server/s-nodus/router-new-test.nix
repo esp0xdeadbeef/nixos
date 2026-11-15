@@ -312,13 +312,23 @@ in
       system.nixos.tags = [ "router-new-test" ];
 
       # No QEMU envelope for this trial: the candidate is realized as NixOS
-      # containers on this host. Drop both VM instances so nothing starts a
-      # guest, and empty the carrier watcher so it cannot start one either.
-      # Turn the VM manager off outright. Emptying the instance lists is not
-      # enough: the module asserts that at least one instance is enabled and
-      # that every carrier control references one, so "no VMs" has to mean the
-      # manager itself is not configured.
-      services.nixosShellVmManager.enable = lib.mkForce false;
+      # containers on this host, so no VM may start.
+      #
+      # Stop the CARRIER WATCHER, not the whole manager. The watcher
+      # (`nixos-shell-<carrierControls key>.service`, i.e.
+      # nixos-shell-wan-router-vms.service) is the only thing that ever starts
+      # a guest here: it watches `wan-carrier` and brings up
+      # s-router-cobalt-prod when the transceiver is present. Both instances
+      # already have `activation.startOnBoot = false` (vm-host.nix), so with the
+      # watcher stopped nothing starts them -- which is exactly what this trial
+      # wants, and it leaves the manager itself intact and inspectable.
+      #
+      # `services.nixosShellVmManager.enable = lib.mkForce false` also worked,
+      # but it was a blunt substitute: it tore down the manager to stop one
+      # unit, and the whole module had to be disabled to satisfy its own
+      # assertions (a carrier control must reference at least one instance).
+      # Masking the single WAN service expresses the actual requirement.
+      systemd.services.nixos-shell-wan-router-vms.enable = lib.mkForce false;
 
       # The rendered container configuration bind-mounts /run/secrets/devices
       # into every container. sops-nix only creates the directories it has
@@ -517,32 +527,57 @@ in
 
       local.routerCapture.enable = true;
 
-      # Resolve the L2 collision instead of warning about it. The rendered
-      # container target enslaves the two physical ports to br-lan-trunk and
-      # br-wan; cobalt-bridges.nix (written for the QEMU envelope) enslaved the
-      # same ports to br-cobalt-lan / br-cobalt-wan. Two .network files
-      # matching one NIC means networkd applies whichever it likes, so instead
-      # of warning, point the legacy units at the SAME bridges the rendered
-      # target uses. One owner per port, no ambiguity.
-      systemd.network.networks."10-mxl_lan0".networkConfig.Bridge = lib.mkForce "br-lan-trunk";
-      systemd.network.networks."10-eth1".networkConfig.Bridge = lib.mkForce "br-wan";
+      # Do NOT force the physical ports onto the renderer's bridges.
+      #
+      # This specialization used to override three things here:
+      #
+      #   systemd.network.networks."10-mxl_lan0".networkConfig.Bridge = mkForce "br-lan-trunk";
+      #   systemd.network.networks."10-eth1".networkConfig.Bridge    = mkForce "br-wan";
+      #   local.sNodusWifi.trunkBridge                               = mkForce "br-lan-trunk";
+      #
+      # All three are gone, because all three were the trial negotiating bridge
+      # ownership on the host's behalf. The division of labour is:
+      #
+      #   host (cobalt-bridges.nix)  hands over RAW L2 ports as bridge members
+      #   renderer                   owns every bridge and VLAN above them
+      #
+      # A host bridge is a FABRIC, not a link. Its throughput is not the
+      # negotiated rate of any one member port -- measured on this board,
+      # br-cobalt-lan forwards ~8.84 Gbit/sec between netdevs while mxl_lan0 is
+      # a 2.5G PHY (see default.nix). So a 2.5G jack in the bridge does not cap
+      # the bridge, and there is nothing to "fix" about the port's speed.
+      #
+      # Why the eth1 override was actively harmful (measured, 2026-11-15 boot
+      # 1f23524a):
+      #   - 10-eth1.network (host) and 20-eth1.network (rendered) both match
+      #     eth1; networkd applies only the FIRST in lexical order, so the host
+      #     file won and the rendered `VLAN=eth1.300` was discarded
+      #     (AGENTS.md defect #2).
+      #   - 11-eth1.300.netdev cannot compensate: `[VLAN] Parent=` is rejected by
+      #     this systemd and not exposed by nixpkgs (AGENTS.md defect #1).
+      #   - So eth1.300 was never created at all: `journalctl -b -2 | grep
+      #     eth1.300` printed nothing, and container@core started `udhcpc` on
+      #     wan at 03:25:48 and stopped it at 03:27:40 with no lease. No tag ->
+      #     no provider -> egress=broken, which is the outage this trial was
+      #     supposed to be measuring, not causing.
+      #
+      # Why the mxl_lan0 override was harmful (same boot): moving the trunk port
+      # to br-lan-trunk left br-cobalt-lan with ZERO members -- the trial runs no
+      # VM, so there is no vhost tap to keep it up -- and cobalt-bridges.nix
+      # still terminates clients VLAN 30 as cobalt-lan.30 off it. That produced
+      # 55 AP unit failures in that boot, and was the reason the Wi-Fi override
+      # below existed at all.
+      #
+      # Leaving both ports alone keeps br-cobalt-lan and br-cobalt-wan populated
+      # exactly as on production, and lets the rendered config be the sole
+      # declarer of its own bridges and VLANs on top.
 
-      # Wi-Fi must ride the trunk that actually has a member in this shape.
+      # Wi-Fi rides the trunk bridge cobalt-bridges.nix gives it, unchanged.
       #
-      # Moving mxl_lan0 to br-lan-trunk (above) leaves br-cobalt-lan with NO
-      # member: this trial disables the VM manager, so the router VM's vhost tap
-      # that normally keeps it up (vm-host.nix vhost-tap-attach) is never
-      # created. cobalt-bridges.nix still terminates clients VLAN 30 as
-      # `cobalt-lan.30` off br-cobalt-lan, so in that shape the VLAN child -- and
-      # every AP bridging onto the resulting vlan30 -- is NO-CARRIER, and each
-      # cobalt-clients AP loops on its `state UP` preStart (measured 2026-11-11:
-      # the AP units stuck activating/auto-restart, restart counter 17).
-      #
-      # The AP module takes the trunk as data, so point it at the same bridge
-      # the inventory gives the physical trunk (`uplinks.trunk.bridge` in
-      # prod-network/testing/inventory-cobalt.nix). Prod keeps the default and
-      # is therefore completely unaffected by this override.
-      local.sNodusWifi.trunkBridge = lib.mkForce "br-lan-trunk";
+      # The trunkBridge override existed only to compensate for moving mxl_lan0
+      # onto br-lan-trunk above; with that gone, br-cobalt-lan keeps its member
+      # and cobalt-lan.30 (and every AP bridging onto vlan30) stays up exactly
+      # as in production. Prod keeps the default and is unaffected either way.
 
       # Host management stays on vlan30. It is the host's own underlay
       # address (10.2.30.100) and the path nebula/ssh use, and vlan30 is fed by
