@@ -2321,11 +2321,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794714205,
-        "narHash": "sha256-/RihH5QBU1GTl7N+DYydB2zD7s4BD4zQBhYHrs1558k=",
+        "lastModified": 1794765601,
+        "narHash": "sha256-mWAEU1DdLO7j4PohaYEp8YZG2fF3NIik2J5j9eFfojc=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-containerlab-linux-backend",
-        "rev": "8767403a2a1d04f2ba7312dcfb1f000dd9d2cdf5",
+        "rev": "ce07fe3e75fd7de0da0b9507df944506d5b41951",
         "type": "github"
       },
       "original": {
