@@ -35,6 +35,9 @@
 #   sudo ./sync-firmware.sh              # apply whatever differs
 #   sudo ./sync-firmware.sh --check      # report drift, write nothing (exit 1 if drift)
 #   sudo ./sync-firmware.sh --force-fip  # rewrite the FIP even if the sums match
+#   sudo ./sync-firmware.sh --fip-only   # BL31/U-Boot only (SAFE default in practice:
+#                                       #   BL2 needs the card pulled if it is wrong)
+#   sudo ./sync-firmware.sh --bl2-only   # risky; only for a BL2 known to boot
 #   sudo ./sync-firmware.sh --adopt      # record what is on the card as current,
 #                                        # e.g. after a hand-flash, to stop drift
 set -euo pipefail
@@ -51,10 +54,14 @@ FIP_PARTLABEL=fip
 CHECK=0
 FORCE_FIP=0
 ADOPT=0
+ONLY_FIP=0
+ONLY_BL2=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --check) CHECK=1 ;;
     --force-fip) FORCE_FIP=1 ;;
+    --fip-only) ONLY_FIP=1 ;;
+    --bl2-only) ONLY_BL2=1 ;;
     --adopt) ADOPT=1 ;;
     -h | --help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
@@ -181,6 +188,16 @@ NEED_FIP=0
 [ "$REC_BL2" = "$BL2_SUM" ] || NEED_BL2=1
 [ "$REC_FIP" = "$FIP_SUM" ] || NEED_FIP=1
 [ "$FORCE_FIP" -eq 1 ] && NEED_FIP=1
+
+# --fip-only / --bl2-only restrict the write set.  BL2 must be written alone
+# unless it has been PROVEN to boot: it is the one tier whose failure cannot
+# be recovered without physically pulling the card.  Writing it as a side
+# effect of "the FIP changed" bricked this board once already.
+if [ "$ONLY_FIP" -eq 1 ] && [ "$ONLY_BL2" -eq 1 ]; then
+  die "--fip-only and --bl2-only are mutually exclusive"
+fi
+[ "$ONLY_FIP" -eq 1 ] && NEED_BL2=0
+[ "$ONLY_BL2" -eq 1 ] && NEED_FIP=0
 
 if [ "$ADOPT" -eq 1 ]; then
   [ "$(id -u)" -eq 0 ] || die "--adopt writes to $MANIFEST; run as root"
