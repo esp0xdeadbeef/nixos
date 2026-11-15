@@ -244,7 +244,7 @@ let
 
       wan = uplinkPort {
         uplink = "wan";
-        bridge = "br-wan";
+        bridge = "br-cobalt-wan";
         interfaceName = "wan";
       };
     })
@@ -1086,7 +1086,7 @@ in
             mode = "vlan";
             vlan = 300;
             parent = "eth1";
-            bridge = "br-wan";
+            bridge = "br-cobalt-wan";
             ipv4 = {
               enable = true;
               dhcp = true;

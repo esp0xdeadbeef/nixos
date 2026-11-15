@@ -78,9 +78,22 @@ let
   containerBinding = producer.containerPlatformBinding {
     inherit hostName;
     bundle = canonicalBundle;
-    # eth1 is the WAN uplink on br-wan; the LAN side is the trunk bridge.
+    # eth1 is the WAN uplink on br-cobalt-wan; the LAN side is the trunk bridge.
+    #
+    # This map is the ONLY remaining place that named `br-wan`, and it was the
+    # reason the trial could never reach the provider: the host provides
+    # br-cobalt-wan (cobalt-bridges.nix enslaves eth1 to it, unaddressed raw
+    # L2), while this hardcoded value put the core's `wan` veth on a bridge the
+    # host never creates. Measured on boot e7f5b9d6: `br-cobalt-wan: port
+    # 1(eth1)` and `br-wan: port 1(cor-wan-eca)` forwarding in two disconnected
+    # L2 domains, with `eth1.300` absent entirely.
+    #
+    # Nothing above this line derives the name -- the renderer emits whatever
+    # string is here -- so changing it is what actually makes the trial and
+    # production agree. production is unaffected: this file is only imported by
+    # the router-new-test specialization.
     interfaceBridges = {
-      wan = "br-wan";
+      wan = "br-cobalt-wan";
       ens3 = "br-lan-trunk";
     };
   };
