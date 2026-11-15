@@ -527,57 +527,57 @@ in
 
       local.routerCapture.enable = true;
 
-      # Do NOT force the physical ports onto the renderer's bridges.
+      # Hand the WAN port to the rendered config entirely: delete the host's
+      # competing .network for eth1 instead of overriding its bridge.
       #
-      # This specialization used to override three things here:
+      # The renderer ships a complete, self-consistent set for the WAN:
       #
-      #   systemd.network.networks."10-mxl_lan0".networkConfig.Bridge = mkForce "br-lan-trunk";
-      #   systemd.network.networks."10-eth1".networkConfig.Bridge    = mkForce "br-wan";
-      #   local.sNodusWifi.trunkBridge                               = mkForce "br-lan-trunk";
+      #   20-eth1.network       eth1: VLAN=eth1.300          (a trunk port, no bridge)
+      #   11-eth1.300.netdev    eth1.300: kind vlan, Id 300  (no [VLAN] Parent=)
+      #   21-eth1.300.network   eth1.300: Bridge=br-wan
+      #   40-cor-wan-eca.network cor-wan-eca: Bridge=br-wan  (the core's WAN veth)
       #
-      # All three are gone, because all three were the trial negotiating bridge
-      # ownership on the host's behalf. The division of labour is:
+      # i.e. eth1 must be UNBRIDGED with a tagged child, and the tag -- not the
+      # raw port -- lands in br-wan next to the core's veth.
       #
-      #   host (cobalt-bridges.nix)  hands over RAW L2 ports as bridge members
-      #   renderer                   owns every bridge and VLAN above them
+      # cobalt-bridges.nix instead declares `10-eth1: Bridge=br-cobalt-wan`,
+      # unaddressed raw L2, because in the VM shape a QEMU tap is the bridge
+      # member and the guest terminates VLAN 300 itself. In THIS shape there is
+      # no guest, so that unit is not just wrong, it is fatal:
       #
-      # A host bridge is a FABRIC, not a link. Its throughput is not the
-      # negotiated rate of any one member port -- measured on this board,
-      # br-cobalt-lan forwards ~8.84 Gbit/sec between netdevs while mxl_lan0 is
-      # a 2.5G PHY (see default.nix). So a 2.5G jack in the bridge does not cap
-      # the bridge, and there is nothing to "fix" about the port's speed.
+      #   networkd applies only the FIRST matching .network in lexical order,
+      #   so `10-eth1` beats `20-eth1` and the rendered `VLAN=eth1.300` never
+      #   runs (AGENTS.md defect #2). `11-eth1.300.netdev` cannot compensate
+      #   because this systemd rejects `[VLAN] Parent=` and nixpkgs does not
+      #   expose it (AGENTS.md defect #1).
       #
-      # Why the eth1 override was actively harmful (measured, 2026-11-15 boot
-      # 1f23524a):
-      #   - 10-eth1.network (host) and 20-eth1.network (rendered) both match
-      #     eth1; networkd applies only the FIRST in lexical order, so the host
-      #     file won and the rendered `VLAN=eth1.300` was discarded
-      #     (AGENTS.md defect #2).
-      #   - 11-eth1.300.netdev cannot compensate: `[VLAN] Parent=` is rejected by
-      #     this systemd and not exposed by nixpkgs (AGENTS.md defect #1).
-      #   - So eth1.300 was never created at all: `journalctl -b -2 | grep
-      #     eth1.300` printed nothing, and container@core started `udhcpc` on
-      #     wan at 03:25:48 and stopped it at 03:27:40 with no lease. No tag ->
-      #     no provider -> egress=broken, which is the outage this trial was
-      #     supposed to be measuring, not causing.
+      # Be precise about the two distinct failures measured so far, because the
+      # second only became visible after the first was fixed:
       #
-      # Why the mxl_lan0 override was harmful (same boot): moving the trunk port
-      # to br-lan-trunk left br-cobalt-lan with ZERO members -- the trial runs no
-      # VM, so there is no vhost tap to keep it up -- and cobalt-bridges.nix
-      # still terminates clients VLAN 30 as cobalt-lan.30 off it. That produced
-      # 55 AP unit failures in that boot, and was the reason the Wi-Fi override
-      # below existed at all.
+      #   boot 1f23524a (before this change): eth1 was mkForce'd onto br-wan, so
+      #     10-eth1 still won the match; eth1.300 was never created at all
+      #     (`journalctl -b -2 | grep eth1.300` printed nothing), the core's
+      #     udhcpc ran 03:25:48-03:27:40 with no lease, egress=broken.
       #
-      # Leaving both ports alone keeps br-cobalt-lan and br-cobalt-wan populated
-      # exactly as on production, and lets the rendered config be the sole
-      # declarer of its own bridges and VLANs on top.
+      #   boot e7f5b9d6 (AFTER removing the mkForce): eth1 sat on br-cobalt-wan
+      #     while cor-wan-eca sat on br-wan -- two disconnected L2 domains with
+      #     nothing bridging them, and eth1.300 STILL absent (0 journal matches),
+      #     because the shadowing was the actual cause and the rename had been
+      #     masking it. Removing an override on a unit that is still shadowing
+      #     its replacement fixed nothing; it just moved the symptom.
+      #
+      # So: suppress the host unit. The rendered 20-/11-/21- set then wins, eth1
+      # stays an unbridged trunk, eth1.300 is created, its tag joins br-wan, and
+      # the core's WAN veth is already there. Prod keeps `10-eth1` untouched --
+      # this is `mkForce` on the option's `enable`, inside the specialization
+      # only, so the production boot entry is unaffected.
+      systemd.network.networks."10-eth1".enable = lib.mkForce false;
 
-      # Wi-Fi rides the trunk bridge cobalt-bridges.nix gives it, unchanged.
-      #
-      # The trunkBridge override existed only to compensate for moving mxl_lan0
-      # onto br-lan-trunk above; with that gone, br-cobalt-lan keeps its member
-      # and cobalt-lan.30 (and every AP bridging onto vlan30) stays up exactly
-      # as in production. Prod keeps the default and is unaffected either way.
+      # The remaining host-side overrides below are left exactly as they were.
+      # They concern the LAN trunk, not the WAN, and moving mxl_lan0 off
+      # br-cobalt-lan cost 55 AP unit failures in the 1f23524a boot (the trial
+      # runs no VM, so there is no vhost tap keeping br-cobalt-lan populated
+      # while cobalt-lan.30 still hangs off it). Untouched deliberately.
 
       # Host management stays on vlan30. It is the host's own underlay
       # address (10.2.30.100) and the path nebula/ssh use, and vlan30 is fed by
