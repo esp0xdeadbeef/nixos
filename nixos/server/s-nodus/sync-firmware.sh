@@ -102,9 +102,18 @@ card_fip_sha() {
   fi
 }
 
+# Hash only as many bytes as the image we are comparing against.  The BL2
+# *partition* is 8158 sectors (~4 MiB) but bl2.img is ~250 KiB, so hashing the
+# whole partition never matches the built file -- that produced a false
+# "readback MISMATCH" on a write that was actually correct.
 card_bl2_sha() {
-  dd if="$DEV" bs=512 skip="$BL2_SECTOR" count="$BL2_SECTORS" status=none |
-    sha256sum | cut -d' ' -f1
+  local n=${1:-}
+  if [ -n "$n" ]; then
+    dd if="$DEV" bs=512 skip="$BL2_SECTOR" status=none | head -c "$n" | sha256sum | cut -d' ' -f1
+  else
+    dd if="$DEV" bs=512 skip="$BL2_SECTOR" count="$BL2_SECTORS" status=none |
+      sha256sum | cut -d' ' -f1
+  fi
 }
 
 # --- resolve the built firmware ------------------------------------------
@@ -135,9 +144,14 @@ FIP_OUT=$(nix_build "$ATTR.system.build.bpiR4ProFip")
 BL2_IMG="$ATF_OUT/bl2.img"
 [ -f "$BL2_IMG" ] || die "no bl2.img in $ATF_OUT"
 
-FIP_IMG=$(find "$FIP_OUT" -maxdepth 1 -type f \( -name '*.fip' -o -name 'fip*' \) | head -1)
-[ -n "$FIP_IMG" ] || FIP_IMG="$FIP_OUT/fip.bin"
-[ -f "$FIP_IMG" ] || die "no fip image in $FIP_OUT"
+# system.build.bpiR4ProFip is a runCommand whose *output is the FIP file
+# itself* (see fip.nix: `fiptool create ... "$out"`), not a directory.
+if [ -f "$FIP_OUT" ]; then
+  FIP_IMG="$FIP_OUT"
+else
+  FIP_IMG=$(find "$FIP_OUT" -maxdepth 1 -type f \( -name '*.fip' -o -name 'fip*' \) | head -1)
+fi
+[ -n "$FIP_IMG" ] && [ -f "$FIP_IMG" ] || die "no fip image from $FIP_OUT"
 
 BL2_SUM=$(sha256sum "$BL2_IMG" | cut -d' ' -f1)
 FIP_SUM=$(sha256sum "$FIP_IMG" | cut -d' ' -f1)
@@ -170,7 +184,7 @@ NEED_FIP=0
 
 if [ "$ADOPT" -eq 1 ]; then
   [ "$(id -u)" -eq 0 ] || die "--adopt writes to $MANIFEST; run as root"
-  manifest_set bl2 "$(card_bl2_sha)"
+  manifest_set bl2 "$(card_bl2_sha "$(stat -c%s "$BL2_IMG")")"
   manifest_set fip "$(card_fip_sha "$(stat -c%s "$FIP_IMG")")"
   say ">> adopted current card contents as installed"
   exit 0
@@ -218,7 +232,8 @@ if [ "$NEED_BL2" -eq 1 ]; then
   sync
 
   say ">> verifying BL2 readback"
-  NOW=$(card_bl2_sha)
+  BL2_SIZE=$(stat -c%s "$BL2_IMG")
+  NOW=$(card_bl2_sha "$BL2_SIZE")
   [ "$NOW" = "$BL2_SUM" ] ||
     die "BL2 readback MISMATCH (got $NOW) -- the card may not boot"
   say "   OK"
