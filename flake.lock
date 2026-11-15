@@ -377,11 +377,11 @@
         "nixpkgs-network": "nixpkgs-network"
       },
       "locked": {
-        "lastModified": 1794519660,
-        "narHash": "sha256-mBgeFYEvZNlj/5OW36t136bCxbQknOil+235M82c1WY=",
+        "lastModified": 1794706510,
+        "narHash": "sha256-3rvajvJAmWSedofAHL1gMW9AdXZgRUfOve1ZEZrVoE0=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "6e8648990efe2a2ef838e4d0b5b881d609f147b9",
+        "rev": "7008fbb17ae58e744cc3b62e4e5da4ee00a602b5",
         "type": "github"
       },
       "original": {
@@ -450,11 +450,11 @@
         "nixpkgs-network": "nixpkgs-network_30"
       },
       "locked": {
-        "lastModified": 1794519660,
-        "narHash": "sha256-mBgeFYEvZNlj/5OW36t136bCxbQknOil+235M82c1WY=",
+        "lastModified": 1794706510,
+        "narHash": "sha256-3rvajvJAmWSedofAHL1gMW9AdXZgRUfOve1ZEZrVoE0=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "6e8648990efe2a2ef838e4d0b5b881d609f147b9",
+        "rev": "7008fbb17ae58e744cc3b62e4e5da4ee00a602b5",
         "type": "github"
       },
       "original": {
@@ -800,11 +800,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1794543056,
-        "narHash": "sha256-O4xjBbw3YhEbi58hkqWjLHbhZBuwOuiiZRIgMNKQfjE=",
+        "lastModified": 1794708028,
+        "narHash": "sha256-JbR8asdBbc/GrFhtPiw6QuwCcDYTV3CFJb8oVJVcHuU=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "a8cebf09112852a84382451629bbca451f842cc0",
+        "rev": "22f26193e90b56b2bc1ecb63bf2d7cda1acde4f9",
         "type": "github"
       },
       "original": {
@@ -2946,11 +2946,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794609034,
-        "narHash": "sha256-mC379f2Ke921LsRnARmFq79Y5kPsqSW2qG8lXok1Auk=",
+        "lastModified": 1794698005,
+        "narHash": "sha256-dk4wVa1stX64yNmQdbBdQNeF38umWbq5YzcHmT+DgOw=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nixos",
-        "rev": "ee9fc15a9db74622d655585d24fd7d52c7237473",
+        "rev": "4ee72208c691c60d3051c0be5f992c76d20a6c55",
         "type": "github"
       },
       "original": {
@@ -3798,11 +3798,11 @@
         "nixpkgs-network": "nixpkgs-network_31"
       },
       "locked": {
-        "lastModified": 1794519660,
-        "narHash": "sha256-mBgeFYEvZNlj/5OW36t136bCxbQknOil+235M82c1WY=",
+        "lastModified": 1794706510,
+        "narHash": "sha256-3rvajvJAmWSedofAHL1gMW9AdXZgRUfOve1ZEZrVoE0=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-network-compiler",
-        "rev": "6e8648990efe2a2ef838e4d0b5b881d609f147b9",
+        "rev": "7008fbb17ae58e744cc3b62e4e5da4ee00a602b5",
         "type": "github"
       },
       "original": {
