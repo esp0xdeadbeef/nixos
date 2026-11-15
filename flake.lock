@@ -800,11 +800,11 @@
         "nixpkgs-network": "nixpkgs-network_4"
       },
       "locked": {
-        "lastModified": 1794741401,
-        "narHash": "sha256-UpZeQ5Yw0eQ8E/Vo3Fzs6OABhv/fa9o4sl6qBzv8DdU=",
+        "lastModified": 1794744917,
+        "narHash": "sha256-ci+ZQkibN71OY/Mjle1TXeiBwt0Fo58ppr7bbk/PKXA=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "81d54ac878b2c175bf4acc3891089b56aac87205",
+        "rev": "c1a921fb39a2658221501d5a7427986d2ed08061",
         "type": "github"
       },
       "original": {
