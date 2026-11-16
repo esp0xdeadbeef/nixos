@@ -1329,11 +1329,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1794832279,
-        "narHash": "sha256-cNRv8E6CPJc8ulgUkeu5kN8w5VovYs1p5NI9enh48Wk=",
+        "lastModified": 1794836531,
+        "narHash": "sha256-GT91JjKUlRAWhn9g7mxQDgmSBe8uGZqw9bueqUZFF14=",
         "owner": "esp0xdeadbeef",
         "repo": "network-labs",
-        "rev": "c0ef0d928a1a19060364ea44bcdab715f51cad6d",
+        "rev": "23ec552d72855da03d6f9f3281d28a594b8d8f8a",
         "type": "github"
       },
       "original": {
