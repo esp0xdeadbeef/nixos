@@ -21,8 +21,8 @@ The GAMP specs are the contract. "It renders / it works" is not evidence
 you placed a behavior in the right layer.
 
 - Before touching any network code or network config, READ
-  `~/github/network-codex-agent/GAMP/URS/README.md` and
-  `~/github/network-codex-agent/GAMP/FS/README.md` — the files themselves,
+  `~/github/canonical-gamp/GAMP/URS/README.md` and
+  `~/github/canonical-gamp/GAMP/FS/README.md` — the files themselves,
   not a summary — and state in your plan which spec sentence assigns the
   behavior to the layer you are about to edit (compiler / forwarding-model /
   control-plane-model / realization-model / renderer).
