@@ -450,11 +450,11 @@
         "nixpkgs-network": "nixpkgs-network_30"
       },
       "locked": {
-        "lastModified": 1794720476,
-        "narHash": "sha256-//h8ETNDfSKhB7TtaTMltoMps4GOuHyhcHs8nJb5Log=",
+        "lastModified": 1794789364,
+        "narHash": "sha256-EbIsX3CZSZPSXDWWGRUMK8BRUWceLNvq47mNt3yql+c=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "f47ce9a81ce767bddf04fd4c8c078167bef46d31",
+        "rev": "9f339f68c513d4f2dcabd40d44370196c50ab3d3",
         "type": "github"
       },
       "original": {
@@ -602,11 +602,11 @@
         "nixpkgs-network": "nixpkgs-network_10"
       },
       "locked": {
-        "lastModified": 1794720476,
-        "narHash": "sha256-//h8ETNDfSKhB7TtaTMltoMps4GOuHyhcHs8nJb5Log=",
+        "lastModified": 1794789364,
+        "narHash": "sha256-EbIsX3CZSZPSXDWWGRUMK8BRUWceLNvq47mNt3yql+c=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "f47ce9a81ce767bddf04fd4c8c078167bef46d31",
+        "rev": "9f339f68c513d4f2dcabd40d44370196c50ab3d3",
         "type": "github"
       },
       "original": {
@@ -1329,11 +1329,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1794789340,
-        "narHash": "sha256-H5O4K2opc6j/04ASBmOl3LuxkZm+xQWGAyodmlgQob0=",
+        "lastModified": 1794811653,
+        "narHash": "sha256-n9Ljt1J7Jzh+fS6WCbegmFbA/bx11FXJ4g7qmPzzPdI=",
         "owner": "esp0xdeadbeef",
         "repo": "network-labs",
-        "rev": "2772b912d60fc9b711f09d5f4d013cbfee7cbbcc",
+        "rev": "e89eeb06fa53460a95332664522857696087a314",
         "type": "github"
       },
       "original": {
@@ -2321,11 +2321,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794787534,
-        "narHash": "sha256-2YF9j5vmSr/x/C0FX7qVTvHyhBFBgYq2ooPycjMw2as=",
+        "lastModified": 1794811663,
+        "narHash": "sha256-Cw00p6+mgn61hGMxd68Ed+1N3jYWi13gB3dn2gcjI88=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-containerlab-linux-backend",
-        "rev": "babc0d52ebce79323e2d0078df5eafbf55099d84",
+        "rev": "4ea637770f73fe61b2974d065b212a0952391fb3",
         "type": "github"
       },
       "original": {
@@ -3798,11 +3798,11 @@
         "nixpkgs-network": "nixpkgs-network_31"
       },
       "locked": {
-        "lastModified": 1794720476,
-        "narHash": "sha256-//h8ETNDfSKhB7TtaTMltoMps4GOuHyhcHs8nJb5Log=",
+        "lastModified": 1794789364,
+        "narHash": "sha256-EbIsX3CZSZPSXDWWGRUMK8BRUWceLNvq47mNt3yql+c=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos-network-compiler",
-        "rev": "f47ce9a81ce767bddf04fd4c8c078167bef46d31",
+        "rev": "9f339f68c513d4f2dcabd40d44370196c50ab3d3",
         "type": "github"
       },
       "original": {
