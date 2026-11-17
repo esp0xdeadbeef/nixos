@@ -1386,6 +1386,11 @@ in
         (allowTenantToWan "cobalt-svc" 110)
         (allowTenantToWan "cobalt-iot" 120)
         (allowTenantToWan "cobalt-mgmt" 140)
+        # FS-460: cobalt-svc is the documented consumer of the cross-site
+        # garnet overlay (the Ollama service on vlan3 is reached over it).
+        # Without this relation the overlay terminates on the core with no
+        # access lane, so the model emits routes no cobalt tenant can use.
+        (allowTenantToGarnet { tenant = "cobalt-svc"; shortName = "svc"; priority = 150; })
         # cobalt-iot-srv is not an ordinary egress tenant: it is the
         # underlayAccess carrier for the onyx/opal VPN overlays. Its WAN need
         # is exactly the WireGuard transport (udp/1637), so it names that class
