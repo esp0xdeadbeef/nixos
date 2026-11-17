@@ -432,6 +432,17 @@ in
   # emergency mode with "Timed out waiting for device".  mmc_block is built into
   # the kernel, so the boot chain needs nothing extra.
   hardware.enableAllHardware = lib.mkForce false;
+
+  # Warm reboot hangs on this board: arm64 machine_restart() trusted U-Boot's
+  # EFI ResetSystem, which does not reset the SoC, so the PSCI handler behind it
+  # never ran and the box sat at "Reboot failed -- System halted".  The kernel is
+  # patched to run the restart chain first (see nixos-hardware
+  # patches/983-arm64-restart-before-efi.patch); this adds a userspace fallback
+  # that issues PSCI SYSTEM_RESET itself, ordered after umount.target and
+  # final.target so every filesystem is unmounted or read-only and sync(2) has
+  # run -- resetting any earlier would risk a dirty btrfs.  Enabled while the
+  # kernel fix is being validated on hardware; drop it once reboot is reliable.
+  hardware.bananapi.bpi-r4-pro.smcReboot.enable = true;
   # Module names must match what this kernel actually ships: `nvme` IS the PCI
   # driver here (there is no separate nvme-pci.ko), and it depends on
   # nvme-core.  No `ahci` -- the board has no SATA.
