@@ -87,7 +87,6 @@ static long smc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static const struct file_operations smc_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = smc_ioctl,
-	.llseek = no_llseek,
 };
 
 static struct miscdevice smc_dev = {
