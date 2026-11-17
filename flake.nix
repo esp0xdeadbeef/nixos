@@ -312,12 +312,18 @@
     # laptops and the Dell servers -- uses the upstream `nixos-hardware` above,
     # so board-specific work never lands on them.
     #
-    # ddc90236 is the `bananapi-bpi-r4-pro-efi` branch: the board builds its own
-    # boot chain (BL2 + FIP carrying BL31 and U-Boot with CONFIG_EFI_LOADER) and
-    # boots an ESP through systemd-boot, instead of the signed vendor OpenWrt
-    # firmware and its raw FIT.
+    # a1a3c296 is the `bananapi-bpi-r4-pro-efi` branch: the board builds its
+    # own boot chain (BL2 + FIP carrying BL31 and U-Boot with
+    # CONFIG_EFI_LOADER) and boots an ESP through systemd-boot, instead of the
+    # signed vendor OpenWrt firmware and its raw FIT.
+    #
+    # Bumped 719b19b2 -> a1a3c296 to pick up "stop building 1570 kernel DTBs":
+    # the aarch64 kernel builder defaulted buildDTBs to true and compiled every
+    # DTB for every ARCH_* common-config enables (~118M, 1570 files) into the
+    # kernel output, even though the board's one DTB is built by dtc from
+    # ./dtb.  There is no behaviour change for anything else.
     nixos-hardware-bpi-r4-pro = {
-      url = "github:esp0xdeadbeef/nixos-hardware/719b19b2";
+      url = "github:esp0xdeadbeef/nixos-hardware/a1a3c296";
       # Share the fleet's nixpkgs rather than pulling the fork's own pin into
       # the module system as a second nixpkgs.
       inputs.nixpkgs.follows = "nixpkgs";
