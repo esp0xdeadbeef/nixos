@@ -317,7 +317,7 @@
     # boots an ESP through systemd-boot, instead of the signed vendor OpenWrt
     # firmware and its raw FIT.
     nixos-hardware-bpi-r4-pro = {
-      url = "github:esp0xdeadbeef/nixos-hardware/3597a431";
+      url = "github:esp0xdeadbeef/nixos-hardware/719b19b2";
       # Share the fleet's nixpkgs rather than pulling the fork's own pin into
       # the module system as a second nixpkgs.
       inputs.nixpkgs.follows = "nixpkgs";
