@@ -312,18 +312,22 @@
     # laptops and the Dell servers -- uses the upstream `nixos-hardware` above,
     # so board-specific work never lands on them.
     #
-    # a1a3c296 is the `bananapi-bpi-r4-pro-efi` branch: the board builds its
+    # ad56e4fe is the `bananapi-bpi-r4-pro-efi` branch: the board builds its
     # own boot chain (BL2 + FIP carrying BL31 and U-Boot with
     # CONFIG_EFI_LOADER) and boots an ESP through systemd-boot, instead of the
     # signed vendor OpenWrt firmware and its raw FIT.
     #
-    # Bumped 719b19b2 -> a1a3c296 to pick up "stop building 1570 kernel DTBs":
-    # the aarch64 kernel builder defaulted buildDTBs to true and compiled every
-    # DTB for every ARCH_* common-config enables (~118M, 1570 files) into the
-    # kernel output, even though the board's one DTB is built by dtc from
-    # ./dtb.  There is no behaviour change for anything else.
+    # Bumped 719b19b2 -> a1a3c296 -> ad56e4fe to pick up two kernel changes:
+    # "stop building 1570 kernel DTBs" (the aarch64 builder defaulted
+    # buildDTBs to true and compiled every DTB for every ARCH_* common-config
+    # enables -- ~118M, 1570 files -- into the kernel output, though the
+    # board's one DTB is built by dtc from ./dtb) and "say buildDTBs=no
+    # explicitly" (so kernel.buildDTBs is a real `false` rather than a missing
+    # attribute, which is what hardware.deviceTree.enable defaults to on).
+    # No behaviour change for anything else; the board DTB still comes from
+    # dtbSource, so the SSD/PCIe description is unaffected.
     nixos-hardware-bpi-r4-pro = {
-      url = "github:esp0xdeadbeef/nixos-hardware/a1a3c296";
+      url = "github:esp0xdeadbeef/nixos-hardware/ad56e4fe";
       # Share the fleet's nixpkgs rather than pulling the fork's own pin into
       # the module system as a second nixpkgs.
       inputs.nixpkgs.follows = "nixpkgs";
