@@ -1026,6 +1026,17 @@ let
       bridge = "rt-core-vpn-garnet-cobalt-upstream-selector";
       interfaceName = "upstream-selector";
     };
+
+    # FS-255: the overlay terminator's egress-facing host surface is the
+    # carriage attachment named by transport.overlays.garnet.underlayAccess.
+    # It is a port on the cobalt-iot-srv access LAN, exactly as onyx/opal model
+    # theirs; it carries the tunnel's underlay reachability and no exit
+    # authority.
+    tenant-cobalt-iot-srv = tenantPort {
+      logicalInterface = "tenant-cobalt-iot-srv";
+      bridge = "iot-srv";
+      interfaceName = "iot-srv";
+    };
   };
 in
 {
@@ -1506,21 +1517,6 @@ in
                     # Bare IPv4 the daemon listens on (target/underlay fact,
                     # SMS-110: explicit; here the WAN-facing core interface).
                     listenHost = "0.0.0.0";
-                  };
-                  groups = [ "garnet" ];
-                };
-                # The policy node joins the overlay once a tenant lane reaches
-                # it: the access lane traverses policy, so policy carries the
-                # nebula interface and needs its modeled endpoint identity.
-                policy = {
-                  addr4 = "10.80.0.4/24";
-                  addr6 = "fd42:dead:beef:80::4/64";
-                  service = {
-                    name = "policy";
-                    interface = "nebula-garnet";
-                    mtu = 1280;
-                    listenHost = "0.0.0.0";
-                    port = 4243;
                   };
                   groups = [ "garnet" ];
                 };

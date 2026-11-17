@@ -1121,6 +1121,10 @@ in
         # It selects the peer site's service scopes, which own their prefixes
         # (FS-322), and offers no default: an egress (default offers 0.0.0.0/0
         # and ::/0) is not modeled here.
+        # The overlay terminator is a client of the underlayAccess tenant's
+        # access LAN: that attachment is what draws the terminator->access
+        # virtual edge, which is how the tunnel's outer packets get a next hop
+        # (the site's ordinary internet access).  It is not a core-to-core link.
         core-vpn-garnet-neon = {
           role = "core";
 
@@ -1130,6 +1134,12 @@ in
             # FS-460: the garnet overlay also carries cobalt-svc -> ollama in
             # the vlan3 access space, so the overlay core must select it.
             "access-vlan3"
+          ];
+          attachments = [
+            {
+              kind = "tenant";
+              name = "neon-iot-srv";
+            }
           ];
         };
 
@@ -1656,12 +1666,22 @@ in
         # It selects the peer site's service scopes, which own their prefixes
         # (FS-322), and offers no default: an egress (default offers 0.0.0.0/0
         # and ::/0) is not modeled here.
+        # The overlay terminator is a client of the underlayAccess tenant's
+        # access LAN: that attachment is what draws the terminator->access
+        # virtual edge, which is how the tunnel's outer packets get a next hop
+        # (the site's ordinary internet access).  It is not a core-to-core link.
         core-vpn-garnet-cobalt = {
           role = "core";
 
           selects = [
             "access-svc"
             "access-dmz"
+          ];
+          attachments = [
+            {
+              kind = "tenant";
+              name = "cobalt-iot-srv";
+            }
           ];
         };
 
@@ -1744,32 +1764,6 @@ in
     transport = {
       overlays = [
         {
-          name = "garnet";
-          terminateOn = "core-vpn-garnet-cobalt";
-          peerSite = "esp0xdeadbeef.neon";
-          mustTraverse = [ "policy" ];
-          underlayAccess = {
-            kind = "tenant";
-            name = "cobalt-iot-srv";
-          };
-          peerNodes = {
-            "esp0xdeadbeef.neon" = {
-              addr4 = "10.80.0.1/24";
-              addr6 = "fd42:dead:beef:80::1/64";
-            };
-          };
-          prefixes = {
-            exported = {
-              ipv4 = [ "10.2.30.0/24" ];
-              ipv6 = [ "fd42:dead:beef:230::/64" ];
-            };
-            imported = {
-              ipv4 = [ "192.168.1.0/24" "192.168.3.0/24" ];
-              ipv6 = [ "fd42:1::/64" "fd42:dead:beef:3::/64" ];
-            };
-          };
-        }
-        {
           name = "onyx";
           terminateOn = [ "core-vpn-onyx" ];
           underlayAccess = {
@@ -1796,12 +1790,13 @@ in
           };
           # Mirror of the neon garnet overlay (URS: overlay transport models
           # endpoint identity, permitted peers, and imported/exported prefixes).
-          # cobalt-svc's prefix is exported; neon's vlan3 prefix is imported so
-          # cobalt routes to the LLM server.  The peer's garnet participant
-          # address is the next hop for those imported prefixes; a peer site is
-          # not compiled in this site's pass, so it is modeled here (the peer
-          # node address is an inventory realization fact mirrored onto the
-          # overlay as its endpoint identity).
+          # One overlay carries both peerings the site needs: cobalt-clients
+          # (10.2.30.0/24) to neon vlan2, and cobalt-svc (10.2.20.0/24) to the
+          # neon Ollama server in vlan3.  Imported are neon's vlan2 + vlan3.
+          # The peer's garnet participant address is the next hop for those
+          # imported prefixes; a peer site is not compiled in this site's pass,
+          # so it is modeled here (the peer node address is an inventory
+          # realization fact mirrored onto the overlay as its endpoint identity).
           peerNodes = {
             "esp0xdeadbeef.neon" = {
               addr4 = "10.80.0.1/24";
@@ -1810,12 +1805,12 @@ in
           };
           prefixes = {
             exported = {
-              ipv4 = [ "10.2.20.0/24" ];
-              ipv6 = [ "fd42:dead:beef:220::/64" ];
+              ipv4 = [ "10.2.20.0/24" "10.2.30.0/24" ];
+              ipv6 = [ "fd42:dead:beef:220::/64" "fd42:dead:beef:230::/64" ];
             };
             imported = {
-              ipv4 = [ "192.168.3.0/24" ];
-              ipv6 = [ "fd42:dead:beef:3::/64" ];
+              ipv4 = [ "192.168.1.0/24" "192.168.3.0/24" ];
+              ipv6 = [ "fd42:1::/64" "fd42:dead:beef:3::/64" ];
             };
           };
         }

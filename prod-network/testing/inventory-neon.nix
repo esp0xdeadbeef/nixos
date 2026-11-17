@@ -50,7 +50,7 @@ let
     { logicalInterface
     , bridge
     , interfaceName
-    , addr4
+    , addr4 ? null
     , addr6 ? null
     , ipv6Ra ? null
     ,
@@ -60,8 +60,8 @@ let
       attach = bridgeAttach bridge;
       interface = {
         name = interfaceName;
-        inherit addr4;
       }
+      // (if addr4 == null then { } else { inherit addr4; })
       // (if addr6 == null then { } else { inherit addr6; })
       // (if ipv6Ra == null then { } else { inherit ipv6Ra; });
     };
@@ -347,6 +347,14 @@ let
       adapterName = "prod-core-vpn-garnet-neon-us";
       bridge = "rt-core-vpn-garnet-neon-upstream-selector";
       interfaceName = "upstream-selector";
+    };
+
+    # FS-255: the overlay terminator's egress-facing host surface is the
+    # carriage attachment named by transport.overlays.garnet.underlayAccess.
+    tenant-neon-iot-srv = tenantPort {
+      logicalInterface = "tenant-neon-iot-srv";
+      bridge = "iot-srv";
+      interfaceName = "iot-srv";
     };
   };
 
