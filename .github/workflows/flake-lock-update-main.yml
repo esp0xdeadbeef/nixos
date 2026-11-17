@@ -92,7 +92,7 @@ jobs:
           while IFS= read -r configuration; do
             [[ -n "${configuration}" ]] || continue
             case "${configuration}" in
-              s-sigma | s-tau | l-envil)
+              s-sigma | s-tau)
                 # These hosts embed every nixos-shell guest image. Evaluate
                 # with only carrier-controlled instances enabled to keep the
                 # host toplevel evaluation cheap; every guest configuration
