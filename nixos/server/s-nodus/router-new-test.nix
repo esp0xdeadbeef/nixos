@@ -579,10 +579,49 @@ in
       # exactly as today, which is the one thing that must not change.
       systemd.network.networks."10-eth1".enable = lib.mkForce false;
 
-      # The LAN-side overrides are untouched by all of this: moving mxl_lan0 off
-      # br-cobalt-lan cost 55 AP unit failures in boot 1f23524a, because the
-      # trial runs no VM so no vhost tap keeps br-cobalt-lan populated while
-      # cobalt-lan.30 still hangs off it.
+      # The LAN trunk has the SAME collision as eth1, on `mxl_lan0`, and it must
+      # be resolved the same way -- the renderer owns the physical trunk in the
+      # container shape.
+      #
+      # `cobalt-bridges.nix` emits `10-mxl_lan0.network` (Bridge=br-cobalt-lan)
+      # for the production shape, where the router's LAN side is a VM tap on
+      # br-cobalt-lan. The renderer emits `20-mxl_lan0.network`
+      # (Bridge=br-lan-trunk) because the inventory's `uplinks.trunk.bridge` is
+      # br-lan-trunk once the router runs as containers on this host. Both
+      # match `mxl_lan0`, networkd applies only the FIRST match in lexical
+      # order, so 10-mxl_lan0 won and the physical trunk was enslaved to
+      # br-cobalt-lan -- leaving the renderer's br-lan-trunk with NO member at
+      # all while `30-br-lan-trunk.network` still created all eight of its VLAN
+      # children (br-lan-trunk.{10,20,30,31,50,51,60,90}) off an empty bridge.
+      # Every tenant behind the LAN side is then NO-CARRIER. This is AGENTS.md
+      # defect #2, unchanged since boot 1f23524a -- the earlier note here that
+      # the LAN side was "untouched" stopped being true the moment the renderer
+      # began emitting 20-mxl_lan0.
+      #
+      # Disabling the host unit is what makes the renderer's binding the one
+      # that applies, exactly as for 10-eth1. Production keeps it.
+      systemd.network.networks."10-mxl_lan0".enable = lib.mkForce false;
+
+      # Wi-Fi must follow the trunk, not a hardcoded bridge.
+      #
+      # `wifi-ap.nix` builds cobalt-lan.{10,31,90} on `local.sNodusWifi.trunkBridge`
+      # and `ap-planes` then enslaves them to ap-mgmt / ap-clients-vpn /
+      # ap-unlock. Those bridges are created by that same unit, so if the VLAN
+      # children are built on a bridge that carries no traffic they come up but
+      # never pass a frame, the three plane bridges stay NO-CARRIER, and every
+      # BSS's preStart (`ip link show <bridge> | grep "state UP"`, 30 attempts
+      # then `exit 1`) kills its hostapd unit.
+      #
+      # The default is br-cobalt-lan, which is right for production (the VM tap
+      # keeps it populated). In this trial there is no VM and no tap, and the
+      # physical trunk now lives on br-lan-trunk (see the override above), so
+      # the default would rebuild the 55-AP-unit outage of boot 1f23524a. The
+      # option exists precisely so a container-shaped host can say this.
+      #
+      # cobalt-clients is unaffected either way: it bridges onto `vlan30`
+      # (clientsBridge), which is fed by the access jack on mxl_lan3 as well as
+      # by cobalt-lan.30 off the trunk.
+      local.sNodusWifi.trunkBridge = lib.mkForce "br-lan-trunk";
 
       # Host management stays on vlan30. It is the host's own underlay
       # address (10.2.30.100) and the path nebula/ssh use, and vlan30 is fed by

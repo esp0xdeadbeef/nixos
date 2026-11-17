@@ -900,6 +900,23 @@ in
         (allowTenantToGarnet { tenant = "neon-mgmt"; shortName = "mgmt"; priority = 150; })
         (allowTenantToGarnet { tenant = "neon-svc"; shortName = "svc"; priority = 151; })
         (allowTenantToGarnet { tenant = "neon-dmz"; shortName = "dmz"; priority = 152; })
+        # The payload end of the cobalt-clients -> garnet -> neon-vlan2 path:
+        # only vlan2 is admitted from the overlay, nothing else on this site.
+        {
+          id = "allow-garnet-to-neon-vlan2";
+          priority = 156;
+          from = {
+            kind = "external";
+            name = "garnet";
+          };
+          to = {
+            kind = "tenant";
+            name = "vlan2";
+          };
+          trafficType = "any";
+          action = "allow";
+          returnBehavior = "symmetric";
+        }
         # The garnet underlay tenant reaches the ISP itself, not just `wan`.
         {
           id = "allow-iot-srv-nebula-garnet-underlay-to-isp";
@@ -1206,12 +1223,14 @@ in
           };
           prefixes = {
             exported = {
-              ipv4 = [ "192.168.3.0/24" ];
-              ipv6 = [ "fd42:dead:beef:3::/64" ];
+              # vlan2 is the payload end of the cobalt-clients path; vlan3
+              # keeps the documented Ollama/DMZ port forward.
+              ipv4 = [ "192.168.1.0/24" "192.168.3.0/24" ];
+              ipv6 = [ "fd42:1::/64" "fd42:dead:beef:3::/64" ];
             };
             imported = {
-              ipv4 = [ "10.2.20.0/24" ];
-              ipv6 = [ "fd42:dead:beef:220::/64" ];
+              ipv4 = [ "10.2.30.0/24" ];
+              ipv6 = [ "fd42:dead:beef:230::/64" ];
             };
           };
         }
@@ -1383,6 +1402,10 @@ in
         (allowFromTo "allow-iot-srv-dns-to-wan" 94 (serviceRef "iot-srv-dns") coreScope "dns")
         (allowFromTo "allow-mgmt-dns-to-wan" 95 (serviceRef "mgmt-dns") coreScope "dns")
         (allowTenantToWan "cobalt-clients" 100)
+        # The overlay reachability graph this lab must prove: cobalt-clients
+        # reaches neon's vlan2 through the cross-site garnet overlay. The
+        # payload relation is the overlay leg; the far side admits only vlan2.
+        (allowTenantToGarnet { tenant = "cobalt-clients"; shortName = "clients"; priority = 150; })
         (allowTenantToWan "cobalt-svc" 110)
         (allowTenantToWan "cobalt-iot" 120)
         (allowTenantToWan "cobalt-mgmt" 140)
@@ -1720,6 +1743,32 @@ in
 
     transport = {
       overlays = [
+        {
+          name = "garnet";
+          terminateOn = "core-vpn-garnet-cobalt";
+          peerSite = "esp0xdeadbeef.neon";
+          mustTraverse = [ "policy" ];
+          underlayAccess = {
+            kind = "tenant";
+            name = "cobalt-iot-srv";
+          };
+          peerNodes = {
+            "esp0xdeadbeef.neon" = {
+              addr4 = "10.80.0.1/24";
+              addr6 = "fd42:dead:beef:80::1/64";
+            };
+          };
+          prefixes = {
+            exported = {
+              ipv4 = [ "10.2.30.0/24" ];
+              ipv6 = [ "fd42:dead:beef:230::/64" ];
+            };
+            imported = {
+              ipv4 = [ "192.168.1.0/24" "192.168.3.0/24" ];
+              ipv6 = [ "fd42:1::/64" "fd42:dead:beef:3::/64" ];
+            };
+          };
+        }
         {
           name = "onyx";
           terminateOn = [ "core-vpn-onyx" ];

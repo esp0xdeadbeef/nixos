@@ -296,6 +296,13 @@ let
       interfaceName = "core-vpn-garnet-cobalt";
     };
 
+    policy-clients-garnet = p2pPort {
+      link = "p2p-policy-upstream-selector--access-access-clients--uplink-garnet";
+      adapterName = "cb-us-p12";
+      bridge = "rt-upstream-policy-clients-garnet";
+      interfaceName = "policy-clients-garnet";
+    };
+
     policy-clients = p2pPort {
       link = upstreamPolicyClientsLink;
       adapterName = "cb-us-p2";
@@ -350,6 +357,15 @@ let
   };
 
   policy = mkNode "policy" {
+    # The overlay lane: clients reach the cross-site garnet overlay through
+    # their own policy/upstream-selector port, separate from their WAN lane.
+    "p2p-policy-upstream-selector--access-access-clients--uplink-garnet" = p2pPort {
+      link = "p2p-policy-upstream-selector--access-access-clients--uplink-garnet";
+      adapterName = "cb-p-us12";
+      bridge = "rt-upstream-policy-clients-garnet";
+      interfaceName = "upstream-clients-garnet";
+    };
+
     upstream-svc = p2pPort {
       link = upstreamPolicySvcLink;
       adapterName = "cb-p-us1";
@@ -1210,6 +1226,7 @@ in
           rt-policy-downstream-iot-srv = { };
           rt-upstream-policy-svc = { };
           rt-upstream-policy-clients = { };
+          rt-upstream-policy-clients-garnet = { };
           rt-upstream-policy-iot-srv = { };
           rt-downstream-access-iot = { };
           rt-policy-downstream-iot = { };
@@ -1489,6 +1506,21 @@ in
                     # Bare IPv4 the daemon listens on (target/underlay fact,
                     # SMS-110: explicit; here the WAN-facing core interface).
                     listenHost = "0.0.0.0";
+                  };
+                  groups = [ "garnet" ];
+                };
+                # The policy node joins the overlay once a tenant lane reaches
+                # it: the access lane traverses policy, so policy carries the
+                # nebula interface and needs its modeled endpoint identity.
+                policy = {
+                  addr4 = "10.80.0.4/24";
+                  addr6 = "fd42:dead:beef:80::4/64";
+                  service = {
+                    name = "policy";
+                    interface = "nebula-garnet";
+                    mtu = 1280;
+                    listenHost = "0.0.0.0";
+                    port = 4243;
                   };
                   groups = [ "garnet" ];
                 };
