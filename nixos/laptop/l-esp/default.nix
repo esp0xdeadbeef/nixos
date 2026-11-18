@@ -19,8 +19,9 @@ in
     profiles.nixos.vm-host.nixos-shell
     profiles.nixos.llm.ollama-base
     profiles.nixos.llm-clients.agents-all
-    # Provider profile: declares sops.secrets."deepseek-api" (whose sopsFile is
-    # pinned to the deadbeef-scoped file below). agents-all selects packages
+    # Provider profile: declares sops.secrets."deepseek-api" and
+    # sops.secrets."xfield-api" (whose sopsFile is pinned to the
+    # deadbeef-scoped file below). agents-all selects packages
     # only and does not declare provider secrets.
     profiles.nixos.llm-clients.claude-deepseek
     profiles.nixos.nix.remote-builder-client
@@ -69,6 +70,7 @@ in
   };
 
   sops.secrets."deepseek-api".sopsFile = relativeRepo.sourcePath "secrets/l-esp-default-deadbeef.yaml";
+  sops.secrets."xfield-api".sopsFile = relativeRepo.sourcePath "secrets/l-esp-default-deadbeef.yaml";
 
   # l-esp-default.yaml is root-only; the cobalt lighthouse public IP is
   # kept in the deadbeef-scoped file instead.

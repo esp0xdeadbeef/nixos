@@ -1,0 +1,101 @@
+{
+  "$schema": "https://pi.dev/schemas/models.schema.json",
+  "providers": {
+    "ollama": {
+      "api": "openai-completions",
+      "apiKey": "ollama",
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "models": [
+        {
+          "_launch": true,
+          "contextWindow": 131072,
+          "id": "huihui_ai/gemma-4-abliterated:12b",
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      ]
+    },
+    "deepseek": {
+      "modelOverrides": {
+        "deepseek-flash": {
+          "inputLimits": {
+            "images": {
+              "resize": {
+                "maxWidth": 1400,
+                "maxHeight": 1400,
+                "maxBytes": 400000,
+                "jpegQuality": 78
+              }
+            }
+          }
+        },
+        "deepseek-v4-pro": {
+          "inputLimits": {
+            "images": {
+              "resize": {
+                "maxWidth": 1400,
+                "maxHeight": 1400,
+                "maxBytes": 400000,
+                "jpegQuality": 78
+              }
+            }
+          }
+        }
+      }
+    },
+    "xfield": {
+      "name": "XField",
+      "api": "openai-completions",
+      "baseUrl": "https://xfield.cloud.brutal.ai/api/v1",
+      "apiKey": "$XFIELD_API_KEY",
+      "authHeader": true,
+      "models": [
+        {
+          "id": "deepseek-v4.1-flash-1017-uncensored",
+          "name": "DeepSeek V4.1 Flash Uncensored (xfield)",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "low",
+            "low": "low",
+            "medium": "high",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "input": [
+            "text",
+            "image"
+          ],
+          "inputLimits": {
+            "images": {
+              "maxPerMessage": 4,
+              "resize": {
+                "maxWidth": 1568,
+                "maxHeight": 1568,
+                "maxBytes": 524288,
+                "jpegQuality": 78
+              }
+            }
+          },
+          "contextWindow": 1048576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.45,
+            "output": 1.7,
+            "cacheRead": 0.13,
+            "cacheWrite": 0.45
+          },
+          "compat": {
+            "thinkingFormat": "openrouter",
+            "supportsReasoningEffort": true,
+            "requiresReasoningContentOnAssistantMessages": false
+          }
+        }
+      ]
+    }
+  }
+}
