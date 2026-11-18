@@ -10,8 +10,15 @@ permissions:
   id-token: write
 
 jobs:
+  # `nix flake update` is what this workflow exists for, so it runs once and
+  # its result is handed to the check shards as an artifact. The host list is
+  # derived here too: nixosConfigurations is auto-discovered from directories
+  # by flake.nix, so any hand-maintained list in the workflow goes stale the
+  # moment a host is added, renamed or removed.
   update:
     runs-on: ubuntu-latest
+    outputs:
+      hosts: ${{ steps.hosts.outputs.hosts }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -22,7 +29,158 @@ jobs:
       - name: Update flake.lock
         run: nix flake update
 
-      - name: Check flake outputs in isolated evaluations
+      - name: Derive the host matrix
+        id: hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          hosts="$(nix eval --raw '.#nixosConfigurations' \
+            --apply 'attrs:
+              builtins.toJSON (builtins.attrNames attrs)')"
+          echo "hosts=${hosts}" >>"${GITHUB_OUTPUT}"
+
+      - name: Upload the updated lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-lock
+          path: flake.lock
+          if-no-files-found: error
+
+  # One runner per host. A single toplevel evaluation can take ~15 minutes and
+  # the repository has ~36 configurations, so evaluating them sequentially in
+  # one job overruns the runner budget and the job is killed mid-eval with
+  # "the hosted runner lost communication with the server". Sharding gives
+  # each configuration its own budget and runs them concurrently.
+  check:
+    needs: update
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ${{ fromJSON(needs.update.outputs.hosts) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Download the updated lock
+        uses: actions/download-artifact@v4
+        with:
+          name: flake-lock
+          # Explicit, so the lock lands at ./flake.lock in every consumer and
+          # the push job's `git diff -- flake.lock` actually sees it.
+          path: .
+
+      - name: Check configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          host="${{ matrix.host }}"
+
+          # Classify from the evaluated configuration rather than a
+          # hand-maintained list. l-envil deliberately has no
+          # nixosShellVmManager option (the cobalt stack moved to s-nodus), so
+          # routing it down the carrier path crashed every nightly with
+          # `attribute 'nixosShellVmManager' missing`; s-nodus and
+          # s-nodus-nixos-hardware are the hosts that do embed every guest
+          # image and must take that path.
+          #
+          # Prints one of: carrier | vmhost | plain
+          # shellcheck disable=SC2016
+          kind="$(nix eval --raw --impure --argstr host "${host}" --expr '
+            { host }:
+            let
+              config = (builtins.getFlake (toString ./.)).nixosConfigurations.${host}.config;
+              manager =
+                if config ? services && config.services ? nixosShellVmManager
+                then config.services.nixosShellVmManager
+                else null;
+            in
+            if manager == null then "plain"
+            else if manager.carrierControls or { } != { } then "carrier"
+            else "vmhost"
+          ')"
+
+          case "${kind}" in
+            carrier | vmhost)
+              echo "::group::Checking ${host} with only carrier-controlled VMs enabled"
+              # shellcheck disable=SC2016
+              nix derivation show \
+                --impure \
+                --argstr host "${host}" \
+                --expr '
+                  { host }:
+                  let
+                    flake = builtins.getFlake (toString ./.);
+                    original = flake.nixosConfigurations.${host};
+                    manager = original.config.services.nixosShellVmManager;
+                    instanceNames = builtins.attrNames manager.instances;
+                    # carrierControls is optional; a host may have the
+                    # manager without any carrier rule.
+                    carrierInstances =
+                      builtins.concatMap
+                        (control: control.instances)
+                        (builtins.attrValues (manager.carrierControls or { }));
+                    filtered = original.extendModules {
+                      modules = [
+                        ({ lib, ... }: {
+                          services.nixosShellVmManager.instances =
+                            builtins.listToAttrs (
+                              map
+                                (name: {
+                                  inherit name;
+                                  value.enable = lib.mkForce (
+                                    builtins.elem name carrierInstances
+                                    || (
+                                      carrierInstances == [ ]
+                                      && name == builtins.head instanceNames
+                                    )
+                                  );
+                                })
+                                instanceNames
+                            );
+                        })
+                      ];
+                    };
+                  in
+                  filtered.config.system.build.toplevel
+                ' >/dev/null
+              echo "::endgroup::"
+              ;;
+            plain)
+              echo "::group::Checking ${host}"
+              nix derivation show \
+                ".#nixosConfigurations.${host}.config.system.build.toplevel" >/dev/null
+              echo "::endgroup::"
+              ;;
+            *)
+              echo "::error::could not classify host '${host}' (got '${kind}')" >&2
+              exit 1
+              ;;
+          esac
+
+  # Everything that is not a host: packages, formatters, overlays, modules.
+  # Split from the per-host matrix so it is not queued behind 36 host evals.
+  check-flake-outputs:
+    needs: update
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Download the updated lock
+        uses: actions/download-artifact@v4
+        with:
+          name: flake-lock
+          path: .
+
+      - name: Check packages, formatters, overlays and modules
         shell: bash
         run: |
           set -euo pipefail
@@ -38,117 +196,6 @@ jobs:
             nix derivation show ".#${attribute}" >/dev/null
             echo "::endgroup::"
           }
-
-          # Hosts are discovered from directories by flake.nix, so this loop
-          # sees every host -- including laptops and dedicated VMs that have
-          # no VM manager at all. Classify each host by what its configuration
-          # actually contains rather than by a hand-maintained list: a stale
-          # list sent l-envil (which deliberately has no nixosShellVmManager
-          # option) down the carrier path and crashed with `attribute
-          # 'nixosShellVmManager' missing`, while omitting s-nodus and
-          # s-nodus-nixos-hardware, which do embed every guest image.
-          #
-          # Prints one of: carrier | vmhost | plain, one line per host.
-          # Classified in a single evaluation so this costs one extra `nix
-          # eval` for the whole repository rather than one per host.
-          classify_hosts() {
-            # shellcheck disable=SC2016
-            nix eval --raw --impure --expr '
-              let
-                configs = (builtins.getFlake (toString ./.)).nixosConfigurations;
-                kindOf =
-                  name:
-                  let
-                    config = configs.${name}.config;
-                    manager =
-                      if config ? services && config.services ? nixosShellVmManager
-                      then config.services.nixosShellVmManager
-                      else null;
-                  in
-                  if manager == null then "plain"
-                  else if manager.carrierControls or { } != { } then "carrier"
-                  else "vmhost";
-              in
-              builtins.concatStringsSep "\n"
-                (map (n: "${n} ${kindOf n}") (builtins.attrNames configs))
-            '
-          }
-
-          check_vm_host() {
-            local host="$1"
-
-            echo "::group::Checking ${host} with carrier-controlled VMs enabled"
-            # The ${host} below is Nix interpolation, not shell interpolation.
-            # shellcheck disable=SC2016
-            nix derivation show \
-              --impure \
-              --argstr host "${host}" \
-              --expr '
-                { host }:
-                let
-                  flake = builtins.getFlake (toString ./.);
-                  original = flake.nixosConfigurations.${host};
-                  manager = original.config.services.nixosShellVmManager;
-                  instanceNames = builtins.attrNames manager.instances;
-                  # carrierControls is optional; a host may have the manager
-                  # without any carrier rule.
-                  carrierInstances =
-                    builtins.concatMap
-                      (control: control.instances)
-                      (builtins.attrValues (manager.carrierControls or { }));
-                  filtered = original.extendModules {
-                    modules = [
-                      ({ lib, ... }: {
-                        services.nixosShellVmManager.instances =
-                          builtins.listToAttrs (
-                            map
-                              (name: {
-                                inherit name;
-                                value.enable = lib.mkForce (
-                                  builtins.elem name carrierInstances
-                                  || (
-                                    carrierInstances == [ ]
-                                    && name == builtins.head instanceNames
-                                  )
-                                );
-                              })
-                              instanceNames
-                          );
-                      })
-                    ];
-                  };
-                in
-                filtered.config.system.build.toplevel
-              ' >/dev/null
-            echo "::endgroup::"
-          }
-
-          configurations="$(list_attrs '.#nixosConfigurations')"
-          host_kinds="$(classify_hosts)"
-          while IFS= read -r configuration; do
-            [[ -n "${configuration}" ]] || continue
-            # Derived, never hardcoded: a host that grows a VM manager is
-            # picked up automatically, and one that never had it cannot be
-            # routed into check_vm_host by a stale list.
-            kind="$(awk -v h="${configuration}" '$1 == h { print $2 }' <<<"${host_kinds}")"
-            case "${kind}" in
-              carrier | vmhost)
-                # These hosts embed nixos-shell guest images. Evaluate with
-                # only carrier-controlled instances enabled to keep the host
-                # toplevel evaluation cheap; every guest configuration is
-                # evaluated independently by the surrounding loop.
-                check_vm_host "${configuration}"
-                ;;
-              plain)
-                check_derivation \
-                  "nixosConfigurations.${configuration}.config.system.build.toplevel"
-                ;;
-              *)
-                echo "::error::could not classify host '${configuration}' (got '${kind}')" >&2
-                exit 1
-                ;;
-            esac
-          done <<<"${configurations}"
 
           systems="$(list_attrs '.#packages')"
           while IFS= read -r system; do
@@ -188,11 +235,25 @@ jobs:
                 else throw "NixOS module has an invalid type"' >/dev/null
           done <<<"${nixos_modules}"
 
+  # Runs only when every shard above passed, so a lock that fails any
+  # configuration evaluation is never pushed.
+  push:
+    needs: [update, check, check-flake-outputs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Download the updated lock
+        uses: actions/download-artifact@v4
+        with:
+          name: flake-lock
+          path: .
+
       - name: Commit and push
         run: |
           set -euo pipefail
-          # Only reached when the check step succeeded, so the lock being
-          # pushed has passed every configuration evaluation above.
           if git diff --quiet -- flake.lock; then
             echo "No flake.lock changes"
             exit 0
