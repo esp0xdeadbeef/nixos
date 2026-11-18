@@ -317,7 +317,8 @@
     # CONFIG_EFI_LOADER) and boots an ESP through systemd-boot, instead of the
     # signed vendor OpenWrt firmware and its raw FIT.
     #
-    # Bumped 719b19b2 -> a1a3c296 -> ad56e4fe to pick up two kernel changes:
+    # Bumped 719b19b2 -> a1a3c296 -> ad56e4fe -> f05d38ef.  ad56e4fe picked up
+    # two kernel changes:
     # "stop building 1570 kernel DTBs" (the aarch64 builder defaulted
     # buildDTBs to true and compiled every DTB for every ARCH_* common-config
     # enables -- ~118M, 1570 files -- into the kernel output, though the
@@ -327,7 +328,11 @@
     # No behaviour change for anything else; the board DTB still comes from
     # dtbSource, so the SSD/PCIe description is unaffected.
     nixos-hardware-bpi-r4-pro = {
-      url = "github:esp0xdeadbeef/nixos-hardware/ad56e4fe";
+      # f05d38ef: build the smc userspace tools instead of only installing
+      # them (rebootctl/smcctl were never compiled, so dev_reboot's
+      # installPhase failed with `cannot stat 'rebootctl'` and took the whole
+      # s-nodus kernel-modules chain with it).
+      url = "github:esp0xdeadbeef/nixos-hardware/f05d38ef";
       # Share the fleet's nixpkgs rather than pulling the fork's own pin into
       # the module system as a second nixpkgs.
       inputs.nixpkgs.follows = "nixpkgs";
