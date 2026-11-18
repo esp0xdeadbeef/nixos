@@ -39,6 +39,20 @@ jobs:
               builtins.toJSON (builtins.attrNames attrs)')"
           echo "hosts=${hosts}" >>"${GITHUB_OUTPUT}"
 
+          # An empty list makes `matrix: {host: []}` a silently skipped job,
+          # so fail here while the reason is still obvious. The upper bound is
+          # GitHub's hard cap of 256 jobs in a single matrix.
+          count="$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1])))' "${hosts}")"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error::nixosConfigurations is empty; nothing to verify" >&2
+            exit 1
+          fi
+          if [ "${count}" -gt 256 ]; then
+            echo "::error::${count} configurations exceeds the 256-job matrix cap" >&2
+            exit 1
+          fi
+          echo "Derived ${count} configurations to check"
+
       - name: Upload the updated lock
         uses: actions/upload-artifact@v4
         with:
