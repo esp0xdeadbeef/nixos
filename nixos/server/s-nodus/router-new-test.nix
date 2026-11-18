@@ -618,9 +618,25 @@ in
       # the default would rebuild the 55-AP-unit outage of boot 1f23524a. The
       # option exists precisely so a container-shaped host can say this.
       #
-      # cobalt-clients is unaffected either way: it bridges onto `vlan30`
-      # (clientsBridge), which is fed by the access jack on mxl_lan3 as well as
-      # by cobalt-lan.30 off the trunk.
+      # cobalt-clients is NOT unaffected, and the earlier text here was wrong.
+      # It said `vlan30` (clientsBridge) "is fed by the access jack on mxl_lan3
+      # as well as by cobalt-lan.30 off the trunk" -- and that is exactly the
+      # defect: those are the ONLY two members, both physical.  On boot
+      # 26.05.20261113.f1e5c35 `mxl_lan3` had `carrier=0` and `mxl_lan0` (the
+      # trunk) had `carrier=0`, so `vlan30` was NO-CARRIER/state DOWN and took
+      # three consumers with it: every `ap-wlp1s*` unit looped in start-pre
+      # waiting for a bridge state hostapd alone can create, the host got no
+      # DHCP lease on `vlan30` and therefore no default route, and nebula
+      # could not handshake (`sendto: network is unreachable`), so
+      # 100.64.0.18 never converged.  The plane's real anchor is the
+      # `access-clients` veth serving 10.2.30.1, which the renderer puts in a
+      # DIFFERENT bridge (`clients`).  See
+      # network-site-esp/GAMP/HAT/router-new-wifi-nebula-2026-11-18.md.
+      #
+      # Do not "fix" that here: which bridge carries the tenant veth is
+      # inventory/renderer realization (`transitBridges.*.parentUplink`), not
+      # host policy.  This override stays as it is; the structural change is
+      # filed against network-renderer-nixos.
       local.sNodusWifi.trunkBridge = lib.mkForce "br-lan-trunk";
 
       # Host management stays on vlan30. It is the host's own underlay

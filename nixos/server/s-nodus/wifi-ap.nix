@@ -93,6 +93,15 @@ in
         Bridge the `cobalt-clients` BSSes are enslaved to. The host already
         terminates clients VLAN 30 as this bridge, and a port cannot belong to
         two bridges, so the AP shares it rather than creating its own.
+
+        This bridge must be self-sufficient: its only guaranteed members are
+        AP VAPs (which supply carrier once hostapd starts) plus whatever the
+        renderer attaches. It must NOT be assumed that a physical port keeps
+        it populated -- that assumption held until boot
+        26.05.20261113.f1e5c35, when both of its members (`mxl_lan3`,
+        `cobalt-lan.30`) had no carrier and the whole clients plane was down
+        while the radio was fine. See
+        network-site-esp/GAMP/HAT/router-new-wifi-nebula-2026-11-18.md.
       '';
     };
   };
@@ -231,7 +240,7 @@ in
         Restart = "on-failure";
         RestartSec = 10;
       };
-      path = [ pkgs.iproute2 pkgs.gnugrep pkgs.coreutils ];
+      path = [ pkgs.iproute2 pkgs.gnugrep pkgs.coreutils pkgs.gawk ];
       script = ''
         set -euo pipefail
         trunk=${cfg.trunkBridge}
@@ -252,6 +261,28 @@ in
         # (vlan child, vlan id, plane bridge) triples, matching the plane set
         # in wifi-ssids.nix.  The clients plane is NOT here: it bridges onto
         # the host's own vlan30 (see clientsBridge).
+        # The VLAN ID may already be allocated on this parent under ANOTHER
+        # name: networkd creates its own trunk children (br-lan-trunk.31,
+        # br-lan-trunk.90, ...) from the `20-cobalt-lan.NN` netdevs.  `ip link
+        # show cobalt-lan.31` then correctly reports "does not exist" while
+        # `ip link add ... type vlan id 31` fails with "VLAN device already
+        # exists" -- the ID, not the name, is the collision.  With `set -e`
+        # that aborted the loop at VLAN 31, so ap-unlock was never created and
+        # every container behind it died with "Failed to add interface vb-tang
+        # to bridge ap-unlock: No such device".  Reuse the existing child when
+        # the ID is taken instead of failing.
+        existing_vlan_if() {
+          local tag="$1" parent
+          parent=$(basename "$(readlink -f "/sys/class/net/$trunk")")
+          while IFS='|' read -r name vid pdev; do
+            name=$(echo "$name" | tr -d ' ')
+            vid=$(echo "$vid" | tr -d ' ')
+            pdev=$(echo "$pdev" | tr -d ' ')
+            [ "$vid" = "$tag" ] && [ "$pdev" = "$parent" ] && { echo "$name"; return 0; }
+          done < /proc/net/vlan/config
+          return 1
+        }
+
         for spec in \
           "cobalt-lan.10 10 ap-mgmt" \
           "cobalt-lan.31 31 ap-clients-vpn" \
@@ -260,7 +291,14 @@ in
           vlan_if=$1; vlan_id=$2; br=$3
           ip link show "$br" >/dev/null 2>&1 || ip link add name "$br" type bridge
           ip link set "$br" up
-          ip link show "$vlan_if" >/dev/null 2>&1 || ip link add link "$trunk" name "$vlan_if" type vlan id "$vlan_id"
+          if ! ip link show "$vlan_if" >/dev/null 2>&1; then
+            if other=$(existing_vlan_if "$vlan_id"); then
+              echo "ap-planes: VLAN $vlan_id on $trunk is $other, using it for $vlan_if" >&2
+              vlan_if=$other
+            else
+              ip link add link "$trunk" name "$vlan_if" type vlan id "$vlan_id"
+            fi
+          fi
           ip link set "$vlan_if" up
           ip link set "$vlan_if" master "$br"
         done

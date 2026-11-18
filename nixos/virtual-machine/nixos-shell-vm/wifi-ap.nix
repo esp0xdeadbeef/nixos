@@ -248,12 +248,31 @@ let
           Restart = "always";
           RestartSec = 3;
         };
+        # Start hostapd when the BRIDGE DEVICE EXISTS, not when it is `state UP`.
+        #
+        # An AP bridge's carrier comes from the VAP that hostapd itself brings
+        # up: before hostapd runs the BSS has no carrier, so the bridge is
+        # NO-CARRIER and `ip link` prints `state DOWN`/`state LOWERLAYERDOWN`.
+        # Requiring `state UP` here is circular -- it waits 30s for a condition
+        # only this unit can create, then `exit 1`, and the BSS never comes up.
+        # That made every AP plane depend on some OTHER, physical member giving
+        # the bridge carrier: with no cable in the trunk the whole clients SSID
+        # was dead even though the radio, the SSID and the plane were all fine
+        # (measured on s-nodus: wlan30 members cobalt-lan.30/mxl_lan3 both
+        # carrier 0, every ap-wlp1s-* unit looping in auto-restart, VAPs
+        # `state DOWN`, while the very same SSID on a wired-fed plane worked).
+        #
+        # Wifi must not depend on a physical adapter, so the guard is now only
+        # "the bridge this BSS is bridged onto exists".  hostapd then enslaves
+        # the VAP, the VAP supplies carrier, and the bridge comes up -- the
+        # correct direction of causality.
         preStart = ''
           for _ in $(seq 1 30); do
-            ${pkgs.iproute2}/bin/ip link show ${v.bridge} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "state UP" && break
+            ${pkgs.iproute2}/bin/ip link show ${v.bridge} >/dev/null 2>&1 && exit 0
             sleep 1
           done
-          ${pkgs.iproute2}/bin/ip link show ${v.bridge} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "state UP" || exit 1
+          echo "ap-${v.iface}: bridge ${v.bridge} never appeared" >&2
+          exit 1
         '';
       };
     };
