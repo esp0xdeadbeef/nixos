@@ -103,10 +103,16 @@ jobs:
           # image and must take that path.
           #
           # Prints one of: carrier | vmhost | plain
+          #
+          # `--expr` is needed because the classification reads the config and
+          # `--apply` would receive the whole flake. A bare lambda prints as
+          # «lambda @ «string»:2:3» instead of being called, so the lambda is
+          # applied to its argument here -- the argument is the host name, not
+          # an attribute path.
           # shellcheck disable=SC2016
-          kind="$(nix eval --raw --impure --argstr host "${host}" --expr '
-            { host }:
+          kind="$(nix eval --raw --impure --expr '
             let
+              host = "'"${host}"'" ;
               config = (builtins.getFlake (toString ./.)).nixosConfigurations.${host}.config;
               manager =
                 if config ? services && config.services ? nixosShellVmManager
