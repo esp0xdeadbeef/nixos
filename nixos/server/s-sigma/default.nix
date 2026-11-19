@@ -1,6 +1,7 @@
 { lib
 , profiles
 , relativeRepo
+, config
 , ...
 }:
 let
@@ -27,8 +28,26 @@ in
     ./github-token.nix
   ];
 
+  # Binary-cache signing key for this builder (see cacheSigningKeyFile below).
+  # Persisted in SOPS, NOT generated per boot: regenerating it would invalidate
+  # the signature of every path signed under the previous key.
+  sops.secrets.nix-cache-signing-key = {
+    sopsFile = relativeRepo.sourcePath "secrets/s-sigma-root.yaml";
+    owner = "root";
+    group = "root";
+    mode = "0400";
+  };
+
   local.nix.remoteBuilderServer = {
     enable = true;
+    # Sign every path realised here so clients can copy a builder output to
+    # themselves with `require-sigs` still on (the default). Without this a
+    # `nixos-rebuild --target-host` to a client fails with "cannot add path ...
+    # because it lacks a signature by a trusted key": the client only trusts
+    # cache.nixos.org-1, and a locally-built path carries no signature at all.
+    # The public half goes in each client's
+    # local.nix.remoteBuilderClient.trustedBuilderKeys.
+    cacheSigningKeyFile = config.sops.secrets.nix-cache-signing-key.path;
     emulateSystems = [ "aarch64-linux" ];
     clients = {
       l-envil.key = remoteBuilderKeyFor "l-envil";

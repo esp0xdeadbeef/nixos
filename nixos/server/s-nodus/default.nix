@@ -20,6 +20,13 @@
 let
   # Resolves a checked-in public key under ssh-keys/deadbeef/.
   keyFor = host: lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/${host}.pub");
+
+  # Public binary-cache signing key of a builder, checked in under
+  # ssh-keys/deadbeef/builder-cache/. Its private half lives on that builder
+  # (e.g. secrets/s-sigma-root.yaml: nix-cache-signing-key).
+  builderCacheKeyFor = host: lib.removeSuffix "\n" (
+    lib.fileContents (relativeRepo.sourceModule "ssh-keys/deadbeef/builder-cache/${host}.pub")
+  );
 in
 {
   imports = [
@@ -215,6 +222,16 @@ in
   # fleet (s-sigma/s-tau, both serving aarch64-linux), unlike a laptop, which
   # never uses another laptop as a builder.
   local.nix.remoteBuilderClient.class = "server";
+
+  # s-sigma signs everything it realises with its binary-cache key, so a
+  # `nixos-rebuild --target-host deadbeef@<this host>` run from there can copy
+  # the closure in without weakening `require-sigs`. Without this entry every
+  # copied path is rejected with "cannot add path ... because it lacks a
+  # signature by a trusted key". The private half lives on s-sigma
+  # (secrets/s-sigma-root.yaml, nix-cache-signing-key).
+  local.nix.remoteBuilderClient.trustedBuilderKeys = [
+    (builderCacheKeyFor "s-sigma")
+  ];
 
   # Persistent SSH host identity, shared with sops (`persist-root-ssh` uses
   # this key as the age identity) -- same arrangement as s-gamma.

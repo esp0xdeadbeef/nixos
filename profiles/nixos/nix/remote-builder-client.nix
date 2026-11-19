@@ -92,6 +92,22 @@ in
       description = "Extra builder aliases to omit from this host's build machines, beyond the same-class and self exclusions applied automatically.";
     };
 
+    trustedBuilderKeys = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = ''
+        Public binary-cache signing keys (`name:base64-ed25519-public`) of the
+        builders in `builders`, added to `trusted-public-keys`.
+
+        A builder signs what it realises with its
+        `local.nix.remoteBuilderServer.cacheSigningKeyFile`. Without the matching
+        public key here, this host cannot `nix copy` a builder's output to
+        itself: `require-sigs` defaults to true, so a path whose signature this
+        host does not trust is rejected with "cannot add path ... because it
+        lacks a signature by a trusted key".
+      '';
+    };
+
     builders = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {
@@ -197,6 +213,10 @@ in
       settings = {
         builders-use-substitutes = true;
         fallback = true;
+        # Signatures the builders' outputs carry. Without these, copying a
+        # builder's realisation here fails (`require-sigs` is on). Additive:
+        # `cache.nixos.org-1` stays trusted.
+        extra-trusted-public-keys = cfg.trustedBuilderKeys;
         # Substituter (curl) connect timeout only; it does NOT bound ssh-ng
         # builder connections. That is `ConnectTimeout` in the generated
         # /root/.ssh/config, see sshConfigText above.

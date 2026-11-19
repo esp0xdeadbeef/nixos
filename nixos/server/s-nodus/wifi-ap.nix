@@ -102,6 +102,56 @@ in
         `cobalt-lan.30`) had no carrier and the whole clients plane was down
         while the radio was fine. See
         network-site-esp/GAMP/HAT/router-new-wifi-nebula-2026-11-18.md.
+
+        Carrier is necessary but not sufficient: a carrier-UP bridge with no
+        gateway still breaks Wi-Fi. See `planeAnchors`, which supplies the
+        tenant veth that gives this plane a router.
+      '';
+    };
+
+    planeAnchors = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      # The three client-facing planes, and the tenant whose container serves
+      # each. ap-unlock is deliberately absent: it is already anchored by the
+      # tang container's own veth (`vb-tang`), so it never had this fault.
+      #
+      # `cobalt-clients` uses clientsBridge rather than a literal, so a host
+      # that renames the clients plane keeps a working anchor.
+      default = {
+        ${cfg.clientsBridge} = "access-clients:clients";
+        ap-clients-vpn = "access-clients-vpn:clients-vpn";
+        ap-mgmt = "access-mgmt:mgmt";
+      };
+      example = { ap-mgmt = "access-mgmt:mgmt"; };
+      description = ''
+        Map of AP plane bridge -> `container:tenantBridge`.
+
+        An AP bridge is only an access medium: the plane's gateway lives in an
+        `access-<tenant>` container, whose veth (`accc-cli-50f`, `accm-mgm-194`,
+        ...) is created by `nixos-containers` and enslaved by the renderer to
+        the *tenant* bridge (`clients`, `clients-vpn`, `mgmt`) -- NOT to the AP
+        bridge. A BSS bridged to an AP plane therefore reaches association and
+        completes the WPA handshake, then has nowhere to get an address: the
+        client waits, gives up, and deauthenticates itself with reason 3
+        (DEAUTH_LEAVING). hostapd looks healthy throughout, which is why this
+        reads as "the radio is fine but clients cannot join".
+
+        Measured on s-nodus, boot 26.05.20261113.f1e5c35: `vlan30` had three
+        AP VAPs forwarding yet `fdb_n_learned 0` and `ra=0`; a station joined
+        at 15:33:22 ("pairwise key handshake completed") and was gone by
+        15:33:40. Enslaving the `access-clients` veth into `vlan30` produced an
+        RA router on the plane immediately and the same station then held for
+        60s+ at -69 dBm.
+
+        The veth name is not derivable in Nix (it is `acc` + a container prefix
+        + a hash), so it is *discovered* at runtime: every interface inside the
+        named container is resolved to its host peer, and the one already on
+        `tenantBridge` is the anchor. `tenantBridge` is therefore required
+        input, not a guess -- `access-clients` serves `clients`, which is not
+        named after the container.
+
+        Leave a plane out when its anchor is supplied elsewhere (ap-unlock is
+        already anchored by the tang container's own veth).
       '';
     };
   };
@@ -118,6 +168,16 @@ in
 
     # Wi-Fi firmware (MT7996 blobs).
     hardware.enableRedistributableFirmware = true;
+
+    # `iw` on the host, not just inside a container.
+    #
+    # Debugging this AP kept needing the radio's own view -- which stations are
+    # associated, on which VAP, with what signal -- and `iw` was only reachable
+    # under /nix/store/*/bin/iw by guessing a hash path. `ip link` shows the
+    # bridge side and hostapd's journal shows the handshake, but neither shows
+    # "is anyone actually associated", which is the question that separates a
+    # radio fault from a plane fault.
+    environment.systemPackages = with pkgs; [ iw ];
 
     # The cobalt Wi-Fi secret (same file/fields the AP VMs read).
     sops.secrets."cobalt-wifi" = {
@@ -305,6 +365,130 @@ in
         for br in ap-mgmt ap-clients-vpn ap-unlock; do
           ip link set "$br" up
         done
+      '';
+    };
+
+    # Give each AP plane the tenant veth that serves it, so the plane has a
+    # ROUTER and not merely carrier.
+    #
+    # Creating the bridges (ap-planes) and supplying a gateway are two
+    # different questions and only the first was ever answered. A wireless
+    # client on a bridge whose only members are AP VAPs associates fine -- the
+    # VAP supplies carrier -- completes the WPA handshake, then has nowhere to
+    # get an address, so it deauthenticates itself (reason 3, DEAUTH_LEAVING)
+    # and hostapd reports nothing wrong. On boot 26.05.20261113.f1e5c35 that is
+    # exactly what `vlan30` did: 3 VAPs forwarding, `fdb_n_learned 0`, `ra=0`,
+    # and a station that joined at 15:33:22 and was gone by 15:33:40.
+    #
+    # The gateway lives in the `access-<tenant>` container, whose veth is
+    # created by nixos-containers and enslaved by the renderer to the TENANT
+    # bridge (`clients`), not to the AP bridge. Joining the two is host
+    # policy, not renderer realization: the AP bridge is a host object that
+    # nothing else knows about, so the host is what must connect it.
+    #
+    # The veth name carries a generated hash (`accc-cli-50f`), so it cannot be
+    # written down in Nix. It is discovered from the container's netns instead:
+    # the interface inside `access-clients` is the named end, and its peer on
+    # the host is the veth to enslave.
+    #
+    # Separate unit from ap-planes on purpose. ap-planes must run early (the
+    # BSS preStart waits on it) and knows nothing about containers; this unit
+    # needs the containers up first, and failing to anchor must not fail the
+    # bridge creation and take every BSS down with it. So it is `wants`-ed,
+    # never a hard dependency, and it retries rather than giving up.
+    systemd.services.ap-plane-anchors = lib.mkIf (cfg.planeAnchors != { }) {
+      description = "Enslave tenant veths into the cobalt AP planes";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "ap-planes.service" ];
+      wants = [ "ap-planes.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        # Containers come up late and may be recreated; anchor whenever they
+        # appear rather than only once at boot.
+        Restart = "on-failure";
+        RestartSec = 15;
+      };
+      path = [ pkgs.iproute2 pkgs.gnugrep pkgs.coreutils pkgs.gawk config.nix.package ];
+      script = ''
+        set -euo pipefail
+
+        # The host-side name of a container's *tenant* veth.
+        #
+        # A veth pair is identified by (host iflink) == (peer ifindex inside
+        # the container netns). This is used rather than the container's netns
+        # pid because `container@<name>.service`'s MainPID is the *parent*, not
+        # the container init: `nsenter -t <MainPID> -n` silently shows the HOST
+        # netns, which makes every interface look like a candidate and picks
+        # the wrong one. `nixos-container run` enters the netns correctly.
+        #
+        # The interface NAME is not a usable discriminator: an access container
+        # holds at least two -- its upward uplink and its tenant veth -- and the
+        # names do not follow one pattern (`clie`, `clients-vpn`, `mgmt`,
+        # `access-mgmt`, ...). A first cut matched /^(cli|acc)/ and silently
+        # found nothing for `access-mgmt`, whose tenant interface is `mgmt@if88`.
+        #
+        # So print the host veth for EVERY interface in the container and let
+        # the caller pick by bridge membership, which is a host fact.
+        host_veths_for() {
+          local ct="$1" idx cand
+          nixos-container run "$ct" -- ${pkgs.iproute2}/bin/ip -o link show 2>/dev/null \
+            | sed -n 's/^\([0-9]\{1,\}\): .*/\1/p' \
+            | while read -r idx; do
+                for cand in /sys/class/net/*; do
+                  [ -r "$cand/iflink" ] || continue
+                  [ "$(cat "$cand/iflink" 2>/dev/null)" = "$idx" ] || continue
+                  basename "$cand"
+                done
+              done
+        }
+
+        # The tenant veth is the one the renderer already enslaved to the
+        # tenant plane (`clients`, `clients-vpn`, `mgmt`). An uplink veth is
+        # also a bridge port, but on a transit bridge, so requiring membership
+        # of the tenant bridge is what tells them apart.
+        tenant_veth() {
+          local ct="$1" tenant_br="$2" cand
+          for cand in $(host_veths_for "$ct"); do
+            if ip -d link show "$cand" 2>/dev/null | grep -q " master $tenant_br "; then
+              echo "$cand"; return 0
+            fi
+          done
+          return 1
+        }
+
+        # One pass per plane. Nothing is waited for here: if a container is not
+        # up yet the unit exits non-zero and `Restart` retries, which is what
+        # this service is for. A sleep loop would only hide the same fact.
+        #
+        # Input lines are `<ap bridge>=<container>:<tenant bridge>`, because the
+        # AP bridge and the tenant bridge are different names for the same
+        # plane (`vlan30` vs `clients`, `ap-mgmt` vs `mgmt`).
+        missing=0
+        while IFS= read -r line; do
+          [ -n "$line" ] || continue
+          br=''${line%%=*}
+          rest=''${line#*=}
+          ct=''${rest%%:*}
+          tenant_br=''${rest#*:}
+          ip link show "$br" >/dev/null 2>&1 \
+            || { echo "ap-plane-anchors: $br does not exist" >&2; missing=1; continue; }
+          if ! veth=$(tenant_veth "$ct" "$tenant_br"); then
+            echo "ap-plane-anchors: $br: no veth of $ct found on $tenant_br" >&2
+            missing=1
+            continue
+          fi
+          if ip -d link show "$veth" | grep -q " master $br "; then
+            echo "ap-plane-anchors: $br already anchored by $veth"
+            continue
+          fi
+          ip link set "$veth" master "$br"
+          echo "ap-plane-anchors: $veth -> $br"
+        done <<< ${lib.escapeShellArg (
+             lib.concatStringsSep "\n"
+               (lib.mapAttrsToList (br: v: "${br}=${v}") cfg.planeAnchors))}
+
+        exit "$missing"
       '';
     };
   };

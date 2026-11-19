@@ -464,6 +464,20 @@ in
                     { field = "endpoint"; path = "endpoint"; }
                     { field = "presharedKey"; path = "preshared-key"; }
                     { field = "publicKey"; path = "public-key"; }
+                    # The inventory reads these two as `addressesFile` and
+                    # `dnsFile` (prod-network/current/inventory-cobalt.nix
+                    # `core-vpn-onyx` / `core-vpn-opal`), but only the four
+                    # key fields above were ever materialized. systemd-nspawn
+                    # therefore failed the container at spawn time with
+                    # "Failed to clone /run/secrets/onyx-address: No such file
+                    # or directory", the unit restart-looped five times, and
+                    # hit `start-limit-hit` -- so core-vpn-onyx and
+                    # core-vpn-opal were dead on every boot while the other
+                    # 14 containers were fine (measured 2026-11-19 on boot
+                    # 26.05.20261113.f1e5c35). `dns` was next in line and would
+                    # have failed the same way.
+                    { field = "address"; path = "address"; }
+                    { field = "dns"; path = "dns"; }
                   ])
               [ "onyx" "opal" ]
           ))
