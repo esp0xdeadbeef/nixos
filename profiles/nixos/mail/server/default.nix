@@ -575,6 +575,20 @@ in
       submissionsOptions = commonSubmissionOptions;
     };
 
+    # rspamd reads its nameservers from /etc/resolv.conf once, at startup. The
+    # stock unit only orders against network.target, which is reached before
+    # dhcpcd has processed the router advertisement and written resolv.conf.
+    # rspamd then starts with no usable resolver and performs zero DNS lookups
+    # for the rest of the boot, silently disabling every RBL, SPF, DKIM, URIBL
+    # and hostname check it has. Wait for the resolver to be populated instead.
+    systemd.services.rspamd = {
+      wants = [ "network-online.target" ];
+      after = [
+        "network-online.target"
+        "dhcpcd.service"
+      ];
+    };
+
     services.rspamd = {
       enable = true;
       postfix = {
