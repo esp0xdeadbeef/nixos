@@ -19,6 +19,17 @@
     # VM reaches (core -> base.common, plus the s-gamma and VM bases directly);
     # base.system is skipped by dell-vm-host and base.common-less hosts.
     sandbox-paths = [ "/bin/sh=${pkgs.bashInteractive}/bin/bash" ];
+
+    # Keep outputs/derivations of store paths that still have a GC root.
+    #
+    # nix.conf(5): keep-outputs keeps "the outputs of non-garbage derivations",
+    # keep-derivations "the derivations from which non-garbage store paths were
+    # built". Both are relative to a ROOT -- they do not protect an unrooted
+    # path, and they do not extend the 30-day retention below. What they buy is
+    # that a rooted artefact keeps its build inputs (compiler, source tarball),
+    # so re-realising it does not silently pull a toolchain back in.
+    keep-outputs = true;
+    keep-derivations = true;
   };
 
   environment.systemPackages = with pkgs; [
