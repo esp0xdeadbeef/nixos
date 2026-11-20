@@ -546,6 +546,20 @@ in
         smtpd_sender_restrictions = [
           "permit_mynetworks"
           "permit_sasl_authenticated"
+          "reject_non_fqdn_sender"
+          "reject_unknown_sender_domain"
+        ];
+        # reject_unknown_sender_domain answers 450 and, with the default
+        # defer_if_permit, would still accept mail from a lookalike domain when
+        # a later restriction permits it. Force a hard defer instead so a
+        # sender domain with no usable MX/A record (throwaway spam domains with
+        # broken DNS) never reaches the virtual alias catchall.
+        unknown_address_tempfail_action = "defer";
+        smtpd_helo_restrictions = [
+          "permit_mynetworks"
+          "permit_sasl_authenticated"
+          "reject_invalid_helo_hostname"
+          "reject_non_fqdn_helo_hostname"
         ];
         smtpd_tls_auth_only = true;
 
@@ -596,10 +610,14 @@ in
         config = {
           smtpd_milters = [ "unix:/run/rspamd/rspamd-milter.sock" ];
           non_smtpd_milters = [ "unix:/run/rspamd/rspamd-milter.sock" ];
-          milter_default_action = "accept";
+          # Fail closed: with the previous "accept", a rspamd crash or milter
+          # timeout delivered every message unscanned. "tempfail" defers
+          # instead, so the sender retries and nothing is lost.
+          milter_default_action = "tempfail";
           milter_protocol = "6";
         };
       };
+      localLuaRules = ./rules/catchall-rcpt.lua;
       locals."dkim_signing.conf".text = ''
         enabled = true;
         sign_authenticated = true;
