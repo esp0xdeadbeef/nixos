@@ -1324,3 +1324,63 @@ The repo should make these questions easy to answer:
 The next concrete action is step 0 above: make `nix fmt` enforce something, then
 clear the formatter drift and the two stashes before finishing the
 `library/01-general` split one host at a time.
+
+## Canonical realization content is absent: the renderer fleet is BLOCKED on an upstream contract
+
+Recorded 2026-11-21 while bringing the containerlab renderer's test suite into the
+HAT. This is the single architectural item that keeps the renderer fleet from
+being "a small shim around the realization schema", and it cannot be fixed
+inside a renderer.
+
+### What is proven
+
+- `network-renderer-containerlab-linux-backend` CI run 44933503740 is **red** on
+  exactly one test, `tests/test-raw-cpm-consumption.sh`:
+  `FAIL RR_RAW_CPM_INPUT`, hits `host-module.nix:control_plane_model`,
+  `flake.nix:control_plane_model`, `flake.nix:controlPlaneEnvelope`.
+- `network-realization-model`'s `canonical-bundle-content` check is red by
+  design, and states the consequence: a renderer that needs canonical content
+  fails loudly (`network-renderer-openconfig`, no `canonicalInterfaces`), while
+  the ones that read the plain CPM keep passing and cannot see that the
+  canonical field is missing.
+
+### Why this is BLOCKED rather than pending work
+
+Three facts pin it, each measured, not inferred:
+
+1. **The model forbids carrying canonical content.**
+   `network-realization-model/src/default.nix` asserts, as an invariant:
+   `candidate.network.data == cpm`, failing with
+   `NR_REALIZATION_INVENTED_SEMANTIC` otherwise. Emitting
+   `canonicalInterfaces` therefore trips the model's own invariant until that
+   identity rule is replaced.
+2. **The schema defines no canonical network shape.**
+   `network-realization-schema` fixes the bundle envelope (`kind`, `revision`,
+   required keys) and nothing else: `grep -r canonicalInterface` over it returns
+   no hits. There is no contract for a renderer to consume.
+3. **Coverage is single-rule.** `canonicalRecordsFor` maps `network.data` leaf
+   for leaf with `transformationRule = "cpm-identity-v1"`, and the coverage
+   invariants reject any other rule. Canonical objects would need their own rule
+   *and* their own coverage rows for every leaf they add.
+
+So the fix is a spec-first, three-repository contract change (schema shape →
+model emission and coverage rule → renderer consumption), plus the GAMP chain
+(FS-310-HDS-040-SDS-010-SMS-100 governs it). It must not be done from inside
+one renderer, and it must not be made green by adding the hits to the test's
+allowlist — the test says so explicitly, and doing it would leave the fleet
+"consuming the CPM with a validation wrapper around it".
+
+### What must not be done instead
+
+- Do not allowlist the containerlab hits. The test's own text forbids it; the
+  allowlist is for deliberate, documented exceptions and there is no canonical
+  content to switch to yet.
+- Do not have a renderer derive interfaces from the raw CPM to silence the scan.
+  That is the invention FS-310 and SMS-100 forbid, and the goal of the whole
+  exercise.
+
+### Consequence for acceptance
+
+The HAT client result (both sites, both families, cross-tenant Tang) does not
+depend on this item and passes today. The containerlab renderer's *correct
+consumption* criterion does, and stays red until the contract above is changed.
