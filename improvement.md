@@ -1537,3 +1537,33 @@ relation". That is a producer-side modelling change, and it needs the spec item
 to say which relation gets which table before it can be implemented.
 
 Reverted; the control-plane model is back to 274 PASS / 0 FAIL.
+
+### The modelled multipath behaviour is dropped between intent and renderer
+
+The `single-wan` conflicts are not missing data — the model *declares* multipath
+and nothing downstream carries it:
+
+- intent vocab: `network-labs/GAMP/SMT/FS-481-HDS-010-SDS-010-SMS-010/intent.nix`
+  declares `behaviors = [ "equal-cost-multipath" ]` with `selects = [...]`, and
+  says outright that "the concurrent equal-cost behavior is declared, not
+  inferred from the member count".
+- forwarding model: `implementation/lib/routing/site-routing.nix` consumes the
+  behaviours list but only asks whether `"bgp"` is present; a site whose only
+  behaviour is equal-cost-multipath runs the base static scheme and the
+  declaration is discarded.
+- control-plane model: `grep -rn equal-cost-multipath src` returns nothing.
+- renderer: `clabgen/s88/CM/linux_routes.py` has
+  `_has_explicit_multipath_authority(...)` returning `False`, documented as
+  "Currently no multipath authority mechanism exists; this is a construction stub
+  that returns False until the upstream contract is implemented."
+
+So the chain is: declared in intent -> normalized into node behaviours -> dropped
+at the forwarding model -> never emitted by the CPM -> renderer stubs it out and
+rejects the site with `conflicting-next-hop`.
+
+The fix is the contract FS-315 already implies ("one route-selection authority
+shall have one modeled semantic next-hop set ... unless explicit multipath policy
+names the complete authorized member set"): the CPM must emit that member set
+from the declared behaviour, and the renderer must consume it instead of returning
+False. It cannot be inferred from route multiplicity — the intent explicitly
+forbids inferring it from the member count.
