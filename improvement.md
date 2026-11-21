@@ -1460,3 +1460,17 @@ The open gate is `tests/test-raw-cpm-consumption.sh` (RR_RAW_CPM_INPUT).
 
 No allowlist was added to that test and no renderer was taught to reconstruct
 meaning from the raw CPM.
+
+### Verified CI state after the pin advance (2026-11-21)
+
+- `network-control-plane-model` 8568ab6: CI run 44947343820 `success`
+  (job `test suite` green; full local suite 274 PASS / 0 FAIL).
+- `network-site-esp` 8b6b45f: client HAT passes on both sites, both families,
+  `tang6` returns a signed payload.
+- Still red by design, and left red: `network-renderer-{nixos,nebula,wireguard,
+  containerlab-linux-backend,access-endpoint-nixos}` `test-raw-cpm-consumption.sh`
+  and `network-realization-model` `canonical-bundle-content`.
+
+The gate is not silenced: no allowlist entry was added, and the fix is the
+contract change described above (canonical routes/targets/policy in the bundle),
+not a renderer-side reconstruction.

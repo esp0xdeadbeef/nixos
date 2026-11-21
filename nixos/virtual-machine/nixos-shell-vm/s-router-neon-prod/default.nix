@@ -2,6 +2,7 @@
 , lib
 , config
 , pkgs
+, profiles
 , relativeRepo
 , outputs
 , ...
@@ -40,6 +41,23 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
+  # Network diagram (nix-topology, profiles.nixos.topology).
+  #
+  # Build with:
+  #   nix build .#nixosConfigurations.s-router-neon-prod.config.local.topology.output
+  #
+  # Interfaces are NOT declared here.  This guest's networking is rendered by
+  # the network-* pipeline into systemd-networkd units, and nix-topology's
+  # systemd-network extractor derives the interface graph from those units --
+  # the same source of truth the guest actually runs.  Hand-listing VLANs or
+  # bridges here would be a second copy that drifts from the renderer.
+  #
+  # Only the node identity and its role are stated (Neon site router (production) -- KVM guest).
+  local.topology = {
+    enable = true;
+    hardwareInfo = "Neon site router (production) -- KVM guest";
+  };
+
   local.users.deadbeefSops.enable = false;
 
   users.users.deadbeef = {
@@ -51,6 +69,7 @@ in
 
   imports = [
     outputs.nixosModules.containerNetworkDefaults
+    profiles.nixos.topology.default
 
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
     (modelSource + "/runtime-secrets.nix")

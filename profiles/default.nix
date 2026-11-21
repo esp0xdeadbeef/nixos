@@ -46,6 +46,9 @@
       fish = import ./nixos/shell/fish.nix;
       zsh-prompt = import ./nixos/shell/zsh-prompt.nix;
     };
+    topology = {
+      default = import ./nixos/topology;
+    };
     home-manager = {
       deadbeef = import ./nixos/home-manager/deadbeef.nix;
     };

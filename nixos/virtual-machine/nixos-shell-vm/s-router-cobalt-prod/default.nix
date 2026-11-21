@@ -2,6 +2,7 @@
 , lib
 , config
 , pkgs
+, profiles
 , relativeRepo
 , outputs
 , vmSystem ? "x86_64-linux"
@@ -75,6 +76,23 @@ in
 
   networking.hostName = lib.mkForce hostName;
 
+  # Network diagram (nix-topology, profiles.nixos.topology).
+  #
+  # Build with:
+  #   nix build .#nixosConfigurations.s-router-cobalt-prod.config.local.topology.output
+  #
+  # Interfaces are NOT declared here.  This guest's networking is rendered by
+  # the network-* pipeline into systemd-networkd units, and nix-topology's
+  # systemd-network extractor derives the interface graph from those units --
+  # the same source of truth the guest actually runs.  Hand-listing VLANs or
+  # bridges here would be a second copy that drifts from the renderer.
+  #
+  # Only the node identity and its role are stated (Cobalt site router (production) -- KVM guest on s-nodus).
+  local.topology = {
+    enable = true;
+    hardwareInfo = "Cobalt site router (production) -- KVM guest on s-nodus";
+  };
+
   # No per-VM secrets/<host>.yaml: this VM reuses the cobalt site's existing
   # secret files (same site, same devices), so opt out of the sops-provisioned
   # deadbeef password the nixos-shell-host base would otherwise expect at
@@ -89,6 +107,7 @@ in
 
   imports = [
     outputs.nixosModules.containerNetworkDefaults
+    profiles.nixos.topology.default
 
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
 

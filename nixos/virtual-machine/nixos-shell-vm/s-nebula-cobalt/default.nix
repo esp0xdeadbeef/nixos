@@ -10,7 +10,22 @@
   imports = [
     profiles.nixos.nixos-shell-host.common
     profiles.nixos.network.nebula-lighthouse
+    profiles.nixos.topology.default
   ];
+
+  # Network diagram (nix-topology, profiles.nixos.topology).
+  #
+  # Build with:
+  #   nix build .#nixosConfigurations.s-nebula-cobalt.config.local.topology.output
+  #
+  # Interfaces are not declared here: this VM expresses its network as
+  # systemd-networkd netdevs/networks (VLAN 10 mgmt, VLAN 20 service -- see the
+  # netdevs below), and nix-topology's systemd-network extractor derives the
+  # interface graph from those units.
+  local.topology = {
+    enable = true;
+    hardwareInfo = "Nebula lighthouse VM (cobalt site) -- KVM guest on s-nodus";
+  };
 
   # No per-VM SOPS/deadbeef password; SSH keys only.
   local.nixosShellHost.secrets.enable = false;

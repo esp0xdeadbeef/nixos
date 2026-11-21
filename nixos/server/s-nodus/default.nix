@@ -45,6 +45,7 @@ in
     profiles.nixos.base.system
     profiles.nixos.base.maintenance
     profiles.nixos.network.private
+    profiles.nixos.topology.default
 
     profiles.nixos.impermanence.minimal
     profiles.nixos.ssh.password-login
@@ -248,6 +249,31 @@ in
   # zsh as the interactive shell (same profile as s-gamma and the laptops).
   # The board is a headless serial/SSH host, so the prompt reads "server".
   local.shell.zshPrompt.enable = true;
+
+  # Network diagram (nix-topology, profiles.nixos.topology).
+  #
+  # Build with:
+  #   nix build .#nixosConfigurations.s-nodus.config.topology.output
+  #
+  # Interfaces are NOT listed here: s-nodus expresses its whole network as
+  # systemd-networkd netdevs/networks (./cobalt-bridges.nix, ./network.nix,
+  # ./wifi-ap.nix), and nix-topology's systemd-network extractor derives the
+  # interface graph -- the mxl_* jacks, the vlan20/30/50 netdevs, br-cobalt-lan
+  # and its members -- from those units directly.  Repeating them below would
+  # create a second source of truth that silently drifts from the netdevs that
+  # actually exist on the board.
+  #
+  # What is added here is the part networkd cannot express: the *semantic*
+  # peers of those interfaces.  The board itself does not route -- the cobalt
+  # router VM does (see the overview at the top of ./default.nix) -- so the
+  # host-side uplink is lan5 (DHCP, carries the nebula underlay), and the
+  # bridges are taps into the guest listed in ./vm-host.nix.  Those are nodes
+  # owned by the VMs' own topology blocks; the connections are declared there,
+  # where the guest's NIC names are known.
+  local.topology = {
+    enable = true;
+    hardwareInfo = "Banana Pi BPI-R4 Pro 4E (MediaTek MT7988A, 4x Cortex-A73, 4 GiB)";
+  };
 
   # Enable the impermanence defaults.  Importing the profile is not enough:
   # it is gated on this option, and without it /persist and /nix never get

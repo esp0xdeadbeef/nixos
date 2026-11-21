@@ -63,6 +63,7 @@ in
     profiles.nixos.base.system
     profiles.nixos.base.maintenance
     profiles.nixos.network.private
+    profiles.nixos.topology.default
 
     profiles.nixos.impermanence.minimal
     profiles.nixos.ssh.password-login
@@ -168,6 +169,19 @@ in
   systemd.services.systemd-networkd-wait-online.enable = lib.mkForce false;
 
   local.internetGuard.enable = true;
+
+  # Network diagram (nix-topology, profiles.nixos.topology).
+  #
+  # This host IS s-nodus (same board, same secrets, same hostname -- see
+  # README.md), evaluated against the nixos-hardware board support instead of
+  # the host-local board files.  It must therefore collapse onto s-nodus's
+  # node, not add a second phantom device: `id` pins the node identity while
+  # `networking.hostName` is already forced to s-nodus for the same reason.
+  local.topology = {
+    enable = true;
+    id = "s-nodus";
+    hardwareInfo = "Banana Pi BPI-R4 Pro 4E (MediaTek MT7988A, 4x Cortex-A73, 4 GiB)";
+  };
 
   # 4 cores is very little for a box that also forwards a 10G WAN into a VM.
   # Measured with `nix run nixpkgs#fast` on the live prod router:

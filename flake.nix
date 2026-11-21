@@ -296,6 +296,22 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Network/infrastructure diagrams, via profiles.nixos.topology.
+    #
+    # nix-topology is a NixOS *module*, not a CLI: it has no runnable app and
+    # no standalone command, so the only entrypoint is a build output of a
+    # configuration that imports it --
+    #   nix build .#nixosConfigurations.<host>.config.topology.output
+    # Rendered by the evaluating machine (graphviz/elk), so it works for the
+    # aarch64 hosts from an x86_64 workstation without an aarch64 builder.
+    #
+    # Only the hosts importing profiles.nixos.topology depend on this input;
+    # nothing else in the fleet evaluates it.
+    nix-topology = {
+      url = "github:oddlama/nix-topology";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # hardware:
     # Upstream nixos-hardware, UNPINNED on purpose: flake.lock is the pin, so
     # `nix flake update nixos-hardware` moves every host at once and nothing in
