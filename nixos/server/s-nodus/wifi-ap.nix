@@ -64,6 +64,16 @@ let
   # 6 GHz forbids pre-RSNA security methods, so only the SAE (WPA3) planes may be
   # advertised there; the WPA-PSK planes (mgmt, unlock) are 2.4/5 GHz only.
   saePlanes = builtins.filter (p: p.plane == "cobalt-clients" || p.plane == "cobalt-clients-vpn") planes;
+
+  # Containers this module may anchor, kept only if the configuration being
+  # built actually defines them. A specialisation is `base // delta`, so this
+  # host module is evaluated for BOTH the prod boot and the router trial; the
+  # `access-*` containers exist only in the latter. Gating on their presence is
+  # what stops the test path leaking an anchor unit (and the containers it
+  # names) into prod. See the `ap-plane-anchors` definition for the failure this
+  # caused: a prod boot that started and failed router containers.
+  anchoredContainers = builtins.filter (name: config.containers ? ${name})
+    (map (v: lib.head (lib.splitString ":" v)) (lib.attrValues cfg.planeAnchors));
 in
 {
   options.local.sNodusWifi = {
@@ -408,11 +418,31 @@ in
     # `after=` on a unit that is not actually started is harmless: it orders
     # if present, and does nothing otherwise. That is exactly the semantics
     # needed here.
-    systemd.services.ap-plane-anchors = lib.mkIf (cfg.planeAnchors != { }) {
+    # TEST-SPECIALISATION ONLY.
+    #
+    # This unit exists to connect the AP planes to the *router trial's*
+    # containers (`access-clients`, `access-clients-vpn`, `access-mgmt`). Those
+    # containers are defined by `router-new-test.nix`'s specialisation, NOT by
+    # this host module -- but a specialisation is `base // delta`, so anything
+    # written here also lands on the PROD boot. That is how a prod boot came to
+    # start (and fail) router containers: the test path was leaking into prod.
+    #
+    # So the unit is gated on the containers it anchors actually existing in
+    # the configuration being built. On a prod boot there is no `access-*`
+    # container, the condition is false, and neither the unit nor anything it
+    # pulls in is present. In the specialisation they exist and it is emitted.
+    #
+    # `cfg.planeAnchors != { }` is NOT a sufficient gate: that option has a
+    # non-empty default, so it is always true, which is precisely why the unit
+    # used to be emitted unconditionally.
+    systemd.services.ap-plane-anchors = lib.mkIf (anchoredContainers != [ ]) {
       description = "Enslave tenant veths into the cobalt AP planes";
       wantedBy = [ "multi-user.target" ];
       after = [ "ap-planes.service" ] ++ map (v: "container@${lib.head (lib.splitString ":" v)}.service")
         (lib.attrValues cfg.planeAnchors);
+      # `after` only. `wants` must NOT list these: `wants=` starts a unit, so it
+      # made this service pull the containers in and start them on boots that
+      # did not define them (see the gate above).
       wants = [ "ap-planes.service" ];
       serviceConfig = {
         Type = "oneshot";
