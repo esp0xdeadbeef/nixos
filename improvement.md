@@ -1474,3 +1474,25 @@ meaning from the raw CPM.
 The gate is not silenced: no allowlist entry was added, and the fix is the
 contract change described above (canonical routes/targets/policy in the bundle),
 not a renderer-side reconstruction.
+
+### The renderer gate is mis-specified as well as unmet
+
+While removing a genuinely dead producer read from
+`network-renderer-nixos` (`s88/ControlModule/lookup/render-inputs.nix`, commit
+324eeffb), the RR_RAW_CPM_INPUT scan showed what it actually matches in a current
+tree: `s88/ControlModule/api/debug-payload.nix` reports six hits, of which ONE is
+a read (`controlPlaneOut.control_plane_model.data`) and five are provenance
+strings such as
+
+    source = "controlPlaneOut.control_plane_model.data.*.trafficPathValidation.validPaths";
+
+Those strings record where a rendered value came from. A scan that counts them
+cannot be satisfied by an honest renderer: passing it requires deleting the
+provenance it is supposed to preserve. So the gate needs a decision -- match code
+reads only (strip comments and string literals), or accept that provenance
+strings are not consumption -- before any renderer can pass it honestly.
+
+This is recorded as BLOCKED rather than patched, because changing the matcher to
+make the five strings stop counting is the same "adjust the test" move that was
+reverted for the S88 audit: the finding must be decided by the owner, not by
+whoever wants a green run.
