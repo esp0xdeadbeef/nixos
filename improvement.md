@@ -1496,3 +1496,14 @@ This is recorded as BLOCKED rather than patched, because changing the matcher to
 make the five strings stop counting is the same "adjust the test" move that was
 reverted for the S88 audit: the finding must be decided by the owner, not by
 whoever wants a green run.
+
+### Fleet hygiene fix landed; renderer gate still BLOCKED
+
+- `network-labs` 34071ccd: the no-private-reference guard now forbids BOTH
+  private repository names (it only knew one, which is how the private site
+  harness was named in a public GAMP document), and the document describes the
+  harness instead of naming it. CI 44949737196 success.
+- `network-renderer-nixos` 324eeffb: removed an inventory fallback that read the
+  producer artifact but could never fire (no producer emits that member). The
+  RR_RAW_CPM_INPUT gate is still red for a genuine read, and for provenance
+  strings it counts as reads — pending the owner's decision recorded above.
