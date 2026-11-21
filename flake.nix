@@ -312,37 +312,37 @@
     # laptops and the Dell servers -- uses the upstream `nixos-hardware` above,
     # so board-specific work never lands on them.
     #
-    # ad56e4fe is the `bananapi-bpi-r4-pro-efi` branch: the board builds its
-    # own boot chain (BL2 + FIP carrying BL31 and U-Boot with
-    # CONFIG_EFI_LOADER) and boots an ESP through systemd-boot, instead of the
-    # signed vendor OpenWrt firmware and its raw FIT.
+    # The pin is a SQUASHED single commit (`bananapi/bpi-r4-pro: init`) on the
+    # `bananapi-bpi-r4-pro-upstream` branch, which is the head of upstream PR
+    # https://github.com/NixOS/nixos-hardware/pull/2124 and is based on
+    # upstream master, so the module content is identical to the 37-commit
+    # `bananapi-bpi-r4-pro-efi` development branch it was collapsed from --
+    # just with the debugging history (`fix(...)` rounds and three `BLOCKED`
+    # commits recording dead ends) not shipped.  The reasoning those commits
+    # carried lives in the module's own comments instead.
     #
-    # Bumped 719b19b2 -> a1a3c296 -> ad56e4fe -> f05d38ef.  ad56e4fe picked up
-    # two kernel changes:
-    # "stop building 1570 kernel DTBs" (the aarch64 builder defaulted
-    # buildDTBs to true and compiled every DTB for every ARCH_* common-config
-    # enables -- ~118M, 1570 files -- into the kernel output, though the
-    # board's one DTB is built by dtc from ./dtb) and "say buildDTBs=no
-    # explicitly" (so kernel.buildDTBs is a real `false` rather than a missing
-    # attribute, which is what hardware.deviceTree.enable defaults to on).
-    # No behaviour change for anything else; the board DTB still comes from
-    # dtbSource, so the SSD/PCIe description is unaffected.
+    # The board builds its own boot chain (BL2 + FIP carrying BL31 and U-Boot
+    # with CONFIG_EFI_LOADER) and boots an ESP through systemd-boot, instead of
+    # the signed vendor OpenWrt firmware and its raw FIT.
     nixos-hardware-bpi-r4-pro = {
-      # f05d38ef: build the smc userspace tools instead of only installing
-      # them (rebootctl/smcctl were never compiled, so dev_reboot's
-      # installPhase failed with `cannot stat 'rebootctl'` and took the whole
-      # s-nodus kernel-modules chain with it).
-      url = "github:esp0xdeadbeef/nixos-hardware/f05d38ef";
+      url = "github:esp0xdeadbeef/nixos-hardware/7d2eddcc64c65109ef2795a712498d67aaa73ba9";
       # Share the fleet's nixpkgs rather than pulling the fork's own pin into
       # the module system as a second nixpkgs.
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Same fork, but on the `x13s-pr1751-plus-bpi` branch: PR #1751's x13s
+    # Same fork, but on the `x13s-bluetooth-mac-race` branch: PR #1751's x13s
     # rework (hardware.lenovo.x13s.* options, feature-keyed kernel patch series)
-    # stacked on top of the bpi-r4-pro commits above. Used ONLY by
-    # l-portal-unstable, so the pinned `nixos-hardware` input above stays the
-    # rollback target for every deployed host.
+    # plus the Bluetooth MAC race fix. Used ONLY by l-portal-unstable, so the
+    # pinned `nixos-hardware` input above stays the rollback target for every
+    # deployed host.
+    #
+    # NOTE: this branch still carries the OLD 2-commit pre-EFI version of
+    # bananapi/bpi-r4-pro (board support + README only -- no efi.nix/fip.nix/
+    # atf.nix, none of the reboot fixes), because it branched before the EFI
+    # rework.  Harmless today: l-portal-unstable never imports that module, so
+    # the stale copy is dead weight in the flake graph.  It is NOT the same
+    # module the `nixos-hardware-bpi-r4-pro` input above pins.
     #
     # The PR is still open upstream; when it merges, drop this input and point
     # `nixos-hardware` at the upstream rev instead.
