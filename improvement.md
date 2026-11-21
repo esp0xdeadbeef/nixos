@@ -1435,3 +1435,28 @@ Note on the scan's other two hits: `flake.nix` contains a negative fixture
 that records this very gap. Neither is a read of semantics, but only
 `host-module.nix:181` is an actual consumption site; the gate cannot pass while
 that one exists, because there is no canonical content to switch it to.
+
+### Progress since the first record, and the part that is still BLOCKED
+
+`network-control-plane-model` 8568ab6 now:
+
+- publishes `canonicalInterfaces` (target-qualified identity, IANA ifType,
+  `enabled`, canonical path), so a renderer can map modelled interface identity
+  instead of deriving it from a platform interface name; and
+- fixes the exit-route defect: a core's egress-only provider overlay and its
+  fabric p2p handoff no longer install competing defaults into the one shared
+  policy table. Measured before: `table 1003 0.0.0.0/0 metric 50 claimed by
+  overlay-wg-egress, p2p-core-nebula-upstream-selector`. The exit owns the
+  default; the handoff carries reachability to it. That is the mechanism of the
+  2026-11-21 live cobalt IPv6 exit failure.
+
+`network-renderer-containerlab-linux-backend` (and the other four renderers) are
+still BLOCKED on the rest of the contract: they read network semantics — routes,
+interfaces, targets — from `network.data`/`controlPlaneEnvelope`, which is the
+CPM with a validation wrapper. Publishing `canonicalInterfaces` removes one
+class of read; it does not canonicalize routes, targets or policy, and until
+those exist in the bundle a renderer cannot consume them without inventing.
+The open gate is `tests/test-raw-cpm-consumption.sh` (RR_RAW_CPM_INPUT).
+
+No allowlist was added to that test and no renderer was taught to reconstruct
+meaning from the raw CPM.
