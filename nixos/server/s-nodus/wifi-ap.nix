@@ -396,11 +396,19 @@ in
     # needs the containers up first, and failing to anchor must not fail the
     # bridge creation and take every BSS down with it. So it is `wants`-ed,
     # never a hard dependency, and it retries rather than giving up.
+
+    # The containers this unit inspects. Ordering on them does not make the
+    # dependency hard (they are `wants`-ed), it only stops the unit from
+    # racing container startup and burning its first attempt on a netns that
+    # does not exist yet. This is robustness, not the fix: the unit failed even
+    # with every container up (see `path` below).
     systemd.services.ap-plane-anchors = lib.mkIf (cfg.planeAnchors != { }) {
       description = "Enslave tenant veths into the cobalt AP planes";
       wantedBy = [ "multi-user.target" ];
-      after = [ "ap-planes.service" ];
-      wants = [ "ap-planes.service" ];
+      after = [ "ap-planes.service" ] ++ map (v: "container@${lib.head (lib.splitString ":" v)}.service")
+        (lib.attrValues cfg.planeAnchors);
+      wants = [ "ap-planes.service" ] ++ map (v: "container@${lib.head (lib.splitString ":" v)}.service")
+        (lib.attrValues cfg.planeAnchors);
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -409,7 +417,18 @@ in
         Restart = "on-failure";
         RestartSec = 15;
       };
-      path = [ pkgs.iproute2 pkgs.gnugrep pkgs.coreutils pkgs.gawk config.nix.package ];
+      # `config.nix.package` gives `nix`, but the script calls
+      # `nixos-container`, which lives in the system profile. Without it here
+      # `host_veths_for`'s discovery subshell died with `command not found`,
+      # its stderr was swallowed by `2>/dev/null`, it printed nothing, and
+      # every plane reported "no veth ... found" -- which reads as a missing
+      # veth and was not. The unit therefore never anchored anything, the
+      # clients plane was left with no gateway (carrier UP, VAPs forwarding,
+      # stations unable to get a route) and it failed forever on its restart
+      # counter. Verified on s-nodus 2026-11-21: with this package on PATH the
+      # unchanged script anchors all three planes and exits 0.
+      path = [ pkgs.iproute2 pkgs.gnugrep pkgs.coreutils pkgs.gawk
+               pkgs.nixos-container config.nix.package ];
       script = ''
         set -euo pipefail
 
@@ -432,7 +451,17 @@ in
         # the caller pick by bridge membership, which is a host fact.
         host_veths_for() {
           local ct="$1" idx cand
-          nixos-container run "$ct" -- ${pkgs.iproute2}/bin/ip -o link show 2>/dev/null \
+          local out
+          # Do not swallow the error here. An empty result has two very
+          # different causes -- the container has no such peer, or the command
+          # to list its interfaces is not on PATH -- and they were
+          # indistinguishable while this was `2>/dev/null`. The second one
+          # silently disabled the whole unit.
+          if ! out=$(nixos-container run "$ct" -- ${pkgs.iproute2}/bin/ip -o link show 2>&1); then
+            echo "ap-plane-anchors: cannot list interfaces of $ct: $out" >&2
+            return 1
+          fi
+          printf '%s\n' "$out" \
             | sed -n 's/^\([0-9]\{1,\}\): .*/\1/p' \
             | while read -r idx; do
                 for cand in /sys/class/net/*; do
@@ -443,14 +472,23 @@ in
               done
         }
 
-        # The tenant veth is the one the renderer already enslaved to the
-        # tenant plane (`clients`, `clients-vpn`, `mgmt`). An uplink veth is
-        # also a bridge port, but on a transit bridge, so requiring membership
-        # of the tenant bridge is what tells them apart.
+        # The tenant veth is the one the renderer enslaved to the tenant plane
+        # (`clients`, `clients-vpn`, `mgmt`), or one this unit has already moved
+        # to the AP plane. An uplink veth is also a bridge port, but on a transit
+        # bridge, so requiring membership of one of those two is what tells them
+        # apart.
+        #
+        # The AP bridge must be included, because this unit MOVES the veth: once
+        # anchored it is no longer on the tenant bridge, so a lookup restricted
+        # to the tenant bridge finds nothing on the next run and the unit exits
+        # non-zero forever. That is a unit that succeeds once and then reports
+        # failure for the rest of its life.
         tenant_veth() {
-          local ct="$1" tenant_br="$2" cand
+          local ct="$1" tenant_br="$2" ap_br="$3" cand m
           for cand in $(host_veths_for "$ct"); do
-            if ip -d link show "$cand" 2>/dev/null | grep -q " master $tenant_br "; then
+            m=$(ip -d link show "$cand" 2>/dev/null \
+                  | sed -n 's/.* master \([^ ]*\) .*/\1/p' | head -1)
+            if [ "$m" = "$tenant_br" ] || [ "$m" = "$ap_br" ]; then
               echo "$cand"; return 0
             fi
           done
@@ -473,7 +511,7 @@ in
           tenant_br=''${rest#*:}
           ip link show "$br" >/dev/null 2>&1 \
             || { echo "ap-plane-anchors: $br does not exist" >&2; missing=1; continue; }
-          if ! veth=$(tenant_veth "$ct" "$tenant_br"); then
+          if ! veth=$(tenant_veth "$ct" "$tenant_br" "$br"); then
             echo "ap-plane-anchors: $br: no veth of $ct found on $tenant_br" >&2
             missing=1
             continue
