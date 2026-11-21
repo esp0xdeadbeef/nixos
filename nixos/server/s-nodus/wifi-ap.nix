@@ -397,18 +397,23 @@ in
     # bridge creation and take every BSS down with it. So it is `wants`-ed,
     # never a hard dependency, and it retries rather than giving up.
 
-    # The containers this unit inspects. Ordering on them does not make the
-    # dependency hard (they are `wants`-ed), it only stops the unit from
-    # racing container startup and burning its first attempt on a netns that
-    # does not exist yet. This is robustness, not the fix: the unit failed even
-    # with every container up (see `path` below).
+    # The containers this unit inspects. Listed in `after` ONLY.
+    #
+    # They must NOT also be in `wants`: `wants=` makes this unit PULL THEM IN,
+    # so on a boot that does not otherwise define them (the base system has
+    # just `tang`) systemd starts `container@access-clients` and friends and
+    # they fail. Adding them there started the router's containers on a plain
+    # prod boot -- ordering is what was wanted, activation was not.
+    #
+    # `after=` on a unit that is not actually started is harmless: it orders
+    # if present, and does nothing otherwise. That is exactly the semantics
+    # needed here.
     systemd.services.ap-plane-anchors = lib.mkIf (cfg.planeAnchors != { }) {
       description = "Enslave tenant veths into the cobalt AP planes";
       wantedBy = [ "multi-user.target" ];
       after = [ "ap-planes.service" ] ++ map (v: "container@${lib.head (lib.splitString ":" v)}.service")
         (lib.attrValues cfg.planeAnchors);
-      wants = [ "ap-planes.service" ] ++ map (v: "container@${lib.head (lib.splitString ":" v)}.service")
-        (lib.attrValues cfg.planeAnchors);
+      wants = [ "ap-planes.service" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
