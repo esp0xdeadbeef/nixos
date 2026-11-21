@@ -136,12 +136,20 @@ in
       '';
     };
 
-    # Re-run daily: a closure built today has no root until the next run, and
-    # that gap is exactly when the nightly GC would take it.
+    # Re-run frequently, not daily.
+    #
+    # A closure built at 14:00 has no root until this service next runs. With a
+    # daily timer that gap is up to 24h, and the nightly GC (00:04 here) sits
+    # squarely inside it -- so a build could finish, and be collected before
+    # anything rooted it. That is the same failure, one timer later.
+    #
+    # Every 15 minutes bounds the exposure to 15 minutes of a multi-hour build's
+    # output, and the service is a cheap `find` + `ln` when nothing changed.
+    # `Persistent` is kept so a missed run is caught up after downtime.
     systemd.timers.root-built-closures = {
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "daily";
+        OnCalendar = "*:0/15";
         Persistent = true;
       };
     };
