@@ -1507,3 +1507,33 @@ whoever wants a green run.
   producer artifact but could never fire (no producer emits that member). The
   RR_RAW_CPM_INPUT gate is still red for a genuine read, and for provenance
   strings it counts as reads — pending the owner's decision recorded above.
+
+### Per-relation policy routes share one table: the renderer gate's real cause
+
+Measured on `single-wan` (control-plane model, `access-admin` p2p interface):
+
+    dst 10.20.10.0/24  via 10.10.0.1  tableId null  metric null  relationId null
+    dst 10.20.10.0/24  via 10.10.0.1  tableId null  metric 40    relationId null
+    dst 10.20.10.0/24  via 10.10.0.1  tableId null  metric null  relationId null
+
+and the tenant interface carries `10.20.15.0/24` twice. The containerlab
+renderer reports these as one authority with several next hops and refuses the
+site (`FS-310-HDS-020-SDS-010-SMS-060: conflicting-next-hop`), which is why five
+renderer repos are red.
+
+Attempted fix, and why it is wrong: dedupe the emitted tuple
+(destination, next hop, table, metric). It looks right — two identical
+`ip route replace` commands — but it removes routes the model requires:
+`FS-370-HDS-010-SDS-010-SMS-101` then fails with "policy/DS per-lane
+return-path missing". So those routes ARE distinct selection authorities that
+`routeKey` keeps on purpose (relation identity), and the defect is one layer
+down: each relation's route is emitted with `tableId: null`, so several
+authorities share one policy table and collapse into one command.
+
+The fix therefore belongs in the table/lane assignment: a per-relation policy
+route must carry its own table (or an explicit multipath member set), which is
+FS-315's "each selection authority carries its own policy table or lane
+relation". That is a producer-side modelling change, and it needs the spec item
+to say which relation gets which table before it can be implemented.
+
+Reverted; the control-plane model is back to 274 PASS / 0 FAIL.
