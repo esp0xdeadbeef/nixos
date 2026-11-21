@@ -1384,3 +1384,54 @@ allowlist — the test says so explicitly, and doing it would leave the fleet
 The HAT client result (both sites, both families, cross-tenant Tang) does not
 depend on this item and passes today. The containerlab renderer's *correct
 consumption* criterion does, and stays red until the contract above is changed.
+
+### Evidence (verbatim, 2026-11-21)
+
+`network-renderer-containerlab-linux-backend` CI run 44933503740,
+`tests/test-raw-cpm-consumption.sh` (exit 1):
+
+```
+FAIL RR_RAW_CPM_INPUT: this renderer takes network semantics from the plain control-plane model.
+
+  hits:
+    host-module.nix:control_plane_model
+    flake.nix:control_plane_model
+    flake.nix:controlPlaneEnvelope
+
+  `controlPlaneEnvelope` is the producer's CPM, returned by
+  canonical.validateInput unchanged. `control_plane_model` is the same value
+  under its own name. Reading either is not consuming the canonical bundle:
+  it is consuming the CPM with a validation wrapper around it.
+```
+
+`network-realization-model`, check `canonical-bundle-content`:
+
+```
+FAIL canonical-bundle-content: the realized bundle carries no canonical network content.
+  bundle.network.data is the producer's CPM data unchanged (sites,
+  secret projections, version). It has no canonicalInterfaces, no
+  canonical routes, no canonical anything.
+```
+
+The two violations that pin the blocker:
+
+```
+src/default.nix:      _network =
+                        if candidate.network.data == cpm then true
+                        else fail "NR_REALIZATION_INVENTED_SEMANTIC" "/network/data"
+
+src/default.nix:      coverageInvariants = {
+                        classification = "realized";
+                        transformationRule = "cpm-identity-v1";
+                      };
+```
+
+`network-realization-schema`: `grep -rn canonicalInterface .` -> no matches.
+The schema fixes `kind`, `revision` and the required top-level keys only.
+
+Note on the scan's other two hits: `flake.nix` contains a negative fixture
+(`rawRejected`) that builds a bare CPM to prove it is rejected, and an assertion
+(`accepted.controlPlaneEnvelope.control_plane_model == bundle.network.data`)
+that records this very gap. Neither is a read of semantics, but only
+`host-module.nix:181` is an actual consumption site; the gate cannot pass while
+that one exists, because there is no canonical content to switch it to.
