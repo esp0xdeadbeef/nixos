@@ -12,11 +12,24 @@
 # state disk (impermanence.nix), so mounting state.qcow2 is enough to read both
 # the captures and the state log.
 #
-# Each capture point is the host side of a container's veth pair. NixOS names
-# that interface `ve-<container>` (nixos-containers.nix: ifaceHost=ve-$INSTANCE),
-# so `ve-core` is exactly the boundary of the core container. Additional veths
-# carry the renderer's own names (`ve-<container>-<suffix>`), which is why the
-# interface set is resolved at runtime rather than hardcoded here.
+# Each capture point is the host side of a container's veth pair. The renderer
+# does NOT name that interface `ve-<container>`: on 2026-11-09 the live names
+# were `cor-wan-eca` / `cor-cbcoru-913`, and on 2026-11-21 they were
+# `accc-cli-50f`, `accm-mgm-194`, `dows-p2pacc-8a9`, `upse-p2pcor-366`. A
+# name-prefix guess therefore matched nothing (or matched by coincidence), which
+# is recorded below.
+#
+# The interface set is resolved EXACTLY, not guessed: an interface inside a
+# container names its host-side peer by that peer's ifindex in
+# `/sys/class/net/<if>/iflink`, and a host ifindex is unique, so the mapping
+# from container interface to host veth is exact and cannot collide across
+# containers.
+#
+# The service also proves it is capturing. A unit that is `active (running)`
+# while writing nothing is worse than a failed one: it is an artifact asserting
+# a property no layer derived (AGENTS.md §8, §11-13). Measured 2026-11-21: four
+# of five capture points had been retrying for twelve days, each still reported
+# `active (running)`, and their directories had been empty since 2026-11-09.
 #
 # Container names are matched as GLOBS against `nixos-container list`, not as
 # literal names: a rename in the model must not silently stop the capture and
@@ -31,8 +44,20 @@ let
       type = lib.types.listOf lib.types.str;
       description = ''
         Container-name globs, matched against `nixos-container list`. Every
-        container matching one of them contributes its host-side veth
-        (`ve-<container>` and `ve-<container>-*`) to this capture point.
+        container matching one of them contributes its host-side veth to this
+        capture point; the veth is resolved exactly through `iflink`, not
+        guessed from the name.
+      '';
+    };
+
+    options.captureProbeSeconds = lib.mkOption {
+      type = lib.types.nullOr lib.types.int;
+      default = null;
+      description = ''
+        Override `captureProbeSeconds` for this hop. A hop that is legitimately
+        idle (an overlay core nothing is using yet) grows no packets, so it must
+        be able to widen or disable the probe instead of flapping. `null` uses
+        the global value; `0` disables the probe for this hop.
       '';
     };
   };
@@ -45,7 +70,9 @@ let
     downstream.containers = [ "downstream-selector" ];
     core.containers = [ "core" "core-vpn-*" ];
     upstream.containers = [ "upstream-selector" ];
-    policy.containers = [ "policy-*" ];
+    # The container is named `policy`, not `policy-*`. The old glob matched no
+    # container at all, so this hop could never resolve its interfaces.
+    policy.containers = [ "policy" ];
   };
 
   # Containers the state log reports on, before any stage matches.
@@ -63,14 +90,21 @@ let
     path = [
       pkgs.coreutils
       pkgs.gnugrep
+      pkgs.gawk
+      pkgs.findutils
+      pkgs.iproute2
       pkgs.nixos-container
       pkgs.tcpdump
     ];
+    # A capture point that cannot resolve or cannot capture must keep retrying
+    # (the guest health check is "no failed units"), but it must not present
+    # itself as a healthy running service while writing nothing. Exiting
+    # non-zero leaves the unit in `activating (auto-restart)`, which is the
+    # honest state, and the start limit is disabled so it never degrades the
+    # router by tripping into `failed`.
+    unitConfig.StartLimitIntervalSec = 0;
     serviceConfig = {
       Type = "simple";
-      # The manager's health check is "no failed units in the guest", so a
-      # capture that cannot find its interfaces yet must retry in place rather
-      # than fail the unit and mark a working router degraded.
       Restart = "always";
       RestartSec = "5s";
       Nice = 10;
@@ -80,55 +114,112 @@ let
       dir=${cfg.directory}/${name}
       mkdir -p "$dir"
 
-      resolve() {
-        ifaces=()
-        containers=()
+      tmp="$(mktemp -d)"
+      trap 'rm -rf "$tmp"' EXIT
+
+      # Containers matching this hop's globs.
+      hop_containers() {
+        local c
         for c in $(nixos-container list 2>/dev/null || true); do
           case "$c" in
-            ${casePattern spec}) containers+=("$c") ;;
+            ${casePattern spec}) printf '%s\n' "$c" ;;
           esac
-        done
-        # The renderer does not name container veths "ve-<container>"; on
-        # 2026-11-09 the live names were "cor-wan-eca" / "cor-cbcoru-913" (core)
-        # and "vb-tang", so the old patterns matched NOTHING: every capture
-        # service sat in its retry loop, stayed "active (running)" and left
-        # 0-byte directories behind -- a trial failed with no pcaps at all.
-        # Match the observed shapes too: a three-letter prefix of the container
-        # name, plus the "vb-" namespace devices.
-        for c in "''${containers[@]-}"; do
-          prefix=$(printf '%s' "$c" | cut -c1-3)
-          for p in /sys/class/net/*; do
-            n=$(basename "$p")
-            case "$n" in
-              "ve-$c" | "ve-$c"-* | "$prefix"-* | "vb-$c" | "vb-$c"-*) ifaces+=("$n") ;;
-            esac
-          done
         done
       }
 
+      # Exact host veth for every interface of every hop container.
+      #
+      # Inside a container, /sys/class/net/<if>/iflink holds the ifindex of the
+      # host-side peer, and a host ifindex is unique, so joining that index
+      # against the host's interface list names the veth exactly. No name is
+      # guessed, so a rename in the renderer cannot silently stop the capture.
+      resolve() {
+        local c
+        ip -o link show \
+          | sed -n 's/^\([0-9]\{1,\}\): \([^:@][^:@]*\).*/\1 \2/p' > "$tmp/host-index" || return 1
+        : > "$tmp/peers"
+        for c in $(hop_containers); do
+          nixos-container run "$c" -- /bin/sh -c '
+            for i in /sys/class/net/*; do
+              n="''${i##*/}"
+              [ "$n" = lo ] && continue
+              [ -r "$i/iflink" ] || continue
+              printf "%s %s\n" "$n" "$(cat "$i/iflink")"
+            done' >> "$tmp/peers" 2>/dev/null || true
+        done
+        awk 'FNR==NR { host[$1] = $2; next }
+             ($2 in host) { print host[$2] }' "$tmp/host-index" "$tmp/peers" | sort -u
+      }
+
+      # Wait for at least one peer, but not forever: a capture point that never
+      # resolves reports failure instead of sitting active with an empty dir.
+      waited=0
       while :; do
-        resolve
-        if [ "''${#ifaces[@]}" -eq 0 ]; then
-          echo "no veth yet for containers (${casePattern spec}); retrying"
-          sleep 10
-          continue
+        mapfile -t ifaces < <(resolve)
+        [ "''${#ifaces[@]}" -gt 0 ] && break
+        if [ "$waited" -ge ${toString cfg.resolveTimeoutSeconds} ]; then
+          echo "router-capture(${name}): no host veth for containers (${casePattern spec}) after ${toString cfg.resolveTimeoutSeconds}s" >&2
+          exit 1
+        fi
+        sleep 5
+        waited=$((waited + 5))
+      done
+
+      args=()
+      for i in "''${ifaces[@]}"; do
+        args+=(-i "$i")
+      done
+
+      ring_bytes() {
+        local f total=0
+        for f in "$dir/${name}".pcap*; do
+          [ -e "$f" ] || continue
+          total=$((total + $(stat -c %s "$f")))
+        done
+        printf '%s' "$total"
+      }
+
+      echo "capturing at hop ${name} on: ''${ifaces[*]}"
+
+      while :; do
+        # -e keeps the link-layer header so VLAN tags are visible in the pcap;
+        # -s keeps headers plus an address, which is what route/NAT/policy
+        # analysis needs, at a fraction of the disk. -C/-W make a bounded ring:
+        # at most $((fileSizeMb * fileCount)) MiB per hop, so a forgotten trial
+        # can never fill the state disk.
+        before="$(ring_bytes)"
+        ${lib.getExe pkgs.tcpdump} -n -tttt -e -s ${toString cfg.snaplen} \
+          "''${args[@]}" -C ${toString cfg.fileSizeMb} -W ${toString cfg.fileCount} \
+          -w "$dir/${name}.pcap" &
+        capture_pid=$!
+
+        # Prove it is capturing. A bound ring that never grows is not evidence,
+        # and reporting a healthy service with an empty directory is how the
+        # previous version misled a whole trial. Probe seconds are per-stage so
+        # a legitimately idle hop can widen or disable the probe.
+        probe=${toString (if spec.captureProbeSeconds != null then spec.captureProbeSeconds else cfg.captureProbeSeconds)}
+        captured=1
+        if [ "$probe" -gt 0 ]; then
+          captured=0
+          for _ in $(seq 1 "$probe"); do
+            sleep 1
+            [ "$(ring_bytes)" -gt "$before" ] && { captured=1; break; }
+          done
+        fi
+        if [ "$captured" -ne 1 ]; then
+          echo "router-capture(${name}): tcpdump wrote no packet in $${probe}s on ''${ifaces[*]}" >&2
+          kill "$capture_pid" 2>/dev/null || true
+          wait "$capture_pid" 2>/dev/null || true
+          exit 1
         fi
 
+        wait "$capture_pid" || true
+        echo "router-capture(${name}): tcpdump exited; re-resolving and restarting"
+        mapfile -t ifaces < <(resolve)
         args=()
         for i in "''${ifaces[@]}"; do
           args+=(-i "$i")
         done
-        echo "capturing at hop ${name} on: ''${ifaces[*]}"
-
-        # -e keeps the link-layer header so VLAN tags are visible in the pcap;
-        # -s 128 keeps headers plus an address, which is what route/NAT/policy
-        # analysis needs, at a fraction of the disk. -C/-W make a bounded ring:
-        # at most $((fileSizeMb * fileCount)) MiB per hop, so a forgotten trial
-        # can never fill the state disk.
-        ${lib.getExe pkgs.tcpdump} -n -tttt -e -s ${toString cfg.snaplen} \
-          "''${args[@]}" -C ${toString cfg.fileSizeMb} -W ${toString cfg.fileCount} \
-          -w "$dir/${name}.pcap" \
-          || echo "tcpdump at hop ${name} exited; restarting"
         sleep 2
       done
     '';
@@ -217,6 +308,30 @@ in
       type = lib.types.int;
       default = 4;
       description = "tcpdump -W. Ring length, so a hop is bounded to fileSizeMb*fileCount.";
+    };
+
+    resolveTimeoutSeconds = lib.mkOption {
+      type = lib.types.int;
+      default = 180;
+      description = ''
+        How long a capture point waits for its containers' veths before it gives
+        up and exits non-zero. Containers need a couple of minutes to appear, so
+        this is generous, but it is bounded on purpose: an unbounded wait is how
+        four of five capture points sat `active (running)` with empty
+        directories for twelve days (measured 2026-11-21).
+      '';
+    };
+
+    captureProbeSeconds = lib.mkOption {
+      type = lib.types.int;
+      default = 60;
+      description = ''
+        After tcpdump starts, how long the ring may stay unchanged before the
+        unit reports that it is not capturing and exits non-zero. A bounded ring
+        that never grows is not evidence, and a service that claims to be
+        running while writing nothing is a false assurance. `0` disables the
+        probe; a per-stage `captureProbeSeconds` overrides this value.
+      '';
     };
 
     stateIntervalSeconds = lib.mkOption {
