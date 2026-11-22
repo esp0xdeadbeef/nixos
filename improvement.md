@@ -1653,3 +1653,24 @@ RR_RAW_CPM_INPUT) and the nixos renderer (that plus SMS-060/SMS-020). All of the
 need canonical routes/targets in the bundle, and the nixos SMS-060 additionally
 needs the multipath member set that the forwarding model never emits. BLOCKED on
 that upstream contract; no renderer-side workaround has been kept.
+
+### Canonical surface complete for the renderer fleet (2026-11-22)
+
+`network-control-plane-model` now publishes, beside each other and all CI-green:
+
+| key | what it carries | consumer proven |
+|---|---|---|
+| `canonicalInterfaces` | target-qualified interface identity + IANA ifType | openconfig (green, 5eb5c1a) |
+| `canonicalRoutes` | target, interface, runtimeIfName, sourceKind, policyOnly, family, dst, gateway, tableId, metric, kind, deploymentHost | containerlab (green, d9b166b) |
+| `canonicalWireGuard` | providers + providerContracts.wireguard | wireguard (green, fc2cdcd) |
+| `canonicalSites` | overlay facts per site, incl. each overlay's complete record (`facts`) | wireguard |
+| `canonicalRuntimeTargets` | enterprise, site, target, role, placementHost, logicalNode, containers | nebula (next) |
+
+Each is a projection of the producer's own values, so none can disagree with the
+model it came from. The pattern that has worked three times: publish the slice,
+consume it in the renderer, and the RR_RAW_CPM_INPUT gate passes without being
+loosened.
+
+Remaining: nebula (consume canonicalSites + canonicalRuntimeTargets, migrate its
+ten fixtures), access-endpoint (needs its own slice), nixos renderer (SMS-060
+multipath member set; SMS-020 fails identically at HEAD).
