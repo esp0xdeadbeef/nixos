@@ -1717,3 +1717,39 @@ Remaining, per renderer:
 - **nixos renderer**: `canonicalRoutes` is available; SMS-060 needs the multipath
   member set that `network-forwarding-model/.../site-routing.nix` drops (it reads
   `behaviors` only for `bgp`), and SMS-020 fails identically at HEAD.
+
+### Final state of the renderer canonicalization (2026-11-22, end of session)
+
+Green, each verified by CI after consuming canonical content (no gate loosened):
+
+| renderer | commit | consumes |
+|---|---|---|
+| network-renderer-openconfig | 5eb5c1a | canonicalInterfaces |
+| network-renderer-containerlab-linux-backend | d9b166b / 3bc12db | canonicalRoutes |
+| network-renderer-wireguard | fc2cdcd | canonicalSites + canonicalWireGuard |
+
+Producer (`network-control-plane-model`, 274 PASS / 0 FAIL throughout):
+canonicalInterfaces, canonicalRoutes, canonicalWireGuard, canonicalSites (each
+entry carries the overlay's complete record in `facts`), canonicalRuntimeTargets
+(each entry carries the target's complete record in `facts`), all built on BOTH
+assembly paths after 6591f72.
+
+Three renderers remain red, and the reason is now precise for each:
+
+- **nebula** -- five attempts. Even with every canonical collection and full
+  `facts` published, and with fixtures adapted, its plan still resolves
+  `plan.nodes` from site-level structure that the canonical collections do not
+  express. Fixing it needs either a designed canonical *site* record (not a
+  rename of the model) or rewriting the plan to iterate
+  `canonicalRuntimeTargets` directly. Both are renderer design work.
+- **access-endpoint** -- needs endpoint assignments published from the building
+  assembly plus four fixtures moved to artifact-level `endpointAssignment`;
+  FS-720's check 1c is an OR over names, so this is not a spec conflict.
+- **nixos renderer** -- needs the multipath member set that
+  network-forwarding-model/.../site-routing.nix drops (it reads `behaviors` only
+  for `bgp`); SMS-020 fails identically at HEAD.
+
+BLOCKED on renderer design decisions (nebula) and on porting fixture inputs in
+the same commits as the source changes (access-endpoint), plus the multipath
+member set (nixos renderer). No gate was loosened and no renderer was taught to
+invent meaning at any point in this session.
