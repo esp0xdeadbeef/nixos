@@ -86,34 +86,12 @@ let
         inventoryPath = resolvedInventory;
       };
       cpmForRenderer = controlPlaneTransform cpmBuilt;
-      # The CPM *envelope*, not the build result.
-      #
-      # `compileAndBuild*` returns `{ control_plane_model = <envelope>;
-      # endpointInventory; forwardingOut; deploymentHosts; ... }`. Passing that
-      # whole record as the artifact's `control_plane_model` wrapped the model
-      # one level too deep: `network.data` still resolved (the schema has a
-      # fallback) but the canonical collections the envelope carries
-      # (canonicalInterfaces, canonicalRoutes, canonicalSites,
-      # canonicalRuntimeTargets, canonicalWireGuard) sat one level further down
-      # and never reached the bundle, so a renderer that maps canonical content
-      # got nothing:
-      #
-      #   network-renderer-nebula: ... the bundle carries no canonical site
-      #   records
-      #
-      # `pipeline.cpm` keeps the build result, because host profiles read
-      # `deploymentHosts` from it.
-      cpmEnvelope =
-        if builtins.isAttrs (cpmForRenderer.control_plane_model or null) then
-          cpmForRenderer.control_plane_model
-        else
-          cpmForRenderer;
-      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmEnvelope);
+      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpmForRenderer);
       controlPlaneArtifact = {
         kind = "network-control-plane-artifact";
         artifactIdentity = artifactDigest;
         inherit artifactDigest;
-        control_plane_model = cpmEnvelope;
+        control_plane_model = cpmForRenderer;
         authorityConflicts = [ ];
         provenance = {
           producer = "nixos/${hostName}";
