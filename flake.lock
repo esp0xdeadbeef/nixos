@@ -4405,11 +4405,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795382614,
-        "narHash": "sha256-tvx2YA1cVpaQ/ODZEOT3PQtp6oXZvFD2s9sQAFDrPbk=",
+        "lastModified": 1795384392,
+        "narHash": "sha256-5bWt3M6pevLUxwp7TDOrHfIWgOl01o/12X9PoVhw7+g=",
         "owner": "esp0xdeadbeef",
         "repo": "network-renderer-nebula",
-        "rev": "99d846c3f799c0d10b6a97fdcf8c9d7bb79c1c43",
+        "rev": "293b8ce05076b8c6b4216027dcafa441fa3e33ed",
         "type": "github"
       },
       "original": {
