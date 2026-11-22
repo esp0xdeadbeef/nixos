@@ -1605,3 +1605,26 @@ interfaces are legitimate for transit and upstream paths. A narrower variant
 keeps SMS-060 green and transit green but breaks the same two, so the
 discriminator is not the table alone; it is the lane relation the canonical
 record names.
+
+### The nixos renderer duplicate is a multipath choice, not a duplicate
+
+Two more predicates were measured on `network-renderer-nixos` SMS-060 and both
+are wrong, so both were reverted:
+
+1. Drop a route whose `Table` differs from the owning interface's allocation.
+   SMS-060 PASS and transit PASS; `FS-540-…-SMS-040` and
+   `test-upstream-selector-core-main-routes` FAIL. Those tests need a route
+   materialized into a table the interface does not itself allocate.
+2. Drop a route that is an exact duplicate including `Gateway`. SMS-040 PASS,
+   upstream PASS, transit FAIL, SMS-060 FAIL.
+
+Together they settle what the SMS-060 duplicate is: the two primitives carry
+**different next hops** for one (family, table, destination) — a multipath
+choice, not a repeated record. A renderer may not pick a member, and the model
+does not name one (the declared `equal-cost-multipath` behaviour is dropped by
+`network-forwarding-model/site-routing.nix`, which reads only `bgp`). So the fix
+belongs upstream: emit the member set for the declared behaviour, or select one
+member per (prefix, lane) — the same contract item recorded earlier.
+
+Renderer gates remaining: `RR_RAW_CPM_INPUT` in five repos, plus this SMS-060 and
+SMS-020 in `network-renderer-nixos`.
