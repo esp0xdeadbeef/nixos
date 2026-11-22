@@ -1628,3 +1628,8 @@ member per (prefix, lane) — the same contract item recorded earlier.
 
 Renderer gates remaining: `RR_RAW_CPM_INPUT` in five repos, plus this SMS-060 and
 SMS-020 in `network-renderer-nixos`.
+
+BLOCKED: the remaining renderer gates need the upstream multipath member set
+(the declared `equal-cost-multipath` behaviour is dropped by
+`network-forwarding-model/site-routing.nix`) and canonical routes/targets for
+`RR_RAW_CPM_INPUT`. Neither can be decided in a renderer.
