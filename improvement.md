@@ -1633,3 +1633,23 @@ BLOCKED: the remaining renderer gates need the upstream multipath member set
 (the declared `equal-cost-multipath` behaviour is dropped by
 `network-forwarding-model/site-routing.nix`) and canonical routes/targets for
 `RR_RAW_CPM_INPUT`. Neither can be decided in a renderer.
+
+### network-renderer-openconfig is green (2026-11-22)
+
+`5eb5c1a` advanced two inputs and the suite passes, including
+`PASS FS-310-HDS-020-SDS-010-SMS-060 (10 canonical interface(s) published for 5
+runtime target(s))`:
+
+- network-control-plane-model `7f33773` -> `48a63ae` (publishes
+  `canonicalInterfaces`; the old pin produced "carries 5 runtime target(s) but
+  publishes no canonicalInterfaces");
+- network-labs `b3c5b4e` -> `34071ccd` (the pinned FS-230-SMS-040 fixture predates
+  the FS-322 scope migration and still carried `from.uplinks`, rejected by
+  network-compiler/lib/correctness/policy/external-selector.nix as
+  E_SUPERSEDED_CONTRACT).
+
+Remaining red: containerlab, nebula, wireguard, access-endpoint (each only
+RR_RAW_CPM_INPUT) and the nixos renderer (that plus SMS-060/SMS-020). All of them
+need canonical routes/targets in the bundle, and the nixos SMS-060 additionally
+needs the multipath member set that the forwarding model never emits. BLOCKED on
+that upstream contract; no renderer-side workaround has been kept.
