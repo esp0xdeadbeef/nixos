@@ -127,9 +127,11 @@ in
         # "cannot find attribute 'options.topology.nodes.definitions'". Pass
         # the annotated subset (a host advertises it by having a
         # `topology.id` option at all), not the whole fleet.
-        topologyHosts = lib.filterAttrs (
-          _: v: v.config ? topology && v.config.topology ? id
-        ) self.nixosConfigurations;
+        topologyHosts = lib.filterAttrs
+          (
+            _: v: v.config ? topology && v.config.topology ? id
+          )
+          self.nixosConfigurations;
       in
       (import inputs.nix-topology {
         pkgs = topologyPkgs;
