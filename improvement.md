@@ -1674,3 +1674,46 @@ loosened.
 Remaining: nebula (consume canonicalSites + canonicalRuntimeTargets, migrate its
 ten fixtures), access-endpoint (needs its own slice), nixos renderer (SMS-060
 multipath member set; SMS-020 fails identically at HEAD).
+
+### Renderer canonicalization: what worked, and the two traps (2026-11-22)
+
+Three renderers are now green on canonical content, each verified by CI:
+
+| renderer | commit | consumes |
+|---|---|---|
+| network-renderer-openconfig | 5eb5c1a | `canonicalInterfaces` |
+| network-renderer-containerlab-linux-backend | d9b166b / 3bc12db | `canonicalRoutes` |
+| network-renderer-wireguard | fc2cdcd | `canonicalSites` + `canonicalWireGuard` |
+
+Production side, all CI-green in network-control-plane-model: `canonicalInterfaces`,
+`canonicalRoutes` (6e56f39, 38103bb), `canonicalWireGuard` (d77d073 + 847af4e),
+`canonicalSites` incl. per-overlay `facts` (c016c19, bbb7782),
+`canonicalRuntimeTargets` incl. realized `interfaces` (02099bd, f6c35c7).
+
+Two traps, both measured, that explain why the remaining three renderers keep
+failing at their fixtures rather than at their source:
+
+1. **`compileAndBuildFromPaths` short-circuits.** When the input is a
+   renderer-input payload it returns `rendererInputPassThrough`, so the canonical
+   keys are never added. Measured on FS-540-SMS-020's `intent-test-clients.nix`:
+   `control_plane_model` keys are `[data, deployment, meta, realization, render]`
+   -- no `canonical*`. A renderer cannot consume canonical collections from such
+   a fixture no matter what the producer publishes.
+
+2. **A projection must be shape-defensive.** Flattening
+   `data.<ent>.<site>.endpointAssignment` in an assembly helper broke 48 of 274
+   CPM tests, because fixtures carry arbitrary site shapes. Reverted.
+
+Remaining, per renderer:
+
+- **nebula**: needs the canonical site model in full (its plan reads
+  node-level `dynamicFirewallCidrs` / `unsafeRoutes`, overlay runtime nodes);
+  small slices are provably insufficient after four attempts.
+- **access-endpoint**: needs endpoint assignments published from the build that
+  produced the model (not a pass-through payload), and its fixtures moved from
+  `.data.<ent>.<site>.endpointAssignment` to the artifact-level
+  `endpointAssignment`. FS-720-HDS-030-SDS-010-SMS-021's check 1c only requires
+  the source to consume endpoint assignments, so this is not a spec conflict.
+- **nixos renderer**: `canonicalRoutes` is available; SMS-060 needs the multipath
+  member set that `network-forwarding-model/.../site-routing.nix` drops (it reads
+  `behaviors` only for `bgp`), and SMS-020 fails identically at HEAD.
