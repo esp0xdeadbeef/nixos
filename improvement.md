@@ -1567,3 +1567,41 @@ names the complete authorized member set"): the CPM must emit that member set
 from the declared behaviour, and the renderer must consume it instead of returning
 False. It cannot be inferred from route multiplicity — the intent explicitly
 forbids inferring it from the member count.
+
+### Renderer state after the CPM 48a63ae advance (verified via CI)
+
+Reduced to one gate in four of the five renderers:
+
+| repo | remaining failure |
+|---|---|
+| network-renderer-containerlab-linux-backend | `test-raw-cpm-consumption.sh` (RR_RAW_CPM_INPUT) |
+| network-renderer-nebula | `test-raw-cpm-consumption.sh` (RR_RAW_CPM_INPUT) |
+| network-renderer-wireguard | `test-raw-cpm-consumption.sh` (RR_RAW_CPM_INPUT) |
+| network-renderer-access-endpoint-nixos | `test-raw-cpm-consumption.sh` (RR_RAW_CPM_INPUT) |
+| network-renderer-nixos | SMS-060, SMS-020, RR_RAW_CPM_INPUT |
+
+Fixed and pushed this round:
+
+- containerlab `220c5bb`: the per-node `exec` list now carries one route per
+  (family, table, destination). The dedupe has to happen at the emitted topology
+  (`render_topology`), because the two writers are different modules and the
+  duplicates only coexist in the final exec list; it is token-based because the
+  list quotes `sh -c` payloads as `'"'"'` and `re.compile` trips the
+  dynamic-code guard (FS-310-HDS-030-SDS-010-SMS-090).
+- containerlab `86c57aa`: removed interface-name literals I had introduced in
+  docstrings (SMS-040 forbids them) — my own regression, confirmed against a
+  worktree at HEAD.
+- wireguard `de5916d`: two peers claiming one prefix on one interface is
+  refused with the SMS-022 diagnostic (it previously emitted both).
+
+Attempted and reverted in `network-renderer-nixos` (kept as history, reverted in
+`991048f4`): a cross-interface dedupe of `(family, table, destination, metric)`.
+It fixed SMS-060 (`537 rendered policy routes across 8 container(s) … no
+duplicated occurrence`) but broke three tests that pass at HEAD —
+`FS-540-…-SMS-040`, `test-transit-endpoint-return-routes`,
+`test-upstream-selector-core-main-routes` — because identical prefixes on several
+interfaces are legitimate for transit and upstream paths. A narrower variant
+(only drop a route whose `Table` differs from the interface's own allocation)
+keeps SMS-060 green and transit green but breaks the same two, so the
+discriminator is not the table alone; it is the lane relation the canonical
+record names.
