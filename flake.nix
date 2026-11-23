@@ -71,7 +71,7 @@
     };
 
     network-renderer-nixos = {
-      url = "github:esp0xdeadbeef/network-renderer-nixos";
+      url = "github:esp0xdeadbeef/network-renderer-nixos/d8fa56b1";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.network-control-plane-model.follows = "network-control-plane-model";
       inputs.network-forwarding-model.follows = "network-forwarding-model";
