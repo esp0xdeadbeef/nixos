@@ -559,7 +559,7 @@ flash() {
 # Create the btrfs root on the NVMe with the subvolumes the system expects
 # (/root, /nix, /persist) and lay down the store closure + toplevel.
 #
-# Partitioning is done by disko (diskoConfigurations.s-nodus-disk), so the
+# Partitioning is done by disko (diskoConfigurations.s-nodus), so the
 # on-disk layout cannot drift from disko.nix.
 #
 # ROOT_IMAGE may be passed to reuse an already-built rootfs image instead of
@@ -584,13 +584,14 @@ root() {
   fi
   echo "   rootfs = $ROOT_IMAGE"
 
-  # Partition with disko.  The `s-nodus-root` output describes ONLY the NVMe,
-  # so this cannot touch the microSD's boot chain.
+  # Partition with disko. It takes the layout file directly (no flake attribute
+  # needed), and since `disk` is not passed the microSD is left untouched: only
+  # the NVMe root is described.
   echo ">> partitioning $DEV via disko (root-only: sdcard untouched)"
-  sudo nix run "$REPO#diskoConfigurations.s-nodus-root" -- \
+  sudo nix run "$REPO#disko" -- \
     --mode destroy,format,mount \
     --argstr rootDisk "$DEV" \
-    "$REPO#s-nodus-root" || {
+    "$REPO/nixos/server/s-nodus/disko.nix" || {
       echo "   !! disko failed; see above.  Not falling back to raw sgdisk --"
       echo "   !! a partial layout is worse than none."
       exit 1

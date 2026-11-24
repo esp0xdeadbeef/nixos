@@ -1,4 +1,4 @@
-{ config, lib, inputs, pkgs, vmImages, vmNics, ... }:
+{ config, lib, inputs, pkgs, derivedVmImages, ... }:
 
 # nixos-shell VM host for s-nodus (BPI-R4 Pro 4E, aarch64).
 #
@@ -13,12 +13,45 @@
 # inventory (and the protected tree) would be both unnecessary and out of
 # bounds.
 #
-# The image comes from `vmImages`, computed at the flake top level (see
+# The image comes from `derivedVmImages`, computed at the flake top level (see
 # flake.nix).  Referencing self.nixosConfigurations.<vm> from inside s-nodus
 # would be a cycle: s-nodus is a member of that attrset, so forcing the VM
 # image re-enters s-nodus and fails with `attribute '<vm>' missing` while
 # building rootfsImage.
 let
+  # Which VMs this hypervisor runs, and how each guest NIC is bridged.  This is
+  # the single source of truth for the tap map: vhost NICs render as
+  # `-netdev tap,ifname=tap-<nicId>`, qemu does not bridge a bare tap, and the
+  # tap lives in THIS host's netns, so the binding has to be declared here
+  # rather than selected by host name in flake.nix.
+  #
+  # The identical mapping is carried by the s-nodus-nixos-hardware test copy
+  # (same board, same VMs), which imports this file.
+  vmImageBuilds = import ./vm-images.nix { inherit lib pkgs; derived = derivedVmImages; };
+
+  vmNics = {
+    s-router-cobalt-new = [
+      {
+        nicId = "lan-trunk";
+        bridge = "br-cobalt-lan";
+      }
+      {
+        nicId = "wan";
+        bridge = "br-cobalt-wan";
+      }
+    ];
+    s-router-cobalt-prod = [
+      {
+        nicId = "lan-trunk";
+        bridge = "br-cobalt-lan";
+      }
+      {
+        nicId = "wan";
+        bridge = "br-cobalt-wan";
+      }
+    ];
+  };
+
   # The managed cobalt router.  s-router-cobalt-prod is the production shape
   # (prod-network/prod, -prod pinned network-* inputs); s-router-cobalt-new is
   # the testing shape it replaced and is kept only as a rollback target, so it
@@ -163,7 +196,7 @@ in
               else
                 "cobalt site router, aarch64 port, testing shape (nixos-shell)";
 
-            image = vmImages.${name};
+            image = vmImageBuilds.${name};
 
             # Never started unconditionally on boot. The prod instance is
             # started by carrierControls; the testing instance is started by
@@ -229,7 +262,7 @@ in
     # bare tap is NOT bridged by qemu, and the tap lives in THIS host netns, so
     # the attach must happen here (a guest-side unit cannot see it).
     #
-    # `vmNics` (flake.nix) is the single source of truth for the map. The unit
+    # `vmNics` above is the single source of truth for the map. The unit
     # polls because the tap only appears once qemu opened the netdev. It is
     # inert while a VM still uses `-nic bridge`, since nothing matches.
 

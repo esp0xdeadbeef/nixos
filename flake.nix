@@ -459,33 +459,72 @@
 
       profiles = import ./profiles;
 
-      # Host architecture overrides.
+      # Host architecture.
       #
-      # Most hosts are x86_64. The ThinkPad X13s is Qualcomm ARM64, so evaluating
-      # it as x86_64-linux is wrong.
-      hostSystems = {
-        l-portal = "aarch64-linux";
-        # Same physical X13s as l-portal, built against the PR #1751
-        # nixos-hardware branch (see the `nixos-hardware-x13s` input).
-        l-portal-unstable = "aarch64-linux";
-        # s-nodus: Banana Pi BPI-R4 Pro 4E (MediaTek MT7988A).
-        s-nodus = "aarch64-linux";
-        # s-router-cobalt-new runs under KVM on s-nodus, so the guest must
-        # match the board.  This is the only place its architecture is set;
-        # every other VM defaults to x86_64-linux.
-        s-router-cobalt-new = "aarch64-linux";
-        # s-router-cobalt-prod is the prod-shaped cobalt router; it also runs
-        # under KVM on s-nodus, so it must match the board.  Without this it
-        # falls back to x86_64-linux, which builds an x86_64 runner wrapper
-        # around an aarch64 guest: the runner dies with `Exec format error`
-        # (exit 78/CONFIG) before the guest boots.
-        s-router-cobalt-prod = "aarch64-linux";
-        # NOTE: s-tang is intentionally absent -- Tang runs as a host container
-        # on s-nodus (nixos/server/s-nodus/tang.nix) instead of a nixos-shell
-        # VM, so it has no VM image and no guest architecture.
-      };
+      # Most hosts are x86_64, so a host only states a system when that would be
+      # wrong (the X13s is Qualcomm ARM64; the cobalt router VMs run under KVM on
+      # an aarch64 board). The declaration lives next to the host in
+      # `<host>/system.nix`, so flake.nix does not accumulate host names:
+      #
+      #   <host>/system.nix   { system = "aarch64-linux"; }
+      #
+      # Optional; the default is x86_64-linux.
+      hostSystemFor =
+        path:
+        let
+          f = root + "/${path}/system.nix";
+        in
+        if builtins.pathExists f then (import f).system or "x86_64-linux" else "x86_64-linux";
 
-      hostSystemFor = name: hostSystems.${name} or "x86_64-linux";
+      # A host may also state which nixpkgs tree it is built from:
+      #
+      #   <host>/nixpkgs.nix   { nixpkgs = "nixpkgs-unstable"; }
+      #
+      # Optional; the default is the flake's release-pinned `nixpkgs`.
+      hostDecl =
+        file:
+        path:
+        let
+          f = root + "/${path}/${file}";
+        in
+        if builtins.pathExists f then import f else { };
+
+      # Every nixpkgs tree this flake carries, discovered rather than listed: a
+      # nixpkgs input exposes both `lib` and `legacyPackages`. Adding a pin to
+      # `inputs` makes it selectable with no edit here.
+      #
+      # `home-manager` matches that shape too but is a downstream *consumer* of
+      # nixpkgs, not a tree to build a host from, so it is excluded by name.
+      nixpkgsInputs = lib.filterAttrs
+        (
+          inputName: input:
+          inputName != "home-manager" && lib.isAttrs input && input ? lib && input ? legacyPackages
+        )
+        inputs;
+
+      # A host's tree must also provide its *module system*: NixOS evaluates its
+      # options with `lib` from the tree that supplies `nixosSystem`, while
+      # `pkgs` comes from `nixpkgs.pkgs`. Mixing the two -- unstable packages
+      # under the 26.05 module system -- fails deep inside NixOS (e.g.
+      # `lib.services.configure` receiving `lib` from one nixpkgs and `pkgs`
+      # from another, where `importService` does not exist). The selection
+      # therefore happens here, before instantiation.
+      #
+      # The host still decides; this only reads the decision.
+      # The nixpkgs input a host selects, defaulting to the primary tree.
+      hostNixpkgsInput = path: (hostDecl "nixpkgs.nix" path).nixpkgs or "stable";
+
+      nixpkgsFor =
+        path:
+        let
+          selected = hostNixpkgsInput path;
+        in
+        if selected == "stable" then
+          nixpkgs
+        else if nixpkgsInputs ? ${selected} then
+          nixpkgsInputs.${selected}
+        else
+          throw "unknown nixpkgs input '${selected}' (known: stable, ${lib.concatStringsSep ", " (builtins.attrNames nixpkgsInputs)})";
 
       # ------------------------------------------------------------
       # STRUCTURAL HOST ROOTS (semantic, stable)
@@ -601,188 +640,71 @@
       # ------------------------------------------------------------
       # GENERATED NIXOS CONFIGURATIONS
       # ------------------------------------------------------------
-      # Hosts built against `nixpkgs-unstable` instead of the pinned `nixpkgs`
-      # (nixos-26.05). This is what makes a host genuinely unstable: its package
-      # set, kernel and module system all come from nixos-unstable.
+      # One configuration per discovered host directory, host-agnostic.
       #
-      # An explicit allowlist, so no host drifts off the release pin by accident.
-      # `l-portal-unstable` exists to run nixos-unstable on the X13s with board
-      # support from the PR #1751 nixos-hardware branch.
+      # The *whole* `nixosSystem` comes from the tree the host selects, not just
+      # its package set: NixOS evaluates its options with `lib` from the tree
+      # that supplied `nixosSystem`, so pointing only `nixpkgs.pkgs` at another
+      # nixpkgs mixes two module systems and fails deep inside NixOS (a service
+      # defined by one nixpkgs being built with the other's `lib.services`).
+      # Taking `lib` and `pkgs` from the same tree is the only consistent
+      # arrangement; see `nixpkgsFor` above.
       nixosConfigurations =
-        let
-          unstableNixpkgsHosts = [ "l-portal-unstable" ];
-          nixpkgsFor =
-            name:
-            if lib.elem name unstableNixpkgsHosts then inputs.nixpkgs-unstable else nixpkgs;
-        in
         lib.mapAttrs
-        (
-          name: path:
-            (nixpkgsFor name).lib.nixosSystem {
-              system = hostSystemFor name;
+          (
+            name: path:
+              (nixpkgsFor path).lib.nixosSystem {
+                system = hostSystemFor path;
 
-              specialArgs = {
-                inherit
-                  inputs
-                  outputs
-                  profiles
-                  relativeRepo
-                  self
-                  name
-                  ;
+                specialArgs = {
+                  inherit
+                    inputs
+                    outputs
+                    profiles
+                    relativeRepo
+                    self
+                    name
+                    ;
 
-                # Guest architecture for this configuration.  Defaults to
-                # x86_64-linux and is overridden per host/VM through
-                # `hostSystems` above, so VM modules never hardcode it.
-                vmSystem = hostSystemFor name;
+                  # Whether this host is built from something other than the
+                  # flake's primary nixpkgs. Modules need to know: a host on an
+                  # alternate tree must not also act as that tree's registry
+                  # source (see profiles/nixos/nixpkgs/alternate-tree.nix).
+                  usesAlternateNixpkgs = hostNixpkgsInput path != "stable";
 
-                # VM images this host is meant to run, resolved HERE rather
-                # than via `self.nixosConfigurations.<vm>` inside the host's own
-                # module tree.  Referencing the attrset from within a member of
-                # it is a cycle: evaluating s-nodus forces the VM image, which
-                # forces nixosConfigurations, which forces s-nodus again -- and
-                # it surfaces as `attribute '<vm>' missing` while building the
-                # host's rootfsImage.  Computing the mapping at the flake level,
-                # where nixosConfigurations is complete, cannot cycle.
-                # NIC map for the cobalt router VMs, computed here for the same
-                # no-cycle reason as vmImages: the hypervisor host needs to know
-                # which tap belongs to which bridge (vhost NICs are rendered as
-                # `-netdev tap,ifname=tap-<nicId>` and qemu does not bridge a
-                # bare tap). This is the single source of truth for those NICs.
-                # The host-local s-nodus carries these, and its
-                # s-nodus-nixos-hardware test copy does too (same board, same VMs),
-                # so neither loses its tap map.
-                vmNics =
-                  if lib.elem name [ "s-nodus" "s-nodus-nixos-hardware" ] then
-                    {
-                      s-router-cobalt-new = [
-                        {
-                          nicId = "lan-trunk";
-                          bridge = "br-cobalt-lan";
-                        }
-                        {
-                          nicId = "wan";
-                          bridge = "br-cobalt-wan";
-                        }
-                      ];
-                      s-router-cobalt-prod = [
-                        {
-                          nicId = "lan-trunk";
-                          bridge = "br-cobalt-lan";
-                        }
-                        {
-                          nicId = "wan";
-                          bridge = "br-cobalt-wan";
-                        }
-                      ];
-                    }
-                  else
-                    { };
+                  # Guest architecture for this configuration.  Defaults to
+                  # x86_64-linux and is overridden per host/VM through
+                  # `<host>/system.nix`, so VM modules never hardcode it.
+                  vmSystem = hostSystemFor path;
 
-                # IMPORTANT: `vmImages` is a BUILD, not a pin.
-                #
-                # The `*-prod` / `*-legacy-prod` inputs above are safe: their
-                # URLs name exact commits, so `nix flake update` provably cannot
-                # move them (verified 2026-11-07: a full `nix flake update`
-                # followed by scripts/check-prod-pins.sh reports
-                # "protected production pins unchanged").
-                #
-                # The production VM *image* is not protected by that at all. It
-                # is derived from `self.nixosConfigurations.<vm>...nixos-shell`,
-                # so every host rebuild rebuilds it from every input -- including
-                # inputs nobody considers production, such as a transitive
-                # nixpkgs. On 2026-11-07 such a bump produced a new image path,
-                # the manager booted it, the guest never brought QGA up, and the
-                # site lost its router while every -prod pin was untouched.
-                #
-                # BLOCKED: pinning the artifact needs its own rev-pinned flake
-                # input for the production router config (URL naming an exact
-                # commit, like the -prod inputs), because a store path literal is
-                # rejected (types.package) and `builtins.storePath` makes the
-                # whole flake evaluate only on a machine that already has the
-                # image. Until that exists, treat any host rebuild as capable of
-                # changing the production image, and verify with vm-status after.
-                vmImages =
-                  if lib.elem name [ "s-nodus" "s-nodus-nixos-hardware" ] then
-                    {
-                      s-router-cobalt-new =
-                        self.nixosConfigurations.s-router-cobalt-new.config.system.build.nixos-shell;
-                      # Prod cobalt router is the carrier-managed instance (see
-                      # vm-host.nix); s-router-cobalt-new above is kept only as
-                      # the rollback target, so its image must stay buildable.
-                      #
-                      # PINNED BY CONTENT. Deriving this from
-                      # `self.nixosConfigurations...` meant the production image
-                      # was rebuilt from every input on every host build: on
-                      # 2026-11-07 a transitive bump changed its store path
-                      # (7mdq7c7f -> 3ja6ivx0), the manager booted the new one,
-                      # and the guest never brought QGA up -- the site lost its
-                      # router while every *-prod pin was provably unchanged.
-                      #
-                      # This copies the known-good image into a derivation whose
-                      # output path is content-addressed, so input bumps cannot
-                      # move it; changing the production image requires editing
-                      # the literal below. `builtins.pathExists` keeps the flake
-                      # evaluable on hosts that do not hold the image (they get the
-                      # derived build), so only the machine that actually runs
-                      # prod is pinned.
-                      s-router-cobalt-prod =
-                        let
-                          pinned = "/nix/store/7mdq7c7f6l9i651v8idi2lxl886js87j-nixos-vm";
-                        in
-                        if builtins.pathExists pinned then
-                          (nixpkgs.legacyPackages.${hostSystemFor name}).runCommandLocal
-                            "s-router-cobalt-prod-pinned-nixos-vm"
-                            { preferredLocalBuilders = [ "@none" ]; }
-                            "cp -L ${builtins.storePath pinned} $out"
-                        else
-                          self.nixosConfigurations.s-router-cobalt-prod.config.system.build.nixos-shell;
-                    }
-                  else
-                    { };
-              };
+                  # Every nixos-shell VM image this flake defines, keyed by VM
+                  # name, computed HERE rather than via
+                  # `self.nixosConfigurations.<vm>` from inside a hypervisor's own
+                  # module tree. `specialArgs` is resolved before module
+                  # evaluation, so a hypervisor module reaching into that attrset
+                  # would re-enter it and fail with `attribute '<vm>' missing`
+                  # while building its rootfsImage. Building the mapping from the
+                  # complete attrset cannot cycle.
+                  #
+                  # This is generic and names no host: which VMs a hypervisor
+                  # actually runs, and on which bridge, is declared by that host
+                  # (s-nodus: ./vm-host.nix and ./vm-images.nix, the latter also
+                  # carrying the content-pinned production image).
+                  derivedVmImages = lib.mapAttrs
+                    (_vm: cfg: cfg.config.system.build.nixos-shell)
+                    (lib.filterAttrs (_vm: cfg: cfg.config.system.build ? nixos-shell) self.nixosConfigurations);
+                };
 
-              modules = [
-                outputs.nixosModules.pythonPycachePrefix
+                modules = [
+                  # Applies to every host, and is inert unless the host is built
+                  # from a non-primary nixpkgs tree (see the module's comment).
+                  profiles.nixos.nixpkgs.alternate-tree
 
-                (./. + "/${path}")
-              ];
-            }
-        )
-        hosts;
+                  (./. + "/${path}")
+                ];
+              }
+          )
+          hosts;
 
-      # Disko configurations evaluated on the BUILD host (x86_64), not the
-      # target. disko's own binaries must run on the machine doing the
-      # partitioning -- evaluating them for aarch64 would ship aarch64 binaries
-      # to an x86_64 host ("Exec format error").
-      #
-      # NOTE: disko alone does NOT produce a bootable s-nodus card (it cannot
-      # write the BL2/FIP firmware blobs nor the raw NixOS FIT). Use
-      # nixos/server/s-nodus/mk-sd-image.sh for the full image.
-      # Card + NVMe, for building a complete card.  `disk` MUST be given: the
-      # card is /dev/sda on a laptop but /dev/mmcblk0 on the board, so there is
-      # no safe default.  e.g.
-      #   nix run github:nix-community/disko -- \
-      #     --mode destroy,format,mount --argstr disk /dev/sda \
-      #     --flake .#s-nodus-disk
-      #
-      # Left unset here on purpose: the value is supplied at disko invocation
-      # time, and the attribute is only forced when `sdcard` is actually
-      # described (see disko.nix).
-      diskoConfigurations.s-nodus-disk =
-        (import ./nixos/server/s-nodus/disko.nix {
-          inherit lib;
-          disk = null;
-        });
-
-      # Root-only: describes just the NVMe.  Used to install the root filesystem
-      # without touching the microSD, whose boot chain is already in place and
-      # must stay intact.
-      diskoConfigurations.s-nodus-root =
-        (import ./nixos/server/s-nodus/disko.nix {
-          inherit lib;
-          disk = null;
-          withSdcard = false;
-        });
     };
 }

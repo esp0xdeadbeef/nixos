@@ -35,6 +35,7 @@
     };
     nixpkgs = {
       allow-unfree = import ./nixos/nixpkgs/allow-unfree.nix;
+      alternate-tree = import ./nixos/nixpkgs/alternate-tree.nix;
       local-overlays = import ./nixos/nixpkgs/local-overlays.nix;
     };
     nix = {

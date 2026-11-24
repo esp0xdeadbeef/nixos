@@ -140,7 +140,7 @@ The image is *compact* — `nixos-root` is only as large as its contents — and
 
 ## Why not plain `disko`
 
-`disko` can express the GPT (this repo exposes `.#s-nodus-disk`), but it cannot
+`disko` can express the GPT (this repo exposes `.#diskoConfigurations.s-nodus`), but it cannot
 produce a bootable card on its own: it cannot write the raw BL2/FIP blobs, it
 cannot write the U-Boot env, and disko has no "raw content in a partition"
 type. `mk-sd-image.sh` therefore does the assembly.

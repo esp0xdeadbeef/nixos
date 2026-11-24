@@ -13,6 +13,7 @@
     profiles.nixos.shell.zsh-prompt
 
     (relativeRepo.module "modules/nixos/cuda-cache.nix")
+    (relativeRepo.module "modules/nixos/python-pycache-prefix.nix")
     (relativeRepo.module "modules/nixos/local-users.nix")
   ];
 }
