@@ -258,8 +258,15 @@ function repoDir(cwd: string, goal: string | null): string | null {
 // reporting: the first repository that contains the commit wins.
 function candidateRepos(cwd: string, goal: string | null): string[] {
 	const out: string[] = [];
-	const primary = repoDir(cwd, goal);
-	if (primary) out.push(primary);
+	// The goal file's repository, then cwd itself. Both are needed: a goal is
+	// often a document outside any repository (`@~/Documents/goal.md`), and
+	// anchoring only on the file's directory made the escape impossible while the
+	// agent was working in a perfectly good repository — measured: 88 rejections
+	// in one session, every one of them reading "no git repo at <cwd>" for a cwd
+	// that was a repository the whole time.
+	for (const anchor of [repoDir(cwd, goal), repoDir(cwd, null)]) {
+		if (anchor && !out.includes(anchor)) out.push(anchor);
+	}
 	try {
 		for (const entry of readdirSync(cwd, { withFileTypes: true })) {
 			if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
@@ -322,15 +329,17 @@ function mentionsBlocker(message: string): boolean {
 // than left inside the settle handler.
 function proofRejections(args: {
 	kind: "done" | "blocked";
+	cwd: string;
 	proof: EscapeProof;
 	want: string;
 	specOk: boolean;
 	repos: string[];
+	cwd: string;
 	sol: CommitInfo | null;
 	solFresh: boolean;
 	solSaysBlocked: boolean;
 }): string[] {
-	const { kind, proof, want, specOk, repos, sol, solFresh, solSaysBlocked } = args;
+	const { kind, proof, want, specOk, repos, cwd, sol, solFresh, solSaysBlocked } = args;
 	const reasons: string[] = [];
 
 	// Distinguish "you did not supply it" from "it is wrong", and print the
@@ -347,7 +356,7 @@ function proofRejections(args: {
 
 	if (repos.length === 0) {
 		reasons.push(
-			`no git repository at the goal directory or in any immediate child directory — commit the work, then give that commit as the solution line`,
+			`no git repository found for the goal file's directory, the current directory (${args.cwd}), or any immediate child of it — commit the work, then give that commit as the solution line`,
 		);
 	} else {
 		if (!proof.solution) {
@@ -634,6 +643,27 @@ function goalSelfTestCases(): SelfTestCase[] {
 			},
 		},
 		{
+			name: "candidateRepos: a goal file outside any repository does not hide cwd",
+			run: () => {
+				// The exact shape that made the escape impossible: the goal was
+				// `@~/Documents/goal2.md`, so the repository resolved from the goal
+				// file's directory was null and cwd — a real repository — was never
+				// consulted. 88 rejections in one session followed, while agents
+				// made valid commits in the repository the gate never looked at.
+				withTmpDir((repo) => {
+					execFileSync("git", ["init", "-q", repo], { stdio: "ignore" });
+					const docs = mkdtempSync(join(tmpdir(), "goal-docs-"));
+					try {
+						writeFileSync(join(docs, "goal.md"), "do the thing\n");
+						const repos = candidateRepos(repo, `@${join(docs, "goal.md")}`);
+						eq(repos[0], repo, "cwd is a candidate even when the goal file is elsewhere");
+					} finally {
+						rmSync(docs, { recursive: true, force: true });
+					}
+				});
+			},
+		},
+		{
 			name: "candidateRepos: a plain directory yields no repository",
 			run: () => {
 				withTmpDir((t) => {
@@ -759,6 +789,7 @@ function goalSelfTestCases(): SelfTestCase[] {
 			want: HEX64_SELFTEST,
 			specOk: true,
 			repos: ["/repo"],
+			cwd: "/work",
 			sol: { hash: COMMIT, ct: 100, msg: "did the work" },
 			solFresh: true,
 			solSaysBlocked: false,
@@ -1159,6 +1190,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 				want,
 				specOk,
 				repos,
+				cwd,
 				sol,
 				solFresh,
 				solSaysBlocked,
