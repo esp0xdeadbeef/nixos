@@ -92,9 +92,27 @@ let
     # string is here -- so changing it is what actually makes the trial and
     # production agree. production is unaffected: this file is only imported by
     # the router-new-test specialization.
+    # eth1 is the WAN uplink on br-cobalt-wan. That is the ONLY host bridge a
+    # container attaches to by interface name on this host.
+    #
+    # `ens3 = "br-lan-trunk"` used to be here and is gone: the rendered host
+    # creates no `br-lan-trunk` at all. The LAN trunk is decomposed into
+    # per-lane bridges (`rt-*`) plus the tenant bridges (`clients`, `dmz`,
+    # `mgmt`, `iot`, `svc`, `unlock`, ...), and every container attaches to one
+    # of those -- measured, the host's own `systemd.network.networks` match
+    # exactly br-cobalt-wan and those bridges, never br-lan-trunk. So the binding
+    # named a bridge nothing creates, and FS-770-HDS-010-SDS-010-SMS-010
+    # correctly refused to start the containers:
+    #
+    #   CONTAINER_HOST_BRIDGE_MISSING [platform-binding]: container
+    #   'downstream-selector' on host 'isp-cobalt' is bound to host bridge(s)
+    #   'br-lan-trunk' that this host does not render
+    #
+    # Removing the entry does not orphan a container: no container's rendered
+    # interface names `ens3`, which is why the binding was dead weight rather
+    # than a missing fact.
     interfaceBridges = {
       wan = "br-cobalt-wan";
-      ens3 = "br-lan-trunk";
     };
   };
 
