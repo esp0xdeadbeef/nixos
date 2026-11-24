@@ -1392,7 +1392,27 @@ in
                   };
                 };
               };
-              runtimeNodes = { };
+              # FS-460-HDS-010-SDS-010-SMS-070: this overlay carries a full
+              # providerContract, so the inventory MUST realize its terminator and
+              # its carriage interface. `runtimeNodes = { }` published provider
+              # material with no runtime interface, and the CPM refused the whole
+              # site:
+              #
+              #   FS-460-HDS-010-SDS-010-SMS-070: overlay 'onyx' carries provider
+              #   material at cpm.data...overlays.onyx but not at
+              #   inventory.controlPlane.sites...overlays.onyx
+              #
+              # The interface is the contract's own `interfaces.vpn`, on the node
+              # the intent names as `terminateOn`.
+              runtimeNodes = {
+                core-vpn-onyx = {
+                  service = {
+                    name = "onyx-runtime";
+                    interface = "overlay-onyx";
+                  };
+                };
+              };
+
             };
 
             opal = {
@@ -1482,7 +1502,18 @@ in
                   };
                 };
               };
-              runtimeNodes = { };
+              # FS-460-HDS-010-SDS-010-SMS-070: same requirement as `onyx` above.
+              # The overlay carries a providerContract, so the inventory must
+              # realize its terminator and carriage interface; an empty
+              # `runtimeNodes` is the empty projection the CPM rejects.
+              runtimeNodes = {
+                core-vpn-opal = {
+                  service = {
+                    name = "opal-runtime";
+                    interface = "overlay-opal";
+                  };
+                };
+              };
             };
 
             garnet = {
