@@ -52,7 +52,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -316,6 +316,61 @@ function commitExists(repo: string, hash: string): boolean {
 	}
 }
 
+// Paths a commit changed, relative to its repository root. Empty on any failure:
+// a commit whose diff cannot be read has nothing to show for itself, and that is
+// the same verdict as an empty commit.
+function commitChangedPaths(repo: string, hash: string): string[] {
+	if (!repo || !/^[0-9a-f]{7,40}$/i.test(hash)) return [];
+	try {
+		const output = execFileSync("git", ["-C", repo, "show", "--name-only", "--format=", `${hash}^{commit}`], {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		});
+		return output
+			.split("\n")
+			.map((line) => line.trim())
+			.filter((line) => line.length > 0);
+	} catch {
+		return [];
+	}
+}
+
+// SUBSTANCE: the solution commit must change at least one path other than the
+// document it answers.
+//
+// Measured 2026-11-24: a run landed six commits in three repositories, every one a
+// crash plus a seeded negative, and escaped with a commit made in `git init
+// /tmp/handoff` that changed only the goal document. The proof was structurally
+// valid — a fresh hash in a real repository — because the harness anchored the
+// "solution" on the goal file's directory. The same proof is available to a run
+// that did nothing, which is what makes it theatre rather than a weak check.
+//
+// Deliberately narrower than "must touch code". A row in `s88/FS-*.md` is work in
+// this project, and `network-forwarding-model` landed a docs-only commit whose whole
+// purpose was repairing the trace-chain IDs it cites; a rule that rejected those
+// would be a rule an agent routes around by touching a file it did not need to
+// change. This rejects exactly the shape where the commit is a note about the goal
+// rather than a change to the world the goal names.
+//
+// The same two conditions are implemented in shell for auditing a run after the
+// fact: `goal-escape-provenance.sh` beside this file, exercised by
+// `tests/test-goal-escape-provenance.sh`. Two implementations, one rule; the
+// selftest asserts the cases that separate a check from decoration.
+function substanceReasons(args: { changedPaths: string[]; goalPath: string | null; hash: string }): string[] {
+	const { changedPaths, goalPath, hash } = args;
+	if (changedPaths.length === 0) {
+		return [`solution ${hash} changes no files — an empty commit is not the work the goal asks for`];
+	}
+	if (!goalPath) return [];
+	const goalName = basename(goalPath);
+	if (changedPaths.every((path) => basename(path) === goalName)) {
+		return [
+			`solution ${hash} changes only the goal document (${goalName}) — commit the work the goal asks for, not a note about it`,
+		];
+	}
+	return [];
+}
+
 // Does a commit message document a blocker? Word-bounded: /BLOCK/i also matches
 // "unblocked", "blockers" and "blocking", which is how a normal commit message
 // would accidentally satisfy the GOAL BLOCKED requirement.
@@ -338,8 +393,9 @@ function proofRejections(args: {
 	sol: CommitInfo | null;
 	solFresh: boolean;
 	solSaysBlocked: boolean;
+	solSubstance: string[];
 }): string[] {
-	const { kind, proof, want, specOk, repos, cwd, sol, solFresh, solSaysBlocked } = args;
+	const { kind, proof, want, specOk, repos, cwd, sol, solFresh, solSaysBlocked, solSubstance } = args;
 	const reasons: string[] = [];
 
 	// Distinguish "you did not supply it" from "it is wrong", and print the
@@ -369,6 +425,8 @@ function proofRejections(args: {
 			reasons.push(
 				`solution ${sol.hash} is not from this run — the commit must be created after auto-continue was armed`,
 			);
+		} else {
+			reasons.push(...solSubstance);
 		}
 		if (kind === "blocked" && sol && !solSaysBlocked) {
 			reasons.push(
@@ -692,6 +750,89 @@ function goalSelfTestCases(): SelfTestCase[] {
 			},
 		},
 
+		// -- substanceReasons: the escape measured on 2026-11-24 -----------------
+		{
+			name: "substanceReasons: a commit that changes only the goal document is rejected",
+			run: () => {
+				// The accepted escape: `git init /tmp/handoff`, commit the goal document
+				// (and a result note) and point `solution:` at it. Structurally perfect
+				// — fresh, in a repository — and it names no work at all.
+				const reasons = substanceReasons({
+					changedPaths: ["AGENT-A-NFM-CPM.md", "RESULT.md/../AGENT-A-NFM-CPM.md"],
+					goalPath: "/tmp/handoff/AGENT-A-NFM-CPM.md",
+					hash: COMMIT,
+				});
+				ok(reasons.length === 1, "exactly one reason");
+				matches(reasons[0], /changes only the goal document/, "reason names the shape");
+			},
+		},
+		{
+			name: "substanceReasons: a documentation commit that is not the goal document passes",
+			run: () => {
+				// `c81c3fc docs: every cited trace-chain ID is a full chain` in
+				// network-forwarding-model is real work and must not be rejected. The rule
+				// is "not the goal document", not "not a document".
+				eq(
+					substanceReasons({
+						changedPaths: ["spec/FS-460.md"],
+						goalPath: "/tmp/handoff/AGENT-A-NFM-CPM.md",
+						hash: COMMIT,
+					}),
+					[],
+				);
+			},
+		},
+		{
+			name: "substanceReasons: an empty commit is rejected",
+			run: () => {
+				const reasons = substanceReasons({ changedPaths: [], goalPath: null, hash: COMMIT });
+				ok(reasons.length === 1, "exactly one reason");
+				matches(reasons[0], /changes no files/, "reason names the shape");
+			},
+		},
+		{
+			name: "commitChangedPaths: reads the real diff, and rejects the theatre commit",
+			run: () => {
+				// IO half of the rule: a real repository, a real commit that changes only
+				// the goal document, and the same commit after adding a source file.
+				withTmpDir((repo) => {
+					const git = (...args: string[]) =>
+						execFileSync("git", ["-C", repo, ...args], {
+							encoding: "utf8",
+							stdio: ["ignore", "pipe", "ignore"],
+							env: {
+								...process.env,
+								GIT_AUTHOR_NAME: "selftest",
+								GIT_AUTHOR_EMAIL: "selftest@example.invalid",
+								GIT_COMMITTER_NAME: "selftest",
+								GIT_COMMITTER_EMAIL: "selftest@example.invalid",
+							},
+						});
+					git("init", "-q");
+					const goalPath = join(repo, "GOAL.md");
+					writeFileSync(goalPath, "do the thing\n");
+					git("add", "GOAL.md");
+					git("commit", "-q", "-m", "record the result");
+					const theatre = git("rev-parse", "HEAD").trim();
+
+					const theatrePaths = commitChangedPaths(repo, theatre);
+					eq(theatrePaths, ["GOAL.md"], "the theatre commit changed one file");
+					ok(
+						substanceReasons({ changedPaths: theatrePaths, goalPath, hash: theatre }).length === 1,
+						"the theatre commit is rejected by the rule the handler applies",
+					);
+
+					writeFileSync(join(repo, "model.nix"), "{ }\n");
+					git("add", "model.nix");
+					git("commit", "-q", "-m", "add the model");
+					const real = git("rev-parse", "HEAD").trim();
+					const realPaths = commitChangedPaths(repo, real);
+					eq(realPaths, ["model.nix"], "the real commit changed the source file");
+					eq(substanceReasons({ changedPaths: realPaths, goalPath, hash: real }), [], "the real commit passes");
+				});
+			},
+		},
+
 		// -- proofRejections: the message the agent actually receives ----------
 		{
 			name: "proofRejections: a complete, fresh, matching proof has no reasons",
@@ -793,6 +934,7 @@ function goalSelfTestCases(): SelfTestCase[] {
 			sol: { hash: COMMIT, ct: 100, msg: "did the work" },
 			solFresh: true,
 			solSaysBlocked: false,
+			solSubstance: [],
 		};
 	}
 }
@@ -866,7 +1008,17 @@ function reportSelfTest(ctx: ExtensionContext): void {
 }
 
 // Exported for the test runner. The default export stays the extension entrypoint.
-export { parseEscape, specHash, candidateRepos, mentionsBlocker, proofRejections, goalSelfTestCases, selfTest };
+export {
+	parseEscape,
+	specHash,
+	candidateRepos,
+	mentionsBlocker,
+	commitChangedPaths,
+	substanceReasons,
+	proofRejections,
+	goalSelfTestCases,
+	selfTest,
+};
 
 export default function goalExtension(pi: ExtensionAPI) {
 	let goal: string | null = null;
@@ -1161,12 +1313,30 @@ export default function goalExtension(pi: ExtensionAPI) {
 			const solExists = sol !== null;
 			const solFresh = solExists && (runStartSec === 0 || sol.ct >= runStartSec - 1);
 			const solSaysBlocked = solExists && mentionsBlocker(sol.msg);
+			// Where the goal document lives, so the substance rule can separate "changed
+			// the work" from "changed the note that asked for the work".
+			const goalPath = loadGoalFiles(cwd, goal)[0]?.abs ?? null;
+			const solSubstance: string[] =
+				sol !== null && solRepo !== null
+					? substanceReasons({
+							changedPaths: commitChangedPaths(solRepo, sol.hash),
+							goalPath,
+							hash: sol.hash,
+						})
+					: [];
+			const solHasSubstance = solSubstance.length === 0;
 
 			// No commit-based escapes outside a git repo; hash alone is nothing.
 			const doneOk =
-				proof.kind === "done" && specOk && repos.length > 0 && solExists && solFresh;
+				proof.kind === "done" && specOk && repos.length > 0 && solExists && solFresh && solHasSubstance;
 			const blockedOk =
-				proof.kind === "blocked" && specOk && repos.length > 0 && solExists && solFresh && solSaysBlocked;
+				proof.kind === "blocked" &&
+				specOk &&
+				repos.length > 0 &&
+				solExists &&
+				solFresh &&
+				solSaysBlocked &&
+				solHasSubstance;
 
 			if (doneOk || blockedOk) {
 				autoRun = false;
@@ -1194,6 +1364,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 				sol,
 				solFresh,
 				solSaysBlocked,
+				solSubstance,
 			});
 			autoIterations += 1;
 			if (lastCtx) updateStatus(lastCtx);

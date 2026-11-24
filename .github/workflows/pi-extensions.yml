@@ -11,10 +11,6 @@ on:
     paths:
       - "profiles/nixos/llm-clients/pi-extensions/**"
       - ".github/workflows/pi-extensions.yml"
-  pull_request:
-    paths:
-      - "profiles/nixos/llm-clients/pi-extensions/**"
-      - ".github/workflows/pi-extensions.yml"
   workflow_dispatch:
 
 permissions:
@@ -39,3 +35,12 @@ jobs:
           set -euo pipefail
           node --version
           node profiles/nixos/llm-clients/pi-extensions/goal.ts --selftest
+
+      # The verifier answers the question the self-test cannot: given a goal
+      # document and a commit, does the commit do work the goal asked for? Its
+      # test builds throwaway repositories, so it needs nothing but this checkout.
+      - name: "Run the escape-provenance verifier (theatre rejected, work accepted)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash profiles/nixos/llm-clients/pi-extensions/tools/goal-escape-provenance.test.sh
