@@ -1,5 +1,18 @@
-{ lib, pkgs, ... }:
+{ lib
+, pkgs
+, relativeRepo
+, ...
+}:
 {
+  imports = [
+    # Keeps Python bytecode out of the store and the checkout. Applied here
+    # because base.common is the one module every host and VM reaches
+    # (core -> base.common, plus the s-gamma and VM bases directly); putting it
+    # in a narrower profile would silently drop it from every host that does
+    # not import that profile.
+    (relativeRepo.module "modules/nixos/python-pycache-prefix.nix")
+  ];
+
   security.sudo.extraConfig = lib.mkAfter ''
     Defaults lecture = never
   '';
