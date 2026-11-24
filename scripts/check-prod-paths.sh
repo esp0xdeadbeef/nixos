@@ -13,6 +13,15 @@
 #   - any *-prod / *-legacy-prod flake input and pin (flake.nix, flake.lock)
 #   - the s-router-prod / s-router-legacy-prod / s-router-prod-* /
 #     s-router-legacy-prod-* host configs and their secrets
+#   - the production router VM image pin, WHEREVER it lives
+#
+# The last entry is content-addressed on purpose. The pin used to sit in
+# flake.nix, which is why flake.nix is listed above; it now lives next to the
+# hypervisor that boots the image (nixos/server/*/vm-images.nix) together with
+# its rationale. Keying the gate on the old *location* would have silently
+# stopped protecting it the moment it moved, so the check follows the content:
+# any changed line that looks like a production image pin, in any file, trips
+# the gate.
 #
 # Two separate permissions are required by AGENTS.md -- one to edit, one to
 # push -- so the approval token names the permission it grants and the exact
@@ -48,6 +57,36 @@ is_protected() {
     # The flake inputs and pins themselves.
     flake.nix | flake.lock) return 0 ;;
   esac
+  return 1
+}
+
+# A changed hunk that pins the production router image. The pin is a store path
+# plus the derivation name that copies it, so either line identifies it; the
+# generic `*-nixos-vm` suffix alone is NOT enough (every VM has one).
+is_prod_image_pin_line() {
+  local line=$1
+  case "$line" in
+    # The pinned store path of the production image.
+    *nixos-vm*) case "$line" in *prod* | *s-router-cobalt*) return 0 ;; esac ;;
+    # The derivation that materialises it.
+    *pinned-nixos-vm*) return 0 ;;
+  esac
+  return 1
+}
+
+# Does this revision change a production image pin, in any file?
+changes_prod_image_pin() {
+  local rev=$1
+  local diff
+  diff=$(git -C "$repo_root" show --unified=0 --format= "$rev" 2>/dev/null || true)
+  [ -z "$diff" ] && return 1
+  while IFS= read -r line; do
+    case "$line" in
+      [+-]*)
+        is_prod_image_pin_line "${line#?}" && return 0
+        ;;
+    esac
+  done <<<"$diff"
   return 1
 }
 
@@ -117,6 +156,8 @@ case "$mode" in
   --staged)
     mapfile -t paths < <(git -C "$repo_root" diff --cached --name-only --diff-filter=ACMRD)
     offending=()
+    # The staged tree, for the content-addressed prod image pin check below.
+    staged_tree=$(git -C "$repo_root" write-tree)
     for path in "${paths[@]}"; do
       if is_protected "$path"; then
         if [ "$approve_all_push" = "1" ]; then
@@ -124,7 +165,7 @@ case "$mode" in
         fi
         # flake.nix/flake.lock only trip the gate for prod-pin changes.
         if [ "$path" = "flake.nix" ] || [ "$path" = "flake.lock" ]; then
-          flake_only_prod_change "$(git -C "$repo_root" write-tree)" || continue
+          flake_only_prod_change "$staged_tree" || continue
         else
           is_approved_file "$path" && continue
         fi
@@ -148,6 +189,16 @@ case "$mode" in
         fi
         offending+=("$rev:$path")
       done < <(git -C "$repo_root" show --name-only --format= "$rev" 2>/dev/null || true)
+      # A production image pin may live outside the paths above, so check the
+      # content of every changed line as well. Without this, moving the pin out
+      # of flake.nix would have removed it from the gate entirely.
+      if changes_prod_image_pin "$rev"; then
+        already=0
+        for o in "${offending[@]+"${offending[@]}"}"; do
+          [ "$o" = "$rev:prod-image-pin" ] && already=1
+        done
+        [ "$already" = 1 ] || offending+=("$rev:prod-image-pin")
+      fi
     done
     [ ${#offending[@]} -eq 0 ] && exit 0
     report push "${offending[@]}"

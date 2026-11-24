@@ -1,4 +1,8 @@
 {
+  "__flake.nix__": {
+    "bytes": 28776,
+    "sha256": "74d508496340c8f6bb6c8ea74df39362966d3b5070927401b4b651c9cd2151cb"
+  },
   "network-compiler-legacy-prod": {
     "lastModified": 1788259011,
     "narHash": "sha256-Z1YdZCQG8I05PG18E1jBTr7AzbfZkEDZC0sTFs3klZ0=",

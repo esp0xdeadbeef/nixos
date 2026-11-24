@@ -12,6 +12,12 @@
 # in the same commit -- which makes the bump visible in review instead of
 # arriving through an unattended job.
 #
+# flake.nix itself is snapshotted too, by content hash. It is the file that
+# *wires* the production inputs into the outputs, so a pin can move with
+# flake.lock untouched simply by editing which input a prod host resolves. The
+# hash makes every flake.nix edit reviewable here instead of relying on someone
+# noticing that a changed line mentions "prod".
+#
 # Approve a real bump with:
 #   PROD_PINS_APPROVED=1 scripts/check-prod-pins.sh --write   # then commit both
 set -euo pipefail
@@ -23,7 +29,7 @@ snapshot="$repo_root/ci/prod-pins.lock"
 current=$(mktemp)
 trap 'rm -f "$current"' EXIT
 
-python3 - "$lock" > "$current" <<'PY'
+python3 - "$lock" "$repo_root/flake.nix" > "$current" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 prod = {}
@@ -36,6 +42,16 @@ for name, node in d["nodes"].items():
         "narHash": locked.get("narHash"),
         "lastModified": locked.get("lastModified"),
     }
+# flake.nix defines which inputs the production surfaces resolve to, so its
+# exact content is part of the snapshot: editing it must be as visible as
+# moving a pin in flake.lock.
+import hashlib
+flake = sys.argv[2]
+data = open(flake, "rb").read()
+prod["__flake.nix__"] = {
+    "sha256": hashlib.sha256(data).hexdigest(),
+    "bytes": len(data),
+}
 print(json.dumps(prod, indent=2, sort_keys=True))
 PY
 
