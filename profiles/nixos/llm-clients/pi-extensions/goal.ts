@@ -29,10 +29,19 @@
  * going up to 2000 turns / 24 h. It does not stop on a bare marker, and a hash
  * alone is not an escape: GOAL DONE and GOAL BLOCKED both require
  *   - spec: sha256 of all the goal's words (recomputed here), and
- *   - solution: a git commit created DURING THIS RUN in the goal repo; for
- *     GOAL BLOCKED its message must document the blocker (contain BLOCKED).
- * An effort complaint is not a blocker. ON by default (setting a goal starts
- * the loop), never persisted on.
+ *   - solution: a git commit created DURING THIS RUN in the goal repo, or in any
+ *     repository directly under it (a goal that spans several checkouts has no
+ *     commit in their common parent); for GOAL BLOCKED its message must document
+ *     the blocker (contain the word BLOCKED).
+ * The stop line and the two proof lines may appear in either order: the proof is
+ * read from the whole message. An effort complaint is not a blocker. ON by
+ * default (setting a goal starts the loop), never persisted on.
+ *
+ * The assertions in this file run at import, gated on a /dev/shm sentinel keyed
+ * to the file's own hash: once per boot, and again after any edit. They can also
+ * be run on demand with `/goal selftest` or `node goal.ts --selftest` (the CI
+ * workflow uses the latter). There is deliberately no test file beside this one:
+ * a second copy of the assertions is a second truth.
  *
  * The goal is stored in the session, so it follows the active branch and is
  * restored on resume / branch navigation. Only the raw goal text is stored;
@@ -41,9 +50,10 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const ENTRY_TYPE = "goal";
@@ -74,7 +84,8 @@ const HUGE_FILE_BYTES = 2_000_000;
 // is re-verified here, not taken on the agent's word):
 //   - GOAL DONE  requires `spec: <sha256>` = the hash of ALL the words of the
 //     goal + its inlined files (recomputed by this extension from disk) and,
-//     in a git repo, `solution: <commit>` = a commit that actually exists.
+//     in a git repo, `solution: <commit>` = a commit that actually exists in that
+//     repository or in a repository directly below it.
 //   - GOAL BLOCKED requires `spec: <sha256>` plus the blocker text.
 // A stop line without a verified proof is rejected and the loop continues.
 const AUTO_MAX_ITERATIONS = 2000;
@@ -94,6 +105,7 @@ const AUTO_PROMPT =
 	"Continue the goal. Do the next concrete step now, using tools, and do not summarize or ask permission. " +
 	"You may only stop this loop by ending your turn with GOAL DONE or GOAL BLOCKED plus an escape proof. " +
 	"A stop line without a proof verified by the goal extension is rejected and the loop continues. " +
+	"Put the stop line and the two proof lines at the end of the message; the proof is read wherever it appears, above or below the stop line.\n" +
 	"Proof format (one per line, lowercase labels):\n" +
 	"  spec: <64-hex sha256 of all the words of the goal files, concatenated in the order listed in this message:\n" +
 	"        cat file1 file2 ... | sha256sum — or of the goal text itself when there are no files>\n" +
@@ -238,6 +250,30 @@ function repoDir(cwd: string, goal: string | null): string | null {
 	}
 }
 
+// Repositories a solution commit may live in: the goal repo (the goal file's
+// repo, else cwd), then every immediate child directory that is its own
+// repository. A goal that spans several checkouts — planning in one, code in
+// another — has no commit in their common parent, and requiring one there pushes
+// a synthetic file into a directory that is not a project. Order matters only for
+// reporting: the first repository that contains the commit wins.
+function candidateRepos(cwd: string, goal: string | null): string[] {
+	const out: string[] = [];
+	const primary = repoDir(cwd, goal);
+	if (primary) out.push(primary);
+	try {
+		for (const entry of readdirSync(cwd, { withFileTypes: true })) {
+			if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+			const dir = join(cwd, entry.name);
+			if (!existsSync(join(dir, ".git"))) continue;
+			const top = repoDir(dir, null);
+			if (top && !out.includes(top)) out.push(top);
+		}
+	} catch {
+		// cwd is not listable; the primary repo (if any) is all we have.
+	}
+	return out;
+}
+
 interface CommitInfo {
 	hash: string;
 	ct: number; // committer timestamp, seconds
@@ -273,6 +309,67 @@ function commitExists(repo: string, hash: string): boolean {
 	}
 }
 
+// Does a commit message document a blocker? Word-bounded: /BLOCK/i also matches
+// "unblocked", "blockers" and "blocking", which is how a normal commit message
+// would accidentally satisfy the GOAL BLOCKED requirement.
+function mentionsBlocker(message: string): boolean {
+	return /\bBLOCKED\b/i.test(message);
+}
+
+// Why an escape proof was rejected, one line per reason, in the order the agent
+// can act on them. Pure on purpose: the wording of these messages is the part
+// that costs a loop when it is wrong, so it is asserted by goal.test.ts rather
+// than left inside the settle handler.
+function proofRejections(args: {
+	kind: "done" | "blocked";
+	proof: EscapeProof;
+	want: string;
+	specOk: boolean;
+	repos: string[];
+	sol: CommitInfo | null;
+	solFresh: boolean;
+	solSaysBlocked: boolean;
+}): string[] {
+	const { kind, proof, want, specOk, repos, sol, solFresh, solSaysBlocked } = args;
+	const reasons: string[] = [];
+
+	// Distinguish "you did not supply it" from "it is wrong", and print the
+	// expected value: the hash is recomputed here, so showing it cannot be used to
+	// fake anything, and withholding it costs the agent a whole loop of guessing at
+	// a file that may not even exist.
+	if (!specOk) {
+		reasons.push(
+			proof.spec
+				? `spec hash rejected (yours: ${proof.spec}; expected: ${want})`
+				: `no "spec:" line found (expected: spec: ${want})`,
+		);
+	}
+
+	if (repos.length === 0) {
+		reasons.push(
+			`no git repository at the goal directory or in any immediate child directory — commit the work, then give that commit as the solution line`,
+		);
+	} else {
+		if (!proof.solution) {
+			reasons.push(`no "solution:" line found (expected a commit hash from this run)`);
+		} else if (!sol) {
+			reasons.push(
+				`solution ${proof.solution} is not a commit in ${repos.join(", ")} — commit your work first, then give its hash`,
+			);
+		} else if (!solFresh) {
+			reasons.push(
+				`solution ${sol.hash} is not from this run — the commit must be created after auto-continue was armed`,
+			);
+		}
+		if (kind === "blocked" && sol && !solSaysBlocked) {
+			reasons.push(
+				`blocker commit ${sol.hash} does not document a blocker — its message must contain the word BLOCKED`,
+			);
+		}
+	}
+	return reasons;
+}
+
 interface EscapeProof {
 	kind: "done" | "blocked";
 	spec: string | null;
@@ -280,23 +377,31 @@ interface EscapeProof {
 }
 
 // Parse the agent's own last words for a stop line + proof fields.
+//
+// Two deliberate choices, both learned from rejections that cost a whole loop:
+//
+// 1. The stop word is located with a case-insensitive regex on the ORIGINAL
+//    string. Searching `text.toUpperCase()` and then slicing `text` mixes two
+//    index spaces: `"ß".toUpperCase()` is two code units, so any such character
+//    before the stop word shifts the slice and can cut into the proof.
+// 2. The proof is read from the WHOLE message. The contract tells the agent what
+//    to supply, not where to put it, and "stop line last, proof above it" is a
+//    reasonable reading of "end your turn with the stop line plus a proof".
+//    Restricting the search to the part after the stop word silently produced
+//    `spec: null, solution: null` for a proof that was present and correct. A
+//    64-hex value after `spec:` cannot occur by accident, so scanning everything
+//    costs nothing.
 function parseEscape(text: string): EscapeProof | null {
-	const up = text.toUpperCase();
-	const doneIdx = up.lastIndexOf(STOP_WORDS[0]);
-	const blockedIdx = up.lastIndexOf(STOP_WORDS[1]);
-	let kind: "done" | "blocked";
-	let at: number;
-	if (doneIdx === -1 && blockedIdx === -1) return null;
-	if (doneIdx > blockedIdx) {
-		kind = "done";
-		at = doneIdx;
-	} else {
-		kind = "blocked";
-		at = blockedIdx;
-	}
-	const after = text.slice(at);
-	const spec = /(?:^|\n)\s*spec\s*:\s*([0-9a-fA-F]{64})\b/.exec(after);
-	const sol = /(?:^|\n)\s*solution\s*:\s*([0-9a-fA-F]{7,40})\b/.exec(after);
+	const stop = /\bGOAL[ \t]+(DONE|BLOCKED)\b/gi;
+	let last: RegExpExecArray | null = null;
+	let m: RegExpExecArray | null;
+	while ((m = stop.exec(text)) !== null) last = m;
+	if (!last) return null;
+
+	const kind: "done" | "blocked" = last[1].toUpperCase() === "DONE" ? "done" : "blocked";
+
+	const spec = /(?:^|\n)\s*spec\s*:\s*([0-9a-fA-F]{64})\b/.exec(text);
+	const sol = /(?:^|\n)\s*solution\s*:\s*([0-9a-fA-F]{7,40})\b/.exec(text);
 	return {
 		kind,
 		spec: spec ? spec[1].toLowerCase() : null,
@@ -315,6 +420,422 @@ function autoPrompt(goal: string | null, _cwd: string): string {
 			: `\n\nWords to hash for the spec proof — run exactly:\n  printf '%s' '${goal}' | sha256sum`;
 	return `${AUTO_PROMPT}${hashTargets}`;
 }
+
+
+// ---------------------------------------------------------------------------
+// Self-test, run when this module is imported
+// ---------------------------------------------------------------------------
+// These assertions used to live only in a test file, which meant the code ran
+// unverified unless someone remembered to run them. They now run at import,
+// gated on a sentinel in /dev/shm keyed to this file's own source hash:
+//
+//   - first import after a boot: the sentinel is absent, the cases run;
+//   - every later import in that boot: the sentinel is present, they are skipped;
+//   - after an edit: the hash changes, so the sentinel name changes and the cases
+//     run again. A stale pass cannot outlive the code it passed.
+//
+// /dev/shm is RAM, so a reboot clears it without anything having to delete it.
+// On a system without /dev/shm the OS temp dir is used, which is weaker (it can
+// survive a reboot) and is the only reason it is a fallback rather than the rule.
+//
+// Failures never throw at import: breaking every turn because a self-check failed
+// would be worse than the bug. They are logged, kept, and surfaced to the user as
+// an error notification on the next session restore, plus `/goal selftest`.
+interface SelfTestCase {
+	name: string;
+	run: () => void;
+}
+
+interface SelfTestFailure {
+	name: string;
+	error: string;
+}
+
+const HEX64_SELFTEST = "a".repeat(64);
+const COMMIT = "b".repeat(40);
+
+function selfTestSha256Hex(text: string): string {
+	return createHash("sha256").update(text).digest("hex");
+}
+
+// A throwaway directory that is always removed. Nothing here touches the goal
+// repository: a self-test that needs the caller's git state cannot run at import.
+function withTmpDir<T>(body: (dir: string) => T): T {
+	const dir = mkdtempSync(join(tmpdir(), "goal-selftest-"));
+	try {
+		return body(dir);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+
+class AssertionError extends Error {}
+
+function eq(actual: unknown, expected: unknown, what = "value"): void {
+	const a = JSON.stringify(actual);
+	const e = JSON.stringify(expected);
+	if (a !== e) throw new AssertionError(`${what}: expected ${e}, got ${a}`);
+}
+
+function ok(value: unknown, what: string): void {
+	if (!value) throw new AssertionError(what);
+}
+
+function matches(value: string, re: RegExp, what: string): void {
+	if (!re.test(value)) throw new AssertionError(`${what}: ${JSON.stringify(value)} does not match ${re}`);
+}
+
+function goalSelfTestCases(): SelfTestCase[] {
+
+	return [
+		// -- parseEscape: where the proof may live ---------------------------
+		{
+			name: "parseEscape: proof ABOVE the stop line is accepted",
+			run: () => {
+				// This exact shape was rejected twice in practice: the parser sliced
+				// from the stop word, so a correct proof read as "spec: missing".
+				eq(
+					parseEscape(`spec: ${HEX64_SELFTEST}\nsolution: ${COMMIT}\n\nGOAL DONE`),
+					{ kind: "done", spec: HEX64_SELFTEST, solution: COMMIT },
+				);
+			},
+		},
+		{
+			name: "parseEscape: proof BELOW the stop line is accepted",
+			run: () => {
+				eq(
+					parseEscape(`GOAL DONE\n\nspec: ${HEX64_SELFTEST}\nsolution: ${COMMIT}`),
+					{ kind: "done", spec: HEX64_SELFTEST, solution: COMMIT },
+				);
+			},
+		},
+		{
+			name: "parseEscape: multi-byte characters before the stop line do not shift the parse",
+			run: () => {
+				// "ß".toUpperCase() is two code units, so locating the stop word in the
+				// uppercased copy and slicing the original doubles the offset. 40 is not
+				// decorative: the shift has to exceed the distance to the `spec:` line.
+				eq(
+					parseEscape(`${"ß".repeat(40)}GOAL DONE\nspec: ${HEX64_SELFTEST}\nsolution: ${COMMIT}`),
+					{ kind: "done", spec: HEX64_SELFTEST, solution: COMMIT },
+				);
+			},
+		},
+		{
+			name: "parseEscape: the LAST stop word wins",
+			run: () => {
+				eq(parseEscape(`GOAL DONE\n\nspec: ${HEX64_SELFTEST}\nsolution: ${COMMIT}\n\nGOAL BLOCKED`)?.kind, "blocked");
+			},
+		},
+		{
+			name: "parseEscape: the stop word is case-insensitive",
+			run: () => {
+				eq(parseEscape("goal done")?.kind, "done");
+				eq(parseEscape("Goal Blocked")?.kind, "blocked");
+			},
+		},
+		{
+			name: "parseEscape: no stop word means no escape",
+			run: () => {
+				eq(parseEscape(`spec: ${HEX64_SELFTEST}\nsolution: ${COMMIT}`), null);
+			},
+		},
+		{
+			name: "parseEscape: a stop word with no proof yields nulls",
+			run: () => {
+				eq(parseEscape("GOAL DONE"), { kind: "done", spec: null, solution: null });
+			},
+		},
+		{
+			name: "parseEscape: a 63-character spec is not a spec",
+			run: () => {
+				eq(parseEscape(`GOAL DONE\nspec: ${"a".repeat(63)}`)?.spec, null);
+			},
+		},
+		{
+			name: "parseEscape: abbreviated commit hashes are accepted",
+			run: () => {
+				eq(parseEscape(`GOAL DONE\nsolution: ${COMMIT.slice(0, 7)}`)?.solution, COMMIT.slice(0, 7));
+			},
+		},
+
+		// -- specHash ---------------------------------------------------------
+		{
+			name: "specHash: the goal text, byte for byte (printf | sha256sum)",
+			run: () => {
+				const goal = "write tests in all network-renderer-* and make the reminder honest";
+				eq(withTmpDir((dir) => specHash(dir, goal)), selfTestSha256Hex(goal));
+			},
+		},
+		{
+			name: "specHash: an empty goal hashes the empty string",
+			run: () => {
+				eq(withTmpDir((dir) => specHash(dir, null)), selfTestSha256Hex(""));
+			},
+		},
+		{
+			name: "specHash: goal files replace the goal text, in the order given",
+			run: () => {
+				withTmpDir((t) => {
+					writeFileSync(join(t, "a.md"), "first\n");
+					writeFileSync(join(t, "b.md"), "second\n");
+					const got = specHash(t, "do it @a.md then @b.md");
+					eq(got, selfTestSha256Hex("first\nsecond\n"));
+					ok(specHash(t, "do it @b.md then @a.md") !== got, "file order must change the digest");
+				});
+			},
+		},
+		{
+			name: "specHash: a missing goal file throws instead of hashing half a goal",
+			run: () => {
+				withTmpDir((t) => {
+					let threw = false;
+					try {
+						specHash(t, "read @nope.md");
+					} catch (err) {
+						threw = /goal file not found/.test((err as Error).message);
+					}
+					ok(threw, "a missing goal file must throw");
+				});
+			},
+		},
+
+		// -- candidateRepos ----------------------------------------------------
+		{
+			name: "candidateRepos: child repositories count when the parent is not one",
+			run: () => {
+				// The shape that forced a synthetic commit at a workspace root.
+				withTmpDir((t) => {
+					for (const name of ["one", "two"]) {
+						const dir = join(t, name);
+						mkdirSync(dir, { recursive: true });
+						execFileSync("git", ["init", "-q", dir], { stdio: "ignore" });
+					}
+					const repos = candidateRepos(t, null);
+					eq(repos.length, 2, "repository count");
+					ok(repos.some((r) => r.endsWith("/one")), "one is a candidate");
+					ok(repos.some((r) => r.endsWith("/two")), "two is a candidate");
+				});
+			},
+		},
+		{
+			name: "candidateRepos: the parent comes first and children still count",
+			run: () => {
+				withTmpDir((t) => {
+					execFileSync("git", ["init", "-q", t], { stdio: "ignore" });
+					const child = join(t, "child");
+					mkdirSync(child, { recursive: true });
+					execFileSync("git", ["init", "-q", child], { stdio: "ignore" });
+					const repos = candidateRepos(t, null);
+					eq(repos[0], t, "the goal repository is tried first");
+					ok(repos.some((r) => r.endsWith("/child")), "the child is a candidate");
+				});
+			},
+		},
+		{
+			name: "candidateRepos: a plain directory yields no repository",
+			run: () => {
+				withTmpDir((t) => {
+					writeFileSync(join(t, "file"), "x");
+					eq(candidateRepos(t, null), []);
+				});
+			},
+		},
+
+		// -- mentionsBlocker ---------------------------------------------------
+		{
+			name: "mentionsBlocker: accepts an actual blocker",
+			run: () => {
+				eq(mentionsBlocker("BLOCKED: the upstream schema has no canonical routes"), true);
+				eq(mentionsBlocker("this is blocked by the missing secret"), true);
+			},
+		},
+		{
+			name: "mentionsBlocker: rejects the look-alikes a normal commit contains",
+			run: () => {
+				// /BLOCK/i accepted every one of these, so GOAL BLOCKED could be
+				// satisfied by a message that documents no blocker at all.
+				eq(mentionsBlocker("unblocked the pipeline"), false);
+				eq(mentionsBlocker("lists the blockers for next week"), false);
+				eq(mentionsBlocker("blocking on review"), false);
+			},
+		},
+
+		// -- proofRejections: the message the agent actually receives ----------
+		{
+			name: "proofRejections: a complete, fresh, matching proof has no reasons",
+			run: () => {
+				eq(proofRejections(base()), []);
+			},
+		},
+		{
+			name: "proofRejections: an absent spec line says so and prints what was expected",
+			run: () => {
+				const reasons = proofRejections({ ...base(), specOk: false, proof: { ...base().proof, spec: null } });
+				eq(reasons.length, 1, "reason count");
+				matches(reasons[0], /no "spec:" line found/, "reason");
+				ok(reasons[0].includes(HEX64_SELFTEST), "the expected hash is shown, not withheld");
+			},
+		},
+		{
+			name: "proofRejections: a wrong spec line is distinguished from an absent one",
+			run: () => {
+				const reasons = proofRejections({
+					...base(),
+					specOk: false,
+					proof: { ...base().proof, spec: "c".repeat(64) },
+				});
+				matches(reasons[0], /spec hash rejected/, "reason");
+				matches(reasons[0], /expected:/, "reason");
+			},
+		},
+		{
+			name: "proofRejections: no repository at all is its own reason",
+			run: () => {
+				const reasons = proofRejections({ ...base(), repos: [], sol: null });
+				eq(reasons.length, 1, "reason count");
+				matches(reasons[0], /no git repository/, "reason");
+			},
+		},
+		{
+			name: "proofRejections: an absent solution line is its own reason",
+			run: () => {
+				const reasons = proofRejections({
+					...base(),
+					sol: null,
+					proof: { ...base().proof, solution: null },
+				});
+				matches(reasons[0], /no "solution:" line found/, "reason");
+			},
+		},
+		{
+			name: "proofRejections: a commit in no candidate repository lists what was searched",
+			run: () => {
+				const reasons = proofRejections({ ...base(), repos: ["/one", "/two"], sol: null });
+				matches(reasons[0], /is not a commit in \/one, \/two/, "reason");
+			},
+		},
+		{
+			name: "proofRejections: a stale commit is named as stale",
+			run: () => {
+				const reasons = proofRejections({ ...base(), solFresh: false });
+				matches(reasons[0], /is not from this run/, "reason");
+			},
+		},
+		{
+			name: "proofRejections: GOAL BLOCKED without a blocker in the message is rejected",
+			run: () => {
+				const reasons = proofRejections({
+					...base(),
+					kind: "blocked",
+					proof: { ...base().proof, kind: "blocked" },
+					solSaysBlocked: false,
+				});
+				eq(reasons.length, 1, "reason count");
+				matches(reasons[0], /must contain the word BLOCKED/, "reason");
+			},
+		},
+		{
+			name: "proofRejections: GOAL BLOCKED with a real blocker passes",
+			run: () => {
+				eq(
+					proofRejections({
+						...base(),
+						kind: "blocked",
+						proof: { ...base().proof, kind: "blocked" },
+						solSaysBlocked: true,
+					}),
+					[],
+				);
+			},
+		},
+	];
+
+	function base(): ProofRejectionArgs {
+		return {
+			kind: "done",
+			proof: { kind: "done", spec: HEX64_SELFTEST, solution: COMMIT },
+			want: HEX64_SELFTEST,
+			specOk: true,
+			repos: ["/repo"],
+			sol: { hash: COMMIT, ct: 100, msg: "did the work" },
+			solFresh: true,
+			solSaysBlocked: false,
+		};
+	}
+}
+
+/**
+ * Run every case. Never throws: the caller decides what a failure means (the
+ * extension notifies, the test runner asserts).
+ */
+export function runGoalSelfTest(): SelfTestFailure[] {
+	const failures: SelfTestFailure[] = [];
+	for (const testCase of goalSelfTestCases()) {
+		try {
+			testCase.run();
+		} catch (err) {
+			failures.push({ name: testCase.name, error: err instanceof Error ? err.message : String(err) });
+		}
+	}
+	return failures;
+}
+
+const SELF_TEST_SENTINEL_DIR = existsSync("/dev/shm") ? "/dev/shm" : tmpdir();
+
+function selfTestSentinelPath(): string | null {
+	try {
+		const source = readFileSync(fileURLToPath(import.meta.url));
+		const digest = createHash("sha256").update(source).digest("hex").slice(0, 16);
+		return join(SELF_TEST_SENTINEL_DIR, `pi-goal-selftest-${digest}`);
+	} catch {
+		// No readable source (bundled, or a read-only oddity): run the cases every
+		// time rather than never.
+		return null;
+	}
+}
+
+const selfTest = (() => {
+	const sentinel = selfTestSentinelPath();
+	if (sentinel && existsSync(sentinel)) {
+		return { ran: false, failures: [] as SelfTestFailure[], sentinel };
+	}
+	const failures = runGoalSelfTest();
+	if (sentinel) {
+		try {
+			writeFileSync(sentinel, `${new Date().toISOString()} cases=${goalSelfTestCases().length} failures=${failures.length}\n`);
+		} catch {
+			// A sentinel we cannot write only means the cases run again next time.
+		}
+	}
+	for (const failure of failures) {
+		console.error(`[goal] self-test failed: ${failure.name}: ${failure.error}`);
+	}
+	return { ran: true, failures, sentinel };
+})();
+
+// Run the cases as a command, so CI can check this file without a test file
+// beside it:  node goal.ts --selftest
+// Exits non-zero on failure, which is what a workflow needs. This path always
+// runs the cases; the sentinel only gates the automatic run at import.
+if (process.argv.includes("--selftest")) {
+	const cases = goalSelfTestCases();
+	const failures = runGoalSelfTest();
+	for (const failure of failures) console.error(`FAIL ${failure.name}: ${failure.error}`);
+	console.log(`${cases.length - failures.length}/${cases.length} goal self-test cases passed`);
+	process.exit(failures.length === 0 ? 0 : 1);
+}
+
+function reportSelfTest(ctx: ExtensionContext): void {
+	if (!selfTest.ran || selfTest.failures.length === 0) return;
+	const first = selfTest.failures[0];
+	const more = selfTest.failures.length > 1 ? ` (+${selfTest.failures.length - 1} more)` : "";
+	ctx.ui.notify(`goal.ts self-test FAILED: ${first.name}: ${first.error}${more}`, "error");
+}
+
+// Exported for the test runner. The default export stays the extension entrypoint.
+export { parseEscape, specHash, candidateRepos, mentionsBlocker, proofRejections, goalSelfTestCases, selfTest };
 
 export default function goalExtension(pi: ExtensionAPI) {
 	let goal: string | null = null;
@@ -349,6 +870,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 	}
 
 	function restore(ctx: ExtensionContext): void {
+		reportSelfTest(ctx);
 		goal = null;
 		autoRun = true;
 		autoIterations = 0;
@@ -396,7 +918,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 	pi.registerCommand("goal", {
 		description: "Set, show, or clear a recurring goal (/goal <text> | /goal clear)",
 		getArgumentCompletions: (prefix) => {
-			const options = ["clear", "off", "auto", "auto off", "status"];
+			const options = ["clear", "off", "auto", "auto off", "status", "selftest"];
 			const matches = options.filter((o) => o.startsWith(prefix.trim()));
 			return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
 		},
@@ -444,6 +966,17 @@ export default function goalExtension(pi: ExtensionAPI) {
 						{ triggerTurn: true },
 					);
 				}
+				return;
+			}
+
+			if (lower === "selftest") {
+				const failures = runGoalSelfTest();
+				ctx.ui.notify(
+					failures.length === 0
+						? `Self-test passed: ${goalSelfTestCases().length} cases. (init run: ${selfTest.ran ? `${selfTest.failures.length} failure(s)` : "skipped, sentinel present"}; sentinel: ${selfTest.sentinel ?? "none"})`
+						: `Self-test FAILED: ${failures.map((f) => `${f.name}: ${f.error}`).join("; ")}`,
+					failures.length === 0 ? "info" : "error",
+				);
 				return;
 			}
 
@@ -576,18 +1109,33 @@ export default function goalExtension(pi: ExtensionAPI) {
 			const cwd = lastCtx?.cwd ?? process.cwd();
 			const want = specHash(cwd, goal);
 			const specOk = proof.spec === want;
-			const repo = repoDir(cwd, goal);
+			// The solution commit may live in any repository this goal touches, not
+			// only the one cwd resolves to. A goal that spans several checkouts has
+			// no commit in their common parent, and demanding one there puts a
+			// synthetic file into a directory that is not a project.
+			const repos = candidateRepos(cwd, goal);
 			const runStartSec = autoStartedAt > 0 ? Math.floor(autoStartedAt / 1000) : 0;
-			const sol = proof.solution ? commitInfo(repo ?? "", proof.solution) : null;
+			let sol: CommitInfo | null = null;
+			let solRepo: string | null = null;
+			if (proof.solution) {
+				for (const candidate of repos) {
+					const info = commitInfo(candidate, proof.solution);
+					if (info) {
+						sol = info;
+						solRepo = candidate;
+						break;
+					}
+				}
+			}
 			const solExists = sol !== null;
 			const solFresh = solExists && (runStartSec === 0 || sol.ct >= runStartSec - 1);
-			const solSaysBlocked = solExists && /BLOCK/i.test(sol.msg);
+			const solSaysBlocked = solExists && mentionsBlocker(sol.msg);
 
 			// No commit-based escapes outside a git repo; hash alone is nothing.
 			const doneOk =
-				proof.kind === "done" && specOk && repo !== null && solExists && solFresh;
+				proof.kind === "done" && specOk && repos.length > 0 && solExists && solFresh;
 			const blockedOk =
-				proof.kind === "blocked" && specOk && repo !== null && solExists && solFresh && solSaysBlocked;
+				proof.kind === "blocked" && specOk && repos.length > 0 && solExists && solFresh && solSaysBlocked;
 
 			if (doneOk || blockedOk) {
 				autoRun = false;
@@ -596,8 +1144,8 @@ export default function goalExtension(pi: ExtensionAPI) {
 					updateStatus(lastCtx);
 					lastCtx.ui.notify(
 						doneOk
-							? `Auto-continue stopped: GOAL DONE proof verified (spec hash + solution commit ${sol?.hash}).`
-							: `Auto-continue stopped: GOAL BLOCKED accepted (spec hash + blocker commit ${sol?.hash}).`,
+							? `Auto-continue stopped: GOAL DONE proof verified (spec hash + solution commit ${sol?.hash} in ${solRepo}).`
+							: `Auto-continue stopped: GOAL BLOCKED accepted (spec hash + blocker commit ${sol?.hash} in ${solRepo}).`,
 						"info",
 					);
 				}
@@ -605,24 +1153,16 @@ export default function goalExtension(pi: ExtensionAPI) {
 			}
 
 			// Rejected escape: tell the agent exactly why and keep it in the loop.
-			const reasons: string[] = [];
-			if (!specOk) {
-				reasons.push(
-					`spec hash rejected (yours: ${proof.spec ?? "missing"}; it does not match the words on disk — run the exact cat|sha256sum command)`,
-				);
-			}
-			if (repo === null) {
-				reasons.push(`no git repo at ${cwd} — commit the work and the blocker, then escape with a solution line`);
-			} else {
-				if (!solExists) {
-					reasons.push(`solution missing (commit your work first, then give its hash)`);
-				} else if (!solFresh) {
-					reasons.push(`solution ${sol.hash} is not from this run — the commit must be created after auto-continue was armed`);
-				}
-				if (proof.kind === "blocked" && solExists && !solSaysBlocked) {
-					reasons.push(`blocker commit ${sol.hash} does not document a blocker — its message must contain BLOCKED`);
-				}
-			}
+			const reasons = proofRejections({
+				kind: proof.kind,
+				proof,
+				want,
+				specOk,
+				repos,
+				sol,
+				solFresh,
+				solSaysBlocked,
+			});
 			autoIterations += 1;
 			if (lastCtx) updateStatus(lastCtx);
 			return {

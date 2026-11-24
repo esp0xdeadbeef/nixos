@@ -1,0 +1,41 @@
+name: "Pi extensions"
+
+# The extension carries its own assertions and exposes them as a command, so the
+# check needs no test file in the tree: `node goal.ts --selftest` runs every case
+# and exits non-zero on failure. Keeping the cases inside the extension is
+# deliberate -- a second copy beside it would be a second truth, and
+# home-manager installs each file in pi-extensions/ as its own store symlink, so
+# a sibling import would not resolve once deployed.
+on:
+  push:
+    paths:
+      - "profiles/nixos/llm-clients/pi-extensions/**"
+      - ".github/workflows/pi-extensions.yml"
+  pull_request:
+    paths:
+      - "profiles/nixos/llm-clients/pi-extensions/**"
+      - ".github/workflows/pi-extensions.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  goal-selftest:
+    name: "goal.ts self-test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Node 24 runs .ts directly (type stripping), which is what the extension
+      # relies on locally. No test file, no runner dependency, no build step.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: "Run the extension self-test"
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node profiles/nixos/llm-clients/pi-extensions/goal.ts --selftest
