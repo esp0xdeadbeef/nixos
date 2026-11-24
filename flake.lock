@@ -11140,11 +11140,11 @@
     "pin-refresh-source": {
       "flake": false,
       "locked": {
-        "lastModified": 1795560789,
-        "narHash": "sha256-nkX52+Czo6syMw99WiBbebY4RrJG3y7PSXpwEGS2QoM=",
+        "lastModified": 1795561920,
+        "narHash": "sha256-qJL9eXmTLlnQ90aaP54vQn4PmxwmmAPQUqPyZsyWyPw=",
         "owner": "esp0xdeadbeef",
         "repo": "nixos",
-        "rev": "e10b15bfa59570f7f7b571b57c54800baeae1488",
+        "rev": "63de08a96b8135da76c8c90276a442fcf1e9891a",
         "type": "github"
       },
       "original": {
