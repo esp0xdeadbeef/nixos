@@ -119,9 +119,34 @@ let
   # VM NIC platform binding, built from the host profile's vmNics list. Kept
   # here (FS-982-SMS-130) so the host profile passes platform-binding material
   # to the producer instead of assembling it inline.
+  # The host's deployment facts, as the inventory states them. Same object the CPM
+  # publishes as `deploymentHosts`, which is what the platform binding's
+  # `deployment.hosts` category is defined to mirror (network-realization-schema).
+  deploymentHostsFrom =
+    inventory:
+    if builtins.isAttrs (inventory.deployment or null) && builtins.isAttrs (inventory.deployment.hosts or null) then
+      inventory.deployment.hosts
+    else
+      { };
+
   vmNicsPlatformBinding =
-    { hostName, vmNics, bundle, target ? "nixos" }:
-    if vmNics == [ ] then
+    { hostName
+    , vmNics
+    , bundle
+    , target ? "nixos"
+    ,
+      # The host's own deployment facts (eth0's uplinks, the management VLAN).
+      # Without them a container-hosted router has NO binding at all -- it has no VM
+      # NICs -- and the renderer renders no uplink netdevs, which is exactly the
+      # five assertions the router profiles fail:
+      #
+      #   s-router-nixos: runtime must define at least one VLAN netdev eth0.2 with
+      #   vlanConfig.Id = 2; … a bridge netdev vlan2; … an eth0 network that attaches
+      #   eth0.2 and disables DHCP; … an eth0.2 network enslaved into vlan2 with DHCP
+      #   disabled; … the first matching vlan2 network with IPv4 DHCP.
+      deploymentHosts ? { }
+    }:
+    if vmNics == [ ] && deploymentHosts == { } then
       null
     else
       let
@@ -158,11 +183,17 @@ let
           bundleIdentity = bundle.bundleIdentity;
           inherit target;
           requestScope = bundle.requestScope;
-          categories.deployment.vmTargets.${hostName} = {
-            explicitNicSet = true;
-            expectedNicCount = builtins.length nics;
-            inherit nics;
-          };
+          categories.deployment =
+            lib.optionalAttrs (vmNics != [ ]) {
+              vmTargets.${hostName} = {
+                explicitNicSet = true;
+                expectedNicCount = builtins.length nics;
+                inherit nics;
+              };
+            }
+            // lib.optionalAttrs (deploymentHosts != { }) {
+              hosts = deploymentHosts;
+            };
           provenance = {
             producer = "nixos/${hostName}";
             producerRevision = "local-working-tree";
@@ -218,6 +249,7 @@ in
     realizeAll
     realizeBundle
     realizeInventory
+    deploymentHostsFrom
     vmNicsPlatformBinding
     containerPlatformBinding
     ;
