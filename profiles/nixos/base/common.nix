@@ -1,6 +1,10 @@
 { lib
 , pkgs
-, relativeRepo
+, relativeRepo ? import ../../../library/relative-repo.nix
+    {
+      inherit lib;
+      root = ../../..;
+    }
 , ...
 }:
 {
@@ -10,7 +14,13 @@
     # (core -> base.common, plus the s-gamma and VM bases directly); putting it
     # in a narrower profile would silently drop it from every host that does
     # not import that profile.
-    (relativeRepo.module "modules/nixos/python-pycache-prefix.nix")
+    # A path literal, not `relativeRepo.module`: an argument used inside
+    # `imports` cannot come from `_module.args`, because that IS `config` and
+    # reading it while imports are evaluated recurses. `relativeRepo` is still
+    # accepted (and still used below) for callers that need a different root, but
+    # the one import that runs at import time names its file relative to this
+    # profile -- which resolves inside whichever checkout is being evaluated.
+    ../../../modules/nixos/python-pycache-prefix.nix
   ];
 
   security.sudo.extraConfig = lib.mkAfter ''

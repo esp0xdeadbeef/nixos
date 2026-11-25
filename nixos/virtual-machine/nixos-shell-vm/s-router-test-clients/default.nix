@@ -80,10 +80,11 @@ let
     inherit lib;
   };
 
-  # A container-hosted router has no VM NICs, so the binding (and with it the
-  # renderer's deployment facts) would be null and no uplink netdev would render.
-  # These are the host's own eth0/uplink facts from the inventory.
-  deploymentHosts = producer.deploymentHostsFrom inventory;
+  # A host with no VM NICs would get `null` from `vmNicsPlatformBinding`, and with it
+  # no deployment facts at all -- no eth0/uplink netdevs. This fixture has no
+  # `inventory` binding of its own: it compiles the CPM straight from paths above, so
+  # the deployment facts are the ones the producer published on that artifact.
+  deploymentHosts = cpmBuilt.deploymentHosts or { };
 
   platformBinding = producer.vmNicsPlatformBinding {
     inherit hostName vmNics deploymentHosts;
