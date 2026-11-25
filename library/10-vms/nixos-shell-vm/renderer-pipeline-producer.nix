@@ -120,8 +120,23 @@ let
   # here (FS-982-SMS-130) so the host profile passes platform-binding material
   # to the producer instead of assembling it inline.
   vmNicsPlatformBinding =
-    { hostName, vmNics, bundle, target ? "nixos" }:
-    if vmNics == [ ] then
+    { hostName
+    , vmNics
+    , bundle
+    , target ? "nixos"
+    ,
+      # The host's deployment facts (uplinks, bridge networks) as the producer's
+      # inventory states them. Without these a renderer using the validated bundle
+      # has no eth0/management-VLAN facts at all and renders no uplink netdevs --
+      # measured on s-router-nixos: no `vlan2` bridge, no `eth0.2`, no `eth0` parent
+      # network, no DHCP on `vlan2`, while the host contract requires all five.
+      #
+      # This is `deployment.hosts.<hostName>` of the platform binding, which the
+      # schema documents as "per-host facts, mirroring the CPM's
+      # deployment.hosts.<host>.bridgeNetworks and .uplinks".
+      deploymentHosts ? { }
+    }:
+    if vmNics == [ ] && deploymentHosts == { } then
       null
     else
       let
@@ -158,11 +173,17 @@ let
           bundleIdentity = bundle.bundleIdentity;
           inherit target;
           requestScope = bundle.requestScope;
-          categories.deployment.vmTargets.${hostName} = {
-            explicitNicSet = true;
-            expectedNicCount = builtins.length nics;
-            inherit nics;
-          };
+          categories.deployment =
+            lib.optionalAttrs (vmNics != [ ]) {
+              vmTargets.${hostName} = {
+                explicitNicSet = true;
+                expectedNicCount = builtins.length nics;
+                inherit nics;
+              };
+            }
+            // lib.optionalAttrs (deploymentHosts != { }) {
+              hosts = deploymentHosts;
+            };
           provenance = {
             producer = "nixos/${hostName}";
             producerRevision = "local-working-tree";

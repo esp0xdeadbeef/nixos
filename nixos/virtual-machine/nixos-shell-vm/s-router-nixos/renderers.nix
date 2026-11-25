@@ -39,8 +39,17 @@ let
 
   # FS-982-SMS-130: the VM NIC platform binding is produced by the producer
   # boundary from the host profile's vmNics list.
+  # The host's own deployment facts, from the inventory this render is built from:
+  # eth0's bridge networks and uplinks, the management VLAN among them. A
+  # container-hosted router has no VM NICs, so without these the binding is null and
+  # the renderer has no uplink facts at all (no vlan2, no eth0.2).
+  deploymentHosts =
+    if builtins.isAttrs (inventory.deployment or null) && builtins.isAttrs (inventory.deployment.hosts or null)
+    then inventory.deployment.hosts
+    else { };
+
   platformBinding = producer.vmNicsPlatformBinding {
-    inherit hostName vmNics;
+    inherit hostName vmNics deploymentHosts;
     bundle = canonicalBundle;
   };
 
