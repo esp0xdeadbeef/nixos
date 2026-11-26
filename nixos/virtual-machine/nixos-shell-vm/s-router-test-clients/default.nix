@@ -95,7 +95,18 @@ in
 {
   imports = [
     (relativeRepo.module "library/10-vms/nixos-shell-vm/host-config-routers-without-network")
-    profiles.nixos.network.router-vlan2-runtime-contract
+    # No `router-vlan2-runtime-contract` here: this fixture is an ACCESS ENDPOINT
+    # (`target = "access-endpoint-nixos"` below), and its model
+    # (`active-lab/intent-s-router-test-clients.nix`) declares no `eth0.2`/`vlan2` at all.
+    # The contract was copied in when this file was a router-shaped VM, and it asserted
+    # a netdev the renderer is right not to produce:
+    #
+    #   Failed assertions:
+    #   - s-router-test-clients: runtime must define at least one VLAN netdev eth0.2
+    #     with vlanConfig.Id = 2; ...
+    #
+    # which failed every host that instantiates this VM through `nixosShellVmManager`
+    # (s-tau, s-nodus, the routers that host it).
 
     (inputs.network-renderer-nixos.libBySystem.${system}.renderer.canonical.hostModule {
       inherit hostName;
