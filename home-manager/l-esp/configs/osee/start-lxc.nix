@@ -1,8 +1,8 @@
-{ config
-, pkgs
+{ pkgs
 , lib
 , systemHostName
 , containerBindMounts
+, sudoCommand
 , ...
 }:
 
@@ -41,7 +41,13 @@ let
     fi
     # sudo crosses the LXC uid boundary; the NOPASSWD rule for this exact
     # command line is generated from local.containerNetwork.bindMounts.
-    exec ${pkgs.sudo}/bin/sudo -n ${bindfsCmd}
+    #
+    # Use the setuid wrapper, never pkgs.sudo: the raw store binary is not
+    # setuid root, so it aborts with "must be owned by uid 0 and have the
+    # setuid bit set". That failed every boot, lxc-osee.service restarted
+    # forever, the container never came up and the x2go session gate then had
+    # no eth0 address to wait for.
+    exec ${sudoCommand} -n ${bindfsCmd}
   '';
 
   # The container's rootfs and config live in the user's home-relative LXC

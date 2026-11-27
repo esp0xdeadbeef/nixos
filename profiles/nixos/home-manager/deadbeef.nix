@@ -51,6 +51,13 @@
       # generates the sudoers rule and the shutdown teardown from this list; the
       # home-manager unit derives the argv it runs from the same values.
       containerBindMounts = config.local.containerNetwork.bindMounts;
+      # The setuid sudo wrapper (`/run/wrappers/bin/sudo`). The bindfs unit runs
+      # sudo from home-manager, which has no access to the system's sudo options;
+      # it must be handed the wrapper path, never `pkgs.sudo`: that store binary
+      # is not setuid root and aborts with "must be owned by uid 0 and have the
+      # setuid bit set". `/run/current-system/sw/bin/sudo` is the same trap -- it
+      # is only a symlink to the unsetuid store binary.
+      sudoCommand = "${config.security.wrapperDir}/sudo";
       primaryUser = config.local.users.primary.resolvedName;
       primaryUserHome = config.local.users.primary.homeDirectory;
     };
