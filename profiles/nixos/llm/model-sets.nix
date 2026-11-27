@@ -29,7 +29,18 @@ let
     "huihui_ai/dolphin3-abliterated:8b-llama3.1-q4_K_M"
     "huihui_ai/gemma-4-abliterated:12b"
 
-    "hf.co/richardyoung/Qwen3-14B-abliterated-GGUF:Q4_K_M"
+    # Qwen3-14B abliterated, Q4_K_M.
+    #
+    # Must be the mradermacher mirror, not richardyoung/Qwen3-14B-abliterated-GGUF:
+    # that repository is gated ("gated": "manual"), so anonymous pulls get a 401
+    # whose auth realm points at huggingface.co instead of the hf.co registry
+    # host. ollama reports that as
+    #   Error: pull model manifest: realm host "huggingface.co" does not match
+    #   original host "hf.co"
+    # and exits non-zero -- which failed ollama-model-loader.service (one
+    # parallel pull job, so any single failure fails the unit) on every switch.
+    # mradermacher's mirror is ungated and serves the same Q4_K_M quant.
+    "hf.co/mradermacher/Qwen3-14B-abliterated-GGUF:Q4_K_M"
 
     # Use the newer v2 abliteration rather than the older repository.
     "hf.co/mradermacher/DeepSeek-R1-Distill-Qwen-14B-abliterated-v2-GGUF:Q4_K_M"
